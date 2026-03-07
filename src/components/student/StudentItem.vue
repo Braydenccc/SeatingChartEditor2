@@ -1,8 +1,8 @@
 <template>
   <div class="student-item" :class="{ selected: isSelected, dragging: isStudentDragging }" :data-student-id="student.id"
     :draggable="canDrag" @click="handleSelectStudent" @dragstart="handleDragStart" @dragend="handleDragEnd"
-    @touchstart.passive="handleTouchDragStart" @touchmove="handleTouchDragMove" @touchend="handleTouchDragEnd"
-    @touchcancel="handleTouchDragCancel" @contextmenu.prevent>
+    @touchstart="handleTouchDragStart" @touchmove="handleTouchDragMove" @touchend="handleTouchDragEnd"
+    @touchcancel="handleTouchDragCancel" @contextmenu.prevent @pointerdown="handleStudentPointerDown">
     <div class="student-info">
       <div class="student-number-section">
         <input v-if="isEditingNumber" v-model.number="editStudentNumber" type="number" min="1"
@@ -86,17 +86,22 @@ let touchPreviewEl = null
 let touchMoveRafId = null
 let touchStartX = 0
 let touchStartY = 0
-
-const isTouchDevice = navigator.maxTouchPoints > 0
+// 当前是否通过触摸交互（动态判断，解决触摸屏笔记本问题）
+let lastPointerWasTouch = false
 
 // 触摸拖拽激活条件
 const canTouchDrag = computed(() => currentMode.value === EditMode.NORMAL)
 
-// HTML5 draggable 属性：触摸设备上禁用
+// HTML5 draggable 属性：触摸操作时禁用，防止幽灵图
 const canDrag = computed(() => {
-  if (isTouchDevice) return false
+  if (lastPointerWasTouch) return false
   return canTouchDrag.value
 })
+
+// 记录指针类型，用于判断是否为触摸操作
+const handleStudentPointerDown = (e) => {
+  lastPointerWasTouch = e.pointerType === 'touch'
+}
 
 const handleDragStart = (e) => {
   if (!canDrag.value) {
@@ -448,6 +453,10 @@ const deleteHandler = () => {
   position: relative;
   border: 1px solid #f0f0f0;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 
 /* 移动端减少间距 */
@@ -520,6 +529,8 @@ const deleteHandler = () => {
   border-radius: 6px;
   outline: none;
   text-align: center;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .student-number-input::-webkit-inner-spin-button,
@@ -563,6 +574,8 @@ const deleteHandler = () => {
   border: 2px solid #23587b;
   border-radius: 4px;
   outline: none;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .student-tags {

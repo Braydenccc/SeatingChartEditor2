@@ -10,8 +10,8 @@
   }" :style="zoneHighlightStyle" :data-seat-id="seat.id" :draggable="isDraggable" @click="handleClick"
     @dragstart="handleDragStart" @dragend="handleDragEnd" @dragover.prevent="handleDragOverSeat"
     @dragenter.prevent="handleDragEnter" @dragleave="handleDragLeave" @drop.prevent.stop="handleDrop"
-    @touchstart.passive="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd"
-    @touchcancel="handleTouchCancel" @contextmenu.prevent>
+    @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd"
+    @touchcancel="handleTouchCancel" @contextmenu.prevent @pointerdown="handlePointerDown">
     <div v-if="seat.isEmpty" class="empty-indicator">
       <span class="empty-text">空置</span>
     </div>
@@ -57,6 +57,8 @@ let previewW = 0
 let previewH = 0
 let touchStartX = 0
 let touchStartY = 0
+// 当前是否通过触摸交互（动态判断，解决触摸屏笔记本问题）
+let lastPointerWasTouch = false
 
 // ==================== 计算属性 ====================
 
@@ -94,20 +96,23 @@ const isClickable = computed(() => {
   return false
 })
 
-// 是否为触摸设备（触摸设备用自定义 touch 拖拽，不用 HTML5 drag 避免幽灵图）
-const isTouchDevice = navigator.maxTouchPoints > 0
-
-// 触摸拖拽激活条件（不受 isTouchDevice 影响）
+// 触摸拖拽激活条件
 const canTouchDrag = computed(() => {
   return hasStudent.value &&
     (currentMode.value === EditMode.NORMAL || currentMode.value === EditMode.SWAP)
 })
 
-// HTML5 draggable 属性：触摸设备上禁用，防止幽灵拖拽图
+// HTML5 draggable 属性：通过触摸交互时禁用，防止幽灵拖拽图
+// 使用动态 lastPointerWasTouch 而非静态 maxTouchPoints，避免触摸屏笔记本问题
 const isDraggable = computed(() => {
-  if (isTouchDevice) return false
+  if (lastPointerWasTouch) return false
   return canTouchDrag.value
 })
+
+// 记录指针类型，用于判断是否为触摸操作
+const handlePointerDown = (e) => {
+  lastPointerWasTouch = e.pointerType === 'touch'
+}
 
 // ==================== 点击处理 ====================
 
@@ -395,6 +400,8 @@ const clearAllTouchHighlights = () => {
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 
 .seat-item.clickable {
