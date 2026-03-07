@@ -10,7 +10,8 @@
   }" :style="zoneHighlightStyle" :data-seat-id="seat.id" :draggable="isDraggable" @click="handleClick"
     @dragstart="handleDragStart" @dragend="handleDragEnd" @dragover.prevent="handleDragOverSeat"
     @dragenter.prevent="handleDragEnter" @dragleave="handleDragLeave" @drop.prevent.stop="handleDrop"
-    @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd">
+    @touchstart.passive="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd"
+    @touchcancel="handleTouchCancel" @contextmenu.prevent>
     <div v-if="seat.isEmpty" class="empty-indicator">
       <span class="empty-text">空置</span>
     </div>
@@ -294,8 +295,23 @@ const handleTouchMove = (e) => {
   })
 }
 
+// 公共清理函数：取消定时器、移除预览、重置所有状态
+const cleanupTouchDrag = () => {
+  if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
+  if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
+  if (touchPreviewEl) { touchPreviewEl.remove(); touchPreviewEl = null }
+  clearAllTouchHighlights()
+  isDragging.value = false
+  touchDragActive = false
+}
+
+// touchcancel：OS 中断触摸（弹出菜单、通知等），直接清理所有状态
+const handleTouchCancel = () => {
+  cleanupTouchDrag()
+}
+
 const handleTouchEnd = (e) => {
-  // 无论如何都先清理定时器和拖拽视觉状态，防止方框残留
+  // 先清理定时器和视觉状态，防止方框残留
   if (touchDragTimer) {
     clearTimeout(touchDragTimer)
     touchDragTimer = null
@@ -303,7 +319,8 @@ const handleTouchEnd = (e) => {
   if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
   isDragging.value = false
 
-  if (!touchDragActive) return
+  const wasActive = touchDragActive
+  if (!wasActive) return
 
   // 获取 drop 目标
   const touch = e.changedTouches[0]
