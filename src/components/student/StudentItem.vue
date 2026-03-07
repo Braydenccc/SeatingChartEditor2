@@ -1,7 +1,8 @@
 <template>
   <div class="student-item" :class="{ selected: isSelected, dragging: isStudentDragging }" :data-student-id="student.id"
     :draggable="canDrag" @click="handleSelectStudent" @dragstart="handleDragStart" @dragend="handleDragEnd"
-    @touchstart="handleTouchDragStart" @touchmove="handleTouchDragMove" @touchend="handleTouchDragEnd">
+    @touchstart.passive="handleTouchDragStart" @touchmove="handleTouchDragMove" @touchend="handleTouchDragEnd"
+    @touchcancel="handleTouchDragCancel" @contextmenu.prevent>
     <div class="student-info">
       <div class="student-number-section">
         <input v-if="isEditingNumber" v-model.number="editStudentNumber" type="number" min="1"
@@ -83,6 +84,8 @@ let touchDragTimer = null
 let touchDragActive = false
 let touchPreviewEl = null
 let touchMoveRafId = null
+let touchStartX = 0
+let touchStartY = 0
 
 const canDrag = computed(() => {
   return currentMode.value === EditMode.NORMAL
@@ -111,6 +114,8 @@ const handleTouchDragStart = (e) => {
   const touch = e.touches[0]
   const startX = touch.clientX
   const startY = touch.clientY
+  touchStartX = startX
+  touchStartY = startY
 
   touchDragTimer = setTimeout(() => {
     touchDragActive = true
@@ -154,8 +159,16 @@ const handleTouchDragStart = (e) => {
 }
 
 const handleTouchDragMove = (e) => {
-  if (!touchDragActive || e.touches.length !== 1) {
-    if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
+  if (e.touches.length !== 1) return
+
+  if (!touchDragActive) {
+    // 小幅抖动（≤ 8px）允许长按继续激活拖拽，大幅移动才视为滑动并取消定时器
+    const touch = e.touches[0]
+    const dx = touch.clientX - touchStartX
+    const dy = touch.clientY - touchStartY
+    if (Math.sqrt(dx * dx + dy * dy) > 8) {
+      if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
+    }
     return
   }
   e.preventDefault()
@@ -183,10 +196,29 @@ const handleTouchDragMove = (e) => {
   })
 }
 
-const handleTouchDragEnd = (e) => {
+// 公共清理：取消定时器、移除预览、重置所有状态
+const cleanupStudentTouchDrag = () => {
   if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
   if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
-  if (!touchDragActive) return
+  if (touchPreviewEl) { touchPreviewEl.remove(); touchPreviewEl = null }
+  document.querySelectorAll('.seat-item.drag-over').forEach(s => s.classList.remove('drag-over'))
+  isStudentDragging.value = false
+  touchDragActive = false
+}
+
+// touchcancel：OS 中断触摸（长按弹出系统菜单等），直接清理
+const handleTouchDragCancel = () => {
+  cleanupStudentTouchDrag()
+}
+
+const handleTouchDragEnd = (e) => {
+  // 无论如何先清理定时器和视觉状态，防止残留
+  if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
+  if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
+  isStudentDragging.value = false
+
+  const wasActive = touchDragActive
+  if (!wasActive) return
 
   const touch = e.changedTouches[0]
   if (touchPreviewEl) touchPreviewEl.style.display = 'none'

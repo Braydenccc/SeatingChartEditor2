@@ -1260,7 +1260,7 @@ const formatLogTime = (timestamp) => {
     backdrop-filter: blur(0px);
   }
 
-  /* 侧边栏整体：固定在底部 */
+  /* 侧边栏整体：固定在底部，用 transform 驱动展开（GPU 加速，无 layout reflow） */
   .sidebar-panel {
     position: fixed;
     bottom: 0;
@@ -1271,14 +1271,15 @@ const formatLogTime = (timestamp) => {
     flex-direction: column-reverse;
     box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.12);
     background: #fff;
-    height: auto;
-    max-height: 56px;
-    transition: max-height 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
-    overflow: hidden;
+    /* 固定面板高度，通过 translateY 下移隐藏多余部分 */
+    height: 70vh;
+    transform: translateY(calc(100% - 56px));
+    transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+    will-change: transform;
   }
 
   .sidebar-panel.mobile-menu-open {
-    max-height: 70vh;
+    transform: translateY(0);
   }
 
   /* sidebar-main flex 反转：tab 在下、内容在上 */
@@ -1341,11 +1342,12 @@ const formatLogTime = (timestamp) => {
     font-size: 11px !important;
   }
 
-  /* 内容面板：在 tab 上方展开 */
+  /* 内容面板：在 tab 上方展开。用 overflow-y: scroll 确保滚动条常驻，避免出现时压缩内容宽度（右位移） */
   .options-bar {
     width: 100%;
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
     -webkit-overflow-scrolling: touch;
     border-bottom: 1px solid #e0e7ec;
   }
@@ -1426,11 +1428,12 @@ const formatLogTime = (timestamp) => {
   }
 
   .sidebar-panel {
-    max-height: 52px;
+    height: 75vh;
+    transform: translateY(calc(100% - 52px));
   }
 
   .sidebar-panel.mobile-menu-open {
-    max-height: 75vh;
+    transform: translateY(0);
   }
 
   .tabs-bar {
