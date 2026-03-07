@@ -4,6 +4,8 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
+import { authMockPlugin } from './vite.mock.plugin.js'
+
 // https://vite.dev/config/
 export default defineConfig({
   server: {
@@ -12,6 +14,7 @@ export default defineConfig({
   plugins: [
     vue(),
     vueDevTools(),
+    authMockPlugin()
   ],
   resolve: {
     alias: {

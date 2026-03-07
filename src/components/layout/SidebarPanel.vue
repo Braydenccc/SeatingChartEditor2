@@ -23,10 +23,16 @@
             <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" style="display: none"
               @change="handleLoadWorkspace" />
             <button class="option-button" @click="$refs.workspaceInput.click()">
-              <span>加载工作区</span>
+              <span>📂 加载本地</span>
             </button>
             <button class="option-button" @click="handleSaveWorkspace">
-              <span>保存工作区</span>
+              <span>💾 保存到本地</span>
+            </button>
+            <button class="option-button" @click="handleCloudLoad">
+              <span>☁️ 从云端加载</span>
+            </button>
+            <button class="option-button primary" @click="handleCloudSave">
+              <span>☁️ 保存至云端</span>
             </button>
           </div>
 
@@ -165,6 +171,14 @@
   <!-- 导出设置弹窗 -->
   <ExportDialog :visible="showExportDialog" @close="showExportDialog = false" @exported="onExported" />
 
+  <!-- 云端工作区弹窗 -->
+  <CloudWorkspaceDialog 
+    :visible="showCloudDialog" 
+    :mode="cloudDialogMode" 
+    @update:visible="showCloudDialog = $event" 
+    @success="handleCloudSuccess" 
+  />
+
   <!-- 座位联系编辑器模态框 -->
   <SeatRelationEditor :visible="showRelationEditor" @close="showRelationEditor = false" />
 </template>
@@ -188,6 +202,8 @@ import { useZoneData } from '@/composables/useZoneData'
 import ZoneList from '../zone/ZoneList.vue'
 import SeatRelationEditor from '../relation/SeatRelationEditor.vue'
 import ExportDialog from './ExportPreview.vue'
+import CloudWorkspaceDialog from '../workspace/CloudWorkspaceDialog.vue'
+import { useAuth } from '@/composables/useAuth'
 
 const { activeTab, mobileMenuOpen, setActiveTab, closeMobileMenu } = useSidebar()
 const { seatConfig, updateConfig, clearAllSeats, seats } = useSeatChart()
@@ -201,6 +217,7 @@ const { downloadTemplate, importFromExcel, exportToExcel } = useExcelData()
 const { saveWorkspace, loadWorkspace } = useWorkspace()
 const { logs, success, warning, error, clearLogs } = useLogger()
 const { requestConfirm, isConfirming } = useConfirmAction()
+const { isLoggedIn, isLoginDialogVisible } = useAuth()
 
 const tabs = [
   { id: 1, label: '文件', icon: '📁' },
@@ -239,13 +256,39 @@ const onExported = (url) => {
   lastExportUrl.value = url
 }
 
-// 工作区管理
+// 工作区管理 (云端)
+const showCloudDialog = ref(false)
+const cloudDialogMode = ref('load')
+
+const handleCloudLoad = () => {
+  if (!isLoggedIn.value) {
+    isLoginDialogVisible.value = true
+    return
+  }
+  cloudDialogMode.value = 'load'
+  showCloudDialog.value = true
+}
+
+const handleCloudSave = () => {
+  if (!isLoggedIn.value) {
+    isLoginDialogVisible.value = true
+    return
+  }
+  cloudDialogMode.value = 'save'
+  showCloudDialog.value = true
+}
+
+const handleCloudSuccess = () => {
+  // 可以根据需要执行刷新动作，当前弹窗内部已经 handled messages
+}
+
+// 工作区管理 (本地)
 const handleSaveWorkspace = () => {
   const isSuccess = saveWorkspace()
   if (isSuccess) {
-    success('工作区保存成功！')
+    success('工作区已成功保存到本地！')
   } else {
-    error('工作区保存失败，请查看控制台了解详情')
+    error('工作区保存到本地失败，请查看控制台了解详情')
   }
 }
 

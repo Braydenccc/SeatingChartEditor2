@@ -1,0 +1,111 @@
+import { ref, computed } from 'vue'
+
+const currentUser = ref(null)
+const token = ref(null)
+const isLoginDialogVisible = ref(false)
+
+// Cookie helper functions
+const setCookie = (name, value, days) => {
+    let expires = ""
+    if (days) {
+        const date = new Date()
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
+        expires = "; expires=" + date.toUTCString()
+    }
+    document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/"
+}
+
+const getCookie = (name) => {
+    const nameEQ = name + "="
+    const ca = document.cookie.split(';')
+    for (let i = 0; i < ca.length; i++) {
+        let c = ca[i]
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length)
+        if (c.indexOf(nameEQ) == 0) return decodeURIComponent(c.substring(nameEQ.length, c.length))
+    }
+    return null
+}
+
+const eraseCookie = (name) => {
+    document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+}
+
+// Initialize from cookies
+const initAuth = () => {
+    const savedUser = getCookie('sce_user')
+    const savedToken = getCookie('sce_token')
+    if (savedUser && savedToken) {
+        try {
+            currentUser.value = JSON.parse(savedUser)
+            token.value = savedToken
+        } catch (e) {
+            // ignore invalid json in cookie
+        }
+    }
+}
+
+export function useAuth() {
+    const isLoggedIn = computed(() => !!currentUser.value && !!token.value)
+
+    const callAuthApi = async (action, username, password) => {
+        try {
+            const response = await fetch('/api/auth.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action, username, password })
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP Error: ${response.status}`)
+            }
+
+            const result = await response.json()
+            return result
+        } catch (err) {
+            console.error('Auth API Error:', err)
+            return { success: false, message: '网络请求失败，请检查连接' }
+        }
+    }
+
+    const login = async (username, password) => {
+        const result = await callAuthApi('login', username, password)
+        if (result.success) {
+            currentUser.value = { username: result.data.username }
+            token.value = result.data.token
+            setCookie('sce_user', JSON.stringify(currentUser.value), 30) // 30 days
+            setCookie('sce_token', token.value, 30)
+        }
+        return result
+    }
+
+    const register = async (username, password) => {
+        const result = await callAuthApi('register', username, password)
+        if (result.success) {
+            currentUser.value = { username: result.data.username }
+            token.value = result.data.token
+            setCookie('sce_user', JSON.stringify(currentUser.value), 30) // 30 days
+            setCookie('sce_token', token.value, 30)
+        }
+        return result
+    }
+
+    const logout = () => {
+        currentUser.value = null
+        token.value = null
+        eraseCookie('sce_user')
+        eraseCookie('sce_token')
+    }
+
+    return {
+        currentUser,
+        isLoggedIn,
+        token,
+        isLoginDialogVisible,
+        login,
+        register,
+        logout,
+        initAuth
+    }
+}

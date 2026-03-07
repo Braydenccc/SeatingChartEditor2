@@ -1,6 +1,13 @@
 <template>
   <header class="app-header">
-    <h1 class="header-text">BraydenSCE V2</h1>
+    <div class="header-left">
+      <h1 class="header-text">BraydenSCE V2</h1>
+      <div v-if="isLoggedIn" class="user-info">
+        <span class="welcome-text">欢迎, {{ currentUser.username }}</span>
+        <button class="auth-btn logout-btn" @click="logout">登出</button>
+      </div>
+      <button v-else class="auth-btn login-btn" @click="emit('open-login')">登录 / 注册</button>
+    </div>
     <div class="header-right">
       <p class="header-subtitle">座位表编辑器 开发版本 <a href="https://afdian.com/a/brayden" target="_blank">byccc</a> 由<a href="https://host.retiehe.com/" target="_blank">热铁盒网页托管</a>提供服务</p>
       <a href="https://github.com/Braydenccc/SeatingCrartEditor2" target="_blank" class="github-link" title="Source Code">
@@ -11,6 +18,19 @@
     </div>
   </header>
 </template>
+
+<script setup>
+import { onMounted } from 'vue'
+import { useAuth } from '@/composables/useAuth'
+
+const emit = defineEmits(['open-login'])
+
+const { currentUser, isLoggedIn, logout, initAuth } = useAuth()
+
+onMounted(() => {
+  initAuth()
+})
+</script>
 
 <style scoped>
 .app-header {
@@ -25,11 +45,52 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
 .header-text {
   margin: 0;
   font-size: 32px;
   font-weight: 600;
   letter-spacing: 1px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 16px;
+  border-radius: 20px;
+}
+
+.welcome-text {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.auth-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auth-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.login-btn {
+  background: rgba(255, 255, 255, 0.15);
+  font-weight: 500;
 }
 
 .header-right {
@@ -95,9 +156,31 @@
     padding: 0 16px;
   }
 
+  .header-left {
+    gap: 12px;
+  }
+
   .header-text {
     font-size: 18px;
     letter-spacing: 0.5px;
+  }
+
+  .user-info {
+    padding: 4px 10px;
+    gap: 8px;
+  }
+  
+  .welcome-text {
+    font-size: 13px;
+    max-width: 80px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .auth-btn {
+    padding: 4px 8px;
+    font-size: 12px;
   }
 
   .header-right {

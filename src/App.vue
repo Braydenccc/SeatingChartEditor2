@@ -4,14 +4,20 @@
 import AppHeader from './components/layout/AppHeader.vue'
 import EditorPanel from './components/layout/EditorPanel.vue'
 import SidebarPanel from './components/layout/SidebarPanel.vue'
+import LoginDialog from './components/auth/LoginDialog.vue'
+import { useAuth } from '@/composables/useAuth'
+
+const { isLoginDialogVisible } = useAuth()
 </script>
 
 <template>
-  <AppHeader />
+  <AppHeader @open-login="isLoginDialogVisible = true" />
   <main class="main-content">
     <EditorPanel />
     <SidebarPanel />
   </main>
+  
+  <LoginDialog v-model:visible="isLoginDialogVisible" />
 </template>
 
 <style scoped>

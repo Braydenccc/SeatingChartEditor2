@@ -17,33 +17,26 @@ export function useWorkspace() {
   const { relations } = useSeatRelation()
   const { zones } = useZoneData()
 
-  // 保存工作区
-  const saveWorkspace = () => {
+  // 生成工作区 JSON 数据 (用于云端或本地保存)
+  const getWorkspaceJson = () => {
     try {
       const workspace = {
-        // 元信息
         meta: {
           version: CURRENT_VERSION,
           app: 'SeatingChartEditor',
           createdAt: new Date().toISOString()
         },
-
-        // 学生数据
         students: students.value.map(s => ({
           id: s.id,
           name: s.name,
           studentNumber: s.studentNumber,
           tags: s.tags
         })),
-
-        // 标签定义
         tags: tags.value.map(t => ({
           id: t.id,
           name: t.name,
           color: t.color
         })),
-
-        // 座位配置与布局
         layout: {
           config: { ...seatConfig.value },
           seats: seats.value.map(s => ({
@@ -55,8 +48,6 @@ export function useWorkspace() {
             empty: s.isEmpty || false
           }))
         },
-
-        // 学生关系
         relations: relations.value.map(r => ({
           id: r.id,
           s1: r.studentId1,
@@ -65,8 +56,6 @@ export function useWorkspace() {
           strength: r.strength || 'high',
           meta: r.metadata || {}
         })),
-
-        // 选区
         zones: zones.value.map(z => ({
           id: z.id,
           name: z.name,
@@ -74,12 +63,21 @@ export function useWorkspace() {
           seatIds: [...z.seatIds],
           visible: z.visible
         })),
-
-        // 导出设置
         exportSettings: { ...exportSettings.value }
       }
+      return JSON.stringify(workspace, null, 2)
+    } catch (e) {
+      console.error(e)
+      return null
+    }
+  }
 
-      const json = JSON.stringify(workspace, null, 2)
+  // 保存工作区 (本地下载)
+  const saveWorkspace = () => {
+    try {
+      const json = getWorkspaceJson()
+      if (!json) return false
+
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -133,6 +131,29 @@ export function useWorkspace() {
       }
 
       reader.readAsText(file)
+    })
+  }
+
+  // 应用工作区数据 (云端或本地解析后共享的逻辑)
+  const applyWorkspaceData = async (workspaceRaw) => {
+    return new Promise((resolve) => {
+      try {
+        // 验证基本结构
+        if (!workspaceRaw.students || !workspaceRaw.tags) {
+          resolve(false)
+          return
+        }
+
+        // 版本迁移
+        const migrated = migrateWorkspace(workspaceRaw)
+
+        // 下发具体的写入将在外部处理 (现有的加载逻辑是在 SidebarPanel 里实现并注入组件的)
+        // 这里我们只需要返回可靠的迁移后的对象，让 SidebarPanel 等组件负责恢复即可。
+        resolve(migrated)
+      } catch (error) {
+        console.error('Apply Workspace Data failed:', error)
+        resolve(false)
+      }
     })
   }
 
@@ -205,6 +226,8 @@ export function useWorkspace() {
 
   return {
     saveWorkspace,
-    loadWorkspace
+    loadWorkspace,
+    getWorkspaceJson,
+    applyWorkspaceData
   }
 }
