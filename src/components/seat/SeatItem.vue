@@ -54,6 +54,8 @@ let touchPreviewEl = null
 let touchMoveRafId = null
 let previewW = 0
 let previewH = 0
+let touchStartX = 0
+let touchStartY = 0
 
 // ==================== 计算属性 ====================
 
@@ -201,6 +203,8 @@ const handleTouchStart = (e) => {
   const touch = e.touches[0]
   const startX = touch.clientX
   const startY = touch.clientY
+  touchStartX = startX
+  touchStartY = startY
 
   touchDragTimer = setTimeout(() => {
     touchDragActive = true
@@ -247,10 +251,19 @@ const handleTouchStart = (e) => {
 }
 
 const handleTouchMove = (e) => {
-  if (!touchDragActive || e.touches.length !== 1) {
-    if (touchDragTimer) {
-      clearTimeout(touchDragTimer)
-      touchDragTimer = null
+  if (e.touches.length !== 1) return
+
+  if (!touchDragActive) {
+    // 判断手指移动距离，超过阈值才认为是滑动（取消长按）
+    // 小幅抖动（≤ 8px）不取消定时器，让长按继续激活拖拽
+    const touch = e.touches[0]
+    const dx = touch.clientX - touchStartX
+    const dy = touch.clientY - touchStartY
+    if (Math.sqrt(dx * dx + dy * dy) > 8) {
+      if (touchDragTimer) {
+        clearTimeout(touchDragTimer)
+        touchDragTimer = null
+      }
     }
     return
   }
@@ -282,11 +295,13 @@ const handleTouchMove = (e) => {
 }
 
 const handleTouchEnd = (e) => {
+  // 无论如何都先清理定时器和拖拽视觉状态，防止方框残留
   if (touchDragTimer) {
     clearTimeout(touchDragTimer)
     touchDragTimer = null
   }
   if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
+  isDragging.value = false
 
   if (!touchDragActive) return
 
