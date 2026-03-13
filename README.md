@@ -4,7 +4,7 @@
 
 一个跨平台、现代化的智能排班与座位表可视化编辑器。支持在浏览器直接使用，也可以下载 Windows 纯净桌面版（轻量级 Tauri版 和 独立 Electron版）。
 
-当前在线体验版： <https://sce.rth1.xyz/>
+当前在线体验版： <https://sce.jbyc.cc/>
 
 发布者：Braydenccc or Jbyccc
 

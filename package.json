@@ -13,7 +13,7 @@
     "build:lite": "tauri build",
     "preview": "vite preview",
     "build:exe": "npm run build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin",
-    "deploy": "powershell -c \"$f=New-TemporaryFile; iwr https://host.retiehe.com/cli -OutFile $f; node $f --site sce --build build --outdir dist; rm $f -Force\""
+    "deploy": "powershell -c \"$f=New-TemporaryFile; iwr https://host.retiehe.com/cli -OutFile $f; node $f --site sce.jbyc.cc --build build --outdir dist; rm $f -Force\""
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
