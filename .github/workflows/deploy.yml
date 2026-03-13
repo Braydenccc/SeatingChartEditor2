@@ -9,11 +9,14 @@ jobs:
       image: shangzheny/rth-host-helper:latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Deploy to Retinbox Web Hosting
         uses: rthsoftware/host-auto-deploy@master
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
         with:
           site: "sce.jbyc.cc"
-          build: "build"
+          build: "build:web"
           outdir: "dist"
