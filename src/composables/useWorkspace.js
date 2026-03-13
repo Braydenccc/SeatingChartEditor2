@@ -229,19 +229,10 @@ export function useWorkspace() {
         if (workspace.zones && Array.isArray(workspace.zones)) {
           clearAllZones()
 
-          const oldZoneTagIdToNewId = {}
-          if (workspace.tags && Array.isArray(workspace.tags)) {
-            workspace.tags.forEach((t, index) => {
-              if (tags.value[index]) {
-                oldZoneTagIdToNewId[t.id] = tags.value[index].id
-              }
-            })
-          }
-
           workspace.zones.forEach(z => {
             const newZone = addZone()
             const mappedTagIds = z.tagIds
-              .map(tid => oldZoneTagIdToNewId[tid])
+              .map(tid => oldTagIdToNewId[tid])
               .filter(id => id !== undefined)
             updateZone(newZone.id, {
               name: z.name,
