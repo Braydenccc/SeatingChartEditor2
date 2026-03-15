@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { useZoneData } from './useZoneData'
 
 // 座位表配置
 const seatConfig = ref({
@@ -75,6 +76,8 @@ const organizedSeats = computed(() => {
 })
 
 export function useSeatChart() {
+  const { cleanupInvalidSeats } = useZoneData()
+
   // 分配学生到座位
   const assignStudent = (seatId, studentId) => {
     const seat = seatMap.get(seatId)
@@ -119,6 +122,8 @@ export function useSeatChart() {
   const updateConfig = (newConfig) => {
     seatConfig.value = { ...seatConfig.value, ...newConfig }
     initializeSeats()  // 重新初始化座位
+    // 清理选区中已失效的座位引用
+    cleanupInvalidSeats(seats.value.map(s => s.id))
   }
 
   // 获取座位上的学生ID

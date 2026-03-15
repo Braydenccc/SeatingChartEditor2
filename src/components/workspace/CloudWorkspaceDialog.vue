@@ -234,14 +234,12 @@ const handleLoad = async (fileId) => {
 
 const confirmDelete = (ws) => {
   if (requestConfirm(`delete_${ws.fileId}`, async () => {
-    isFetching.value = true
     const result = await deleteWorkspaceFromCloud(ws.fileId)
     if (result.success) {
       success(`文件 ${ws.metadata.name} 已删除`)
       await fetchWorkspaces()
     } else {
       error(result.message || '删除失败')
-      isFetching.value = false
     }
   })) {
     // 第一次点击只提示

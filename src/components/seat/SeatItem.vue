@@ -26,7 +26,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { useStudentData } from '@/composables/useStudentData'
 import { useEditMode } from '@/composables/useEditMode'
 import { useZoneData } from '@/composables/useZoneData'
@@ -381,6 +381,10 @@ const clearAllTouchHighlights = () => {
     el.classList.remove('drag-over')
   })
 }
+
+onUnmounted(() => {
+  cleanupTouchDrag()
+})
 </script>
 
 <style scoped>
