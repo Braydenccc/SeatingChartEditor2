@@ -7,23 +7,11 @@
 [![Vite](https://img.shields.io/badge/Vite-7.x-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
 [![在线体验](https://img.shields.io/badge/%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-sce.jbyc.cc-23587b)](https://sce.jbyc.cc/)
 
-> 一个跨平台、现代化的智能排班与座位表可视化编辑器。  
+> 一个跨平台、现代化的座位表可视化编辑器。  
 > 支持在浏览器直接使用，也可下载 Windows 纯净桌面版（轻量级 Tauri 版 和 独立 Electron 版）。
 
 **在线体验：** <https://sce.jbyc.cc/>  
 **发布者：** Braydenccc / Jbyccc
-
----
-
-## 目录
-
-- [核心功能特性](#核心功能特性)
-- [技术栈](#技术栈)
-- [使用指南](#使用指南)
-- [私有化部署说明](#私有化部署说明)
-- [项目结构](#项目结构)
-- [开源协议](#开源协议)
-- [赞助与支持](#赞助与支持)
 
 ---
 
@@ -35,25 +23,20 @@
 | **智能化人际关系网** | 为学生添加"吸引"或"排斥"关系，一键自动化智能排位（自动避开仇恨、聚拢友好） |
 | **快捷标签与分区管理** | 内置彩色标签系统，拖拽圈选座位区域，限定指定标签学生只能排入划定区域（如：走读生区、特殊视力照顾区） |
 | **极速名单录入** | 一键从内置 Excel 模板导入学生数据及批量打标签，支持全量导出 |
-| **美观长图一键导出** | 内置原生画布引擎，座位图按海报级高清直接导出 `.png`，无需截图插件 |
-| **跨端云同步工作区** | 免费内置跨设备云端储存，注册账号即可将不同班级配置安全备份至云端 |
+| **可打印图片一键导出** | 内置原生画布引擎，座位图按海报级高清直接导出 `.png`，专为学校打印优化 |
+| **跨端云同步工作区** | 免费内置跨设备云端储存，注册账号即可将不同班级配置安全备份至云端（谨慎使用） |
 
----
+##Todo
+[ ]webdev支持
+[ ]更加强大的排位规则，以及易于学习和使用的编辑器（考虑接入llm）
+[ ]补上自动换位功能
 
-## 技术栈
-
-| 层级 | 技术 |
-|------|------|
-| 前端框架 | Vue 3（Composition API + 单例 Composables 状态管理） |
-| 构建工具 | Vite 7 |
-| 桌面端 | Tauri 2（轻量） / Electron（完整） |
-| 安装包 | NSIS（Windows 安装向导） |
-| 后端/云函数 | 热铁盒 (Retinbox) PHP 云函数 |
-| 数据导入导出 | SheetJS (xlsx) |
 
 ---
 
 ## 使用指南
+
+**体验链接**<jbyc.cc>
 
 ### 1. 基础配置
 
@@ -120,38 +103,6 @@ npm run build
 | `npm run build:lite` | Tauri 轻量版（< 5 MB，需 Win10+ WebView2） |
 | `npm run build:full` | Electron 完整版（~ 110 MB，内置 Chromium） |
 
----
-
-## 项目结构
-
-```
-SeatingCrartEditor2/
-├── src/
-│   ├── components/        # Vue 组件
-│   │   ├── auth/          #   登录/注册
-│   │   ├── layout/        #   全局布局
-│   │   ├── relation/      #   人际关系
-│   │   ├── seat/          #   座位表
-│   │   ├── student/       #   学生管理
-│   │   ├── ui/            #   通用 UI
-│   │   ├── workspace/     #   工作区
-│   │   └── zone/          #   分区管理
-│   ├── composables/       # 状态管理（单例 Composables）
-│   ├── constants/         # 常量定义
-│   └── assets/            # 静态资源
-├── public/api/            # 热铁盒 PHP 云函数
-├── src-tauri/             # Tauri 桌面端配置
-├── server.cjs             # 本地服务器（用于 NSIS 打包）
-├── electron-main.cjs      # Electron 主进程入口
-├── installer.nsi          # NSIS 安装脚本
-└── vite.config.js         # Vite 配置
-```
-
----
-
-## 开源协议
-
-本项目基于 [GPL-3.0](LICENSE) 协议开源。
 
 ---
 
