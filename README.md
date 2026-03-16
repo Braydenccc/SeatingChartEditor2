@@ -11,7 +11,9 @@
 > 支持在浏览器直接使用，也可下载 Windows 纯净桌面版（轻量级 Tauri 版 和 独立 Electron 版）。
 
 **在线体验（保持最新）：** <https://sce.jbyc.cc/> 
+
 **离线版本不保证最新！**
+
 **发布者：** Braydenccc / Jbyccc
 
 ---
