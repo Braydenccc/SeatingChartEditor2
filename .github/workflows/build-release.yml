@@ -27,8 +27,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build NSIS installer
-        run: npm run build
+      - name: Build NSIS Installer
+        run: npm run build:nsis
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
