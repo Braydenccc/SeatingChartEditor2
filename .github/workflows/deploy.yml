@@ -1,6 +1,9 @@
 name: Deploy to Retinbox Web Hosting
 
-on: push
+on:
+  push:
+    branches:
+      - main
 
 jobs:
   deploy:
