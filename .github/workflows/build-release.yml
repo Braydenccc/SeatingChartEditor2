@@ -27,8 +27,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build NSIS Installer
-        run: npm run build:nsis
+      -name: Setup NSIS
+        uses: joncloud/makensis-action@v4
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
