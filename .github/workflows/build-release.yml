@@ -27,7 +27,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      -name: Setup NSIS
+      - name: Setup NSIS
         uses: joncloud/makensis-action@v4
 
       - name: Create Release
