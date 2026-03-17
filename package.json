@@ -8,12 +8,12 @@
   },
   "scripts": {
     "dev": "cross-env EDITOR=antigravity vite",
-    "build": "vite build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin && \"C:\\Program Files (x86)\\NSIS\\makensis.exe\" installer.nsi",
-    "build:web": "vite build",
-    "build:full": "npm run build && electron-builder --win",
-    "build:lite": "tauri build",
     "preview": "vite preview",
-    "build:exe": "npm run build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin",
+    "build:web": "vite build",
+    "build:exe": "npm run build:web && pkg server.cjs --targets node18-win-x64 --out-path dist/bin",
+    "build:nsis": "npm run build:exe && makensis installer.nsi",
+    "build:lite": "tauri build",
+    "build:full": "npm run build:web && electron-builder --win",
     "deploy": "powershell -c \"$f=New-TemporaryFile; iwr https://host.retiehe.com/cli -OutFile $f; node $f --site sce.jbyc.cc --build build:web --outdir dist; rm $f -Force\""
   },
   "dependencies": {
