@@ -14,7 +14,8 @@
     "build:lite": "tauri build",
     "preview": "vite preview",
     "build:exe": "npm run build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin",
-    "deploy": "powershell -c \"$f=New-TemporaryFile; iwr https://host.retiehe.com/cli -OutFile $f; node $f --site sce.jbyc.cc --build build:web --outdir dist; rm $f -Force\""
+    "deploy:test": "git checkout test && git merge dev --no-edit && git push origin test && git checkout dev",
+    "deploy:main": "git checkout main && git merge dev --no-edit && git push origin main && git checkout dev"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
