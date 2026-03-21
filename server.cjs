@@ -1,6 +1,6 @@
 const http = require('http');
-const fs = require('fs');
 const path = require('path');
+const { readFile } = require('fs').promises;
 
 // dist 目录（构建输出）
 // 当打包为 exe 时，需要从 exe 所在目录向上查找 dist 目录
@@ -40,29 +40,46 @@ const mime = {
 };
 
 function safeJoin(base, target) {
-  const targetPath = '.' + path.normalize('/' + target);
-  return path.join(base, targetPath);
+  const resolved = path.resolve(base, '.' + path.normalize('/' + target));
+  const baseResolved = path.resolve(base);
+  if (!resolved.startsWith(baseResolved + path.sep) && resolved !== baseResolved) {
+    throw new Error('Path traversal attempt detected');
+  }
+  return resolved;
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
+  // Security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
   try {
     let urlPath = decodeURIComponent(req.url.split('?')[0]);
     if (urlPath === '/' || urlPath === '') urlPath = '/index.html';
 
     const filePath = safeJoin(DIST, urlPath);
 
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.statusCode = 404;
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        return res.end('Not found');
-      }
-
+    try {
+      const data = await readFile(filePath);
       const ext = path.extname(filePath).toLowerCase();
       const type = mime[ext] || 'application/octet-stream';
       res.setHeader('Content-Type', type);
       res.end(data);
-    });
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        return res.end('Not found');
+      }
+      if (err.code === 'EACCES') {
+        res.statusCode = 403;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        return res.end('Forbidden');
+      }
+      throw err;
+    }
   } catch (e) {
     res.statusCode = 500;
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');

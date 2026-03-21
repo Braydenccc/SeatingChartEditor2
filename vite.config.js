@@ -7,11 +7,10 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import { authMockPlugin } from './vite.mock.plugin.js'
 
 // https://vite.dev/config/
-// https://vite.dev/config/
 export default defineConfig({
   base: './', // Allow relative paths for electron/tauri builds
   server: {
-    host: '0.0.0.0', // Listen on all local IPs
+    host: 'localhost',
   },
   plugins: [
     vue(),

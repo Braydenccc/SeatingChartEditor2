@@ -1,8 +1,14 @@
 import { ref, computed } from 'vue'
+import bcryptjs from 'bcryptjs'
 
 const currentUser = ref(null)
 const token = ref(null)
 const isLoginDialogVisible = ref(false)
+
+// Fixed client-side salt used to pre-hash passwords before transmission.
+// This prevents the plaintext password from traveling over the wire;
+// the server then applies its own bcrypt round on top.
+const CLIENT_SALT = '$2a$06$seatcharteditor0000000'
 
 // Cookie helper functions
 const setCookie = (name, value, days) => {
@@ -12,7 +18,8 @@ const setCookie = (name, value, days) => {
         date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000))
         expires = "; expires=" + date.toUTCString()
     }
-    document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/"
+    const secure = location.protocol === 'https:' ? '; Secure' : ''
+    document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/; SameSite=Strict" + secure
 }
 
 const getCookie = (name) => {
@@ -27,7 +34,19 @@ const getCookie = (name) => {
 }
 
 const eraseCookie = (name) => {
-    document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+    document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Strict'
+}
+
+// Generate a CSRF token and persist it in a cookie for the session
+const getOrCreateCsrfToken = () => {
+    let csrfToken = getCookie('sce_csrf')
+    if (!csrfToken) {
+        csrfToken = Array.from(crypto.getRandomValues(new Uint8Array(24)))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('')
+        setCookie('sce_csrf', csrfToken, 1)
+    }
+    return csrfToken
 }
 
 // Initialize from cookies
@@ -36,10 +55,17 @@ const initAuth = () => {
     const savedToken = getCookie('sce_token')
     if (savedUser && savedToken) {
         try {
-            currentUser.value = JSON.parse(savedUser)
-            token.value = savedToken
+            const parsed = JSON.parse(savedUser)
+            if (parsed && typeof parsed === 'object' && typeof parsed.username === 'string') {
+                currentUser.value = parsed
+                token.value = savedToken
+            } else {
+                eraseCookie('sce_user')
+                eraseCookie('sce_token')
+            }
         } catch (e) {
-            // ignore invalid json in cookie
+            eraseCookie('sce_user')
+            eraseCookie('sce_token')
         }
     }
 }
@@ -49,12 +75,18 @@ export function useAuth() {
 
     const callAuthApi = async (action, username, password) => {
         try {
+            // Pre-hash the password with a fixed client-side salt so the plaintext
+            // password is never transmitted over the network.
+            const hashedPassword = await bcryptjs.hash(password, CLIENT_SALT)
+
+            const csrfToken = getOrCreateCsrfToken()
             const response = await fetch('/api/auth.php', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
                 },
-                body: JSON.stringify({ action, username, password })
+                body: JSON.stringify({ action, username, password: hashedPassword })
             })
 
             if (!response.ok) {
