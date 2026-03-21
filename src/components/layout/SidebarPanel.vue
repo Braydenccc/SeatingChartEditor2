@@ -440,7 +440,7 @@ const configForm = ref({
   seatsPerColumn: 6,
   shiftDistance: 4,
   shiftColShift: 0,
-  shiftDirection: 0,
+  shiftDirection: -1,
 })
 
 // 联系编辑器显示状态
