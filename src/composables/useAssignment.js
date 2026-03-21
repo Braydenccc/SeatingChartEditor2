@@ -47,6 +47,37 @@ export function useAssignment() {
     return [shuffled[0], shuffled[1]]
   }
 
+  // ==================== 座位邻接关系缓存 ====================
+
+  /**
+   * 构建座位邻接关系缓存，避免重复调用 areDeskmates/getSeatDistance
+   * 返回: { deskmatesSet: Set<string>, distanceMap: Map<string, number> }
+   * key 格式: `${seatId1}|${seatId2}`（id 按字典序排列）
+   */
+  const buildSeatAdjacencyCache = (seatList) => {
+    const deskmatesSet = new Set()
+    const distanceMap = new Map()
+    const makeSeatPairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`)
+
+    for (let i = 0; i < seatList.length; i++) {
+      for (let j = i + 1; j < seatList.length; j++) {
+        const key = makeSeatPairKey(seatList[i].id, seatList[j].id)
+        if (areDeskmates(seatList[i].id, seatList[j].id)) {
+          deskmatesSet.add(key)
+          distanceMap.set(key, 0)
+        } else {
+          const d = getSeatDistance(seatList[i].id, seatList[j].id)
+          distanceMap.set(key, d)
+        }
+      }
+    }
+
+    return {
+      isDeskmate: (a, b) => deskmatesSet.has(makeSeatPairKey(a, b)),
+      getDistance: (a, b) => distanceMap.get(makeSeatPairKey(a, b)) ?? Infinity
+    }
+  }
+
   // ==================== 座位查找策略 ====================
 
   // 获取当前空闲座位
@@ -58,15 +89,18 @@ export function useAssignment() {
    * 优先级: 同桌 → 相邻 → 同组 → fallback
    * 每个优先级内随机选取
    */
-  const findAttractionSeats = (allSeats, assignedSeatIds, allowAdjacent = true) => {
+  const findAttractionSeats = (allSeats, assignedSeatIds, allowAdjacent = true, cache = null) => {
     const free = getFreeSeats(allSeats, assignedSeatIds)
     if (free.length < 2) return null
+
+    const isDeskmate = cache ? cache.isDeskmate : areDeskmates
+    const getDistance = cache ? cache.getDistance : getSeatDistance
 
     // 收集所有同桌对
     const deskmatesPairs = []
     for (let i = 0; i < free.length; i++) {
       for (let j = i + 1; j < free.length; j++) {
-        if (areDeskmates(free[i].id, free[j].id)) {
+        if (isDeskmate(free[i].id, free[j].id)) {
           deskmatesPairs.push([free[i], free[j]])
         }
       }
@@ -81,7 +115,7 @@ export function useAssignment() {
       const adjacentPairs = []
       for (let i = 0; i < free.length; i++) {
         for (let j = i + 1; j < free.length; j++) {
-          const d = getSeatDistance(free[i].id, free[j].id)
+          const d = getDistance(free[i].id, free[j].id)
           if (d === 1) {
             adjacentPairs.push([free[i], free[j]])
           }
@@ -97,7 +131,7 @@ export function useAssignment() {
     const sameGroupPairs = []
     for (let i = 0; i < free.length; i++) {
       for (let j = i + 1; j < free.length; j++) {
-        const d = getSeatDistance(free[i].id, free[j].id)
+        const d = getDistance(free[i].id, free[j].id)
         if (d > 1 && d !== Infinity) {
           sameGroupPairs.push({ pair: [free[i], free[j]], distance: d })
         }
@@ -117,7 +151,7 @@ export function useAssignment() {
     if (pair) {
       return {
         seats: pair,
-        distance: getSeatDistance(pair[0].id, pair[1].id),
+        distance: getDistance(pair[0].id, pair[1].id),
         type: 'fallback'
       }
     }
@@ -130,9 +164,11 @@ export function useAssignment() {
    * 优先级: 跨大组 → 同组满足 minDistance → fallback
    * 每个优先级内随机选取
    */
-  const findRepulsionSeats = (allSeats, assignedSeatIds, minDistance = 2) => {
+  const findRepulsionSeats = (allSeats, assignedSeatIds, minDistance = 2, cache = null) => {
     const free = getFreeSeats(allSeats, assignedSeatIds)
     if (free.length < 2) return null
+
+    const getDistance = cache ? cache.getDistance : getSeatDistance
 
     // 收集所有跨组对
     const crossGroupPairs = []
@@ -152,7 +188,7 @@ export function useAssignment() {
     const distantPairs = []
     for (let i = 0; i < free.length; i++) {
       for (let j = i + 1; j < free.length; j++) {
-        const d = getSeatDistance(free[i].id, free[j].id)
+        const d = getDistance(free[i].id, free[j].id)
         if (d >= minDistance) {
           distantPairs.push({ pair: [free[i], free[j]], distance: d })
         }
@@ -173,13 +209,15 @@ export function useAssignment() {
   /**
    * 同桌绑定：必须找到同桌座位对，从候选中随机
    */
-  const findSeatmateBindingSeats = (allSeats, assignedSeatIds) => {
+  const findSeatmateBindingSeats = (allSeats, assignedSeatIds, cache = null) => {
     const free = getFreeSeats(allSeats, assignedSeatIds)
     const pairs = []
 
+    const isDeskmate = cache ? cache.isDeskmate : areDeskmates
+
     for (let i = 0; i < free.length; i++) {
       for (let j = i + 1; j < free.length; j++) {
-        if (areDeskmates(free[i].id, free[j].id)) {
+        if (isDeskmate(free[i].id, free[j].id)) {
           pairs.push([free[i], free[j]])
         }
       }
@@ -196,13 +234,16 @@ export function useAssignment() {
   /**
    * 同桌排斥：禁止同桌，随机选非同桌对
    */
-  const findSeatmateRepulsionSeats = (allSeats, assignedSeatIds) => {
+  const findSeatmateRepulsionSeats = (allSeats, assignedSeatIds, cache = null) => {
     const free = getFreeSeats(allSeats, assignedSeatIds)
     const pairs = []
 
+    const isDeskmate = cache ? cache.isDeskmate : areDeskmates
+    const getDistance = cache ? cache.getDistance : getSeatDistance
+
     for (let i = 0; i < free.length; i++) {
       for (let j = i + 1; j < free.length; j++) {
-        if (!areDeskmates(free[i].id, free[j].id)) {
+        if (!isDeskmate(free[i].id, free[j].id)) {
           pairs.push([free[i], free[j]])
         }
       }
@@ -210,7 +251,7 @@ export function useAssignment() {
 
     if (pairs.length > 0) {
       const pair = pickRandom(pairs)
-      const distance = getSeatDistance(pair[0].id, pair[1].id)
+      const distance = getDistance(pair[0].id, pair[1].id)
       return { seats: pair, distance, type: 'seatmate_repulsion' }
     }
 
@@ -272,6 +313,9 @@ export function useAssignment() {
       const assignedStudentIds = new Set()
       const assignedSeatIds = new Set()
 
+      // 构建座位邻接关系缓存，避免重复计算 O(n²) 的同桌/距离关系
+      const seatCache = buildSeatAdjacencyCache(allSeats)
+
       const assignToSeat = (student, seat) => {
         assignments.push({ studentId: student.id, seatId: seat.id })
         assignedStudentIds.add(student.id)
@@ -302,14 +346,14 @@ export function useAssignment() {
 
           if (relation.relationType === RelationType.ATTRACTION) {
             const allowAdjacent = relation.metadata?.allowAdjacent ?? true
-            result = findAttractionSeats(allSeats, assignedSeatIds, allowAdjacent)
+            result = findAttractionSeats(allSeats, assignedSeatIds, allowAdjacent, seatCache)
           } else if (relation.relationType === RelationType.REPULSION) {
             const minDistance = relation.metadata?.minDistance ?? 2
-            result = findRepulsionSeats(allSeats, assignedSeatIds, minDistance)
+            result = findRepulsionSeats(allSeats, assignedSeatIds, minDistance, seatCache)
           } else if (relation.relationType === RelationType.SEATMATE_BINDING) {
-            result = findSeatmateBindingSeats(allSeats, assignedSeatIds)
+            result = findSeatmateBindingSeats(allSeats, assignedSeatIds, seatCache)
           } else if (relation.relationType === RelationType.SEATMATE_REPULSION) {
-            result = findSeatmateRepulsionSeats(allSeats, assignedSeatIds)
+            result = findSeatmateRepulsionSeats(allSeats, assignedSeatIds, seatCache)
           }
 
           if (result && result.seats.length === 2) {
@@ -373,9 +417,13 @@ export function useAssignment() {
       }
 
       if (unassigned.length > 0) {
+        const unassignedNames = unassigned.map(s => s.name || '未命名').join(', ')
+        const relationInfo = useRelations && totalRelations > 0
+          ? `\n联系关系: ${satisfiedRelations}/${totalRelations} 满足`
+          : ''
         return {
           success: false,
-          message: `部分学生无法分配\n成功分配: ${assignments.length}/${allStudents.length}\n${useRelations && totalRelations > 0 ? `联系关系: ${satisfiedRelations}/${totalRelations} 满足\n` : ''}未分配学生: ${unassigned.map(s => s.name || '未命名').join(', ')}`,
+          message: `部分学生无法分配\n成功分配: ${assignments.length}/${allStudents.length}${relationInfo}\n未分配学生: ${unassignedNames}`,
           assigned: assignments.length,
           total: allStudents.length,
           unassigned,

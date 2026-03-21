@@ -40,8 +40,12 @@ const mime = {
 };
 
 function safeJoin(base, target) {
-  const targetPath = '.' + path.normalize('/' + target);
-  return path.join(base, targetPath);
+  const baseResolved = path.resolve(base);
+  const resolved = path.resolve(base, '.' + path.normalize('/' + target));
+  if (!resolved.startsWith(baseResolved + path.sep) && resolved !== baseResolved) {
+    throw new Error('Path traversal attempt detected');
+  }
+  return resolved;
 }
 
 const server = http.createServer((req, res) => {
