@@ -429,6 +429,7 @@ onUnmounted(() => {
 /* 拖拽相关样式 */
 .seat-item[draggable="true"] {
   cursor: grab;
+  -webkit-user-drag: element;
 }
 
 .seat-item[draggable="true"]:active {
