@@ -79,26 +79,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 注入测试环境标记
-      - name: Patch test-env notices
-        run: |
-          # 解决 GitHub Actions 容器环境下的 git 目录所有权安全限制
-          git config --global --add safe.directory '*'
-
-          # 1. 修改页面标题（加[测试版]前缀）
-          sed -i 's|<title>座位表编辑器-scev2byccc</title>|<title>[测试版] 座位表编辑器-scev2byccc</title>|' index.html
-
-          # 2. 替换登录弹窗中的旧提示文本为测试环境专属说明
-          sed -i 's|本账号服务不保证可用性，请妥善备份您的数据|⚠️ 测试环境：账号与正式版不互通，用户数据可能随时被清除，请勿使用真实账号|' src/components/auth/LoginDialog.vue
-
-          # 3. 在顶栏标题 h1 之后插入 commit 信息 span
-          COMMIT_SHA=$(git log -1 --format='%h')
-          COMMIT_MSG=$(git log -1 --format='%s' | cut -c1-40 | sed 's/[\/&]/\\&/g')
-          COMMIT_SPAN="<span class=\"commit-badge\">${COMMIT_SHA} ${COMMIT_MSG}</span>"
-          sed -i "s#<h1 class=\"header-text\">BraydenSCE V2</h1>#<h1 class=\"header-text\">BraydenSCE V2</h1>${COMMIT_SPAN}#" src/components/layout/AppHeader.vue
-          # 在 </style> 前插入 commit-badge 样式
-          sed -i 's#</style>#.commit-badge { display: inline-block; font-size: 11px; font-weight: 400; font-family: monospace; background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; padding: 2px 8px; margin-left: 10px; vertical-align: middle; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n</style>#' src/components/layout/AppHeader.vue
-
       # 第 1 次尝试
       - name: Deploy (1/3)
         id: d1
@@ -108,7 +88,7 @@ jobs:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
         with:
           site: "test.sce.jbyc.cc"
-          build: "build:web"
+          build: "build:test"
           outdir: "dist"
 
       # 第 2 次尝试
@@ -127,7 +107,7 @@ jobs:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
         with:
           site: "test.sce.jbyc.cc"
-          build: "build:web"
+          build: "build:test"
           outdir: "dist"
 
       # 第 3 次尝试
@@ -144,5 +124,5 @@ jobs:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
         with:
           site: "test.sce.jbyc.cc"
-          build: "build:web"
+          build: "build:test"
           outdir: "dist"
