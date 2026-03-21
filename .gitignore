@@ -48,6 +48,7 @@ Thumbs.db
 .cache/
 coverage/
 *.local
+.local-*.json
 草稿/seat_chart_2025-11-08T19-09-44.png
 
 # Editor project files
