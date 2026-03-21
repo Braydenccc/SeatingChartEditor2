@@ -40,8 +40,14 @@ const mime = {
 };
 
 function safeJoin(base, target) {
-  const targetPath = '.' + path.normalize('/' + target);
-  return path.join(base, targetPath);
+  const baseResolved = path.resolve(base);
+  const resolved = path.resolve(base, '.' + path.normalize('/' + target));
+  if (!resolved.startsWith(baseResolved + path.sep) && resolved !== baseResolved) {
+    const err = new Error('Path traversal attempt detected');
+    err.code = 'PATH_TRAVERSAL';
+    throw err;
+  }
+  return resolved;
 }
 
 const server = http.createServer((req, res) => {
@@ -61,9 +67,15 @@ const server = http.createServer((req, res) => {
       const ext = path.extname(filePath).toLowerCase();
       const type = mime[ext] || 'application/octet-stream';
       res.setHeader('Content-Type', type);
+      res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'");
       res.end(data);
     });
   } catch (e) {
+    if (e.code === 'PATH_TRAVERSAL') {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.end('Bad request');
+    }
     res.statusCode = 500;
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.end('Server error');
