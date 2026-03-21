@@ -40,26 +40,11 @@ export function useImageExport() {
     return `#${grayHex}${grayHex}${grayHex}`
   }
 
-  // 绘制圆角矩形（兼容旧浏览器）
+  // 绘制圆角矩形
   function drawRoundRect(ctx, x, y, w, h, r) {
-    if (typeof ctx.roundRect === 'function') {
-      ctx.beginPath()
-      ctx.roundRect(x, y, w, h, r)
-      ctx.closePath()
-    } else {
-      // Fallback for browsers without ctx.roundRect support
-      ctx.beginPath()
-      ctx.moveTo(x + r, y)
-      ctx.lineTo(x + w - r, y)
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r)
-      ctx.lineTo(x + w, y + h - r)
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-      ctx.lineTo(x + r, y + h)
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r)
-      ctx.lineTo(x, y + r)
-      ctx.quadraticCurveTo(x, y, x + r, y)
-      ctx.closePath()
-    }
+    ctx.beginPath()
+    ctx.roundRect(x, y, w, h, r)
+    ctx.closePath()
   }
 
   // 导出为图片，返回 Promise<string> (data URL)
@@ -72,9 +57,6 @@ export function useImageExport() {
         // 创建canvas
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          throw new Error('无法获取 Canvas 2D 上下文')
-        }
 
         // 尺寸常量（从设置读取可调节间距）
         const SEAT_WIDTH = 140
@@ -110,12 +92,6 @@ export function useImageExport() {
         const isLandscape = contentWidth / contentHeight > 1
         const canvasWidth = isLandscape ? A4_LONG : A4_SHORT
         const canvasHeight = isLandscape ? A4_SHORT : A4_LONG
-
-        // 内存安全：最大 64MB（每像素 4 字节），需在分配 canvas 前检查
-        const MAX_CANVAS_PIXELS = 64 * 1024 * 1024 / 4
-        if (canvasWidth * canvasHeight > MAX_CANVAS_PIXELS) {
-          throw new Error(`Canvas 尺寸过大（${canvasWidth}×${canvasHeight}），可能导致内存溢出`)
-        }
 
         canvas.width = canvasWidth
         canvas.height = canvasHeight

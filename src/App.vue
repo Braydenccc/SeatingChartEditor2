@@ -7,10 +7,7 @@ import SidebarPanel from './components/layout/SidebarPanel.vue'
 import LoginDialog from './components/auth/LoginDialog.vue'
 import { useAuth } from '@/composables/useAuth'
 
-const { isLoginDialogVisible, initAuth } = useAuth()
-
-// Restore auth state from cookies on app startup
-initAuth()
+const { isLoginDialogVisible } = useAuth()
 </script>
 
 <template>

@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.0.0"
+    "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
     "dev": "cross-env EDITOR=antigravity vite",
     "build:web": "vite build",
     "build": "vite build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin && \"C:\\Program Files (x86)\\NSIS\\makensis.exe\" installer.nsi",
+    "build:web": "vite build",
     "build:full": "npm run build && electron-builder --win",
     "build:lite": "tauri build",
     "preview": "vite preview",
