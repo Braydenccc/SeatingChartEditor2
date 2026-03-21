@@ -41,8 +41,8 @@ const mime = {
 
 function safeJoin(base, target) {
   const resolved = path.resolve(base, '.' + path.normalize('/' + target));
-  const baseResolved = path.resolve(base);
-  if (!resolved.startsWith(baseResolved + path.sep) && resolved !== baseResolved) {
+  const rel = path.relative(path.resolve(base), resolved);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
     throw new Error('Path traversal attempt detected');
   }
   return resolved;
@@ -53,7 +53,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Referrer-Policy', 'no-referrer');
 
   try {
     let urlPath = decodeURIComponent(req.url.split('?')[0]);

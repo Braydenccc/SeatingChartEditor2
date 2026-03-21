@@ -1,14 +1,8 @@
 import { ref, computed } from 'vue'
-import bcryptjs from 'bcryptjs'
 
 const currentUser = ref(null)
 const token = ref(null)
 const isLoginDialogVisible = ref(false)
-
-// Fixed client-side salt used to pre-hash passwords before transmission.
-// This prevents the plaintext password from traveling over the wire;
-// the server then applies its own bcrypt round on top.
-const CLIENT_SALT = '$2a$06$seatcharteditor0000000'
 
 // Cookie helper functions
 const setCookie = (name, value, days) => {
@@ -37,7 +31,11 @@ const eraseCookie = (name) => {
     document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Strict'
 }
 
-// Generate a CSRF token and persist it in a cookie for the session
+// Double-Submit Cookie CSRF protection:
+// A random token is stored in a readable cookie AND sent as a request header.
+// A cross-origin attacker cannot read the cookie (same-origin policy), so they
+// cannot replicate the matching header. The server must verify that both values
+// are identical to reject forged cross-site requests.
 const getOrCreateCsrfToken = () => {
     let csrfToken = getCookie('sce_csrf')
     if (!csrfToken) {
@@ -75,10 +73,9 @@ export function useAuth() {
 
     const callAuthApi = async (action, username, password) => {
         try {
-            // Pre-hash the password with a fixed client-side salt so the plaintext
-            // password is never transmitted over the network.
-            const hashedPassword = await bcryptjs.hash(password, CLIENT_SALT)
-
+            // Passwords must be transmitted over HTTPS to prevent plaintext exposure.
+            // Server-side bcrypt hashing (already implemented in the backend) provides
+            // the primary password security layer.
             const csrfToken = getOrCreateCsrfToken()
             const response = await fetch('/api/auth.php', {
                 method: 'POST',
@@ -86,7 +83,7 @@ export function useAuth() {
                     'Content-Type': 'application/json',
                     'X-CSRF-Token': csrfToken
                 },
-                body: JSON.stringify({ action, username, password: hashedPassword })
+                body: JSON.stringify({ action, username, password })
             })
 
             if (!response.ok) {
