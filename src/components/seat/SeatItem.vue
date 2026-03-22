@@ -26,7 +26,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onUnmounted } from 'vue'
+import { computed, ref, onUnmounted, shallowRef } from 'vue'
 import { useStudentData } from '@/composables/useStudentData'
 import { useEditMode } from '@/composables/useEditMode'
 import { useZoneData } from '@/composables/useZoneData'
@@ -60,7 +60,8 @@ let previewH = 0
 let touchStartX = 0
 let touchStartY = 0
 // 当前是否通过触摸交互（动态判断，解决触摸屏笔记本问题）
-let lastPointerWasTouch = false
+// 使用 shallowRef 让 isDraggable computed 能追踪其变化
+const lastPointerWasTouch = shallowRef(false)
 
 // ==================== 计算属性 ====================
 
@@ -111,13 +112,13 @@ const canTouchDrag = computed(() => {
 // HTML5 draggable 属性：通过触摸交互时禁用，防止幽灵拖拽图
 // 使用动态 lastPointerWasTouch 而非静态 maxTouchPoints，避免触摸屏笔记本问题
 const isDraggable = computed(() => {
-  if (lastPointerWasTouch) return false
+  if (lastPointerWasTouch.value) return false
   return canTouchDrag.value
 })
 
 // 记录指针类型，用于判断是否为触摸操作
 const handlePointerDown = (e) => {
-  lastPointerWasTouch = e.pointerType === 'touch'
+  lastPointerWasTouch.value = e.pointerType === 'touch'
 }
 
 // ==================== 点击处理 ====================

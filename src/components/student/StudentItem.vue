@@ -53,7 +53,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useStudentData } from '@/composables/useStudentData'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
@@ -87,20 +87,21 @@ let touchMoveRafId = null
 let touchStartX = 0
 let touchStartY = 0
 // 当前是否通过触摸交互（动态判断，解决触摸屏笔记本问题）
-let lastPointerWasTouch = false
+// 使用 shallowRef 让 canDrag computed 能追踪其变化
+const lastPointerWasTouch = shallowRef(false)
 
 // 触摸拖拽激活条件
 const canTouchDrag = computed(() => currentMode.value === EditMode.NORMAL)
 
 // HTML5 draggable 属性：触摸操作时禁用，防止幽灵图
 const canDrag = computed(() => {
-  if (lastPointerWasTouch) return false
+  if (lastPointerWasTouch.value) return false
   return canTouchDrag.value
 })
 
 // 记录指针类型，用于判断是否为触摸操作
 const handleStudentPointerDown = (e) => {
-  lastPointerWasTouch = e.pointerType === 'touch'
+  lastPointerWasTouch.value = e.pointerType === 'touch'
 }
 
 const handleDragStart = (e) => {
