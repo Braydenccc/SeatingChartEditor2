@@ -116,6 +116,20 @@
                 </div>
               </div>
             </div>
+
+            <div class="settings-section">
+              <h4>位置微调</h4>
+              <div class="spacing-grid">
+                <div class="num-input">
+                  <label>姓名 Y 偏移</label>
+                  <input type="number" v-model.number="exportSettings.offsetYName" min="-100" max="100" />
+                </div>
+                <div class="num-input">
+                  <label>学号 Y 偏移</label>
+                  <input type="number" v-model.number="exportSettings.offsetYStudentId" min="-100" max="100" />
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- 右侧：实时预览 -->
@@ -247,6 +261,8 @@ watch(
     exportSettings.value.fontSizeName,
     exportSettings.value.fontSizeStudentId,
     exportSettings.value.fontSizeTag,
+    exportSettings.value.offsetYName,
+    exportSettings.value.offsetYStudentId,
   ],
   () => {
     if (props.visible) generatePreview()

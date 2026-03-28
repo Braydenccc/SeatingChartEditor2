@@ -267,18 +267,20 @@ export function useImageExport() {
 
       const student = students.value.find(s => s.id === seat.studentId)
       if (student) {
-        // 绘制姓名和学号，垂直居中分布
+        // 绘制姓名和学号，垂直居中分布，叠加用户自定义 Y 偏移
         const hasNumber = !!student.studentNumber
         const nameFontSize = exportSettings.value.fontSizeName
         const idFontSize = exportSettings.value.fontSizeStudentId
+        const offsetYName = exportSettings.value.offsetYName || 0
+        const offsetYStudentId = exportSettings.value.offsetYStudentId || 0
         const cx = x + width / 2
         const cy = y + height / 2
 
         if (hasNumber) {
           // 两行文本：上方姓名，下方学号，以座位中心为基准均匀分布
           const gap = Math.round((nameFontSize + idFontSize) / 2) + 4
-          const nameY = cy - gap / 2
-          const idY = cy + gap / 2
+          const nameY = cy - gap / 2 + offsetYName
+          const idY = cy + gap / 2 + offsetYStudentId
 
           ctx.fillStyle = 'black'
           ctx.font = `bold ${nameFontSize}px Microsoft YaHei, Arial, sans-serif`
@@ -295,7 +297,7 @@ export function useImageExport() {
           ctx.font = `bold ${nameFontSize}px Microsoft YaHei, Arial, sans-serif`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          ctx.fillText(student.name || '未命名', cx, cy)
+          ctx.fillText(student.name || '未命名', cx, cy + offsetYName)
         }
 
         // 绘制标签
