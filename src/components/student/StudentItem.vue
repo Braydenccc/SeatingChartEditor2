@@ -310,6 +310,8 @@ const handleClickOutside = (event) => {
 
   if (!clickedInsidePicker && !clickedAddBtn) {
     showTagPicker.value = false
+    window.removeEventListener('resize', onWindowChange)
+    window.removeEventListener('scroll', onWindowChange, true)
   }
 }
 
@@ -368,19 +370,33 @@ const computeTagPickerPosition = () => {
   if (!btn) return
   const rect = btn.getBoundingClientRect()
   const width = 220
+  const maxHeight = 240
   const margin = 8
-  let left = rect.left + window.scrollX
-  // avoid overflow to the right
+
+  // 水平方向：防止溢出右侧
+  let left = rect.left
   if (left + width + margin > window.innerWidth) {
     left = Math.max(margin, window.innerWidth - width - margin)
   }
-  // avoid overflow to the left
   if (left < margin) left = margin
+
+  // 垂直方向：优先显示在按钮下方，空间不足时改为上方
+  const spaceBelow = window.innerHeight - rect.bottom - margin
+  const spaceAbove = rect.top - margin
+  let top
+  if (spaceBelow >= Math.min(maxHeight, 80) || spaceBelow >= spaceAbove) {
+    top = rect.bottom + 6
+  } else {
+    // 在按钮上方显示
+    top = rect.top - Math.min(maxHeight, spaceAbove) - 6
+  }
+
   tagPickerStyle.value = {
-    position: 'absolute',
-    top: `${rect.bottom + window.scrollY + 6}px`,
+    position: 'fixed',
+    top: `${top}px`,
     left: `${left}px`,
     minWidth: `${width}px`,
+    maxHeight: `${maxHeight}px`,
     zIndex: 9999
   }
 }
@@ -409,7 +425,10 @@ const addTagToStudent = (tagId) => {
     studentNumber: props.student.studentNumber,
     tags: newTags
   })
+  // 关闭 picker 并清理监听器
   showTagPicker.value = false
+  window.removeEventListener('resize', onWindowChange)
+  window.removeEventListener('scroll', onWindowChange, true)
 }
 
 const removeTag = (tagId) => {
@@ -684,17 +703,12 @@ const deleteHandler = () => {
 }
 
 .tag-picker {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 6px;
+  /* position/top/left/zIndex 由 JS tagPickerStyle 动态设置（fixed 定位） */
   background: white;
   border: 2px solid #23587b;
   border-radius: 8px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-  z-index: 1000;
   min-width: 220px;
-  max-height: 240px;
   overflow-y: auto;
 }
 

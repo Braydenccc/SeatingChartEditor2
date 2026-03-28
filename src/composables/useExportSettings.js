@@ -14,6 +14,17 @@ const exportSettings = ref({
   rowGap: 15,      // 行间距
   groupGap: 60,    // 大组间距
   padding: 40,     // 边距
+  // 字号设置
+  fontSizeTitle: 28,       // 标题
+  fontSizeRowNumber: 18,   // 行号
+  fontSizeGroupLabel: 20,  // 组号
+  fontSizePodium: 20,      // 讲台
+  fontSizeName: 28,        // 姓名（调高）
+  fontSizeStudentId: 20,   // 学号（调高）
+  fontSizeTag: 14,         // 标签
+  // Y轴偏移（额外微调，在自动居中的基础上叠加）
+  offsetYName: 0,          // 姓名 Y 偏移
+  offsetYStudentId: 0,     // 学号 Y 偏移
   tagSettings: {} // 格式: { tagId: { enabled: true, displayText: '文本' } }
 })
 

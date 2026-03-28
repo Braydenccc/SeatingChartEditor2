@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="export-dialog-overlay" @click.self="$emit('close')">
+    <div v-if="visible" class="export-dialog-overlay" @mousedown.self="overlayMouseDownSelf = true" @mouseup.self="handleOverlayMouseUp">
       <div class="export-dialog">
         <div class="dialog-header">
           <h3>导出设置</h3>
@@ -82,6 +82,40 @@
                 </div>
               </div>
             </div>
+
+            <div class="settings-section">
+              <h4>字号</h4>
+              <div class="spacing-grid">
+                <div class="num-input">
+                  <label>姓名</label>
+                  <input type="number" v-model.number="exportSettings.fontSizeName" min="8" max="60" />
+                </div>
+                <div class="num-input">
+                  <label>学号</label>
+                  <input type="number" v-model.number="exportSettings.fontSizeStudentId" min="8" max="60" />
+                </div>
+                <div class="num-input">
+                  <label>标题</label>
+                  <input type="number" v-model.number="exportSettings.fontSizeTitle" min="8" max="80" />
+                </div>
+                <div class="num-input">
+                  <label>行号</label>
+                  <input type="number" v-model.number="exportSettings.fontSizeRowNumber" min="8" max="40" />
+                </div>
+                <div class="num-input">
+                  <label>组号</label>
+                  <input type="number" v-model.number="exportSettings.fontSizeGroupLabel" min="8" max="40" />
+                </div>
+                <div class="num-input">
+                  <label>讲台</label>
+                  <input type="number" v-model.number="exportSettings.fontSizePodium" min="8" max="40" />
+                </div>
+                <div class="num-input">
+                  <label>标签</label>
+                  <input type="number" v-model.number="exportSettings.fontSizeTag" min="8" max="30" />
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- 右侧：实时预览 -->
@@ -121,6 +155,15 @@ const previewUrl = ref('')
 const isGenerating = ref(false)
 const tagSettingsLocal = ref({})
 let debounceTimer = null
+
+// 防止鼠标从弹窗内拖出后意外关闭：需要 mousedown 和 mouseup 都在 overlay 自身上才关闭
+const overlayMouseDownSelf = ref(false)
+const handleOverlayMouseUp = () => {
+  if (overlayMouseDownSelf.value) {
+    emit('close')
+  }
+  overlayMouseDownSelf.value = false
+}
 
 // 初始化标签本地副本
 const initTagLocal = () => {
@@ -196,7 +239,14 @@ watch(
     exportSettings.value.rowGap,
     exportSettings.value.groupGap,
     exportSettings.value.padding,
-    exportSettings.value.tagSettings
+    exportSettings.value.tagSettings,
+    exportSettings.value.fontSizeTitle,
+    exportSettings.value.fontSizeRowNumber,
+    exportSettings.value.fontSizeGroupLabel,
+    exportSettings.value.fontSizePodium,
+    exportSettings.value.fontSizeName,
+    exportSettings.value.fontSizeStudentId,
+    exportSettings.value.fontSizeTag,
   ],
   () => {
     if (props.visible) generatePreview()

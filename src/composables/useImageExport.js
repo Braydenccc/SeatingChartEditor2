@@ -147,7 +147,7 @@ export function useImageExport() {
         // 绘制标题
         if (exportSettings.value.showTitle) {
           ctx.fillStyle = 'black'
-          ctx.font = 'bold 28px Microsoft YaHei, Arial, sans-serif'
+          ctx.font = `bold ${exportSettings.value.fontSizeTitle}px Microsoft YaHei, Arial, sans-serif`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           ctx.fillText(exportSettings.value.title, contentWidth / 2, PADDING + 20)
@@ -160,7 +160,7 @@ export function useImageExport() {
         // 绘制左右行号
         if (exportSettings.value.showRowNumbers) {
           ctx.fillStyle = primaryColor
-          ctx.font = '18px Microsoft YaHei, Arial, sans-serif'
+          ctx.font = `${exportSettings.value.fontSizeRowNumber}px Microsoft YaHei, Arial, sans-serif`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
 
@@ -202,7 +202,7 @@ export function useImageExport() {
             (seatConfig.value.seatsPerColumn - 1) * ROW_GAP + 30
 
           ctx.fillStyle = primaryColor
-          ctx.font = 'bold 20px Microsoft YaHei, Arial, sans-serif'
+          ctx.font = `bold ${exportSettings.value.fontSizeGroupLabel}px Microsoft YaHei, Arial, sans-serif`
           ctx.textAlign = 'center'
 
           let groupLabelX = seatStartX
@@ -224,7 +224,7 @@ export function useImageExport() {
           ctx.stroke()
 
           ctx.fillStyle = primaryColor
-          ctx.font = 'bold 20px Microsoft YaHei, Arial, sans-serif'
+          ctx.font = `bold ${exportSettings.value.fontSizePodium}px Microsoft YaHei, Arial, sans-serif`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           ctx.fillText('讲台', podiumX + podiumWidth / 2, podiumY + 20)
@@ -267,18 +267,35 @@ export function useImageExport() {
 
       const student = students.value.find(s => s.id === seat.studentId)
       if (student) {
-        // 绘制姓名
-        ctx.fillStyle = 'black'
-        ctx.font = 'bold 24px Microsoft YaHei, Arial, sans-serif'
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(student.name || '未命名', x + width / 2, y + height / 2 - 10)
+        // 绘制姓名和学号，垂直居中分布
+        const hasNumber = !!student.studentNumber
+        const nameFontSize = exportSettings.value.fontSizeName
+        const idFontSize = exportSettings.value.fontSizeStudentId
+        const cx = x + width / 2
+        const cy = y + height / 2
 
-        // 绘制学号
-        if (student.studentNumber) {
+        if (hasNumber) {
+          // 两行文本：上方姓名，下方学号，以座位中心为基准均匀分布
+          const gap = Math.round((nameFontSize + idFontSize) / 2) + 4
+          const nameY = cy - gap / 2
+          const idY = cy + gap / 2
+
+          ctx.fillStyle = 'black'
+          ctx.font = `bold ${nameFontSize}px Microsoft YaHei, Arial, sans-serif`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(student.name || '未命名', cx, nameY)
+
           ctx.fillStyle = isBW ? '#444' : '#666'
-          ctx.font = '16px Microsoft YaHei, Arial, sans-serif'
-          ctx.fillText(student.studentNumber.toString(), x + width / 2, y + height / 2 + 18)
+          ctx.font = `${idFontSize}px Microsoft YaHei, Arial, sans-serif`
+          ctx.fillText(student.studentNumber.toString(), cx, idY)
+        } else {
+          // 只有姓名，垂直居中
+          ctx.fillStyle = 'black'
+          ctx.font = `bold ${nameFontSize}px Microsoft YaHei, Arial, sans-serif`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(student.name || '未命名', cx, cy)
         }
 
         // 绘制标签
@@ -320,14 +337,14 @@ export function useImageExport() {
 
     ctx.save()
 
-    const LABEL_HEIGHT = 24
+    const LABEL_HEIGHT = exportSettings.value.fontSizeTag + 10  // 字号 + 上下各5px内边距
     const LABEL_PADDING = 8
     const LABEL_GAP = 4
     const OFFSET_X = 8
     const OFFSET_Y = -8
 
     // 计算每个标签的宽度
-    ctx.font = 'bold 14px Microsoft YaHei, Arial, sans-serif'
+    ctx.font = `bold ${exportSettings.value.fontSizeTag}px Microsoft YaHei, Arial, sans-serif`
     const labelWidths = enabledTags.map(tag => {
       const textWidth = ctx.measureText(tag.text).width
       return textWidth + LABEL_PADDING * 2
