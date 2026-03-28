@@ -422,7 +422,7 @@ onUnmounted(() => {
 }
 
 .seat-item.clickable:hover {
-  border-color: #23587b;
+  border-color: var(--color-primary);
   box-shadow: 0 2px 8px rgba(35, 88, 123, 0.2);
   transform: translateY(-2px);
 }
@@ -446,7 +446,7 @@ onUnmounted(() => {
 }
 
 .seat-item.drag-over {
-  border-color: #23587b;
+  border-color: var(--color-primary);
   border-width: 2.5px;
   background: rgba(35, 88, 123, 0.08);
   outline: 3px solid rgba(35, 88, 123, 0.18);
@@ -488,8 +488,8 @@ onUnmounted(() => {
 
 /* 已分配学生的座位 */
 .seat-item.occupied {
-  background: #e8f4f8;
-  border-color: #23587b;
+  background: var(--color-bg-selected);
+  border-color: var(--color-primary);
 }
 
 .student-display {
@@ -505,7 +505,7 @@ onUnmounted(() => {
 .student-number {
   font-size: 12px;
   font-weight: 700;
-  color: #23587b;
+  color: var(--color-primary);
   background: white;
   padding: 2px 10px;
   border-radius: 6px;
@@ -553,7 +553,7 @@ onUnmounted(() => {
 }
 
 .seat-item.zone-highlight.occupied {
-  background: color-mix(in srgb, var(--zone-color, #E0E0E0) 40%, #e8f4f8);
+  background: color-mix(in srgb, var(--zone-color, #E0E0E0) 40%, var(--color-bg-selected));
 }
 
 /* 响应式调整 */

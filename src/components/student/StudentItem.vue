@@ -1,8 +1,7 @@
 <template>
   <div class="student-item" :class="{ selected: isSelected, dragging: isStudentDragging }" :data-student-id="student.id"
-    :draggable="canDrag" @click="handleSelectStudent" @dragstart="handleDragStart" @dragend="handleDragEnd"
-    @touchstart="handleTouchDragStart" @touchmove="handleTouchDragMove" @touchend="handleTouchDragEnd"
-    @touchcancel="handleTouchDragCancel" @contextmenu.prevent @pointerdown="handleStudentPointerDown">
+    ref="itemRef" :draggable="canHtmlDrag()" @click="handleSelectStudent" @dragstart="handleDragStart" @dragend="handleDragEnd"
+    @contextmenu.prevent @pointerdown="handlePointerDown">
     <div class="student-info">
       <div class="student-number-section">
         <input v-if="isEditingNumber" v-model.number="editStudentNumber" type="number" min="1"
@@ -37,27 +36,25 @@
       </button>
     </div>
 
-    <!-- 标签选择器 (teleport 到 body 避免被父容器裁剪) -->
-    <teleport to="body">
-      <div v-if="showTagPicker" class="tag-picker" ref="tagPickerRef" :style="tagPickerStyle" @click.stop>
-        <div v-for="tag in availableTagsForStudent" :key="tag.id" class="tag-option" @click="addTagToStudent(tag.id)">
-          <span class="tag-dot" :style="{ background: tag.color }"></span>
-          <span>{{ tag.name }}</span>
-        </div>
-        <div v-if="availableTagsForStudent.length === 0" class="no-tags">
-          暂无可添加的标签
-        </div>
-      </div>
-    </teleport>
+    <!-- 标签选择器独立组件 -->
+    <TagPickerPopup 
+      :show="showTagPicker" 
+      :availableTags="availableTagsForStudent"
+      :triggerEl="addBtnRef"
+      @add="addTagToStudent"
+      @close="showTagPicker = false" 
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted, shallowRef } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useStudentData } from '@/composables/useStudentData'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
-import { useEditMode } from '@/composables/useEditMode'
+
+import TagPickerPopup from './TagPickerPopup.vue'
+import { useStudentDragging } from '@/composables/useStudentDragging'
 
 const props = defineProps({
   student: {
@@ -76,183 +73,16 @@ const emit = defineEmits(['update-student', 'delete-student'])
 const { selectedStudentId, selectStudent } = useStudentData()
 const { requestConfirm, isConfirming } = useConfirmAction()
 const { warning } = useLogger()
-const { currentMode, EditMode } = useEditMode()
+const itemRef = ref(null)
 
-// ==================== 拖拽功能 ====================
-const isStudentDragging = ref(false)
-let touchDragTimer = null
-let touchDragActive = false
-let touchPreviewEl = null
-let touchMoveRafId = null
-let touchStartX = 0
-let touchStartY = 0
-// 当前是否通过触摸交互（动态判断，解决触摸屏笔记本问题）
-// 使用 shallowRef 让 canDrag computed 能追踪其变化
-const lastPointerWasTouch = shallowRef(false)
-
-// 触摸拖拽激活条件
-const canTouchDrag = computed(() => currentMode.value === EditMode.NORMAL)
-
-// HTML5 draggable 属性：触摸操作时禁用，防止幽灵图
-const canDrag = computed(() => {
-  if (lastPointerWasTouch.value) return false
-  return canTouchDrag.value
-})
-
-// 记录指针类型，用于判断是否为触摸操作
-const handleStudentPointerDown = (e) => {
-  lastPointerWasTouch.value = e.pointerType === 'touch'
-}
-
-const handleDragStart = (e) => {
-  if (!canDrag.value) {
-    e.preventDefault()
-    return
-  }
-  isStudentDragging.value = true
-  e.dataTransfer.effectAllowed = 'move'
-  e.dataTransfer.setData('application/json', JSON.stringify({
-    type: 'student',
-    studentId: props.student.id
-  }))
-}
-
-const handleDragEnd = () => {
-  isStudentDragging.value = false
-}
-
-// 触摸拖拽
-const handleTouchDragStart = (e) => {
-  if (e.touches.length !== 1 || !canTouchDrag.value) return
-  const touch = e.touches[0]
-  const startX = touch.clientX
-  const startY = touch.clientY
-  touchStartX = startX
-  touchStartY = startY
-
-  touchDragTimer = setTimeout(() => {
-    touchDragActive = true
-    isStudentDragging.value = true
-
-    touchPreviewEl = document.createElement('div')
-    touchPreviewEl.className = 'touch-drag-preview'
-    touchPreviewEl.textContent = props.student.name || '未命名'
-    touchPreviewEl.style.cssText = `
-      position: fixed;
-      left: ${startX - 40}px;
-      top: ${startY - 25}px;
-      min-width: 80px;
-      padding: 8px 16px;
-      background: rgba(35, 88, 123, 0.92);
-      color: white;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 600;
-      pointer-events: none;
-      z-index: 9999;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-      transform: scale(0.8);
-      opacity: 0;
-      will-change: transform, left, top;
-      transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), opacity 0.15s ease;
-    `
-    document.body.appendChild(touchPreviewEl)
-    // 触发入场动画
-    requestAnimationFrame(() => {
-      if (touchPreviewEl) {
-        touchPreviewEl.style.transform = 'scale(1)'
-        touchPreviewEl.style.opacity = '1'
-      }
-    })
-    if (navigator.vibrate) navigator.vibrate(30)
-  }, 300)
-}
-
-const handleTouchDragMove = (e) => {
-  if (e.touches.length !== 1) return
-
-  if (!touchDragActive) {
-    // 小幅抖动（≤ 8px）允许长按继续激活拖拽，大幅移动才视为滑动并取消定时器
-    const touch = e.touches[0]
-    const dx = touch.clientX - touchStartX
-    const dy = touch.clientY - touchStartY
-    if (Math.sqrt(dx * dx + dy * dy) > 8) {
-      if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
-    }
-    return
-  }
-  e.preventDefault()
-  const touch = e.touches[0]
-  const cx = touch.clientX
-  const cy = touch.clientY
-
-  // rAF 节流：每帧最多更新一次
-  if (touchMoveRafId) cancelAnimationFrame(touchMoveRafId)
-  touchMoveRafId = requestAnimationFrame(() => {
-    touchMoveRafId = null
-    if (touchPreviewEl) {
-      touchPreviewEl.style.transition = 'none'
-      touchPreviewEl.style.left = `${cx - 40}px`
-      touchPreviewEl.style.top = `${cy - 25}px`
-    }
-    // 高亮目标座位
-    const el = document.elementFromPoint(cx, cy)
-    document.querySelectorAll('.seat-item.drag-over').forEach(s => s.classList.remove('drag-over'))
-    if (el) {
-      let cur = el
-      while (cur && !cur.dataset?.seatId) cur = cur.parentElement
-      if (cur) cur.classList.add('drag-over')
-    }
-  })
-}
-
-// 公共清理：取消定时器、移除预览、重置所有状态
-const cleanupStudentTouchDrag = () => {
-  if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
-  if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
-  if (touchPreviewEl) { touchPreviewEl.remove(); touchPreviewEl = null }
-  document.querySelectorAll('.seat-item.drag-over').forEach(s => s.classList.remove('drag-over'))
-  isStudentDragging.value = false
-  touchDragActive = false
-}
-
-// touchcancel：OS 中断触摸（长按弹出系统菜单等），直接清理
-const handleTouchDragCancel = () => {
-  cleanupStudentTouchDrag()
-}
-
-const handleTouchDragEnd = (e) => {
-  // 无论如何先清理定时器和视觉状态，防止残留
-  if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
-  if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
-  isStudentDragging.value = false
-
-  const wasActive = touchDragActive
-  if (!wasActive) return
-
-  const touch = e.changedTouches[0]
-  if (touchPreviewEl) touchPreviewEl.style.display = 'none'
-  const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)
-  if (touchPreviewEl) { touchPreviewEl.remove(); touchPreviewEl = null }
-
-  document.querySelectorAll('.seat-item.drag-over').forEach(s => s.classList.remove('drag-over'))
-  isStudentDragging.value = false
-  touchDragActive = false
-
-  if (!targetEl) return
-  let cur = targetEl
-  while (cur && !cur.dataset?.seatId) cur = cur.parentElement
-  if (!cur) return
-
-  const event = new CustomEvent('touch-student-drop', {
-    bubbles: true,
-    detail: { studentId: props.student.id, targetSeatId: cur.dataset.seatId }
-  })
-  cur.dispatchEvent(event)
-}
+// 拖拽逻辑抽离（VueUse onLongPress 等）
+const { 
+  isStudentDragging, 
+  canHtmlDrag, 
+  handlePointerDown, 
+  handleDragStart, 
+  handleDragEnd 
+} = useStudentDragging(itemRef, computed(() => props.student))
 
 const isEditingName = ref(false)
 const isEditingNumber = ref(false)
@@ -261,9 +91,7 @@ const editStudentNumber = ref(null)
 const nameInput = ref(null)
 const numberInput = ref(null)
 const showTagPicker = ref(false)
-const tagPickerRef = ref(null)
 const addBtnRef = ref(null)
-const tagPickerStyle = ref({})
 
 // 获取可以添加的标签(排除已添加的)
 const availableTagsForStudent = computed(() => {
@@ -301,29 +129,7 @@ const handleSelectStudent = (event) => {
   }
 }
 
-// 点击外部关闭标签选择器
-const handleClickOutside = (event) => {
-  if (!showTagPicker.value) return
 
-  const clickedInsidePicker = tagPickerRef.value && tagPickerRef.value.contains(event.target)
-  const clickedAddBtn = event.target.closest && event.target.closest('.add-tag-to-student-btn')
-
-  if (!clickedInsidePicker && !clickedAddBtn) {
-    showTagPicker.value = false
-    window.removeEventListener('resize', onWindowChange)
-    window.removeEventListener('scroll', onWindowChange, true)
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-  window.removeEventListener('resize', onWindowChange)
-  window.removeEventListener('scroll', onWindowChange, true)
-})
 
 // 学号编辑
 const startEditNumber = () => {
@@ -365,57 +171,8 @@ const saveName = () => {
   isEditingName.value = false
 }
 
-const computeTagPickerPosition = () => {
-  const btn = addBtnRef.value
-  if (!btn) return
-  const rect = btn.getBoundingClientRect()
-  const width = 220
-  const maxHeight = 240
-  const margin = 8
-
-  // 水平方向：防止溢出右侧
-  let left = rect.left
-  if (left + width + margin > window.innerWidth) {
-    left = Math.max(margin, window.innerWidth - width - margin)
-  }
-  if (left < margin) left = margin
-
-  // 垂直方向：优先显示在按钮下方，空间不足时改为上方
-  const spaceBelow = window.innerHeight - rect.bottom - margin
-  const spaceAbove = rect.top - margin
-  let top
-  if (spaceBelow >= Math.min(maxHeight, 80) || spaceBelow >= spaceAbove) {
-    top = rect.bottom + 6
-  } else {
-    // 在按钮上方显示
-    top = rect.top - Math.min(maxHeight, spaceAbove) - 6
-  }
-
-  tagPickerStyle.value = {
-    position: 'fixed',
-    top: `${top}px`,
-    left: `${left}px`,
-    minWidth: `${width}px`,
-    maxHeight: `${maxHeight}px`,
-    zIndex: 9999
-  }
-}
-
-const onWindowChange = () => {
-  computeTagPickerPosition()
-}
-
-const toggleTagPicker = async () => {
+const toggleTagPicker = () => {
   showTagPicker.value = !showTagPicker.value
-  if (showTagPicker.value) {
-    await nextTick()
-    computeTagPickerPosition()
-    window.addEventListener('resize', onWindowChange)
-    window.addEventListener('scroll', onWindowChange, true)
-  } else {
-    window.removeEventListener('resize', onWindowChange)
-    window.removeEventListener('scroll', onWindowChange, true)
-  }
 }
 
 const addTagToStudent = (tagId) => {
@@ -425,10 +182,7 @@ const addTagToStudent = (tagId) => {
     studentNumber: props.student.studentNumber,
     tags: newTags
   })
-  // 关闭 picker 并清理监听器
   showTagPicker.value = false
-  window.removeEventListener('resize', onWindowChange)
-  window.removeEventListener('scroll', onWindowChange, true)
 }
 
 const removeTag = (tagId) => {
@@ -493,9 +247,9 @@ const deleteHandler = () => {
 }
 
 .student-item.selected {
-  background: #e8f4f8;
-  border: 2px solid #23587b;
-  box-shadow: 0 4px 16px rgba(35, 88, 123, 0.25);
+  background: var(--color-bg-selected);
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 16px rgba(35, 88, 123, 0.25), 0 0 0 1px var(--color-primary) inset;
   transform: translateY(-2px);
 }
 
@@ -520,8 +274,8 @@ const deleteHandler = () => {
   padding: 6px 12px;
   font-size: 15px;
   font-weight: 600;
-  color: #23587b;
-  background: #e8f4f8;
+  color: var(--color-primary);
+  background: var(--color-bg-selected);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
@@ -545,7 +299,7 @@ const deleteHandler = () => {
   padding: 6px 12px;
   font-size: 15px;
   font-weight: 600;
-  border: 2px solid #23587b;
+  border: 2px solid var(--color-primary);
   border-radius: 6px;
   outline: none;
   text-align: center;
@@ -591,7 +345,7 @@ const deleteHandler = () => {
   padding: 4px 8px;
   font-size: 16px;
   font-weight: 500;
-  border: 2px solid #23587b;
+  border: 2px solid var(--color-primary);
   border-radius: 4px;
   outline: none;
   user-select: text;
@@ -651,7 +405,7 @@ const deleteHandler = () => {
 }
 
 .add-tag-to-student-btn:hover {
-  background: #23587b;
+  background: var(--color-primary);
   color: white;
 }
 
@@ -661,7 +415,7 @@ const deleteHandler = () => {
 
 .delete-student-btn {
   padding: 7px 14px;
-  background: #f44336;
+  background: var(--color-danger);
   color: white;
   border: none;
   border-radius: 6px;
@@ -673,7 +427,7 @@ const deleteHandler = () => {
 }
 
 .delete-student-btn:hover {
-  background: #d32f2f;
+  background: var(--color-danger-hover);
   box-shadow: 0 4px 8px rgba(244, 67, 54, 0.3);
   transform: translateY(-1px);
 }
@@ -702,63 +456,7 @@ const deleteHandler = () => {
   }
 }
 
-.tag-picker {
-  /* position/top/left/zIndex 由 JS tagPickerStyle 动态设置（fixed 定位） */
-  background: white;
-  border: 2px solid #23587b;
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-  min-width: 220px;
-  overflow-y: auto;
-}
 
-.tag-picker::-webkit-scrollbar {
-  width: 6px;
-}
-
-.tag-picker::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
-
-.tag-picker::-webkit-scrollbar-thumb {
-  background: #bbb;
-  border-radius: 3px;
-}
-
-.tag-picker::-webkit-scrollbar-thumb:hover {
-  background: #888;
-}
-
-.tag-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: background 0.2s;
-  color: #333;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.tag-option:hover {
-  background: #e8f4f8;
-}
-
-.tag-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.no-tags {
-  padding: 16px;
-  text-align: center;
-  color: #999;
-  font-size: 14px;
-}
 
 /* 响应式设计 - 移动设备 */
 @media (max-width: 768px) {
@@ -868,6 +566,7 @@ const deleteHandler = () => {
 /* 拖拽样式 */
 .student-item[draggable="true"] {
   cursor: grab;
+  -webkit-user-drag: element;
 }
 
 .student-item[draggable="true"]:active {

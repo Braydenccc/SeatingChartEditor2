@@ -1,0 +1,1002 @@
+diff --git a/package-lock.json b/package-lock.json
+index 3e32ef9..c2eaa76 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -9,6 +9,7 @@
+       "version": "0.0.0",
+       "license": "GPL-3.0-or-later",
+       "dependencies": {
++        "@vueuse/core": "^14.2.1",
+         "bcryptjs": "^3.0.3",
+         "pkg": "^5.8.1",
+         "vue": "^3.5.22",
+@@ -2332,6 +2333,12 @@
+       "license": "MIT",
+       "optional": true
+     },
++    "node_modules/@types/web-bluetooth": {
++      "version": "0.0.21",
++      "resolved": "https://registry.npmmirror.com/@types/web-bluetooth/-/web-bluetooth-0.0.21.tgz",
++      "integrity": "sha512-oIQLCGWtcFZy2JW77j9k8nHzAOpqMHLQejDA48XXMWH6tjCQHz5RCFz1bzsmROyL6PUm+LLnUiI4BCn221inxA==",
++      "license": "MIT"
++    },
+     "node_modules/@types/yauzl": {
+       "version": "2.10.3",
+       "resolved": "https://registry.npmmirror.com/@types/yauzl/-/yauzl-2.10.3.tgz",
+@@ -2576,6 +2583,44 @@
+       "integrity": "sha512-0YZ1DYuC5o/YJPf6pFdt2KYxVGDxkDbH/1NYJnVJWUkzr8ituBEmFVQRNX2gCaAsFEjEDnLkWpgqlZA7htgS/g==",
+       "license": "MIT"
+     },
++    "node_modules/@vueuse/core": {
++      "version": "14.2.1",
++      "resolved": "https://registry.npmmirror.com/@vueuse/core/-/core-14.2.1.tgz",
++      "integrity": "sha512-3vwDzV+GDUNpdegRY6kzpLm4Igptq+GA0QkJ3W61Iv27YWwW/ufSlOfgQIpN6FZRMG0mkaz4gglJRtq5SeJyIQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/web-bluetooth": "^0.0.21",
++        "@vueuse/metadata": "14.2.1",
++        "@vueuse/shared": "14.2.1"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/antfu"
++      },
++      "peerDependencies": {
++        "vue": "^3.5.0"
++      }
++    },
++    "node_modules/@vueuse/metadata": {
++      "version": "14.2.1",
++      "resolved": "https://registry.npmmirror.com/@vueuse/metadata/-/metadata-14.2.1.tgz",
++      "integrity": "sha512-1ButlVtj5Sb/HDtIy1HFr1VqCP4G6Ypqt5MAo0lCgjokrk2mvQKsK2uuy0vqu/Ks+sHfuHo0B9Y9jn9xKdjZsw==",
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/antfu"
++      }
++    },
++    "node_modules/@vueuse/shared": {
++      "version": "14.2.1",
++      "resolved": "https://registry.npmmirror.com/@vueuse/shared/-/shared-14.2.1.tgz",
++      "integrity": "sha512-shTJncjV9JTI4oVNyF1FQonetYAiTBd+Qj7cY89SWbXSkx7gyhrgtEdF2ZAVWS1S3SHlaROO6F2IesJxQEkZBw==",
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/antfu"
++      },
++      "peerDependencies": {
++        "vue": "^3.5.0"
++      }
++    },
+     "node_modules/@xmldom/xmldom": {
+       "version": "0.8.11",
+       "resolved": "https://registry.npmmirror.com/@xmldom/xmldom/-/xmldom-0.8.11.tgz",
+diff --git a/package.json b/package.json
+index 5ad690f..c73469e 100644
+--- a/package.json
++++ b/package.json
+@@ -19,6 +19,7 @@
+     "deploy:main": "git checkout main && git merge dev --no-edit && git push origin main && git checkout dev"
+   },
+   "dependencies": {
++    "@vueuse/core": "^14.2.1",
+     "bcryptjs": "^3.0.3",
+     "pkg": "^5.8.1",
+     "vue": "^3.5.22",
+diff --git a/src/assets/main.css b/src/assets/main.css
+index 37311c1..4f8f609 100644
+--- a/src/assets/main.css
++++ b/src/assets/main.css
+@@ -1,5 +1,17 @@
+ @import './base.css';
+ 
++:root {
++  --color-primary: #23587b;
++  --color-primary-light: #2d6a94;
++  --color-bg-selected: #e8f4f8;
++  --color-danger: #f44336;
++  --color-danger-hover: #d32f2f;
++  
++  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
++  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
++  --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.25);
++}
++
+ #app {
+   font-weight: normal;
+ }
+diff --git a/src/components/layout/SidebarPanel.vue b/src/components/layout/SidebarPanel.vue
+index 95697f5..26a4063 100644
+--- a/src/components/layout/SidebarPanel.vue
++++ b/src/components/layout/SidebarPanel.vue
+@@ -793,7 +793,7 @@ const formatLogTime = (timestamp) => {
+ .sidebar-panel {
+   width: 20%;
+   background: #f8f9fa;
+-  color: #23587b;
++  color: var(--color-primary);
+   display: flex;
+   flex-direction: column;
+   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+@@ -910,7 +910,7 @@ const formatLogTime = (timestamp) => {
+   transform: translateY(-50%);
+   width: 4px;
+   height: 0;
+-  background: #23587b;
++  background: var(--color-primary);
+   border-radius: 0 2px 2px 0;
+   transition: height 0.3s ease;
+ }
+@@ -936,12 +936,12 @@ const formatLogTime = (timestamp) => {
+ 
+ .tab-button:hover {
+   background: rgba(35, 88, 123, 0.08);
+-  color: #23587b;
++  color: var(--color-primary);
+ }
+ 
+ .tab-button.active {
+   background: rgba(35, 88, 123, 0.12);
+-  color: #23587b;
++  color: var(--color-primary);
+   font-weight: 600;
+ }
+ 
+@@ -1066,7 +1066,7 @@ const formatLogTime = (timestamp) => {
+ 
+ .tab-header h3 {
+   margin: 0;
+-  color: #23587b;
++  color: var(--color-primary);
+   font-size: 18px;
+   font-weight: 600;
+ }
+@@ -1104,15 +1104,15 @@ const formatLogTime = (timestamp) => {
+ 
+ .option-button:hover {
+   background: #ffffff;
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+   box-shadow: 0 2px 6px rgba(35, 88, 123, 0.15);
+   transform: translateX(2px);
+ }
+ 
+ .option-button.primary {
+-  background: #23587b;
++  background: var(--color-primary);
+   color: white;
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+   font-weight: 600;
+ }
+ 
+@@ -1122,9 +1122,9 @@ const formatLogTime = (timestamp) => {
+ }
+ 
+ .option-button.active {
+-  background: #23587b;
++  background: var(--color-primary);
+   color: white;
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+   box-shadow: 0 3px 10px rgba(35, 88, 123, 0.3);
+ }
+ 
+@@ -1186,7 +1186,7 @@ const formatLogTime = (timestamp) => {
+ .input-group input[type="number"]:focus,
+ .input-group input[type="text"]:focus {
+   outline: none;
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+ }
+ 
+ .checkbox-label {
+@@ -1274,7 +1274,7 @@ const formatLogTime = (timestamp) => {
+ 
+ .tag-text-input:focus {
+   outline: none;
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+ }
+ 
+ .tag-text-input::placeholder {
+@@ -1391,7 +1391,7 @@ const formatLogTime = (timestamp) => {
+ .log-title {
+   font-weight: 600;
+   font-size: 14px;
+-  color: #23587b;
++  color: var(--color-primary);
+ }
+ 
+ .log-clear-btn {
+@@ -1407,8 +1407,8 @@ const formatLogTime = (timestamp) => {
+ 
+ .log-clear-btn:hover {
+   background: #f5f5f5;
+-  border-color: #23587b;
+-  color: #23587b;
++  border-color: var(--color-primary);
++  color: var(--color-primary);
+ }
+ 
+ .log-list {
+@@ -1567,7 +1567,7 @@ const formatLogTime = (timestamp) => {
+   }
+ 
+   .tab-button.active {
+-    color: #23587b;
++    color: var(--color-primary);
+     background: rgba(35, 88, 123, 0.06);
+     font-weight: 600;
+   }
+@@ -1738,12 +1738,12 @@ const formatLogTime = (timestamp) => {
+ 
+ .diagram-dir-btn:hover {
+   background: #e8f0f7;
+-  border-color: #23587b;
+-  color: #23587b;
++  border-color: var(--color-primary);
++  color: var(--color-primary);
+ }
+ 
+ .diagram-dir-btn.active {
+-  background: #23587b;
++  background: var(--color-primary);
+   color: #fff !important;
+   border-color: #1a4460;
+   box-shadow: 0 2px 6px rgba(35,88,123,0.35);
+@@ -1785,12 +1785,12 @@ const formatLogTime = (timestamp) => {
+ 
+ .diagram-col-btn:hover {
+   background: #e8f0f7;
+-  border-color: #23587b;
+-  color: #23587b;
++  border-color: var(--color-primary);
++  color: var(--color-primary);
+ }
+ 
+ .diagram-col-btn.active {
+-  background: #23587b;
++  background: var(--color-primary);
+   color: #fff;
+   border-color: #1a4460;
+   box-shadow: 0 2px 6px rgba(35,88,123,0.3);
+@@ -1812,12 +1812,12 @@ const formatLogTime = (timestamp) => {
+ 
+ .diagram-row-btn:hover {
+   background: #e8f0f7;
+-  border-color: #23587b;
+-  color: #23587b;
++  border-color: var(--color-primary);
++  color: var(--color-primary);
+ }
+ 
+ .diagram-row-btn.active {
+-  background: #23587b;
++  background: var(--color-primary);
+   color: #fff;
+   border-color: #1a4460;
+   box-shadow: 0 2px 6px rgba(35,88,123,0.3);
+@@ -1848,7 +1848,7 @@ const formatLogTime = (timestamp) => {
+ 
+ .diagram-cell-sm:hover {
+   background: #c2d8ed;
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+   transform: scale(1.15);
+ }
+ 
+@@ -1942,7 +1942,7 @@ const formatLogTime = (timestamp) => {
+   border: 1.5px solid #cdd8e0;
+   border-radius: 6px;
+   font-size: 13px;
+-  color: #23587b;
++  color: var(--color-primary);
+   background: #fff;
+   box-sizing: border-box;
+   transition: border-color 0.2s;
+@@ -1950,7 +1950,7 @@ const formatLogTime = (timestamp) => {
+ 
+ .input-group-compact input:focus {
+   outline: none;
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+ }
+ 
+ /* ==================== 自动轮换 Tab 切换 ==================== */
+@@ -1981,7 +1981,7 @@ const formatLogTime = (timestamp) => {
+ }
+ 
+ .shift-mode-tab.active {
+-  background: #23587b;
++  background: var(--color-primary);
+   color: #fff;
+   box-shadow: 0 2px 4px rgba(35,88,123,0.2);
+ }
+@@ -1997,12 +1997,12 @@ const formatLogTime = (timestamp) => {
+ .zone-rot-section-title {
+   font-size: 13px;
+   font-weight: 600;
+-  color: #23587b;
++  color: var(--color-primary);
+ }
+ 
+ .zone-rot-add-btn {
+   padding: 4px 10px;
+-  background: #23587b;
++  background: var(--color-primary);
+   color: #fff;
+   border: none;
+   border-radius: 6px;
+@@ -2037,12 +2037,12 @@ const formatLogTime = (timestamp) => {
+ }
+ 
+ .zone-rot-item:hover {
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+   background: #f0f6fa;
+ }
+ 
+ .zone-rot-item.selected {
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+   background: rgba(35, 88, 123, 0.08);
+   box-shadow: 0 0 0 2px rgba(35,88,123,0.15);
+ }
+@@ -2117,7 +2117,7 @@ const formatLogTime = (timestamp) => {
+ 
+ .zone-rot-type-badge.cycle {
+   background: rgba(35,88,123,0.15);
+-  color: #23587b;
++  color: var(--color-primary);
+ }
+ 
+ .zone-rot-type-badge.swap {
+@@ -2160,7 +2160,7 @@ const formatLogTime = (timestamp) => {
+   border: 1.5px dashed #b0c8dc;
+   border-radius: 6px;
+   font-size: 12px;
+-  color: #23587b;
++  color: var(--color-primary);
+   background: #fff;
+   cursor: pointer;
+   outline: none;
+@@ -2168,7 +2168,7 @@ const formatLogTime = (timestamp) => {
+ }
+ 
+ .zone-rot-select:focus {
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+ }
+ 
+ .zone-rot-group-error {
+@@ -2194,8 +2194,8 @@ const formatLogTime = (timestamp) => {
+ }
+ 
+ .zone-rot-add-zone-btn:hover {
+-  border-color: #23587b;
+-  color: #23587b;
++  border-color: var(--color-primary);
++  color: var(--color-primary);
+   background: #f0f6fa;
+ }
+ 
+@@ -2217,13 +2217,13 @@ const formatLogTime = (timestamp) => {
+   border: 1px solid rgba(35,88,123,0.25);
+   border-radius: 8px;
+   font-size: 12px;
+-  color: #23587b;
++  color: var(--color-primary);
+   margin-bottom: 8px;
+ }
+ 
+ .zone-rot-hint-close {
+   padding: 2px 8px;
+-  background: #23587b;
++  background: var(--color-primary);
+   color: #fff;
+   border: none;
+   border-radius: 5px;
+@@ -2250,7 +2250,7 @@ const formatLogTime = (timestamp) => {
+ }
+ .zone-rot-name-input:focus {
+   background: #fff;
+-  border-bottom: 1.5px solid #23587b;
++  border-bottom: 1.5px solid var(--color-primary);
+ }
+ 
+ .zone-rot-zone-name-input {
+@@ -2266,7 +2266,7 @@ const formatLogTime = (timestamp) => {
+ }
+ .zone-rot-zone-name-input:focus {
+   background: #fff;
+-  border-bottom: 1px solid #23587b;
++  border-bottom: 1px solid var(--color-primary);
+ }
+ 
+ /* 颜色点：可交互（切换编辑） */
+diff --git a/src/components/seat/SeatItem.vue b/src/components/seat/SeatItem.vue
+index 86bdf54..ea98407 100644
+--- a/src/components/seat/SeatItem.vue
++++ b/src/components/seat/SeatItem.vue
+@@ -422,7 +422,7 @@ onUnmounted(() => {
+ }
+ 
+ .seat-item.clickable:hover {
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+   box-shadow: 0 2px 8px rgba(35, 88, 123, 0.2);
+   transform: translateY(-2px);
+ }
+@@ -446,7 +446,7 @@ onUnmounted(() => {
+ }
+ 
+ .seat-item.drag-over {
+-  border-color: #23587b;
++  border-color: var(--color-primary);
+   border-width: 2.5px;
+   background: rgba(35, 88, 123, 0.08);
+   outline: 3px solid rgba(35, 88, 123, 0.18);
+@@ -488,8 +488,8 @@ onUnmounted(() => {
+ 
+ /* 已分配学生的座位 */
+ .seat-item.occupied {
+-  background: #e8f4f8;
+-  border-color: #23587b;
++  background: var(--color-bg-selected);
++  border-color: var(--color-primary);
+ }
+ 
+ .student-display {
+@@ -505,7 +505,7 @@ onUnmounted(() => {
+ .student-number {
+   font-size: 12px;
+   font-weight: 700;
+-  color: #23587b;
++  color: var(--color-primary);
+   background: white;
+   padding: 2px 10px;
+   border-radius: 6px;
+@@ -553,7 +553,7 @@ onUnmounted(() => {
+ }
+ 
+ .seat-item.zone-highlight.occupied {
+-  background: color-mix(in srgb, var(--zone-color, #E0E0E0) 40%, #e8f4f8);
++  background: color-mix(in srgb, var(--zone-color, #E0E0E0) 40%, var(--color-bg-selected));
+ }
+ 
+ /* 响应式调整 */
+diff --git a/src/components/student/StudentItem.vue b/src/components/student/StudentItem.vue
+index 1ca2fbb..e082c49 100644
+--- a/src/components/student/StudentItem.vue
++++ b/src/components/student/StudentItem.vue
+@@ -1,8 +1,7 @@
+ <template>
+   <div class="student-item" :class="{ selected: isSelected, dragging: isStudentDragging }" :data-student-id="student.id"
+-    :draggable="canDrag" @click="handleSelectStudent" @dragstart="handleDragStart" @dragend="handleDragEnd"
+-    @touchstart="handleTouchDragStart" @touchmove="handleTouchDragMove" @touchend="handleTouchDragEnd"
+-    @touchcancel="handleTouchDragCancel" @contextmenu.prevent @pointerdown="handleStudentPointerDown">
++    ref="itemRef" :draggable="canHtmlDrag()" @click="handleSelectStudent" @dragstart="handleDragStart" @dragend="handleDragEnd"
++    @contextmenu.prevent @pointerdown="handlePointerDown">
+     <div class="student-info">
+       <div class="student-number-section">
+         <input v-if="isEditingNumber" v-model.number="editStudentNumber" type="number" min="1"
+@@ -37,27 +36,25 @@
+       </button>
+     </div>
+ 
+-    <!-- 标签选择器 (teleport 到 body 避免被父容器裁剪) -->
+-    <teleport to="body">
+-      <div v-if="showTagPicker" class="tag-picker" ref="tagPickerRef" :style="tagPickerStyle" @click.stop>
+-        <div v-for="tag in availableTagsForStudent" :key="tag.id" class="tag-option" @click="addTagToStudent(tag.id)">
+-          <span class="tag-dot" :style="{ background: tag.color }"></span>
+-          <span>{{ tag.name }}</span>
+-        </div>
+-        <div v-if="availableTagsForStudent.length === 0" class="no-tags">
+-          暂无可添加的标签
+-        </div>
+-      </div>
+-    </teleport>
++    <!-- 标签选择器独立组件 -->
++    <TagPickerPopup 
++      :show="showTagPicker" 
++      :availableTags="availableTagsForStudent"
++      :triggerEl="addBtnRef"
++      @add="addTagToStudent"
++      @close="showTagPicker = false" 
++    />
+   </div>
+ </template>
+ 
+ <script setup>
+-import { ref, computed, nextTick, onMounted, onUnmounted, shallowRef } from 'vue'
++import { ref, computed, nextTick } from 'vue'
+ import { useStudentData } from '@/composables/useStudentData'
+ import { useConfirmAction } from '@/composables/useConfirmAction'
+ import { useLogger } from '@/composables/useLogger'
+-import { useEditMode } from '@/composables/useEditMode'
++
++import TagPickerPopup from './TagPickerPopup.vue'
++import { useStudentDragging } from '@/composables/useStudentDragging'
+ 
+ const props = defineProps({
+   student: {
+@@ -76,183 +73,16 @@ const emit = defineEmits(['update-student', 'delete-student'])
+ const { selectedStudentId, selectStudent } = useStudentData()
+ const { requestConfirm, isConfirming } = useConfirmAction()
+ const { warning } = useLogger()
+-const { currentMode, EditMode } = useEditMode()
+-
+-// ==================== 拖拽功能 ====================
+-const isStudentDragging = ref(false)
+-let touchDragTimer = null
+-let touchDragActive = false
+-let touchPreviewEl = null
+-let touchMoveRafId = null
+-let touchStartX = 0
+-let touchStartY = 0
+-// 当前是否通过触摸交互（动态判断，解决触摸屏笔记本问题）
+-// 使用 shallowRef 让 canDrag computed 能追踪其变化
+-const lastPointerWasTouch = shallowRef(false)
+-
+-// 触摸拖拽激活条件
+-const canTouchDrag = computed(() => currentMode.value === EditMode.NORMAL)
+-
+-// HTML5 draggable 属性：触摸操作时禁用，防止幽灵图
+-const canDrag = computed(() => {
+-  if (lastPointerWasTouch.value) return false
+-  return canTouchDrag.value
+-})
+-
+-// 记录指针类型，用于判断是否为触摸操作
+-const handleStudentPointerDown = (e) => {
+-  lastPointerWasTouch.value = e.pointerType === 'touch'
+-}
+-
+-const handleDragStart = (e) => {
+-  if (!canDrag.value) {
+-    e.preventDefault()
+-    return
+-  }
+-  isStudentDragging.value = true
+-  e.dataTransfer.effectAllowed = 'move'
+-  e.dataTransfer.setData('application/json', JSON.stringify({
+-    type: 'student',
+-    studentId: props.student.id
+-  }))
+-}
+-
+-const handleDragEnd = () => {
+-  isStudentDragging.value = false
+-}
+-
+-// 触摸拖拽
+-const handleTouchDragStart = (e) => {
+-  if (e.touches.length !== 1 || !canTouchDrag.value) return
+-  const touch = e.touches[0]
+-  const startX = touch.clientX
+-  const startY = touch.clientY
+-  touchStartX = startX
+-  touchStartY = startY
+-
+-  touchDragTimer = setTimeout(() => {
+-    touchDragActive = true
+-    isStudentDragging.value = true
+-
+-    touchPreviewEl = document.createElement('div')
+-    touchPreviewEl.className = 'touch-drag-preview'
+-    touchPreviewEl.textContent = props.student.name || '未命名'
+-    touchPreviewEl.style.cssText = `
+-      position: fixed;
+-      left: ${startX - 40}px;
+-      top: ${startY - 25}px;
+-      min-width: 80px;
+-      padding: 8px 16px;
+-      background: rgba(35, 88, 123, 0.92);
+-      color: white;
+-      border-radius: 10px;
+-      display: flex;
+-      align-items: center;
+-      justify-content: center;
+-      font-size: 14px;
+-      font-weight: 600;
+-      pointer-events: none;
+-      z-index: 9999;
+-      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+-      transform: scale(0.8);
+-      opacity: 0;
+-      will-change: transform, left, top;
+-      transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), opacity 0.15s ease;
+-    `
+-    document.body.appendChild(touchPreviewEl)
+-    // 触发入场动画
+-    requestAnimationFrame(() => {
+-      if (touchPreviewEl) {
+-        touchPreviewEl.style.transform = 'scale(1)'
+-        touchPreviewEl.style.opacity = '1'
+-      }
+-    })
+-    if (navigator.vibrate) navigator.vibrate(30)
+-  }, 300)
+-}
+-
+-const handleTouchDragMove = (e) => {
+-  if (e.touches.length !== 1) return
+-
+-  if (!touchDragActive) {
+-    // 小幅抖动（≤ 8px）允许长按继续激活拖拽，大幅移动才视为滑动并取消定时器
+-    const touch = e.touches[0]
+-    const dx = touch.clientX - touchStartX
+-    const dy = touch.clientY - touchStartY
+-    if (Math.sqrt(dx * dx + dy * dy) > 8) {
+-      if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
+-    }
+-    return
+-  }
+-  e.preventDefault()
+-  const touch = e.touches[0]
+-  const cx = touch.clientX
+-  const cy = touch.clientY
+-
+-  // rAF 节流：每帧最多更新一次
+-  if (touchMoveRafId) cancelAnimationFrame(touchMoveRafId)
+-  touchMoveRafId = requestAnimationFrame(() => {
+-    touchMoveRafId = null
+-    if (touchPreviewEl) {
+-      touchPreviewEl.style.transition = 'none'
+-      touchPreviewEl.style.left = `${cx - 40}px`
+-      touchPreviewEl.style.top = `${cy - 25}px`
+-    }
+-    // 高亮目标座位
+-    const el = document.elementFromPoint(cx, cy)
+-    document.querySelectorAll('.seat-item.drag-over').forEach(s => s.classList.remove('drag-over'))
+-    if (el) {
+-      let cur = el
+-      while (cur && !cur.dataset?.seatId) cur = cur.parentElement
+-      if (cur) cur.classList.add('drag-over')
+-    }
+-  })
+-}
+-
+-// 公共清理：取消定时器、移除预览、重置所有状态
+-const cleanupStudentTouchDrag = () => {
+-  if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
+-  if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
+-  if (touchPreviewEl) { touchPreviewEl.remove(); touchPreviewEl = null }
+-  document.querySelectorAll('.seat-item.drag-over').forEach(s => s.classList.remove('drag-over'))
+-  isStudentDragging.value = false
+-  touchDragActive = false
+-}
+-
+-// touchcancel：OS 中断触摸（长按弹出系统菜单等），直接清理
+-const handleTouchDragCancel = () => {
+-  cleanupStudentTouchDrag()
+-}
+-
+-const handleTouchDragEnd = (e) => {
+-  // 无论如何先清理定时器和视觉状态，防止残留
+-  if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
+-  if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
+-  isStudentDragging.value = false
+-
+-  const wasActive = touchDragActive
+-  if (!wasActive) return
+-
+-  const touch = e.changedTouches[0]
+-  if (touchPreviewEl) touchPreviewEl.style.display = 'none'
+-  const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)
+-  if (touchPreviewEl) { touchPreviewEl.remove(); touchPreviewEl = null }
+-
+-  document.querySelectorAll('.seat-item.drag-over').forEach(s => s.classList.remove('drag-over'))
+-  isStudentDragging.value = false
+-  touchDragActive = false
++const itemRef = ref(null)
+ 
+-  if (!targetEl) return
+-  let cur = targetEl
+-  while (cur && !cur.dataset?.seatId) cur = cur.parentElement
+-  if (!cur) return
+-
+-  const event = new CustomEvent('touch-student-drop', {
+-    bubbles: true,
+-    detail: { studentId: props.student.id, targetSeatId: cur.dataset.seatId }
+-  })
+-  cur.dispatchEvent(event)
+-}
++// 拖拽逻辑抽离（VueUse onLongPress 等）
++const { 
++  isStudentDragging, 
++  canHtmlDrag, 
++  handlePointerDown, 
++  handleDragStart, 
++  handleDragEnd 
++} = useStudentDragging(itemRef, computed(() => props.student))
+ 
+ const isEditingName = ref(false)
+ const isEditingNumber = ref(false)
+@@ -261,9 +91,7 @@ const editStudentNumber = ref(null)
+ const nameInput = ref(null)
+ const numberInput = ref(null)
+ const showTagPicker = ref(false)
+-const tagPickerRef = ref(null)
+ const addBtnRef = ref(null)
+-const tagPickerStyle = ref({})
+ 
+ // 获取可以添加的标签(排除已添加的)
+ const availableTagsForStudent = computed(() => {
+@@ -301,29 +129,7 @@ const handleSelectStudent = (event) => {
+   }
+ }
+ 
+-// 点击外部关闭标签选择器
+-const handleClickOutside = (event) => {
+-  if (!showTagPicker.value) return
+ 
+-  const clickedInsidePicker = tagPickerRef.value && tagPickerRef.value.contains(event.target)
+-  const clickedAddBtn = event.target.closest && event.target.closest('.add-tag-to-student-btn')
+-
+-  if (!clickedInsidePicker && !clickedAddBtn) {
+-    showTagPicker.value = false
+-    window.removeEventListener('resize', onWindowChange)
+-    window.removeEventListener('scroll', onWindowChange, true)
+-  }
+-}
+-
+-onMounted(() => {
+-  document.addEventListener('click', handleClickOutside)
+-})
+-
+-onUnmounted(() => {
+-  document.removeEventListener('click', handleClickOutside)
+-  window.removeEventListener('resize', onWindowChange)
+-  window.removeEventListener('scroll', onWindowChange, true)
+-})
+ 
+ // 学号编辑
+ const startEditNumber = () => {
+@@ -365,57 +171,8 @@ const saveName = () => {
+   isEditingName.value = false
+ }
+ 
+-const computeTagPickerPosition = () => {
+-  const btn = addBtnRef.value
+-  if (!btn) return
+-  const rect = btn.getBoundingClientRect()
+-  const width = 220
+-  const maxHeight = 240
+-  const margin = 8
+-
+-  // 水平方向：防止溢出右侧
+-  let left = rect.left
+-  if (left + width + margin > window.innerWidth) {
+-    left = Math.max(margin, window.innerWidth - width - margin)
+-  }
+-  if (left < margin) left = margin
+-
+-  // 垂直方向：优先显示在按钮下方，空间不足时改为上方
+-  const spaceBelow = window.innerHeight - rect.bottom - margin
+-  const spaceAbove = rect.top - margin
+-  let top
+-  if (spaceBelow >= Math.min(maxHeight, 80) || spaceBelow >= spaceAbove) {
+-    top = rect.bottom + 6
+-  } else {
+-    // 在按钮上方显示
+-    top = rect.top - Math.min(maxHeight, spaceAbove) - 6
+-  }
+-
+-  tagPickerStyle.value = {
+-    position: 'fixed',
+-    top: `${top}px`,
+-    left: `${left}px`,
+-    minWidth: `${width}px`,
+-    maxHeight: `${maxHeight}px`,
+-    zIndex: 9999
+-  }
+-}
+-
+-const onWindowChange = () => {
+-  computeTagPickerPosition()
+-}
+-
+-const toggleTagPicker = async () => {
++const toggleTagPicker = () => {
+   showTagPicker.value = !showTagPicker.value
+-  if (showTagPicker.value) {
+-    await nextTick()
+-    computeTagPickerPosition()
+-    window.addEventListener('resize', onWindowChange)
+-    window.addEventListener('scroll', onWindowChange, true)
+-  } else {
+-    window.removeEventListener('resize', onWindowChange)
+-    window.removeEventListener('scroll', onWindowChange, true)
+-  }
+ }
+ 
+ const addTagToStudent = (tagId) => {
+@@ -425,10 +182,7 @@ const addTagToStudent = (tagId) => {
+     studentNumber: props.student.studentNumber,
+     tags: newTags
+   })
+-  // 关闭 picker 并清理监听器
+   showTagPicker.value = false
+-  window.removeEventListener('resize', onWindowChange)
+-  window.removeEventListener('scroll', onWindowChange, true)
+ }
+ 
+ const removeTag = (tagId) => {
+@@ -493,9 +247,9 @@ const deleteHandler = () => {
+ }
+ 
+ .student-item.selected {
+-  background: #e8f4f8;
+-  border: 2px solid #23587b;
+-  box-shadow: 0 4px 16px rgba(35, 88, 123, 0.25);
++  background: var(--color-bg-selected);
++  border-color: var(--color-primary);
++  box-shadow: 0 4px 16px rgba(35, 88, 123, 0.25), 0 0 0 1px var(--color-primary) inset;
+   transform: translateY(-2px);
+ }
+ 
+@@ -520,8 +274,8 @@ const deleteHandler = () => {
+   padding: 6px 12px;
+   font-size: 15px;
+   font-weight: 600;
+-  color: #23587b;
+-  background: #e8f4f8;
++  color: var(--color-primary);
++  background: var(--color-bg-selected);
+   border-radius: 6px;
+   cursor: pointer;
+   transition: all 0.2s;
+@@ -545,7 +299,7 @@ const deleteHandler = () => {
+   padding: 6px 12px;
+   font-size: 15px;
+   font-weight: 600;
+-  border: 2px solid #23587b;
++  border: 2px solid var(--color-primary);
+   border-radius: 6px;
+   outline: none;
+   text-align: center;
+@@ -591,7 +345,7 @@ const deleteHandler = () => {
+   padding: 4px 8px;
+   font-size: 16px;
+   font-weight: 500;
+-  border: 2px solid #23587b;
++  border: 2px solid var(--color-primary);
+   border-radius: 4px;
+   outline: none;
+   user-select: text;
+@@ -651,7 +405,7 @@ const deleteHandler = () => {
+ }
+ 
+ .add-tag-to-student-btn:hover {
+-  background: #23587b;
++  background: var(--color-primary);
+   color: white;
+ }
+ 
+@@ -661,7 +415,7 @@ const deleteHandler = () => {
+ 
+ .delete-student-btn {
+   padding: 7px 14px;
+-  background: #f44336;
++  background: var(--color-danger);
+   color: white;
+   border: none;
+   border-radius: 6px;
+@@ -673,7 +427,7 @@ const deleteHandler = () => {
+ }
+ 
+ .delete-student-btn:hover {
+-  background: #d32f2f;
++  background: var(--color-danger-hover);
+   box-shadow: 0 4px 8px rgba(244, 67, 54, 0.3);
+   transform: translateY(-1px);
+ }
+@@ -702,63 +456,7 @@ const deleteHandler = () => {
+   }
+ }
+ 
+-.tag-picker {
+-  /* position/top/left/zIndex 由 JS tagPickerStyle 动态设置（fixed 定位） */
+-  background: white;
+-  border: 2px solid #23587b;
+-  border-radius: 8px;
+-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+-  min-width: 220px;
+-  overflow-y: auto;
+-}
+-
+-.tag-picker::-webkit-scrollbar {
+-  width: 6px;
+-}
+-
+-.tag-picker::-webkit-scrollbar-track {
+-  background: #f1f1f1;
+-  border-radius: 3px;
+-}
+-
+-.tag-picker::-webkit-scrollbar-thumb {
+-  background: #bbb;
+-  border-radius: 3px;
+-}
+-
+-.tag-picker::-webkit-scrollbar-thumb:hover {
+-  background: #888;
+-}
+-
+-.tag-option {
+-  display: flex;
+-  align-items: center;
+-  gap: 10px;
+-  padding: 12px 16px;
+-  cursor: pointer;
+-  transition: background 0.2s;
+-  color: #333;
+-  font-size: 15px;
+-  font-weight: 500;
+-}
+ 
+-.tag-option:hover {
+-  background: #e8f4f8;
+-}
+-
+-.tag-dot {
+-  width: 14px;
+-  height: 14px;
+-  border-radius: 50%;
+-  flex-shrink: 0;
+-}
+-
+-.no-tags {
+-  padding: 16px;
+-  text-align: center;
+-  color: #999;
+-  font-size: 14px;
+-}
+ 
+ /* 响应式设计 - 移动设备 */
+ @media (max-width: 768px) {
+@@ -868,6 +566,7 @@ const deleteHandler = () => {
+ /* 拖拽样式 */
+ .student-item[draggable="true"] {
+   cursor: grab;
++  -webkit-user-drag: element;
+ }
+ 
+ .student-item[draggable="true"]:active {
+diff --git a/src/composables/useStudentData.js b/src/composables/useStudentData.js
+index 598e9a2..ebd054c 100644
+--- a/src/composables/useStudentData.js
++++ b/src/composables/useStudentData.js
+@@ -71,16 +71,29 @@ export function useStudentData() {
+   // 更新学生
+   const updateStudent = (studentId, studentData) => {
+     const student = students.value.find(s => s.id === studentId)
+-    if (student) {
+-      student.name = studentData.name
+-      student.studentNumber = studentData.studentNumber
+-      student.tags = studentData.tags
++    if (!student) return
++
++    // 学号防重：如果新设定的学号不为空，且已被他人使用，优先将他人的学号清空，避免同一班级出现两个相同学号
++    if (studentData.studentNumber !== null && studentData.studentNumber !== student.studentNumber) {
++      const conflictStudent = students.value.find(s => s.studentNumber === studentData.studentNumber && s.id !== studentId)
++      if (conflictStudent) {
++        conflictStudent.studentNumber = null
++      }
+     }
++
++    student.name = studentData.name?.trim() || ''
++    student.studentNumber = studentData.studentNumber
++    // 过滤掉无效(null/undefined)的标签，并进行去重防腐
++    student.tags = [...new Set((studentData.tags || []).filter(Boolean))]
+   }
+ 
+   // 删除学生
+   const deleteStudent = (studentId) => {
+     students.value = students.value.filter(s => s.id !== studentId)
++    // 健壮性：如果被删除的学生正处于选中状态，则清空焦点
++    if (selectedStudentId.value === studentId) {
++      selectedStudentId.value = null
++    }
+   }
+ 
+   // 从学生中移除指定标签

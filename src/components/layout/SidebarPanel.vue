@@ -793,7 +793,7 @@ const formatLogTime = (timestamp) => {
 .sidebar-panel {
   width: 20%;
   background: #f8f9fa;
-  color: #23587b;
+  color: var(--color-primary);
   display: flex;
   flex-direction: column;
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
@@ -910,7 +910,7 @@ const formatLogTime = (timestamp) => {
   transform: translateY(-50%);
   width: 4px;
   height: 0;
-  background: #23587b;
+  background: var(--color-primary);
   border-radius: 0 2px 2px 0;
   transition: height 0.3s ease;
 }
@@ -936,12 +936,12 @@ const formatLogTime = (timestamp) => {
 
 .tab-button:hover {
   background: rgba(35, 88, 123, 0.08);
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .tab-button.active {
   background: rgba(35, 88, 123, 0.12);
-  color: #23587b;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -1066,7 +1066,7 @@ const formatLogTime = (timestamp) => {
 
 .tab-header h3 {
   margin: 0;
-  color: #23587b;
+  color: var(--color-primary);
   font-size: 18px;
   font-weight: 600;
 }
@@ -1104,15 +1104,15 @@ const formatLogTime = (timestamp) => {
 
 .option-button:hover {
   background: #ffffff;
-  border-color: #23587b;
+  border-color: var(--color-primary);
   box-shadow: 0 2px 6px rgba(35, 88, 123, 0.15);
   transform: translateX(2px);
 }
 
 .option-button.primary {
-  background: #23587b;
+  background: var(--color-primary);
   color: white;
-  border-color: #23587b;
+  border-color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -1122,9 +1122,9 @@ const formatLogTime = (timestamp) => {
 }
 
 .option-button.active {
-  background: #23587b;
+  background: var(--color-primary);
   color: white;
-  border-color: #23587b;
+  border-color: var(--color-primary);
   box-shadow: 0 3px 10px rgba(35, 88, 123, 0.3);
 }
 
@@ -1186,7 +1186,7 @@ const formatLogTime = (timestamp) => {
 .input-group input[type="number"]:focus,
 .input-group input[type="text"]:focus {
   outline: none;
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .checkbox-label {
@@ -1274,7 +1274,7 @@ const formatLogTime = (timestamp) => {
 
 .tag-text-input:focus {
   outline: none;
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .tag-text-input::placeholder {
@@ -1391,7 +1391,7 @@ const formatLogTime = (timestamp) => {
 .log-title {
   font-weight: 600;
   font-size: 14px;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .log-clear-btn {
@@ -1407,8 +1407,8 @@ const formatLogTime = (timestamp) => {
 
 .log-clear-btn:hover {
   background: #f5f5f5;
-  border-color: #23587b;
-  color: #23587b;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .log-list {
@@ -1567,7 +1567,7 @@ const formatLogTime = (timestamp) => {
   }
 
   .tab-button.active {
-    color: #23587b;
+    color: var(--color-primary);
     background: rgba(35, 88, 123, 0.06);
     font-weight: 600;
   }
@@ -1738,12 +1738,12 @@ const formatLogTime = (timestamp) => {
 
 .diagram-dir-btn:hover {
   background: #e8f0f7;
-  border-color: #23587b;
-  color: #23587b;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .diagram-dir-btn.active {
-  background: #23587b;
+  background: var(--color-primary);
   color: #fff !important;
   border-color: #1a4460;
   box-shadow: 0 2px 6px rgba(35,88,123,0.35);
@@ -1785,12 +1785,12 @@ const formatLogTime = (timestamp) => {
 
 .diagram-col-btn:hover {
   background: #e8f0f7;
-  border-color: #23587b;
-  color: #23587b;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .diagram-col-btn.active {
-  background: #23587b;
+  background: var(--color-primary);
   color: #fff;
   border-color: #1a4460;
   box-shadow: 0 2px 6px rgba(35,88,123,0.3);
@@ -1812,12 +1812,12 @@ const formatLogTime = (timestamp) => {
 
 .diagram-row-btn:hover {
   background: #e8f0f7;
-  border-color: #23587b;
-  color: #23587b;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .diagram-row-btn.active {
-  background: #23587b;
+  background: var(--color-primary);
   color: #fff;
   border-color: #1a4460;
   box-shadow: 0 2px 6px rgba(35,88,123,0.3);
@@ -1848,7 +1848,7 @@ const formatLogTime = (timestamp) => {
 
 .diagram-cell-sm:hover {
   background: #c2d8ed;
-  border-color: #23587b;
+  border-color: var(--color-primary);
   transform: scale(1.15);
 }
 
@@ -1942,7 +1942,7 @@ const formatLogTime = (timestamp) => {
   border: 1.5px solid #cdd8e0;
   border-radius: 6px;
   font-size: 13px;
-  color: #23587b;
+  color: var(--color-primary);
   background: #fff;
   box-sizing: border-box;
   transition: border-color 0.2s;
@@ -1950,7 +1950,7 @@ const formatLogTime = (timestamp) => {
 
 .input-group-compact input:focus {
   outline: none;
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 /* ==================== 自动轮换 Tab 切换 ==================== */
@@ -1981,7 +1981,7 @@ const formatLogTime = (timestamp) => {
 }
 
 .shift-mode-tab.active {
-  background: #23587b;
+  background: var(--color-primary);
   color: #fff;
   box-shadow: 0 2px 4px rgba(35,88,123,0.2);
 }
@@ -1997,12 +1997,12 @@ const formatLogTime = (timestamp) => {
 .zone-rot-section-title {
   font-size: 13px;
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .zone-rot-add-btn {
   padding: 4px 10px;
-  background: #23587b;
+  background: var(--color-primary);
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -2037,12 +2037,12 @@ const formatLogTime = (timestamp) => {
 }
 
 .zone-rot-item:hover {
-  border-color: #23587b;
+  border-color: var(--color-primary);
   background: #f0f6fa;
 }
 
 .zone-rot-item.selected {
-  border-color: #23587b;
+  border-color: var(--color-primary);
   background: rgba(35, 88, 123, 0.08);
   box-shadow: 0 0 0 2px rgba(35,88,123,0.15);
 }
@@ -2117,7 +2117,7 @@ const formatLogTime = (timestamp) => {
 
 .zone-rot-type-badge.cycle {
   background: rgba(35,88,123,0.15);
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .zone-rot-type-badge.swap {
@@ -2160,7 +2160,7 @@ const formatLogTime = (timestamp) => {
   border: 1.5px dashed #b0c8dc;
   border-radius: 6px;
   font-size: 12px;
-  color: #23587b;
+  color: var(--color-primary);
   background: #fff;
   cursor: pointer;
   outline: none;
@@ -2168,7 +2168,7 @@ const formatLogTime = (timestamp) => {
 }
 
 .zone-rot-select:focus {
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .zone-rot-group-error {
@@ -2194,8 +2194,8 @@ const formatLogTime = (timestamp) => {
 }
 
 .zone-rot-add-zone-btn:hover {
-  border-color: #23587b;
-  color: #23587b;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
   background: #f0f6fa;
 }
 
@@ -2217,13 +2217,13 @@ const formatLogTime = (timestamp) => {
   border: 1px solid rgba(35,88,123,0.25);
   border-radius: 8px;
   font-size: 12px;
-  color: #23587b;
+  color: var(--color-primary);
   margin-bottom: 8px;
 }
 
 .zone-rot-hint-close {
   padding: 2px 8px;
-  background: #23587b;
+  background: var(--color-primary);
   color: #fff;
   border: none;
   border-radius: 5px;
@@ -2250,7 +2250,7 @@ const formatLogTime = (timestamp) => {
 }
 .zone-rot-name-input:focus {
   background: #fff;
-  border-bottom: 1.5px solid #23587b;
+  border-bottom: 1.5px solid var(--color-primary);
 }
 
 .zone-rot-zone-name-input {
@@ -2266,7 +2266,7 @@ const formatLogTime = (timestamp) => {
 }
 .zone-rot-zone-name-input:focus {
   background: #fff;
-  border-bottom: 1px solid #23587b;
+  border-bottom: 1px solid var(--color-primary);
 }
 
 /* 颜色点：可交互（切换编辑） */

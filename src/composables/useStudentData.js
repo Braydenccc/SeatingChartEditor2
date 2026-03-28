@@ -71,16 +71,29 @@ export function useStudentData() {
   // 更新学生
   const updateStudent = (studentId, studentData) => {
     const student = students.value.find(s => s.id === studentId)
-    if (student) {
-      student.name = studentData.name
-      student.studentNumber = studentData.studentNumber
-      student.tags = studentData.tags
+    if (!student) return
+
+    // 学号防重：如果新设定的学号不为空，且已被他人使用，优先将他人的学号清空，避免同一班级出现两个相同学号
+    if (studentData.studentNumber !== null && studentData.studentNumber !== student.studentNumber) {
+      const conflictStudent = students.value.find(s => s.studentNumber === studentData.studentNumber && s.id !== studentId)
+      if (conflictStudent) {
+        conflictStudent.studentNumber = null
+      }
     }
+
+    student.name = studentData.name?.trim() || ''
+    student.studentNumber = studentData.studentNumber
+    // 过滤掉无效(null/undefined)的标签，并进行去重防腐
+    student.tags = [...new Set((studentData.tags || []).filter(Boolean))]
   }
 
   // 删除学生
   const deleteStudent = (studentId) => {
     students.value = students.value.filter(s => s.id !== studentId)
+    // 健壮性：如果被删除的学生正处于选中状态，则清空焦点
+    if (selectedStudentId.value === studentId) {
+      selectedStudentId.value = null
+    }
   }
 
   // 从学生中移除指定标签

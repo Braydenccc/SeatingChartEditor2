@@ -1,5 +1,17 @@
 @import './base.css';
 
+:root {
+  --color-primary: #23587b;
+  --color-primary-light: #2d6a94;
+  --color-bg-selected: #e8f4f8;
+  --color-danger: #f44336;
+  --color-danger-hover: #d32f2f;
+  
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
 #app {
   font-weight: normal;
 }

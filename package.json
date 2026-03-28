@@ -19,6 +19,7 @@
     "deploy:main": "git checkout main && git merge dev --no-edit && git push origin main && git checkout dev"
   },
   "dependencies": {
+    "@vueuse/core": "^14.2.1",
     "bcryptjs": "^3.0.3",
     "pkg": "^5.8.1",
     "vue": "^3.5.22",
