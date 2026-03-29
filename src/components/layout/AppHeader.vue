@@ -59,10 +59,11 @@
 </template>
 
 <script setup>
-import { onMounted, ref, onBeforeUnmount, computed } from 'vue'
+import { onMounted, ref, onBeforeUnmount, computed, defineAsyncComponent } from 'vue'
 import { useAuth } from '@/composables/useAuth'
-import CloudWorkspaceDialog from '../workspace/CloudWorkspaceDialog.vue'
-import SyncSettingsDialog from '../auth/SyncSettingsDialog.vue'
+
+const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
+const SyncSettingsDialog = defineAsyncComponent(() => import('../auth/SyncSettingsDialog.vue'))
 
 const emit = defineEmits(['open-login'])
 
