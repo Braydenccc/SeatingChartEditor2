@@ -1,8 +1,17 @@
-import * as XLSX from 'xlsx-js-style'
+// 移除了顶层 eager 导入：import * as XLSX from 'xlsx-js-style'
+// 该重型组件通过 loadXlsx() 函数按需动态加载，显著减小初始包大小。
+
+let xlsxInstance = null
+const loadXlsx = async () => {
+    if (xlsxInstance) return xlsxInstance
+    xlsxInstance = await import('xlsx-js-style')
+    return xlsxInstance
+}
 
 export function useExcelData() {
   // 下载空白模板
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await loadXlsx()
     // 创建示例数据
     const templateData = [
       ['学号', '姓名', '性别', '不修', '830', '住宿生', '午休', '周五走'],
@@ -19,7 +28,8 @@ export function useExcelData() {
   }
 
   // 从Excel导入 - 返回原始数据供调用者处理
-  const importFromExcel = (file) => {
+  const importFromExcel = async (file) => {
+    const XLSX = await loadXlsx()
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
 
@@ -166,7 +176,8 @@ export function useExcelData() {
   }
 
   // 导出到Excel
-  const exportToExcel = (students, tags) => {
+  const exportToExcel = async (students, tags) => {
+    const XLSX = await loadXlsx()
     if (!students || students.length === 0) {
       alert('没有学生数据可导出')
       return
@@ -207,7 +218,8 @@ export function useExcelData() {
   /**
    * 核心函数：生成用于导出的 Excel 工作簿和主工作表（用于直接渲染高保真预览或文件导出）
    */
-  const generateSeatChartWorkbook = (organizedSeats, students, tags = [], seatConfig, options = {}) => {
+  const generateSeatChartWorkbook = async (organizedSeats, students, tags = [], seatConfig, options = {}) => {
+    const XLSX = await loadXlsx()
     const {
       showStudentId    = true,
       showRowNumbers   = true,
@@ -478,8 +490,9 @@ export function useExcelData() {
   /**
    * 将座位表导出为 Excel 并触发下载
    */
-  const exportSeatChartToExcel = (organizedSeats, students, tags = [], seatConfig, options = {}) => {
-    const { wb } = generateSeatChartWorkbook(organizedSeats, students, tags, seatConfig, options)
+  const exportSeatChartToExcel = async (organizedSeats, students, tags = [], seatConfig, options = {}) => {
+    const XLSX = await loadXlsx()
+    const { wb } = await generateSeatChartWorkbook(organizedSeats, students, tags, seatConfig, options)
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     XLSX.writeFile(wb, `座位表_${timestamp}.xlsx`)
   }
@@ -487,8 +500,9 @@ export function useExcelData() {
   /**
    * 将座位表导出为 ArrayBuffer, 供上传云端使用
    */
-  const exportSeatChartToExcelBuffer = (organizedSeats, students, tags = [], seatConfig, options = {}) => {
-    const { wb } = generateSeatChartWorkbook(organizedSeats, students, tags, seatConfig, options)
+  const exportSeatChartToExcelBuffer = async (organizedSeats, students, tags = [], seatConfig, options = {}) => {
+    const XLSX = await loadXlsx()
+    const { wb } = await generateSeatChartWorkbook(organizedSeats, students, tags, seatConfig, options)
     return XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
   }
 

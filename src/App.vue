@@ -4,8 +4,9 @@
 import AppHeader from './components/layout/AppHeader.vue'
 import EditorPanel from './components/layout/EditorPanel.vue'
 import SidebarPanel from './components/layout/SidebarPanel.vue'
-import LoginDialog from './components/auth/LoginDialog.vue'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
+
+const LoginDialog = defineAsyncComponent(() => import('./components/auth/LoginDialog.vue'))
 import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
 import { useWorkspace } from '@/composables/useWorkspace'

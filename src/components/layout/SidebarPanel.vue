@@ -385,7 +385,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
+
+const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
+const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
+const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
+
 import { useSidebar } from '@/composables/useSidebar'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useEditMode } from '@/composables/useEditMode'
@@ -402,10 +407,7 @@ import { useSeatRules } from '@/composables/useSeatRules'
 import { useZoneData } from '@/composables/useZoneData'
 import { useZoneRotation } from '@/composables/useZoneRotation'
 import ZoneList from '../zone/ZoneList.vue'
-import SeatRuleEditor from '../relation/SeatRuleEditor.vue'
 import AssignmentInlineReport from '../rule/AssignmentInlineReport.vue'
-import ExportDialog from './ExportPreview.vue'
-import CloudWorkspaceDialog from '../workspace/CloudWorkspaceDialog.vue'
 import { useAuth } from '@/composables/useAuth'
 
 const { activeTab, mobileMenuOpen, setActiveTab, closeMobileMenu } = useSidebar()
