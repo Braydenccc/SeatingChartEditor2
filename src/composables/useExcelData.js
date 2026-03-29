@@ -1,11 +1,15 @@
+import { shallowRef } from 'vue'
+
 // 移除了顶层 eager 导入：import * as XLSX from 'xlsx-js-style'
 // 该重型组件通过 loadXlsx() 函数按需动态加载，显著减小初始包大小。
 
-let xlsxInstance = null
-const loadXlsx = async () => {
-    if (xlsxInstance) return xlsxInstance
-    xlsxInstance = await import('xlsx-js-style')
-    return xlsxInstance
+export const xlsxInstance = shallowRef(null)
+export const loadXlsx = async () => {
+    if (xlsxInstance.value) return xlsxInstance.value
+    const mod = await import('xlsx-js-style')
+    // 处理 CJS/ESM 混合情况下的 .default 导出
+    xlsxInstance.value = mod.default || mod
+    return xlsxInstance.value
 }
 
 export function useExcelData() {
@@ -507,6 +511,8 @@ export function useExcelData() {
   }
 
   return {
+    xlsxInstance,
+    loadXlsx,
     downloadTemplate,
     importFromExcel,
     exportToExcel,

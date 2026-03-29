@@ -178,7 +178,11 @@
             <template v-if="activeTab === 'excel'">
               <div class="excel-preview-wrap">
                 <div class="excel-preview-hint">预览（与实际 Excel 文件布局一致）</div>
-                <div class="excel-preview-scroll" ref="excelScrollRef">
+                <div v-if="isExcelGenerating" class="excel-preview-loading">
+                  <div class="spinner"></div>
+                  <span>正在生成 Excel 预览...</span>
+                </div>
+                <div v-else class="excel-preview-scroll" ref="excelScrollRef">
                   <div class="excel-preview-scale-wrapper" :style="{ zoom: Math.min(1, excelScale) }">
                     <div v-html="excelPreviewHtml" class="excel-preview-content" ref="excelContentRef"></div>
                   </div>
@@ -224,7 +228,6 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import * as XLSX from 'xlsx-js-style'
 import { useExportSettings } from '@/composables/useExportSettings'
 import { useImageExport } from '@/composables/useImageExport'
 import { useTagData } from '@/composables/useTagData'
@@ -241,7 +244,7 @@ const emit = defineEmits(['close', 'exported'])
 const { exportSettings, initializeTagSettings, updateTagSetting } = useExportSettings()
 const { exportToImage } = useImageExport()
 const { tags } = useTagData()
-const { exportSeatChartToExcel, exportSeatChartToExcelBuffer, generateSeatChartWorkbook } = useExcelData()
+const { exportSeatChartToExcel, exportSeatChartToExcelBuffer, generateSeatChartWorkbook, loadXlsx, xlsxInstance } = useExcelData()
 const { organizedSeats, seatConfig } = useSeatChart()
 const { students } = useStudentData()
 const { authType, webdavConfig } = useAuth()
@@ -251,6 +254,7 @@ const { loadCloudSettings, saveCloudSettings } = useCloudWorkspace()
 const activeTab = ref('image')
 const previewUrl = ref('')
 const isGenerating = ref(false)
+const isExcelGenerating = ref(false)
 const isExcelDownloading = ref(false)
 const tagSettingsLocal = ref({})
 let debounceTimer = null
@@ -292,37 +296,73 @@ const getTagStudentCount = (tagId) => {
 // ── HTML 转义（防止学生名字中含有 < > & 等字符破坏预览）
 const esc = (str) => String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-// ── 生成原生 Excel Workbook (缓存用于各 Sheet 预览) ──
-const excelWorkbook = computed(() => {
-  if (activeTab.value !== 'excel') return null
+const excelWorkbook = ref(null)
 
-  const es = exportSettings.value
+const updateExcelWorkbook = async () => {
+  if (activeTab.value !== 'excel' || !props.visible) return
   
-  const { wb } = generateSeatChartWorkbook(
-    organizedSeats.value,
-    students.value,
-    tags.value,
-    seatConfig.value,
-    {
-      showStudentId:    es.excelShowStudentId,
-      showRowNumbers:   es.excelShowRowNumbers,
-      showGroupLabels:  es.excelShowGroupLabels,
-      showTitle:        es.excelShowTitle,
-      showPodium:       es.excelShowPodium,
-      reverseOrder:     es.excelReverseOrder,
-      showGroupGap:     es.excelShowGroupGap,
-      colorMode:        es.excelColorMode,
-      nameFontSize:     es.excelNameFontSize,
-      idFontSize:       es.excelIdFontSize,
-      cellWidth:        es.excelCellWidth,
-      seatRowHeight:    es.excelSeatRowHeight,
-      showTagTable:     es.excelShowTagTable,
-      tagTableNewSheet: es.excelTagTableNewSheet,
-      title:            es.title || '班级座位表'
+  isExcelGenerating.value = true
+  try {
+    const es = exportSettings.value
+    const { wb } = await generateSeatChartWorkbook(
+      organizedSeats.value,
+      students.value,
+      tags.value,
+      seatConfig.value,
+      {
+        showStudentId:    es.excelShowStudentId,
+        showRowNumbers:   es.excelShowRowNumbers,
+        showGroupLabels:  es.excelShowGroupLabels,
+        showTitle:        es.excelShowTitle,
+        showPodium:       es.excelShowPodium,
+        reverseOrder:     es.excelReverseOrder,
+        showGroupGap:     es.excelShowGroupGap,
+        colorMode:        es.excelColorMode,
+        nameFontSize:     es.excelNameFontSize,
+        idFontSize:       es.excelIdFontSize,
+        cellWidth:        es.excelCellWidth,
+        seatRowHeight:    es.excelSeatRowHeight,
+        showTagTable:     es.excelShowTagTable,
+        tagTableNewSheet: es.excelTagTableNewSheet,
+        title:            es.title || '班级座位表'
+      }
+    )
+    excelWorkbook.value = wb
+  } catch (e) {
+    console.error('Failed to generate excel workbook:', e)
+  } finally {
+    isExcelGenerating.value = false
+  }
+}
+
+// 监听设置变化以更新工作簿
+watch(
+  () => [
+    activeTab.value,
+    props.visible,
+    exportSettings.value.excelShowStudentId,
+    exportSettings.value.excelShowRowNumbers,
+    exportSettings.value.excelShowGroupLabels,
+    exportSettings.value.excelShowTitle,
+    exportSettings.value.excelShowPodium,
+    exportSettings.value.excelReverseOrder,
+    exportSettings.value.excelShowGroupGap,
+    exportSettings.value.excelColorMode,
+    exportSettings.value.excelNameFontSize,
+    exportSettings.value.excelIdFontSize,
+    exportSettings.value.excelCellWidth,
+    exportSettings.value.excelSeatRowHeight,
+    exportSettings.value.excelShowTagTable,
+    exportSettings.value.excelTagTableNewSheet,
+    exportSettings.value.title
+  ],
+  () => {
+    if (activeTab.value === 'excel' && props.visible) {
+      updateExcelWorkbook()
     }
-  )
-  return wb
-})
+  },
+  { deep: true }
+)
 
 // 监听 workbook 变化以更新选项卡
 watch(() => excelWorkbook.value?.SheetNames, (names) => {
@@ -344,7 +384,15 @@ const excelPreviewHtml = computed(() => {
   const ws = wb.Sheets[names[idx]]
   if (!ws) return ''
   
-  const range = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : { e: { r: 0, c: 0 } }
+  // 由于 XLSX 现在是异步加载的，我们需要通过 loadXlsx 动态获取，但 computed 不能异步
+  // 幸好预览逻辑主入口在 updateExcelWorkbook，那里已经加载过了全局单例
+  // 但为了安全，我们还是在渲染函数内部通过 ref 或者是缓存来处理
+  // 此处假设 xlsxInstance 已经在 generateSeatChartWorkbook 内部被初始化
+  // 我们可以通过一个同步的获取方式拿到缓存的实例
+  const XLSX_READY = xlsxInstance.value; 
+  if (!XLSX_READY) return '<div class="preview-loading">正在初始化 Excel 组件...</div>'
+
+  const range = ws['!ref'] ? XLSX_READY.utils.decode_range(ws['!ref']) : { e: { r: 0, c: 0 } }
   const maxRow = range.e.r
   const maxCol = range.e.c
 
@@ -476,6 +524,13 @@ const excelPreviewHtml = computed(() => {
   return html
 })
 
+// 监听 tab 切换，如果切到 excel 则根据当前状态看是否需要更新
+watch(() => [activeTab.value, props.visible], ([tab, vis]) => {
+  if (tab === 'excel' && vis && !excelWorkbook.value) {
+    updateExcelWorkbook()
+  }
+}, { immediate: true })
+
 
 // ── 标签本地副本 ──
 const initTagLocal = () => {
@@ -536,7 +591,7 @@ const handleExcelDownload = async () => {
   isExcelDownloading.value = true
   try {
     const es = exportSettings.value
-    exportSeatChartToExcel(
+    await exportSeatChartToExcel(
       organizedSeats.value,
       students.value,
       tags.value,
@@ -609,7 +664,7 @@ const handleCloudExportExcel = async () => {
   isUploading.value = true
   try {
     const es = exportSettings.value
-    const buffer = exportSeatChartToExcelBuffer(
+    const buffer = await exportSeatChartToExcelBuffer(
       organizedSeats.value,
       students.value,
       tags.value,
@@ -922,6 +977,36 @@ onBeforeUnmount(() => {
 .excel-tab-btn:hover {
   background: #fafafa;
 }
+.excel-preview-scale-wrapper {
+  transform-origin: top center;
+}
+
+.excel-preview-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  gap: 12px;
+  color: #23587b;
+  font-size: 14px;
+}
+
+.excel-preview-loading .spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(35, 88, 123, 0.1);
+  border-top: 3px solid #23587b;
+  border-radius: 50%;
+  animation: excel-spin 1s linear infinite;
+}
+
+@keyframes excel-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .excel-tab-btn.active {
   background: #fff;
   border-bottom: 1px solid #fff;
