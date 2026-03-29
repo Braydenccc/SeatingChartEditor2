@@ -4,9 +4,14 @@
 import AppHeader from './components/layout/AppHeader.vue'
 import EditorPanel from './components/layout/EditorPanel.vue'
 import SidebarPanel from './components/layout/SidebarPanel.vue'
+import LoadingSpinner from './components/ui/LoadingSpinner.vue'
 import { ref, onMounted, defineAsyncComponent } from 'vue'
 
-const LoginDialog = defineAsyncComponent(() => import('./components/auth/LoginDialog.vue'))
+const LoginDialog = defineAsyncComponent({
+  loader: () => import('./components/auth/LoginDialog.vue'),
+  loadingComponent: LoadingSpinner,
+  delay: 200 // 仅在加载超过 200ms 时显示 Loading，避免快速网速下的闪烁
+})
 import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
 import { useWorkspace } from '@/composables/useWorkspace'
@@ -52,6 +57,24 @@ onMounted(async () => {
   } else if (lastWs && lastWs.type === 'local') {
     success(`欢迎回来！上次任务：${lastWs.name} (本地文件需手动再次加载)`)
   }
+
+  // --- 静默预乘 (Prefetch) ---
+  // 利用浏览器空闲时间，提前在后台加载重型组件的 JS 碎片
+  // 这样当用户点击按钮时，资源已在本地缓存，实现“秒开”
+  const prefetchAsyncComponents = () => {
+    const idleCallback = window.requestIdleCallback || ((cb) => setTimeout(cb, 2000))
+    idleCallback(() => {
+      // 预乘主要弹窗组件
+      import('./components/auth/LoginDialog.vue')
+      import('./components/relation/SeatRuleEditor.vue')
+      import('./components/layout/ExportPreview.vue')
+      import('./components/workspace/CloudWorkspaceDialog.vue')
+      // 预乘重型库（xlsx）
+      import('xlsx-js-style')
+    })
+  }
+  
+  prefetchAsyncComponents()
 })
 </script>
 

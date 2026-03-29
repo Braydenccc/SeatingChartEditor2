@@ -386,10 +386,23 @@
 
 <script setup>
 import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
+import LoadingSpinner from '../ui/LoadingSpinner.vue'
 
-const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
-const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
-const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
+const SeatRuleEditor = defineAsyncComponent({
+  loader: () => import('../relation/SeatRuleEditor.vue'),
+  loadingComponent: LoadingSpinner,
+  delay: 200
+})
+const ExportDialog = defineAsyncComponent({
+  loader: () => import('./ExportPreview.vue'),
+  loadingComponent: LoadingSpinner,
+  delay: 200
+})
+const CloudWorkspaceDialog = defineAsyncComponent({
+  loader: () => import('../workspace/CloudWorkspaceDialog.vue'),
+  loadingComponent: LoadingSpinner,
+  delay: 200
+})
 
 import { useSidebar } from '@/composables/useSidebar'
 import { useSeatChart } from '@/composables/useSeatChart'
