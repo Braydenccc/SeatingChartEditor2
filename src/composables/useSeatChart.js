@@ -310,6 +310,117 @@ export function useSeatChart() {
     })
   }
 
+  // ==================== 拓扑判定工具（纯函数，供规则引擎使用）====================
+
+  /**
+   * 判断座位是否在指定行范围内
+   * 讲台在最下方，行数从下往上数（前排为 1=离讲台最近的排，即图形底部的排，rowIndex 最大）
+   * @param {string} seatId
+   * @param {number} minRow - 最小排数（含），1-indexed
+   * @param {number} maxRow - 最大排数（含），1-indexed
+   */
+  const isInRowRange = (seatId, minRow, maxRow) => {
+    const { rowIndex } = parseSeatId(seatId)
+    const totalRows = seatConfig.value.seatsPerColumn
+    const rowFromPodium = totalRows - rowIndex // 讲台在最下方，rowIndex 最大即第 1 排
+    return rowFromPodium >= minRow && rowFromPodium <= maxRow
+  }
+
+  /**
+   * 获取座位的列类型
+   * - wall: 每个大组的最左或最右列（groupIndex 的两端列）
+   * - aisle: 紧邻走廊的列（大组内的最外列，每组最左列和最右列）
+   * - center: 既非 wall 也非 aisle 的中间列
+   *
+   * 简化规则：
+   *   columnsPerGroup = 2 时：所有列都是 edge（wall+aisle 重合）
+   *   columnsPerGroup > 2 时：
+   *     columnIndex 0 或 columnsPerGroup-1 的是 aisle（紧邻走廊的组外侧）
+   *     同时 groupIndex 0 的 columnIndex 0 也是 wall（最左墙）
+   *     groupIndex groupCount-1 的 columnIndex columnsPerGroup-1 也是 wall（最右墙）
+   */
+  const getColumnType = (seatId) => {
+    const { groupIndex, columnIndex } = parseSeatId(seatId)
+    const { groupCount, columnsPerGroup } = seatConfig.value
+
+    const isFirstGroup = groupIndex === 0
+    const isLastGroup = groupIndex === groupCount - 1
+    const isFirstCol = columnIndex === 0
+    const isLastCol = columnIndex === columnsPerGroup - 1
+
+    // 最边缘的墙边列（整个座位图的最左/最右列）
+    const isWall = (isFirstGroup && isFirstCol) || (isLastGroup && isLastCol)
+
+    // 靠近走廊的列（大组两侧的最外列）
+    const isAisle = isFirstCol || isLastCol
+
+    if (isWall) return 'wall'
+    if (isAisle) return 'aisle'
+    return 'center'
+  }
+
+  /**
+   * 判断座位是否为指定列类型
+   * columnType: 'wall' | 'aisle' | 'edge' | 'center'
+   * edge = wall + aisle
+   */
+  const isColumnType = (seatId, columnType) => {
+    const type = getColumnType(seatId)
+    if (columnType === 'edge') return type === 'wall' || type === 'aisle'
+    return type === columnType
+  }
+
+  /**
+   * 判断 seatId1 是否在 seatId2 的视线前方（即 seatId1 遮挡 seatId2）
+   * 讲台在下方：rowIndex 越大的座位在屏幕上越靠下，离讲台越近。
+   * 若 s1 遮挡 s2，则 s1 必须在 s2 前方（离讲台更近），即 s1.rowIndex 必须更大。
+   * @param {string} seatId1 - 遮挡者（在前方，离讲台更近）
+   * @param {string} seatId2 - 被遮挡者（在后方，离讲台更远）
+   * @param {number} tolerance - 0=仅正前方; 1=正前方±1列
+   */
+  const isDirectlyBehind = (seatId1, seatId2, tolerance = 0) => {
+    const s1 = parseSeatId(seatId1)
+    const s2 = parseSeatId(seatId2)
+
+    // 遮挡者必须在被遮挡者的前方（离讲台更近，因此 rowIndex 必须更大）
+    if (s1.rowIndex <= s2.rowIndex) return false
+
+    // 遮挡者必须在同大组
+    if (s1.groupIndex !== s2.groupIndex) return false
+
+    const colDiff = Math.abs(s1.columnIndex - s2.columnIndex)
+    return colDiff <= tolerance
+  }
+
+  /**
+   * 判断两个座位是否在相邻排（同大组，行差为 1）
+   */
+  const isAdjacentRow = (seatId1, seatId2) => {
+    const s1 = parseSeatId(seatId1)
+    const s2 = parseSeatId(seatId2)
+    if (s1.groupIndex !== s2.groupIndex) return false
+    return Math.abs(s1.rowIndex - s2.rowIndex) === 1
+  }
+
+  /**
+   * 判断座位是否在指定大组范围内（1-indexed，1=最左大组）
+   */
+  const isInGroupRange = (seatId, minGroup, maxGroup) => {
+    const { groupIndex } = parseSeatId(seatId)
+    const group1 = groupIndex + 1 // 转为 1-indexed
+    return group1 >= minGroup && group1 <= maxGroup
+  }
+
+  /**
+   * 获取座位表总行数
+   */
+  const getTotalRows = () => seatConfig.value.seatsPerColumn
+
+  /**
+   * 获取座位所在大组（1-indexed）
+   */
+  const getSeatGroup = (seatId) => parseSeatId(seatId).groupIndex + 1
+
   return {
     seatConfig,
     seats,
@@ -333,6 +444,15 @@ export function useSeatChart() {
     getSeatDistance,
     getAdjacentSeats,
     validateRepulsion,
-    getDangerZoneSeats
+    getDangerZoneSeats,
+    // 规则引擎拓扑判定（新增）
+    isInRowRange,
+    getColumnType,
+    isColumnType,
+    isDirectlyBehind,
+    isAdjacentRow,
+    isInGroupRange,
+    getTotalRows,
+    getSeatGroup
   }
 }

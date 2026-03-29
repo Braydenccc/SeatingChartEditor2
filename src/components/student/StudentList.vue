@@ -52,7 +52,6 @@ import EmptyState from '../ui/EmptyState.vue'
 import { useTagData, initializeTags } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
 import { useZoneData } from '@/composables/useZoneData'
-import { useSeatRelation } from '@/composables/useSeatRelation'
 import { useExportSettings } from '@/composables/useExportSettings'
 
 // 初始化数据
@@ -64,7 +63,6 @@ onMounted(() => {
 const { tags, addTag, editTag, deleteTag } = useTagData()
 const { students, addStudent, setStudentCount, updateStudent, deleteStudent, removeTagFromStudents } = useStudentData()
 const { removeTagFromAllZones } = useZoneData()
-const { cleanupInvalidRelations } = useSeatRelation()
 const { exportSettings } = useExportSettings()
 
 // 学生人数控制
@@ -128,9 +126,6 @@ const handleUpdateStudent = (studentId, studentData) => {
 
 const handleDeleteStudent = (studentId) => {
   deleteStudent(studentId)
-  // 清理该学生的联系关系
-  const validStudentIds = students.value.map(s => s.id)
-  cleanupInvalidRelations(validStudentIds)
   isCountError.value = false
 }
 </script>

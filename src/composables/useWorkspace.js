@@ -2,9 +2,7 @@ import { useStudentData } from './useStudentData'
 import { useTagData } from './useTagData'
 import { useSeatChart } from './useSeatChart'
 import { useExportSettings } from './useExportSettings'
-import { useSeatRelation } from './useSeatRelation'
 import { useZoneData } from './useZoneData'
-import { RelationType, RelationStrength } from '../constants/relationTypes.js'
 import { useLogger } from './useLogger'
 
 const FILE_EXT = '.sce'
@@ -15,7 +13,6 @@ export function useWorkspace() {
   const { tags, addTag, clearAllTags } = useTagData()
   const { seatConfig, seats, updateConfig, clearAllSeats } = useSeatChart()
   const { exportSettings } = useExportSettings()
-  const { relations, clearAllRelations, addRelation } = useSeatRelation()
   const { zones, clearAllZones, addZone, updateZone } = useZoneData()
   const { success, error } = useLogger()
 
@@ -50,14 +47,6 @@ export function useWorkspace() {
             empty: s.isEmpty || false
           }))
         },
-        relations: relations.value.map(r => ({
-          id: r.id,
-          s1: r.studentId1,
-          s2: r.studentId2,
-          type: r.relationType,
-          strength: r.strength || 'high',
-          meta: r.metadata || {}
-        })),
         zones: zones.value.map(z => ({
           id: z.id,
           name: z.name,
@@ -205,25 +194,8 @@ export function useWorkspace() {
           })
         }
 
-        // 恢复联系关系
-        if (workspace.relations && Array.isArray(workspace.relations)) {
-          clearAllRelations()
-          workspace.relations.forEach(r => {
-            const newStudentId1 = oldStudentIdToNewId[r.s1]
-            const newStudentId2 = oldStudentIdToNewId[r.s2]
-
-            // 只有当两个学生都成功映射时才恢复联系
-            if (newStudentId1 && newStudentId2) {
-              addRelation(
-                newStudentId1,
-                newStudentId2,
-                r.type,
-                r.strength || 'high',
-                r.meta || {}
-              )
-            }
-          })
-        }
+        // 注意：旧版的 relations (人际关系) 已被废弃，我们不再从存档中恢复它们。
+        // 如有需要，用户应使用最新的 SeatRules (座位规则) 机制进行配置。
 
         // 恢复选区数据
         if (workspace.zones && Array.isArray(workspace.zones)) {
@@ -256,17 +228,9 @@ export function useWorkspace() {
   function migrateWorkspace(ws) {
     const version = ws.meta?.version || ws.version || '1.0'
 
-    // v1.0 → v1.1：bindings → relations
+    // v1.0 → v1.1：bindings → relations (忽略)
     if (version === '1.0') {
       if (ws.bindings && Array.isArray(ws.bindings)) {
-        ws.relations = ws.bindings.map(b => ({
-          id: b.id,
-          s1: b.studentId1,
-          s2: b.studentId2,
-          type: RelationType.ATTRACTION,
-          strength: RelationStrength.HIGH,
-          meta: { allowAdjacent: true, minDistance: 0 }
-        }))
         delete ws.bindings
       }
     }
@@ -289,16 +253,9 @@ export function useWorkspace() {
       delete ws.seatConfig
       delete ws.seats
 
-      // 迁移 relations 字段名
+      // 丢弃旧的 relations
       if (ws.relations) {
-        ws.relations = ws.relations.map(r => ({
-          id: r.id,
-          s1: r.studentId1 || r.s1,
-          s2: r.studentId2 || r.s2,
-          type: r.relationType || r.type,
-          strength: r.strength || 'high',
-          meta: r.metadata || r.meta || {}
-        }))
+        delete ws.relations
       }
 
       // 添加 meta
@@ -312,7 +269,6 @@ export function useWorkspace() {
     }
 
     // 确保默认值
-    ws.relations = ws.relations || []
     ws.zones = ws.zones || []
     ws.exportSettings = ws.exportSettings || {}
 

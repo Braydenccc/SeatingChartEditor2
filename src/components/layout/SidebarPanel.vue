@@ -240,21 +240,35 @@
           <!-- 选区列表 -->
           <ZoneList />
 
-          <div class="options-group">
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="useRelations" />
-              <span>使用座位联系</span>
-            </label>
-            <button v-show="useRelations" class="option-button primary" @click="showRelationEditor = true">
-              <span>座位联系编辑</span>
+          <!-- 规则快捷管理 -->
+          <div class="options-group assign-rule-group">
+            <button class="option-button rule-shortcut-btn" @click="showRuleEditor = true">
+              <span class="rule-shortcut-icon">📋</span>
+              <span class="rule-shortcut-text">规则管理</span>
+              <span v-if="ruleCount > 0" class="rule-badge">{{ ruleCount }}</span>
             </button>
           </div>
 
+          <!-- 进度条 -->
+          <div v-if="isAssigning" class="assign-progress-wrap">
+            <div class="assign-progress-bar" :style="{ width: assignmentProgress + '%' }"></div>
+            <span class="assign-progress-text">{{ assignmentProgress }}%</span>
+          </div>
+
+
+
           <div class="options-group">
             <button id="applyAssign" class="option-button primary" :disabled="isAssigning" @click="handleRunAssignment">
-              <span>{{ isAssigning ? '排位中...' : '运行排位' }}</span>
+              <span>{{ isAssigning ? '排位中...' : '🚀 智能排位' }}</span>
             </button>
           </div>
+
+          <!-- 排位报告内联显示 -->
+          <AssignmentInlineReport 
+            v-if="lastAssignmentReport !== null && !isAssigning"
+            :report="lastAssignmentReport" 
+            :duration="lastAssignmentDuration" 
+          />
         </div>
 
         <!-- 导出座位表图片 -->
@@ -315,8 +329,10 @@
     @success="handleCloudSuccess"
   />
 
-  <!-- 座位联系编辑器模态框 -->
-  <SeatRelationEditor :visible="showRelationEditor" @close="showRelationEditor = false" />
+  <!-- 座位规则编辑器模态框 -->
+  <SeatRuleEditor :visible="showRuleEditor" initialTab="rules" @close="showRuleEditor = false" />
+
+
 </template>
 
 <script setup>
@@ -333,11 +349,12 @@ import { useExcelData } from '@/composables/useExcelData'
 import { useWorkspace } from '@/composables/useWorkspace'
 import { useLogger } from '@/composables/useLogger'
 import { useConfirmAction } from '@/composables/useConfirmAction'
-import { useSeatRelation } from '@/composables/useSeatRelation'
+import { useSeatRules } from '@/composables/useSeatRules'
 import { useZoneData } from '@/composables/useZoneData'
 import { useZoneRotation } from '@/composables/useZoneRotation'
 import ZoneList from '../zone/ZoneList.vue'
-import SeatRelationEditor from '../relation/SeatRelationEditor.vue'
+import SeatRuleEditor from '../relation/SeatRuleEditor.vue'
+import AssignmentInlineReport from '../rule/AssignmentInlineReport.vue'
 import ExportDialog from './ExportPreview.vue'
 import CloudWorkspaceDialog from '../workspace/CloudWorkspaceDialog.vue'
 import { useAuth } from '@/composables/useAuth'
@@ -345,7 +362,7 @@ import { useAuth } from '@/composables/useAuth'
 const { activeTab, mobileMenuOpen, setActiveTab, closeMobileMenu } = useSidebar()
 const { seatConfig, updateConfig, clearAllSeats, seats, shiftSeats } = useSeatChart()
 const { currentMode, setMode, toggleEmptyEditMode, EditMode } = useEditMode()
-const { isAssigning, runAssignment } = useAssignment()
+const { isAssigning, assignmentProgress, runSmartAssignment } = useAssignment()
 const { tags, addTag, clearAllTags } = useTagData()
 const { students, addStudent, updateStudent, clearAllStudents } = useStudentData()
 const { exportSettings } = useExportSettings()
@@ -354,6 +371,7 @@ const { downloadTemplate, importFromExcel, exportToExcel } = useExcelData()
 const { saveWorkspace, loadWorkspace, applyWorkspaceData } = useWorkspace()
 const { logs, success, warning, error, clearLogs } = useLogger()
 const { requestConfirm, isConfirming } = useConfirmAction()
+const { ruleCount } = useSeatRules()
 const { isLoggedIn, isLoginDialogVisible } = useAuth()
 
 // ==================== 选区轮换 ====================
@@ -443,11 +461,18 @@ const configForm = ref({
   shiftDirection: -1,
 })
 
-// 联系编辑器显示状态
-const showRelationEditor = ref(false)
+// 规则编辑器显示状态
+const showRuleEditor = ref(false)
 
-// 是否使用座位联系
-const useRelations = ref(false)
+// 排位结果状态
+const lastAssignmentReport = ref(null)
+const lastAssignmentDuration = ref(0)
+
+// 打开联系编辑器并跳转到指定 Tab
+const openRelationEditorTab = (tab) => {
+  relationEditorTab.value = tab
+  showRelationEditor.value = true
+}
 
 // 文件输入引用
 const workspaceInput = ref(null)
@@ -765,10 +790,15 @@ const toggleClearMode = () => {
 const handleRunAssignment = async () => {
   if (isAssigning.value) return
 
-  const result = await runAssignment(useRelations.value)
+  const result = await runSmartAssignment({
+    useRules: true
+  })
 
   if (result.success) {
     success(result.message)
+    // 存储审计报告
+    lastAssignmentReport.value = result.report ?? null
+    lastAssignmentDuration.value = result.duration ?? 0
   } else {
     error(result.message)
   }
@@ -2235,7 +2265,7 @@ const formatLogTime = (timestamp) => {
 
 .zone-rot-hint-close:hover { background: #1a4460; }
 
-/* 组 / 选区重命名 inline input */
+/* 组 或 选区重命名 inline input */
 .zone-rot-name-input {
   flex: 1;
   border: none;
@@ -2279,5 +2309,137 @@ const formatLogTime = (timestamp) => {
   transform: scale(1.3);
   filter: brightness(0.85);
 }
+
+/* ==================== 智能排位快捷区 ==================== */
+.assign-rule-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.rule-shortcut-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.rule-shortcut-btn:hover {
+  border-color: #23587b;
+  background: #eff6ff;
+  color: #23587b;
+}
+
+.rule-shortcut-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.rule-shortcut-text {
+  flex: 1;
+  text-align: center;
+}
+
+.rule-badge {
+  background: #23587b;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 9px;
+  min-width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ==================== 进度条 ==================== */
+.assign-progress-wrap {
+  position: relative;
+  height: 24px;
+  background: #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 4px 0;
+}
+
+.assign-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #23587b, #3b82f6);
+  border-radius: 12px;
+  transition: width 0.3s ease;
+}
+
+.assign-progress-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* ==================== 上次满足度 ==================== */
+.last-sat-rate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #334155;
+  border: 1.5px solid transparent;
+}
+
+.last-sat-rate.sat-a {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.last-sat-rate.sat-b {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.last-sat-rate.sat-c {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.sat-icon { font-size: 14px; flex-shrink: 0; }
+
+.last-sat-rate strong { font-weight: 700; }
+
+.sat-detail-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.sat-detail-btn:hover { opacity: 1; }
 
 </style>
