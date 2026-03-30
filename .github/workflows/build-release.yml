@@ -29,12 +29,31 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build Application
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build Application (Installer)
         run: npm run build:nsis
+
+      - name: Build Application (Portable)
+        run: npm run build:lite
+
+      - name: Rename Artifacts
+        shell: pwsh
+        run: |
+          $TAG = $env:GITHUB_REF_NAME
+          # 重命名 Electron 安装包
+          Move-Item "dist/BraydenSCE-Setup.exe" "dist/BraydenSCE-Setup-$TAG.exe"
+          # 重命名 Tauri 便携版 (根据 tauri.conf.json 中的 productName)
+          Move-Item "src-tauri/target/release/BraydenSCE.exe" "dist/BraydenSCE-Portable-$TAG.exe"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/BraydenSCE-Setup.exe
+          files: |
+            dist/BraydenSCE-Setup-*.exe
+            dist/BraydenSCE-Portable-*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

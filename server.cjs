@@ -10,16 +10,22 @@ let DIST = path.join(__dirname, 'dist');
 
 // 检查是否是打包后的可执行文件（pkg 会设置 process.pkg）
 if (process.pkg) {
-  // exe 所在目录就是 dist 目录（或者 exe 在 dist/bin 下）
+  // 检查 exe 所在目录下是否存在 dist 目录（安装版模式）
   const exeDir = path.dirname(process.execPath);
-  const exeDirName = path.basename(exeDir);
-
-  if (exeDirName === 'bin') {
-    // exe 在 dist/bin 目录下，需要访问上级目录（dist）
-    DIST = path.join(exeDir, '..');
-  } else {
-    // exe 直接在 dist 目录下
-    DIST = exeDir;
+  const localDist = path.join(exeDir, 'dist');
+  
+  // 如果是打包为单文件 (Tauri 或 Pkg 模式)，或者安装包模式，都需要寻找资源
+  // 对于 pkg：__dirname 指向包内虚拟路径，process.execPath 指向 exe 路径
+  try {
+    const { statSync } = require('fs');
+    if (statSync(localDist).isDirectory()) {
+      DIST = localDist;
+    } else {
+      DIST = path.join(__dirname, 'dist');
+    }
+  } catch (e) {
+    // 找不到外部 dist 目录时，回退到包内虚拟目录
+    DIST = path.join(__dirname, 'dist');
   }
 } else {
   // 开发模式，从项目根目录的 dist 目录读取
