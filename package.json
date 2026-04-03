@@ -16,8 +16,8 @@
     "preview": "vite preview",
     "build:nsis": "vite build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin && makensis installer.nsi",
     "build:exe": "npm run build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin",
-    "deploy:test": "git checkout test && git merge dev --no-edit && git push origin test && git checkout dev",
-    "deploy:main": "git checkout main && git merge dev --no-edit && git push origin main && git checkout dev"
+    "deploy:test": "git checkout test && git merge @{-1} --no-edit && git push origin test && git checkout @{-1}",
+    "deploy:main": "git checkout main && git merge @{-1} --no-edit && git push origin main && git checkout @{-1}"
   },
   "dependencies": {
     "@vueuse/core": "^14.2.1",
