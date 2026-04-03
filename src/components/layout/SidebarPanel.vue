@@ -1018,6 +1018,10 @@ const handleApplySuggestion = (action) => {
   }
 
   if (action.type === 'downgrade_priority') {
+    if (!action.to) {
+      warning('建议应用失败：缺少目标优先级')
+      return
+    }
     updateRule(action.ruleId, { priority: action.to })
     success('已应用建议：规则优先级已调整')
   } else if (action.type === 'increase_param') {

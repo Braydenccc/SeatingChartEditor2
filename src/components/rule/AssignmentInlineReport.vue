@@ -119,8 +119,14 @@ const getSuggestion = (item) => {
   const rule = item?.rule
   if (!rule) return null
 
-  if (rule.predicate === 'DISTANCE_AT_LEAST' || rule.predicate === 'DISTANCE_AT_MOST') {
+  // 放宽距离约束：
+  // - DISTANCE_AT_MOST：增大上限
+  // - DISTANCE_AT_LEAST：减小下限
+  if (rule.predicate === 'DISTANCE_AT_MOST') {
     return { type: 'increase_param', ruleId: rule.id, key: 'distance', delta: 1 }
+  }
+  if (rule.predicate === 'DISTANCE_AT_LEAST') {
+    return { type: 'increase_param', ruleId: rule.id, key: 'distance', delta: -1 }
   }
 
   if (rule.priority === 'required') {
