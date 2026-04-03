@@ -19,6 +19,10 @@ import {
 
 const rules = ref([])
 let _idCounter = 1
+// 规则数据模型版本：
+// v3: legacy subject.kind（student/pair/tag/tag_pair）
+// v4: subjectMode + subjectsA/subjectsB（支持个人/标签混合多对象）
+const CURRENT_RULE_VERSION = 4
 
 function genId() {
   return `rule-${Date.now()}-${_idCounter++}`
@@ -237,12 +241,14 @@ export function useSeatRules() {
     subjectsA.forEach(entry => validateEntry(entry, 'A'))
     if (subjectMode === 'dual') subjectsB.forEach(entry => validateEntry(entry, 'B'))
 
-    const dedupeKey = (e) => `${e.type}:${e.id}`
-    const uniqueA = new Set(subjectsA.map(dedupeKey))
-    if (uniqueA.size !== subjectsA.length) warnings.push('集合 A 存在重复对象')
+    const getEntryKey = (e) => `${e.type}:${e.id}`
+    const selectedA = subjectsA.filter(e => e?.id !== null && e?.id !== undefined)
+    const uniqueA = new Set(selectedA.map(getEntryKey))
+    if (uniqueA.size !== selectedA.length) warnings.push('集合 A 存在重复对象')
     if (subjectMode === 'dual') {
-      const uniqueB = new Set(subjectsB.map(dedupeKey))
-      if (uniqueB.size !== subjectsB.length) warnings.push('集合 B 存在重复对象')
+      const selectedB = subjectsB.filter(e => e?.id !== null && e?.id !== undefined)
+      const uniqueB = new Set(selectedB.map(getEntryKey))
+      if (uniqueB.size !== selectedB.length) warnings.push('集合 B 存在重复对象')
     }
 
     for (const paramSpec of meta.params) {
@@ -334,7 +340,7 @@ export function useSeatRules() {
     const normalized = normalizeRuleShape(ruleData)
     return {
       id: genId(),
-      version: 4,
+      version: CURRENT_RULE_VERSION,
       enabled: ruleData.enabled ?? true,
       priority: ruleData.priority ?? RulePriority.PREFER,
       subjectMode: normalized.subjectMode,
@@ -419,7 +425,7 @@ export function useSeatRules() {
   }
 
   const exportRules = () => {
-    return JSON.stringify({ version: 4, rules: rules.value }, null, 2)
+    return JSON.stringify({ version: CURRENT_RULE_VERSION, rules: rules.value }, null, 2)
   }
 
   const importRules = (jsonString) => {

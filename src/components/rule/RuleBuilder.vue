@@ -196,6 +196,13 @@ const { tags } = useTagData()
 const { zones } = useZoneData()
 const { addRule, validateRule, renderRuleText } = useSeatRules()
 
+const QUICK_TEMPLATE_KEYS = {
+  FRONT_ROW: 'front-row',
+  AVOID_WINDOW: 'avoid-window',
+  DESKMATES: 'deskmates',
+  SPREAD_GROUP: 'spread-group'
+}
+
 const subjectMode = ref('single')
 const selectedPredicate = ref('')
 const selectedPriority = ref(RulePriority.PREFER)
@@ -347,33 +354,39 @@ const resetForm = () => {
 }
 
 const applyQuickTemplate = (key) => {
-  if (key === 'front-row') {
-    setSubjectMode('single')
-    selectedPriority.value = RulePriority.REQUIRED
-    selectedPredicate.value = 'IN_ROW_RANGE'
-    paramValues.value = getDefaultParams('IN_ROW_RANGE')
-    return
+  const quickTemplates = {
+    [QUICK_TEMPLATE_KEYS.FRONT_ROW]: {
+      mode: 'single',
+      priority: RulePriority.REQUIRED,
+      predicate: 'IN_ROW_RANGE',
+      params: () => getDefaultParams('IN_ROW_RANGE')
+    },
+    [QUICK_TEMPLATE_KEYS.AVOID_WINDOW]: {
+      mode: 'single',
+      priority: RulePriority.PREFER,
+      predicate: 'NOT_IN_COLUMN_TYPE',
+      params: () => ({ ...getDefaultParams('NOT_IN_COLUMN_TYPE'), columnType: 'wall' })
+    },
+    [QUICK_TEMPLATE_KEYS.DESKMATES]: {
+      mode: 'dual',
+      priority: RulePriority.REQUIRED,
+      predicate: 'MUST_BE_SEATMATES',
+      params: () => getDefaultParams('MUST_BE_SEATMATES')
+    },
+    [QUICK_TEMPLATE_KEYS.SPREAD_GROUP]: {
+      mode: 'single',
+      priority: RulePriority.PREFER,
+      predicate: 'DISTRIBUTE_EVENLY',
+      params: () => ({ ...getDefaultParams('DISTRIBUTE_EVENLY'), scope: 'group' })
+    }
   }
-  if (key === 'avoid-window') {
-    setSubjectMode('single')
-    selectedPriority.value = RulePriority.PREFER
-    selectedPredicate.value = 'NOT_IN_COLUMN_TYPE'
-    paramValues.value = { ...getDefaultParams('NOT_IN_COLUMN_TYPE'), columnType: 'wall' }
-    return
-  }
-  if (key === 'deskmates') {
-    setSubjectMode('dual')
-    selectedPriority.value = RulePriority.REQUIRED
-    selectedPredicate.value = 'MUST_BE_SEATMATES'
-    paramValues.value = getDefaultParams('MUST_BE_SEATMATES')
-    return
-  }
-  if (key === 'spread-group') {
-    setSubjectMode('single')
-    selectedPriority.value = RulePriority.PREFER
-    selectedPredicate.value = 'DISTRIBUTE_EVENLY'
-    paramValues.value = { ...getDefaultParams('DISTRIBUTE_EVENLY'), scope: 'group' }
-  }
+
+  const tpl = quickTemplates[key]
+  if (!tpl) return
+  setSubjectMode(tpl.mode)
+  selectedPriority.value = tpl.priority
+  selectedPredicate.value = tpl.predicate
+  paramValues.value = tpl.params()
 }
 </script>
 

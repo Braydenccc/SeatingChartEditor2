@@ -172,6 +172,8 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useConfirmAction } from '@/composables/useConfirmAction'
+import { useStudentData } from '@/composables/useStudentData'
+import { useTagData } from '@/composables/useTagData'
 import {
   PRIORITY_COLORS,
   PRIORITY_ICONS,
@@ -193,6 +195,8 @@ const props = defineProps({
 const emit = defineEmits(['export', 'import'])
 
 const { rules, renderRuleText, toggleRule, updateRule, deleteRule, clearAllRules, detectConflicts } = useSeatRules()
+const { students } = useStudentData()
+const { tags } = useTagData()
 const { requestConfirm, isConfirming } = useConfirmAction()
 
 const searchQuery = ref('')
@@ -332,8 +336,14 @@ const formatParamValue = (predicate, key, value) => {
 const formatSubjects = (subjects) => {
   if (!subjects?.length) return '-'
   return subjects.map(s => {
-    if (s.type === 'person') return `学生#${s.id}`
-    if (s.type === 'tag') return `标签#${s.id}`
+    if (s.type === 'person') {
+      const student = students.value.find(st => st.id === s.id)
+      return student?.name || `学生#${s.id}`
+    }
+    if (s.type === 'tag') {
+      const tag = tags.value.find(t => t.id === s.id)
+      return tag?.name || `标签#${s.id}`
+    }
     return '-'
   }).join('、')
 }

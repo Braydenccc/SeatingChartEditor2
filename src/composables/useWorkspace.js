@@ -233,63 +233,76 @@ export function useWorkspace() {
           })
         }
 
+        const normalizeRule = (rule) => {
+          if (rule.subjectMode === 'single' || rule.subjectMode === 'dual') {
+            return {
+              subjectMode: rule.subjectMode,
+              subjectsA: (rule.subjectsA || []).map(item => ({ ...item })),
+              subjectsB: (rule.subjectsB || []).map(item => ({ ...item }))
+            }
+          }
+          const subject = rule.subject || {}
+          if (subject.kind === 'student') {
+            return { subjectMode: 'single', subjectsA: [{ type: 'person', id: subject.id }], subjectsB: [] }
+          }
+          if (subject.kind === 'tag') {
+            return { subjectMode: 'single', subjectsA: [{ type: 'tag', id: subject.tagId }], subjectsB: [] }
+          }
+          if (subject.kind === 'pair') {
+            return {
+              subjectMode: 'dual',
+              subjectsA: [{ type: 'person', id: subject.id1 }],
+              subjectsB: [{ type: 'person', id: subject.id2 }]
+            }
+          }
+          if (subject.kind === 'tag_pair') {
+            return {
+              subjectMode: 'dual',
+              subjectsA: [{ type: 'tag', id: subject.tagId1 }],
+              subjectsB: [{ type: 'tag', id: subject.tagId2 }]
+            }
+          }
+          return { subjectMode: 'single', subjectsA: [], subjectsB: [] }
+        }
+
+        const remapEntry = (entry, oldStudentIdToNewIdMap, oldTagIdToNewIdMap) => {
+          if (!entry) return null
+          if (entry.type === 'person') {
+            return { ...entry, id: oldStudentIdToNewIdMap[entry.id] }
+          }
+          if (entry.type === 'tag') {
+            return { ...entry, id: oldTagIdToNewIdMap[entry.id] }
+          }
+          return entry
+        }
+
         // 恢复智能排位规则
         if (workspace.rules && Array.isArray(workspace.rules)) {
           clearAllRules()
 
           workspace.rules.forEach(r => {
-            const normalizeRule = (rule) => {
-              if (rule.subjectMode === 'single' || rule.subjectMode === 'dual') {
-                return {
-                  subjectMode: rule.subjectMode,
-                  subjectsA: (rule.subjectsA || []).map(item => ({ ...item })),
-                  subjectsB: (rule.subjectsB || []).map(item => ({ ...item }))
-                }
-              }
-              const subject = rule.subject || {}
-              if (subject.kind === 'student') {
-                return { subjectMode: 'single', subjectsA: [{ type: 'person', id: subject.id }], subjectsB: [] }
-              }
-              if (subject.kind === 'tag') {
-                return { subjectMode: 'single', subjectsA: [{ type: 'tag', id: subject.tagId }], subjectsB: [] }
-              }
-              if (subject.kind === 'pair') {
-                return {
-                  subjectMode: 'dual',
-                  subjectsA: [{ type: 'person', id: subject.id1 }],
-                  subjectsB: [{ type: 'person', id: subject.id2 }]
-                }
-              }
-              if (subject.kind === 'tag_pair') {
-                return {
-                  subjectMode: 'dual',
-                  subjectsA: [{ type: 'tag', id: subject.tagId1 }],
-                  subjectsB: [{ type: 'tag', id: subject.tagId2 }]
-                }
-              }
-              return { subjectMode: 'single', subjectsA: [], subjectsB: [] }
-            }
-
             const normalized = normalizeRule(r)
-            const remapEntry = (entry) => {
-              if (!entry) return null
-              if (entry.type === 'person') {
-                return { ...entry, id: oldStudentIdToNewId[entry.id] }
-              }
-              if (entry.type === 'tag') {
-                return { ...entry, id: oldTagIdToNewId[entry.id] }
-              }
-              return entry
-            }
 
-            const subjectsA = normalized.subjectsA.map(remapEntry).filter(e => !!e?.id)
-            const subjectsB = normalized.subjectsB.map(remapEntry).filter(e => !!e?.id)
+            const remappedA = normalized.subjectsA.map(entry => remapEntry(entry, oldStudentIdToNewId, oldTagIdToNewId))
+            const remappedB = normalized.subjectsB.map(entry => remapEntry(entry, oldStudentIdToNewId, oldTagIdToNewId))
+            const subjectsA = remappedA.filter(e => !!e?.id)
+            const subjectsB = remappedB.filter(e => !!e?.id)
+            const droppedA = remappedA.length - subjectsA.length
+            const droppedB = remappedB.length - subjectsB.length
+            if (droppedA > 0 || droppedB > 0) {
+              console.warn('Workspace rule subject remap dropped entries', {
+                rule: r,
+                droppedA,
+                droppedB
+              })
+            }
 
             const newParams = { ...r.params }
             if (newParams.tagId) newParams.tagId = oldTagIdToNewId[newParams.tagId]
             if (newParams.zoneId) newParams.zoneId = oldZoneIdToNewId[newParams.zoneId]
 
-            if (subjectsA.length > 0 && (normalized.subjectMode !== 'dual' || subjectsB.length > 0)) {
+            const hasValidSubjects = subjectsA.length > 0 && (normalized.subjectMode !== 'dual' || subjectsB.length > 0)
+            if (hasValidSubjects) {
               addRule({
                 enabled: r.enabled ?? true,
                 priority: r.priority,
