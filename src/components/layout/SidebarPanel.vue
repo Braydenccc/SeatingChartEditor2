@@ -266,9 +266,36 @@
                 <span v-if="ruleCount > 0" class="rule-badge">{{ ruleCount }}</span>
               </button>
               <button id="applyAssign" class="option-button primary main-assign-btn" 
-                :disabled="isAssigning" @click="handleRunAssignment">
-                <span>{{ isAssigning ? '执行中...' : '🚀 开始排位' }}</span>
+                :disabled="isAssigning || (precheckResult && !precheckResult.pass)" @click="handleRunAssignment">
+                <span>{{ isAssigning ? '执行中...' : (precheckResult && !precheckResult.pass ? '先修复阻断项' : '开始排位') }}</span>
               </button>
+            </div>
+
+            <div class="assign-card-section precheck-section">
+              <div class="precheck-header">
+                <span class="section-label">执行前预检查</span>
+                <button class="precheck-btn" @click="handleRunPrecheck">运行预检查</button>
+              </div>
+              <div v-if="precheckResult" class="precheck-summary" :class="`risk-${precheckResult.risk}`">
+                <div class="precheck-main-line">
+                  <span>状态：{{ precheckResult.pass ? '通过' : '未通过' }}</span>
+                  <span>风险：{{ precheckRiskText }}</span>
+                  <span>覆盖率：{{ precheckResult.coverageRate }}%</span>
+                  <span>预计耗时：{{ precheckResult.estimatedMs }}ms</span>
+                </div>
+                <div class="precheck-main-line">
+                  <span>学生 {{ precheckResult.studentCount }}</span>
+                  <span>可用座位 {{ precheckResult.availableSeatCount }}</span>
+                  <span>启用规则 {{ precheckResult.activeRuleCount }}</span>
+                  <span>冲突 {{ precheckResult.conflictCount }}</span>
+                </div>
+                <div v-if="precheckResult.blockingReasons.length > 0" class="precheck-list blocking">
+                  <div v-for="(item, idx) in precheckResult.blockingReasons" :key="`b-${idx}`">⛔ {{ item }}</div>
+                </div>
+                <div v-if="precheckResult.warnings.length > 0" class="precheck-list warning">
+                  <div v-for="(item, idx) in precheckResult.warnings" :key="`w-${idx}`">⚠ {{ item }}</div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -317,6 +344,8 @@
             v-if="lastAssignmentReport !== null && !isAssigning"
             :report="lastAssignmentReport" 
             :duration="lastAssignmentDuration" 
+            @focus-rule="handleFocusRule"
+            @apply-suggestion="handleApplySuggestion"
           />
         </div>
 
@@ -424,7 +453,7 @@ import AssignmentInlineReport from '../rule/AssignmentInlineReport.vue'
 import { useAuth } from '@/composables/useAuth'
 
 const { activeTab, mobileMenuOpen, setActiveTab, closeMobileMenu } = useSidebar()
-const { seatConfig, updateConfig, clearAllSeats, seats, shiftSeats } = useSeatChart()
+const { seatConfig, updateConfig, clearAllSeats, seats, shiftSeats, getAvailableSeats } = useSeatChart()
 const { currentMode, setMode, toggleEmptyEditMode, EditMode } = useEditMode()
 const { isAssigning, assignmentProgress, assignmentIterationInfo, runSmartAssignment } = useAssignment()
 const { tags, addTag, clearAllTags } = useTagData()
@@ -435,7 +464,7 @@ const { downloadTemplate, importFromExcel, exportToExcel } = useExcelData()
 const { saveWorkspace, loadWorkspace, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
 const { logs, success, warning, error, clearLogs } = useLogger()
 const { requestConfirm, isConfirming } = useConfirmAction()
-const { ruleCount } = useSeatRules()
+const { rules, ruleCount, getActiveRules, getRulesForStudent, detectConflicts, updateRule, renderRuleText } = useSeatRules()
 const { isLoggedIn, isLoginDialogVisible } = useAuth()
 
 // ==================== 选区轮换 ====================
@@ -540,6 +569,7 @@ const showRuleEditor = ref(false)
 // 排位结果状态
 const lastAssignmentReport = ref(null)
 const lastAssignmentDuration = ref(0)
+const precheckResult = ref(null)
 
 // 打开联系编辑器并跳转到指定 Tab
 const openRelationEditorTab = (tab) => {
@@ -865,6 +895,12 @@ const toggleClearMode = () => {
 const handleRunAssignment = async () => {
   if (isAssigning.value) return
 
+  const gate = runAssignmentPrecheck({ silent: true })
+  if (!gate.pass) {
+    error('预检查未通过，请先修复阻断项')
+    return
+  }
+
   lastAssignmentReport.value = null
   const startTime = Date.now()
 
@@ -887,6 +923,128 @@ const handleRunAssignment = async () => {
     console.error(err)
   }
 }
+
+const precheckRiskText = computed(() => {
+  if (!precheckResult.value) return '未评估'
+  if (precheckResult.value.risk === 'low') return '低'
+  if (precheckResult.value.risk === 'medium') return '中'
+  return '高'
+})
+
+const runAssignmentPrecheck = ({ silent = false } = {}) => {
+  const studentCount = students.value.length
+  const availableSeatCount = getAvailableSeats().length
+  const activeRuleCount = getActiveRules().length
+  const conflictList = detectConflicts()
+  const conflictCount = conflictList.length
+  const blockingReasons = []
+  const warnings = []
+
+  if (studentCount === 0) blockingReasons.push('没有学生数据')
+  if (availableSeatCount === 0) blockingReasons.push('没有可用座位')
+  if (studentCount > 0 && availableSeatCount < studentCount) {
+    blockingReasons.push(`可用座位不足（学生 ${studentCount} 人 / 座位 ${availableSeatCount} 个）`)
+  }
+
+  const hardConflictCount = conflictList.filter(c => c.type === 'infeasible' || c.type === 'contradiction').length
+  if (hardConflictCount > 0) {
+    blockingReasons.push(`存在 ${hardConflictCount} 条不可满足或逻辑矛盾规则`)
+  }
+  if (activeRuleCount === 0) {
+    warnings.push('当前未启用规则，本次将接近随机排位')
+  }
+
+  const coveredStudents = students.value.filter(s => getRulesForStudent(s.id).length > 0).length
+  const coverageRate = studentCount > 0 ? Math.round((coveredStudents / studentCount) * 100) : 0
+  if (activeRuleCount > 0 && coverageRate < 40) {
+    warnings.push('规则覆盖率较低，建议补充关键学生规则')
+  }
+
+  const estimatedMs = Math.max(
+    300,
+    Math.round((assignConfig.value.maxIterations / 100000) * Math.max(1, studentCount / 20) * 900)
+  )
+
+  let risk = 'low'
+  if (blockingReasons.length > 0) {
+    risk = 'high'
+  } else if (warnings.length > 0 || conflictCount > 0) {
+    risk = 'medium'
+  }
+
+  const result = {
+    pass: blockingReasons.length === 0,
+    risk,
+    studentCount,
+    availableSeatCount,
+    activeRuleCount,
+    conflictCount,
+    coverageRate,
+    estimatedMs,
+    blockingReasons,
+    warnings
+  }
+
+  precheckResult.value = result
+
+  if (!silent) {
+    if (result.pass) {
+      success(`预检查通过（风险${precheckRiskText.value}）`)
+    } else {
+      error('预检查未通过，请先处理阻断项')
+    }
+  }
+
+  return result
+}
+
+const handleRunPrecheck = () => {
+  runAssignmentPrecheck()
+}
+
+const handleFocusRule = (item) => {
+  if (!item?.rule) return
+  showRuleEditor.value = true
+  warning(`请在规则管理中定位：${renderRuleText(item.rule)}`)
+}
+
+const handleApplySuggestion = (action) => {
+  if (!action?.ruleId) return
+  const target = rules.value.find(r => r.id === action.ruleId)
+  if (!target) {
+    warning('建议应用失败：规则不存在')
+    return
+  }
+
+  if (action.type === 'downgrade_priority') {
+    updateRule(action.ruleId, { priority: action.to })
+    success('已应用建议：规则优先级已调整')
+  } else if (action.type === 'increase_param') {
+    const prev = Number(target.params?.[action.key] ?? 0)
+    const next = Math.max(1, prev + Number(action.delta ?? 0))
+    updateRule(action.ruleId, {
+      params: {
+        ...target.params,
+        [action.key]: next
+      }
+    })
+    success('已应用建议：规则参数已放宽')
+  }
+
+  runAssignmentPrecheck({ silent: true })
+}
+
+watch(
+  [students, rules, () => assignConfig.value.maxIterations, seats],
+  () => {
+    runAssignmentPrecheck({ silent: true })
+  },
+  { deep: true }
+)
+
+onMounted(() => {
+  runAssignmentPrecheck({ silent: true })
+})
 
 // 日志相关方法
 const handleClearLogs = () => {
@@ -2418,6 +2576,82 @@ const formatLogTime = (timestamp) => {
 .assign-card-section {
   padding: 10px;
   border-bottom: 1px dashed #e2e8f0;
+}
+
+.precheck-section {
+  background: #f8fafc;
+}
+
+.precheck-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.precheck-btn {
+  border: 1px solid #dbe3ea;
+  background: white;
+  color: #334155;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.precheck-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.precheck-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+}
+
+.precheck-summary.risk-low {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.precheck-summary.risk-medium {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.precheck-summary.risk-high {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.precheck-main-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 12px;
+  color: #334155;
+}
+
+.precheck-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.precheck-list.blocking {
+  color: #b91c1c;
+}
+
+.precheck-list.warning {
+  color: #92400e;
 }
 
 /* 算法选择器 */

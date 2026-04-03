@@ -2,6 +2,17 @@
   <div class="rule-builder">
     <h4 class="builder-title">添加新规则</h4>
 
+    <div v-if="mode === 'quick'" class="quick-template-wrap">
+      <label class="seg-label">快捷场景</label>
+      <div class="quick-template-grid">
+        <button class="quick-template-btn" @click="applyQuickTemplate('front-row')">前排优先</button>
+        <button class="quick-template-btn" @click="applyQuickTemplate('avoid-window')">避开窗边</button>
+        <button class="quick-template-btn" @click="applyQuickTemplate('deskmates')">同桌绑定</button>
+        <button class="quick-template-btn" @click="applyQuickTemplate('spread-group')">分组分散</button>
+      </div>
+      <p class="quick-template-tip">提示：点击后可继续修改对象、参数和优先级。</p>
+    </div>
+
     <!-- 句子式构建器 -->
     <!-- 句子式构建器 -->
     <div class="sentence-builder">
@@ -215,6 +226,12 @@ import {
 } from '@/constants/ruleTypes.js'
 
 const emit = defineEmits(['added'])
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'quick'
+  }
+})
 
 const { students } = useStudentData()
 const { tags } = useTagData()
@@ -400,6 +417,36 @@ const resetForm = () => {
   subjectTagId2.value = null
   paramValues.value = {}
 }
+
+const applyQuickTemplate = (key) => {
+  if (key === 'front-row') {
+    setSubjectKind('student')
+    selectedPriority.value = RulePriority.REQUIRED
+    selectedPredicate.value = 'IN_ROW_RANGE'
+    paramValues.value = getDefaultParams('IN_ROW_RANGE')
+    return
+  }
+  if (key === 'avoid-window') {
+    setSubjectKind('student')
+    selectedPriority.value = RulePriority.PREFER
+    selectedPredicate.value = 'NOT_IN_COLUMN_TYPE'
+    paramValues.value = { ...getDefaultParams('NOT_IN_COLUMN_TYPE'), columnType: 'window' }
+    return
+  }
+  if (key === 'deskmates') {
+    setSubjectKind('pair')
+    selectedPriority.value = RulePriority.REQUIRED
+    selectedPredicate.value = 'MUST_BE_SEATMATES'
+    paramValues.value = getDefaultParams('MUST_BE_SEATMATES')
+    return
+  }
+  if (key === 'spread-group') {
+    setSubjectKind('tag')
+    selectedPriority.value = RulePriority.PREFER
+    selectedPredicate.value = 'DISTRIBUTE_EVENLY'
+    paramValues.value = { ...getDefaultParams('DISTRIBUTE_EVENLY'), scope: 'group' }
+  }
+}
 </script>
 
 <style scoped>
@@ -414,6 +461,44 @@ const resetForm = () => {
   font-size: 14px;
   font-weight: 600;
   color: #23587b;
+}
+
+.quick-template-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.quick-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.quick-template-btn {
+  border: 1px solid #dbe3ea;
+  background: white;
+  color: #334155;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quick-template-btn:hover {
+  border-color: #23587b;
+  color: #23587b;
+}
+
+.quick-template-tip {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
 }
 
 /* ==================== 句子构建器 ==================== */

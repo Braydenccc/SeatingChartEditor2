@@ -22,6 +22,28 @@
       </div>
 
       <div class="modal-body">
+        <div class="mode-switch-bar">
+          <div class="mode-switch-left">
+            <button
+              class="mode-btn"
+              :class="{ active: editorMode === 'quick' }"
+              @click="editorMode = 'quick'"
+            >
+              快速模式
+            </button>
+            <button
+              class="mode-btn"
+              :class="{ active: editorMode === 'pro' }"
+              @click="editorMode = 'pro'"
+            >
+              专业模式
+            </button>
+          </div>
+          <span class="mode-hint">
+            {{ editorMode === 'quick' ? '推荐：按场景快速建规则' : '高级：按对象和参数精细控制' }}
+          </span>
+        </div>
+
         <!-- Tab 1: 规则总览 -->
         <div v-show="activeTab === 'rules'" class="tab-content">
           <RuleList
@@ -29,7 +51,7 @@
             @import="handleImportRules"
           />
           <div class="tab-divider"></div>
-          <RuleBuilder @added="onRuleAdded" />
+          <RuleBuilder :mode="editorMode" @added="onRuleAdded" />
         </div>
 
         <!-- Tab 2: 个人/分组规则（目前展示占位符，内容在 rules tab 中） -->
@@ -80,6 +102,7 @@ const { ruleCount, exportRules, importRules } = useSeatRules()
 
 // ==================== Tab 状态 ====================
 const activeTab = ref('rules')
+const editorMode = ref('quick')
 const tabs = computed(() => [
   { key: 'rules', icon: '📋', label: '规则总览', badge: ruleCount.value > 0 ? ruleCount.value : null },
   { key: 'personal', icon: '🏷️', label: '个人/分组', badge: null }
@@ -212,6 +235,45 @@ const close = () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.mode-switch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.mode-switch-left {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-btn {
+  border: 1px solid #dbe3ea;
+  background: white;
+  color: #334155;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background: #23587b;
+  border-color: #23587b;
+  color: white;
+}
+
+.mode-hint {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .tab-divider {
