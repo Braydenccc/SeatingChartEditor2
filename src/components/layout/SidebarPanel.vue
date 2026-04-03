@@ -408,7 +408,12 @@
   />
 
   <!-- 座位规则编辑器模态框 -->
-  <SeatRuleEditor :visible="showRuleEditor" initialTab="rules" @close="showRuleEditor = false" />
+  <SeatRuleEditor
+    :visible="showRuleEditor"
+    initialTab="rules"
+    :focus-rule-id="focusedRuleId"
+    @close="showRuleEditor = false"
+  />
 
 
 </template>
@@ -565,17 +570,12 @@ const assignConfig = ref({
 
 // 规则编辑器显示状态
 const showRuleEditor = ref(false)
+const focusedRuleId = ref('')
 
 // 排位结果状态
 const lastAssignmentReport = ref(null)
 const lastAssignmentDuration = ref(0)
 const precheckResult = ref(null)
-
-// 打开联系编辑器并跳转到指定 Tab
-const openRelationEditorTab = (tab) => {
-  relationEditorTab.value = tab
-  showRelationEditor.value = true
-}
 
 // 文件输入引用
 const workspaceInput = ref(null)
@@ -1004,8 +1004,9 @@ const handleRunPrecheck = () => {
 
 const handleFocusRule = (item) => {
   if (!item?.rule) return
+  focusedRuleId.value = item.rule.id
   showRuleEditor.value = true
-  warning(`请在规则管理中定位：${renderRuleText(item.rule)}`)
+  success(`已定位规则：${renderRuleText(item.rule)}`)
 }
 
 const handleApplySuggestion = (action) => {

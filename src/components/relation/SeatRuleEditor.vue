@@ -47,6 +47,8 @@
         <!-- Tab 1: 规则总览 -->
         <div v-show="activeTab === 'rules'" class="tab-content">
           <RuleList
+            ref="ruleListRef"
+            :focus-rule-id="focusRuleId"
             @export="handleExportRules"
             @import="handleImportRules"
           />
@@ -78,9 +80,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { useStudentData } from '@/composables/useStudentData'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useSeatRules } from '@/composables/useSeatRules'
+import { useLogger } from '@/composables/useLogger'
 import RuleBuilder from '@/components/rule/RuleBuilder.vue'
 import RuleList from '@/components/rule/RuleList.vue'
 
@@ -92,13 +94,18 @@ const props = defineProps({
   initialTab: {
     type: String,
     default: 'rules'
+  },
+  focusRuleId: {
+    type: String,
+    default: ''
   }
 })
 
 const emit = defineEmits(['close'])
 
-const { students } = useStudentData()
 const { ruleCount, exportRules, importRules } = useSeatRules()
+const { success, warning, error } = useLogger()
+const ruleListRef = ref(null)
 
 // ==================== Tab 状态 ====================
 const activeTab = ref('rules')
@@ -135,19 +142,34 @@ const handleImportRules = () => {
     const file = event.target?.files?.[0]
     if (!file) return
     const text = await file.text()
-    importRules(text)
+    const result = importRules(text)
+    if (!result.success) {
+      const firstErr = result.errors?.[0]
+      error(firstErr?.message || '规则导入失败')
+      return
+    }
+
+    if (result.imported > 0) {
+      success(`规则导入成功：${result.imported} 条`)
+    } else {
+      warning('未导入任何规则')
+    }
+    if (result.errors?.length) {
+      warning(`有 ${result.errors.length} 条规则导入失败，请检查格式或参数`)
+    }
   }
   input.click()
 }
 
-const onRuleAdded = () => {
-  //
-}
+const onRuleAdded = () => {}
 
 // 当模态框关闭时重置 tab
 watch(() => props.visible, (visible) => {
-  if (!visible) {
-    //
+  if (visible && props.focusRuleId) {
+    activeTab.value = 'rules'
+    nextTick(() => {
+      ruleListRef.value?.focusRule?.(props.focusRuleId)
+    })
   }
 })
 

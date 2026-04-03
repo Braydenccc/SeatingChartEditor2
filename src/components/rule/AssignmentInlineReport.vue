@@ -119,15 +119,15 @@ const getSuggestion = (item) => {
   const rule = item?.rule
   if (!rule) return null
 
+  if (rule.predicate === 'DISTANCE_AT_LEAST' || rule.predicate === 'DISTANCE_AT_MOST') {
+    return { type: 'increase_param', ruleId: rule.id, key: 'distance', delta: 1 }
+  }
+
   if (rule.priority === 'required') {
     return { type: 'downgrade_priority', ruleId: rule.id, to: 'prefer' }
   }
   if (rule.priority === 'prefer') {
     return { type: 'downgrade_priority', ruleId: rule.id, to: 'optional' }
-  }
-
-  if (rule.predicate === 'DISTANCE_AT_LEAST' || rule.predicate === 'DISTANCE_AT_MOST') {
-    return { type: 'increase_param', ruleId: rule.id, key: 'distance', delta: 1 }
   }
 
   return null

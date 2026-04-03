@@ -81,7 +81,8 @@
         <div
           v-for="rule in filteredRules"
           :key="rule.id"
-        class="rule-item"
+          class="rule-item"
+          :data-rule-id="rule.id"
         :class="{
           disabled: !rule.enabled,
           expanded: expandedId === rule.id,
@@ -160,7 +161,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import {
@@ -173,6 +174,13 @@ import {
   COLUMN_TYPE_LABELS,
   SCOPE_LABELS
 } from '@/constants/ruleTypes.js'
+
+const props = defineProps({
+  focusRuleId: {
+    type: String,
+    default: ''
+  }
+})
 
 const emit = defineEmits(['export', 'import'])
 
@@ -313,7 +321,34 @@ const formatParamValue = (predicate, key, value) => {
   return String(value)
 }
 
+const focusRule = async (ruleId) => {
+  if (!ruleId) return false
+  const target = rules.value.find(r => r.id === ruleId)
+  if (!target) return false
+
+  if (filterPriority.value !== 'all' && target.priority !== filterPriority.value) {
+    filterPriority.value = 'all'
+  }
+  if (searchQuery.value.trim()) {
+    searchQuery.value = ''
+  }
+  expandedId.value = ruleId
+
+  await nextTick()
+  const node = document.querySelector(`.rule-item[data-rule-id="${ruleId}"]`)
+  node?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  return true
+}
+
+watch(() => props.focusRuleId, (id) => {
+  if (id) {
+    focusRule(id)
+  }
+})
+
 watch(rules, clearInvalidSelections, { deep: true })
+
+defineExpose({ focusRule })
 </script>
 
 <style scoped>
