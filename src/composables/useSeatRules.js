@@ -421,12 +421,8 @@ export function useSeatRules() {
     const normalized = normalizeRuleShape(ruleData)
     const meta = PREDICATE_META[ruleData.predicate] || {}
     const subjectMode = meta.relation === 'single' ? 'single' : 'dual'
-    const subjectsA = subjectMode === 'single'
-      ? [...normalized.subjects]
-      : normalized.subjects.slice(0, Math.ceil(normalized.subjects.length / 2))
-    const subjectsB = subjectMode === 'single'
-      ? []
-      : normalized.subjects.slice(Math.ceil(normalized.subjects.length / 2))
+    const subjectsA = [...normalized.subjects]
+    const subjectsB = []
     return {
       id: genId(),
       version: CURRENT_RULE_VERSION,

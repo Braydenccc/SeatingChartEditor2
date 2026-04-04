@@ -204,6 +204,7 @@ export function useSeatChart() {
     const seat2 = parseSeatId(seatId2)
     const columnsPerGroup = Number(seatConfig.value?.columnsPerGroup || 0)
 
+    // 列数<=1 时结构上不存在同桌位（0 也按不可同桌处理，避免无效配置误判）
     if (columnsPerGroup <= 1) return false
 
     // 同桌 = 同大组 且 同排(rowIndex相同) 且 不是同一列

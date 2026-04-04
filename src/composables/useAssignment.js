@@ -123,6 +123,11 @@ export function useAssignment() {
     const normalized = normalizeRuleSubjects(rule)
     const expanded = expandEntriesToStudentIds(normalized.subjects, studentList)
     const relation = PREDICATE_META[rule.predicate]?.relation || 'single'
+    const maxSuggestedSubjects = 20
+
+    if (expanded.length > maxSuggestedSubjects) {
+      console.warn(`Rule "${rule.predicate}" has ${expanded.length} subjects; pair expansion may be expensive.`)
+    }
 
     if (relation === 'single') {
       return expanded.map(studentId => ({ type: 'single', studentId }))

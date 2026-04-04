@@ -266,7 +266,7 @@ export const SCOPE_LABELS = {
 }
 
 /**
- * 获取指定谓词适用的主体模式列表
+ * 获取指定谓词适用的主体模式列表（兼容旧调用，内部已切到 relation 语义）
  */
 export function getCompatibleSubjectModes(predicate) {
   const relation = PREDICATE_META[predicate]?.relation

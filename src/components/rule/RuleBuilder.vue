@@ -264,6 +264,12 @@ const onEntryTypeChange = (entry) => {
   entry.id = null
 }
 
+const ensureMinimumSubjects = (minSubjects) => {
+  while (subjects.value.length < minSubjects) {
+    subjects.value.push({ type: 'person', id: null })
+  }
+}
+
 const addEntry = () => {
   subjects.value.push({ type: 'person', id: null })
 }
@@ -277,9 +283,7 @@ const onPredicateChange = () => {
   if (selectedPredicate.value) {
     paramValues.value = getDefaultParams(selectedPredicate.value)
     const minSubjects = PREDICATE_META[selectedPredicate.value]?.minSubjects ?? 1
-    while (subjects.value.length < minSubjects) {
-      subjects.value.push({ type: 'person', id: null })
-    }
+    ensureMinimumSubjects(minSubjects)
   }
 }
 
@@ -330,9 +334,7 @@ const applyQuickTemplate = (key) => {
   selectedPredicate.value = tpl.predicate
   paramValues.value = tpl.params()
   const minSubjects = PREDICATE_META[selectedPredicate.value]?.minSubjects ?? 1
-  while (subjects.value.length < minSubjects) {
-    subjects.value.push({ type: 'person', id: null })
-  }
+  ensureMinimumSubjects(minSubjects)
 }
 </script>
 

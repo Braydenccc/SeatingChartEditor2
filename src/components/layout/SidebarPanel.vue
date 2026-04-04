@@ -995,8 +995,16 @@ const detectDeskmateBindingConflicts = () => {
   }
 
   const details = []
-  const availableSeatCount = getAvailableSeats().length
-  const maxFeasiblePairs = Math.floor((availableSeatCount * (columnsPerGroup - 1)) / 2)
+  const seatsByGroupRow = new Map()
+  for (const seat of getAvailableSeats()) {
+    const key = `${seat.groupIndex}:${seat.rowIndex}`
+    if (!seatsByGroupRow.has(key)) seatsByGroupRow.set(key, 0)
+    seatsByGroupRow.set(key, seatsByGroupRow.get(key) + 1)
+  }
+  let maxFeasiblePairs = 0
+  for (const count of seatsByGroupRow.values()) {
+    maxFeasiblePairs += Math.floor((count * Math.max(0, count - 1)) / 2)
+  }
   if (expandedPairs.length > maxFeasiblePairs) {
     details.push(`同桌容量不足：当前最多可满足约 ${maxFeasiblePairs} 对同桌关系，但规则展开后需要 ${expandedPairs.length} 对`)
   }
