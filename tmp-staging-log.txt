@@ -1,0 +1,142 @@
+commit 04d4ad7eeb43c0873935a055d615e520c83ffbe3
+Author: Braydenccc <braydenccc_daily@outlook.com>
+Date:   Sat Apr 4 17:05:14 2026 +0800
+
+    chore: 优化部署流程
+
+diff --git a/scripts/staging-deploy-path.js b/scripts/staging-deploy-path.js
+index 3ddb5c8..2a52711 100644
+--- a/scripts/staging-deploy-path.js
++++ b/scripts/staging-deploy-path.js
+@@ -45,8 +45,8 @@ export function resolveStagingTarget(branchName) {
+     };
+   }
+ 
+-  if (!normalizedBranch.startsWith('test/')) {
+-    throw new Error(`无效分支：${normalizedBranch}，必须是 test 或 test/<path>。`);
++  if (!normalizedBranch.startsWith('test-')) {
++    throw new Error(`无效分支：${normalizedBranch}，必须是 test 或 test-<path>。`);
+   }
+ 
+   const deployPath = validateDeploySubPath(normalizedBranch.slice(5));
+
+commit cc552bbb9d6e1b3059c6a41a1d7e9d7b543a521d
+Author: Braydenccc <braydenccc_daily@outlook.com>
+Date:   Sat Apr 4 16:46:55 2026 +0800
+
+    chore: 自动codeql，优化部署设置
+
+diff --git a/scripts/staging-deploy-path.js b/scripts/staging-deploy-path.js
+index 7959e5a..3ddb5c8 100644
+--- a/scripts/staging-deploy-path.js
++++ b/scripts/staging-deploy-path.js
+@@ -39,8 +39,8 @@ export function resolveStagingTarget(branchName) {
+ 
+   if (normalizedBranch === 'test') {
+     return {
+-      deploySite: 'test.sce.jbyc.cc',
+-      siteUrl: TEST_HOST,
++      deploySite: 'test.sce.jbyc.cc/test',
++      siteUrl: `${TEST_HOST}/test`,
+       deployPath: '',
+     };
+   }
+@@ -51,8 +51,8 @@ export function resolveStagingTarget(branchName) {
+ 
+   const deployPath = validateDeploySubPath(normalizedBranch.slice(5));
+   return {
+-    deploySite: `test.sce.jbyc.cc/${deployPath}`,
+-    siteUrl: `${TEST_HOST}/${deployPath}`,
++    deploySite: `test.sce.jbyc.cc/test/${deployPath}`,
++    siteUrl: `${TEST_HOST}/test/${deployPath}`,
+     deployPath,
+   };
+ }
+
+commit 66c6a0021afc9624f244f37f32abec59f36a5e29
+Author: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>
+Date:   Sat Apr 4 07:46:59 2026 +0000
+
+    fix: resolve remaining PR review issues
+    
+    Agent-Logs-Url: https://github.com/Braydenccc/SeatingChartEditor2/sessions/58d8be6b-a068-4b12-9beb-e83e33b97d7b
+    
+    Co-authored-by: Braydenccc <177214309+Braydenccc@users.noreply.github.com>
+
+diff --git a/scripts/staging-deploy-path.js b/scripts/staging-deploy-path.js
+index 65dc90c..7959e5a 100644
+--- a/scripts/staging-deploy-path.js
++++ b/scripts/staging-deploy-path.js
+@@ -19,7 +19,7 @@ export function validateDeploySubPath(rawPath) {
+   const pathSegments = safePath.split('/').filter(Boolean);
+   for (const segment of pathSegments) {
+     if (segment === 'test') {
+-      throw new Error('部署路径不能包含名为 test 的段。');
++      throw new Error('部署路径不能包含名称为 "test" 的段。');
+     }
+ 
+     if (segment.startsWith('.')) {
+
+commit e57d755dff615db2af215d8105480cd54bc14621
+Author: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>
+Date:   Sat Apr 4 07:44:24 2026 +0000
+
+    chore: plan fix final review comments and docs clarity
+    
+    Agent-Logs-Url: https://github.com/Braydenccc/SeatingChartEditor2/sessions/58d8be6b-a068-4b12-9beb-e83e33b97d7b
+    
+    Co-authored-by: Braydenccc <177214309+Braydenccc@users.noreply.github.com>
+
+diff --git a/scripts/staging-deploy-path.js b/scripts/staging-deploy-path.js
+index c0e38eb..65dc90c 100644
+--- a/scripts/staging-deploy-path.js
++++ b/scripts/staging-deploy-path.js
+@@ -5,11 +5,11 @@ export function normalizeDeployPath(rawPath) {
+   return String(rawPath ?? '').trim().replace(/^\/+|\/+$/g, '');
+ }
+ 
+-export function validateDeployPath(rawPath) {
++export function validateDeploySubPath(rawPath) {
+   const safePath = normalizeDeployPath(rawPath);
+ 
+   if (!safePath) {
+-    throw new Error('部署路径不能为空。');
++    throw new Error('部署子路径不能为空。');
+   }
+ 
+   if (!PATH_ALLOWED_CHARS_REGEX.test(safePath)) {
+@@ -49,7 +49,7 @@ export function resolveStagingTarget(branchName) {
+     throw new Error(`无效分支：${normalizedBranch}，必须是 test 或 test/<path>。`);
+   }
+ 
+-  const deployPath = validateDeployPath(normalizedBranch.slice(5));
++  const deployPath = validateDeploySubPath(normalizedBranch.slice(5));
+   return {
+     deploySite: `test.sce.jbyc.cc/${deployPath}`,
+     siteUrl: `${TEST_HOST}/${deployPath}`,
+
+commit 5a330feb71f7992dea57723d90f53b3030f61fb2
+Author: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>
+Date:   Sat Apr 4 07:43:12 2026 +0000
+
+    chore: plan resolve final code review comments
+    
+    Agent-Logs-Url: https://github.com/Braydenccc/SeatingChartEditor2/sessions/58d8be6b-a068-4b12-9beb-e83e33b97d7b
+    
+    Co-authored-by: Braydenccc <177214309+Braydenccc@users.noreply.github.com>
+
+diff --git a/scripts/staging-deploy-path.js b/scripts/staging-deploy-path.js
+index fbbb6c2..c0e38eb 100644
+--- a/scripts/staging-deploy-path.js
++++ b/scripts/staging-deploy-path.js
+@@ -17,10 +17,6 @@ export function validateDeployPath(rawPath) {
+   }
+ 
+   const pathSegments = safePath.split('/').filter(Boolean);
+-  if (pathSegments.length === 0) {
+-    throw new Error('部署路径不能为空。');
+-  }
+-
+   for (const segment of pathSegments) {
+     if (segment === 'test') {
+       throw new Error('部署路径不能包含名为 test 的段。');

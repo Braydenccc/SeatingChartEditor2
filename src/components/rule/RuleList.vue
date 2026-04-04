@@ -123,17 +123,9 @@
         <transition name="expand">
           <div v-if="expandedId === rule.id" class="rule-detail">
             <div class="rule-detail-grid">
-              <div class="detail-item">
-                <span class="detail-key">对象模式</span>
-                <span class="detail-val">{{ SUBJECT_KIND_LABELS[rule.subjectMode || 'single'] }}</span>
-              </div>
               <div class="detail-item full-width">
-                <span class="detail-key">对象集合 A</span>
-                <span class="detail-val">{{ formatSubjects(rule.subjectsA || []) }}</span>
-              </div>
-              <div v-if="(rule.subjectMode || 'single') === 'dual'" class="detail-item full-width">
-                <span class="detail-key">对象集合 B</span>
-                <span class="detail-val">{{ formatSubjects(rule.subjectsB || []) }}</span>
+                <span class="detail-key">对象集合</span>
+                <span class="detail-val">{{ formatSubjects(rule.subjects || []) }}</span>
               </div>
               <div class="detail-item">
                 <span class="detail-key">谓词</span>
@@ -178,7 +170,6 @@ import {
   PRIORITY_COLORS,
   PRIORITY_ICONS,
   PRIORITY_LABELS,
-  SUBJECT_KIND_LABELS,
   RULE_TYPE_LABELS,
   PREDICATE_META,
   COLUMN_TYPE_LABELS,

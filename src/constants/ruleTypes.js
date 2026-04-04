@@ -35,22 +35,12 @@ export const PRIORITY_ICONS = {
   optional: '⚪'
 }
 
-// ==================== 主体模式 ====================
+// ==================== 主体类型（兼容旧字段展示） ====================
 
-export const SubjectMode = {
-  SINGLE: 'single',
-  DUAL: 'dual'
-}
-
-export const SUBJECT_MODE_LABELS = {
-  single: '单对象',
-  dual: '双对象'
-}
-
-// 兼容旧字段展示
 export const SUBJECT_KIND_LABELS = {
-  single: '单对象',
-  dual: '双对象',
+  multi: '多对象',
+  single: '单对象（旧）',
+  dual: '双对象（旧）',
   student: '单个学生',
   pair: '学生对',
   tag: '标签分组',
@@ -108,29 +98,31 @@ export const RULE_TYPE_DESCRIPTIONS = {
   IN_ZONE: '必须坐在指定的选区范围内',
   NOT_IN_ZONE: '禁止坐在指定的选区范围内',
   IN_GROUP_RANGE: '限定在第 N～M 大组之间（1=最左组）',
-  MUST_BE_SEATMATES: '两人必须在同一排同一大组（同桌）',
-  MUST_NOT_BE_SEATMATES: '两人禁止同桌',
-  DISTANCE_AT_MOST: '两人座位曼哈顿距离不超过 N',
-  DISTANCE_AT_LEAST: '两人座位曼哈顿距离至少为 N',
-  NOT_BLOCK_VIEW: '前者不可坐在后者的视线正后方',
-  MUST_BE_SAME_GROUP: '两人必须在同一大组',
-  MUST_NOT_BE_SAME_GROUP: '两人必须在不同大组',
-  MUST_BE_ADJACENT_ROW: '两人在同大组内行数差为 1',
+  MUST_BE_SEATMATES: '对象集合内任意两者必须同桌',
+  MUST_NOT_BE_SEATMATES: '对象集合内任意两者禁止同桌',
+  DISTANCE_AT_MOST: '对象集合内任意两者曼哈顿距离不超过 N',
+  DISTANCE_AT_LEAST: '对象集合内任意两者曼哈顿距离至少为 N',
+  NOT_BLOCK_VIEW: '对象集合内前者不可坐在后者的视线正后方',
+  MUST_BE_SAME_GROUP: '对象集合内任意两者必须同一大组',
+  MUST_NOT_BE_SAME_GROUP: '对象集合内任意两者必须不同大组',
+  MUST_BE_ADJACENT_ROW: '对象集合内任意两者在同大组内行数差为 1',
   DISTRIBUTE_EVENLY: '同标签学生尽量分散到不同大组/排',
   CLUSTER_TOGETHER: '同标签学生尽量聚集在同一区域'
 }
 
-// 谓词元数据：适用的主体模式 + 参数规格
+// 谓词元数据：适用对象语义 + 参数规格
 export const PREDICATE_META = {
   IN_ROW_RANGE: {
-    subjectMode: ['single'],
+    relation: 'single',
+    minSubjects: 1,
     params: [
       { key: 'minRow', label: '最前排', type: 'number', min: 1, default: 1 },
       { key: 'maxRow', label: '最后排', type: 'number', min: 1, default: 3 }
     ]
   },
   NOT_IN_COLUMN_TYPE: {
-    subjectMode: ['single'],
+    relation: 'single',
+    minSubjects: 1,
     params: [
       {
         key: 'columnType',
@@ -147,46 +139,54 @@ export const PREDICATE_META = {
     ]
   },
   IN_ZONE: {
-    subjectMode: ['single'],
+    relation: 'single',
+    minSubjects: 1,
     params: [
       { key: 'zoneId', label: '选区', type: 'zone', default: null }
     ]
   },
   NOT_IN_ZONE: {
-    subjectMode: ['single'],
+    relation: 'single',
+    minSubjects: 1,
     params: [
       { key: 'zoneId', label: '选区', type: 'zone', default: null }
     ]
   },
   IN_GROUP_RANGE: {
-    subjectMode: ['single'],
+    relation: 'single',
+    minSubjects: 1,
     params: [
       { key: 'minGroup', label: '最左大组', type: 'number', min: 1, default: 1 },
       { key: 'maxGroup', label: '最右大组', type: 'number', min: 1, default: 2 }
     ]
   },
   MUST_BE_SEATMATES: {
-    subjectMode: ['dual'],
+    relation: 'pair',
+    minSubjects: 2,
     params: []
   },
   MUST_NOT_BE_SEATMATES: {
-    subjectMode: ['dual'],
+    relation: 'pair',
+    minSubjects: 2,
     params: []
   },
   DISTANCE_AT_MOST: {
-    subjectMode: ['dual'],
+    relation: 'pair',
+    minSubjects: 2,
     params: [
       { key: 'distance', label: '最大距离', type: 'number', min: 1, default: 2 }
     ]
   },
   DISTANCE_AT_LEAST: {
-    subjectMode: ['dual'],
+    relation: 'pair',
+    minSubjects: 2,
     params: [
       { key: 'distance', label: '最小距离', type: 'number', min: 1, default: 3 }
     ]
   },
   NOT_BLOCK_VIEW: {
-    subjectMode: ['dual'],
+    relation: 'ordered_pair',
+    minSubjects: 2,
     params: [
       {
         key: 'tolerance',
@@ -202,19 +202,23 @@ export const PREDICATE_META = {
     ordered: true // id1 不遮挡 id2（有序）
   },
   MUST_BE_SAME_GROUP: {
-    subjectMode: ['dual'],
+    relation: 'pair',
+    minSubjects: 2,
     params: []
   },
   MUST_NOT_BE_SAME_GROUP: {
-    subjectMode: ['dual'],
+    relation: 'pair',
+    minSubjects: 2,
     params: []
   },
   MUST_BE_ADJACENT_ROW: {
-    subjectMode: ['dual'],
+    relation: 'pair',
+    minSubjects: 2,
     params: []
   },
   DISTRIBUTE_EVENLY: {
-    subjectMode: ['single'],
+    relation: 'single',
+    minSubjects: 1,
     params: [
       {
         key: 'scope',
@@ -229,7 +233,8 @@ export const PREDICATE_META = {
     ]
   },
   CLUSTER_TOGETHER: {
-    subjectMode: ['single'],
+    relation: 'single',
+    minSubjects: 1,
     params: [
       {
         key: 'scope',
@@ -261,10 +266,12 @@ export const SCOPE_LABELS = {
 }
 
 /**
- * 获取指定谓词适用的主体模式列表
+ * 获取指定谓词适用的主体模式列表（兼容旧调用，内部已切到 relation 语义）
  */
 export function getCompatibleSubjectModes(predicate) {
-  return PREDICATE_META[predicate]?.subjectMode ?? []
+  const relation = PREDICATE_META[predicate]?.relation
+  if (!relation) return []
+  return relation === 'single' ? ['single'] : ['dual']
 }
 
 /**

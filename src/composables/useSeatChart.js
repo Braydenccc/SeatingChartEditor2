@@ -202,14 +202,24 @@ export function useSeatChart() {
   const areDeskmates = (seatId1, seatId2) => {
     const seat1 = parseSeatId(seatId1)
     const seat2 = parseSeatId(seatId2)
+    const columnsPerGroup = Number(seatConfig.value?.columnsPerGroup || 0)
 
-    // 同桌 = 同大组 且 同排(rowIndex相同)
-    return seat1.groupIndex === seat2.groupIndex && seat1.rowIndex === seat2.rowIndex
+    // 列数<=1 时结构上不存在同桌位（0 也按不可同桌处理，避免无效配置误判）
+    if (columnsPerGroup <= 1) return false
+
+    // 同桌 = 同大组 且 同排(rowIndex相同) 且 不是同一列
+    return (
+      seat1.groupIndex === seat2.groupIndex &&
+      seat1.rowIndex === seat2.rowIndex &&
+      seat1.columnIndex !== seat2.columnIndex
+    )
   }
 
   // 查找指定座位的同桌座位
   const findDeskmates = (seatId) => {
     const parsed = parseSeatId(seatId)
+    const columnsPerGroup = Number(seatConfig.value?.columnsPerGroup || 0)
+    if (columnsPerGroup <= 1) return []
     return seats.value.filter(seat =>
       seat.groupIndex === parsed.groupIndex &&
       seat.rowIndex === parsed.rowIndex &&

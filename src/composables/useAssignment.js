@@ -73,36 +73,33 @@ export function useAssignment() {
   // ==================== 新引擎：主体展开 ====================
 
   const normalizeRuleSubjects = (rule) => {
-    if (rule.subjectMode === 'single' || rule.subjectMode === 'dual') {
+    if (Array.isArray(rule.subjects)) {
       return {
-        subjectMode: rule.subjectMode,
-        subjectsA: rule.subjectsA || [],
-        subjectsB: rule.subjectsB || []
+        subjects: rule.subjects || []
       }
+    }
+    if (rule.subjectMode === 'single' || rule.subjectMode === 'dual') {
+      return { subjects: [...(rule.subjectsA || []), ...(rule.subjectsB || [])] }
     }
 
     const subject = rule.subject || {}
     if (subject.kind === 'student') {
-      return { subjectMode: 'single', subjectsA: [{ type: 'person', id: subject.id }], subjectsB: [] }
+      return { subjects: [{ type: 'person', id: subject.id }] }
     }
     if (subject.kind === 'tag') {
-      return { subjectMode: 'single', subjectsA: [{ type: 'tag', id: subject.tagId }], subjectsB: [] }
+      return { subjects: [{ type: 'tag', id: subject.tagId }] }
     }
     if (subject.kind === 'pair') {
       return {
-        subjectMode: 'dual',
-        subjectsA: [{ type: 'person', id: subject.id1 }],
-        subjectsB: [{ type: 'person', id: subject.id2 }]
+        subjects: [{ type: 'person', id: subject.id1 }, { type: 'person', id: subject.id2 }]
       }
     }
     if (subject.kind === 'tag_pair') {
       return {
-        subjectMode: 'dual',
-        subjectsA: [{ type: 'tag', id: subject.tagId1 }],
-        subjectsB: [{ type: 'tag', id: subject.tagId2 }]
+        subjects: [{ type: 'tag', id: subject.tagId1 }, { type: 'tag', id: subject.tagId2 }]
       }
     }
-    return { subjectMode: 'single', subjectsA: [], subjectsB: [] }
+    return { subjects: [] }
   }
 
   const expandEntriesToStudentIds = (entries, studentList) => {
@@ -124,25 +121,32 @@ export function useAssignment() {
    */
   const expandSubject = (rule, studentList) => {
     const normalized = normalizeRuleSubjects(rule)
-    const groupA = expandEntriesToStudentIds(normalized.subjectsA, studentList)
-    const groupB = expandEntriesToStudentIds(normalized.subjectsB, studentList)
+    const expanded = expandEntriesToStudentIds(normalized.subjects, studentList)
+    const relation = PREDICATE_META[rule.predicate]?.relation || 'single'
+    const maxSuggestedSubjects = 20
 
-    if (normalized.subjectMode === 'single') {
-      return groupA.map(studentId => ({ type: 'single', studentId }))
+    if (expanded.length > maxSuggestedSubjects) {
+      console.warn(`Rule "${rule.predicate}" has ${expanded.length} subjects; pair expansion may be expensive.`)
+    }
+
+    if (relation === 'single') {
+      return expanded.map(studentId => ({ type: 'single', studentId }))
     }
 
     const pairs = []
-    const seenUnorderedPairs = new Set()
-    const isOrderedPredicate = !!PREDICATE_META[rule.predicate]?.ordered
-    for (const a of groupA) {
-      for (const b of groupB) {
-        if (a === b) continue
-        if (!isOrderedPredicate) {
-          const key = a < b ? `${a}:${b}` : `${b}:${a}`
-          if (seenUnorderedPairs.has(key)) continue
-          seenUnorderedPairs.add(key)
+    if (relation === 'ordered_pair') {
+      for (const a of expanded) {
+        for (const b of expanded) {
+          if (a === b) continue
+          pairs.push({ type: 'pair', studentId1: a, studentId2: b })
         }
-        pairs.push({ type: 'pair', studentId1: a, studentId2: b })
+      }
+      return pairs
+    }
+
+    for (let i = 0; i < expanded.length; i++) {
+      for (let j = i + 1; j < expanded.length; j++) {
+        pairs.push({ type: 'pair', studentId1: expanded[i], studentId2: expanded[j] })
       }
     }
     return pairs

@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import { resolveStagingTarget } from './staging-deploy-path.js';
 
 function runCommand(executable, args) {
@@ -52,13 +53,41 @@ if (!targetPath) {
 
 let resolvedTarget;
 try {
-  resolvedTarget = resolveStagingTarget(`test/${targetPath}`);
+  resolvedTarget = resolveStagingTarget(`test-${targetPath}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 }
 
-const deployBranch = `test/${resolvedTarget.deployPath}`;
+// --- 自动添加子测试环境到 JSON 逻辑 ---
+const envsFilePath = 'test-envs.json';
+let envs = [];
+try {
+  envs = JSON.parse(fs.readFileSync(envsFilePath, 'utf8'));
+} catch (e) {
+  // 如果首次没有该文件，忽略即可，后续会自动创建
+}
+
+if (!envs.some(env => env.id === targetPath)) {
+  envs.push({
+    id: targetPath,
+    label: `子测试 ${targetPath}`,
+    url: resolvedTarget.siteUrl
+  });
+  fs.writeFileSync(envsFilePath, JSON.stringify(envs, null, 2) + '\n', 'utf8');
+  console.log(`[提示] 自动将新环境加入到了 ${envsFilePath}`);
+  
+  try {
+    runCommandInherit('git', ['add', envsFilePath]);
+    runCommandInherit('git', ['commit', '-m', `chore: 自动注册新的测试环境 ${targetPath}`]);
+    console.log(`[提示] 已自动创建 Commit。`);
+  } catch(e) {
+    console.warn(`[警告] 自动 Commit 失败，如果工作区为空可能无需提交。`);
+  }
+}
+// ----------------------------------------
+
+const deployBranch = `test-${targetPath}`;
 
 runCommandInherit('git', ['push', 'origin', `HEAD:refs/heads/${deployBranch}`]);
 console.log(`已推送当前分支到 ${deployBranch}，将部署到 ${resolvedTarget.siteUrl}`);

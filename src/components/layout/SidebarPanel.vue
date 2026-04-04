@@ -345,7 +345,6 @@
             :report="lastAssignmentReport" 
             :duration="lastAssignmentDuration" 
             @focus-rule="handleFocusRule"
-            @apply-suggestion="handleApplySuggestion"
           />
         </div>
 
@@ -469,7 +468,7 @@ const { downloadTemplate, importFromExcel, exportToExcel } = useExcelData()
 const { saveWorkspace, loadWorkspace, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
 const { logs, success, warning, error, clearLogs } = useLogger()
 const { requestConfirm, isConfirming } = useConfirmAction()
-const { rules, ruleCount, getActiveRules, getRulesForStudent, detectConflicts, updateRule, renderRuleText } = useSeatRules()
+const { rules, ruleCount, getActiveRules, getRulesForStudent, detectConflicts, renderRuleText } = useSeatRules()
 const { isLoggedIn, isLoginDialogVisible } = useAuth()
 
 // ==================== 选区轮换 ====================
@@ -955,6 +954,117 @@ const precheckRiskText = computed(() => {
   return '高'
 })
 
+const detectDeskmateBindingConflicts = () => {
+  const activeRules = getActiveRules().filter(rule => rule.predicate === 'MUST_BE_SEATMATES')
+  if (activeRules.length === 0) {
+    return { count: 0, details: [] }
+  }
+
+  const studentNameMap = new Map(students.value.map(student => [student.id, student.name || `学生#${student.id}`]))
+  const tagToStudentIds = new Map()
+  for (const student of students.value) {
+    for (const tagId of (student.tags || [])) {
+      if (!tagToStudentIds.has(tagId)) tagToStudentIds.set(tagId, new Set())
+      tagToStudentIds.get(tagId).add(student.id)
+    }
+  }
+
+  const expandEntriesToStudentIds = (entries = []) => {
+    const ids = new Set()
+    for (const entry of entries) {
+      if (!entry?.id) continue
+      if (entry.type === 'person') {
+        ids.add(entry.id)
+        continue
+      }
+      if (entry.type === 'tag') {
+        const studentIds = tagToStudentIds.get(entry.id)
+        if (!studentIds) continue
+        for (const studentId of studentIds) {
+          ids.add(studentId)
+        }
+      }
+    }
+    return [...ids]
+  }
+
+  const columnsPerGroup = Number(seatConfig.value?.columnsPerGroup || 0)
+  if (columnsPerGroup <= 1) {
+    return {
+      count: 1,
+      details: ['当前每大组列数为 1，不存在同桌位，所有“必须同桌”规则不可满足']
+    }
+  }
+
+  const adjacency = new Map()
+  const pairKeys = new Set()
+  const expandedPairs = []
+
+  for (const rule of activeRules) {
+    const ids = expandEntriesToStudentIds(rule.subjects || [])
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = ids[i]
+        const b = ids[j]
+        const key = a < b ? `${a}:${b}` : `${b}:${a}`
+        if (pairKeys.has(key)) continue
+        pairKeys.add(key)
+        expandedPairs.push([a, b])
+        if (!adjacency.has(a)) adjacency.set(a, new Set())
+        if (!adjacency.has(b)) adjacency.set(b, new Set())
+        adjacency.get(a).add(b)
+        adjacency.get(b).add(a)
+      }
+    }
+  }
+
+  const details = []
+  const seatsByGroupRow = new Map()
+  for (const seat of getAvailableSeats()) {
+    const key = `${seat.groupIndex}:${seat.rowIndex}`
+    if (!seatsByGroupRow.has(key)) seatsByGroupRow.set(key, 0)
+    seatsByGroupRow.set(key, seatsByGroupRow.get(key) + 1)
+  }
+  let maxFeasiblePairs = 0
+  for (const count of seatsByGroupRow.values()) {
+    maxFeasiblePairs += Math.floor((count * Math.max(0, count - 1)) / 2)
+  }
+  if (expandedPairs.length > maxFeasiblePairs) {
+    details.push(`同桌容量不足：当前最多可满足约 ${maxFeasiblePairs} 对同桌关系，但规则展开后需要 ${expandedPairs.length} 对`)
+  }
+  const maxDeskmatesPerStudent = columnsPerGroup - 1
+  for (const [studentId, mates] of adjacency.entries()) {
+    if (mates.size <= maxDeskmatesPerStudent) continue
+    const selfName = studentNameMap.get(studentId) || `学生#${studentId}`
+    const mateNames = [...mates].map(id => studentNameMap.get(id) || `学生#${id}`)
+    details.push(`同桌绑定冲突：${selfName} 绑定了 ${mateNames.join('、')}，超过当前列数可容纳上限（${maxDeskmatesPerStudent}）`)
+  }
+
+  const forbidRules = getActiveRules().filter(rule => rule.predicate === 'MUST_NOT_BE_SEATMATES')
+  if (forbidRules.length > 0 && expandedPairs.length > 0) {
+    const forbidPairKeys = new Set()
+    for (const rule of forbidRules) {
+      const ids = expandEntriesToStudentIds(rule.subjects || [])
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const a = ids[i]
+          const b = ids[j]
+          forbidPairKeys.add(a < b ? `${a}:${b}` : `${b}:${a}`)
+        }
+      }
+    }
+    for (const [a, b] of expandedPairs) {
+      const key = a < b ? `${a}:${b}` : `${b}:${a}`
+      if (!forbidPairKeys.has(key)) continue
+      const aName = studentNameMap.get(a) || `学生#${a}`
+      const bName = studentNameMap.get(b) || `学生#${b}`
+      details.push(`规则冲突：${aName} 与 ${bName} 同时存在“必须同桌”和“禁止同桌”`)
+    }
+  }
+
+  return { count: details.length, details }
+}
+
 const runAssignmentPrecheck = ({ silent = false } = {}) => {
   const studentCount = students.value.length
   const availableSeatCount = getAvailableSeats().length
@@ -973,6 +1083,12 @@ const runAssignmentPrecheck = ({ silent = false } = {}) => {
   const hardConflictCount = conflictList.filter(c => c.type === 'infeasible' || c.type === 'contradiction').length
   if (hardConflictCount > 0) {
     blockingReasons.push(`存在 ${hardConflictCount} 条不可满足或逻辑矛盾规则`)
+  }
+
+  const deskmateBindingConflict = detectDeskmateBindingConflicts()
+  if (deskmateBindingConflict.count > 0) {
+    blockingReasons.push(`存在 ${deskmateBindingConflict.count} 处同桌绑定冲突`)
+    blockingReasons.push(...deskmateBindingConflict.details.slice(0, 5))
   }
   if (activeRuleCount === 0) {
     warnings.push('当前未启用规则，本次将接近随机排位')
@@ -1031,35 +1147,6 @@ const handleFocusRule = (item) => {
   success(`已定位规则：${renderRuleText(item.rule)}`)
 }
 
-const handleApplySuggestion = (action) => {
-  if (!action?.ruleId) return
-  const target = rules.value.find(r => r.id === action.ruleId)
-  if (!target) {
-    warning('建议应用失败：规则不存在')
-    return
-  }
-
-  if (action.type === 'downgrade_priority') {
-    if (!action.to) {
-      warning('建议应用失败：缺少目标优先级')
-      return
-    }
-    updateRule(action.ruleId, { priority: action.to })
-    success('已应用建议：规则优先级已调整')
-  } else if (action.type === 'increase_param') {
-    const prev = Number(target.params?.[action.key] ?? 0)
-    const next = Math.max(1, prev + Number(action.delta ?? 0))
-    updateRule(action.ruleId, {
-      params: {
-        ...target.params,
-        [action.key]: next
-      }
-    })
-    success('已应用建议：规则参数已放宽')
-  }
-
-  runAssignmentPrecheck({ silent: true })
-}
 
 watch(
   [students, rules, () => assignConfig.value.maxIterations, seats],

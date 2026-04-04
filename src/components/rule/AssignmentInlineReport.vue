@@ -6,9 +6,7 @@
         <svg viewBox="0 0 40 40" class="in-ring-svg">
           <circle class="in-ring-bg" cx="20" cy="20" r="16" />
           <circle class="in-ring-fill" cx="20" cy="20" r="16"
-            pathLength="100"
-            :stroke-dasharray="`${satPct} ${100 - satPct}`"
-            :style="{ stroke: gradeColor }" />
+            :style="{ stroke: gradeColor, strokeDasharray: `${satPct * circumference / 100} ${circumference - satPct * circumference / 100}` }" />
         </svg>
         <span class="in-ring-pct">{{ Math.round(satPct) }}%</span>
       </div>
@@ -37,13 +35,6 @@
             <span v-if="item.reason" class="in-row-reason">{{ item.reason }}</span>
             <div class="in-row-actions">
               <button class="in-action-btn" @click="emit('focus-rule', item)">定位规则</button>
-              <button
-                v-if="getSuggestion(item)"
-                class="in-action-btn primary"
-                @click="emit('apply-suggestion', getSuggestion(item))"
-              >
-                一键修正建议
-              </button>
             </div>
           </div>
         </div>
@@ -80,10 +71,12 @@ const props = defineProps({
   report: { type: Object, default: null },
   duration: { type: Number, default: 0 }
 })
-const emit = defineEmits(['focus-rule', 'apply-suggestion'])
+const emit = defineEmits(['focus-rule'])
 
 const { renderRuleText } = useSeatRules()
 const showSatisfied = ref(false)
+
+const circumference = 2 * Math.PI * 16 // r=16, ≈100.53
 
 const satPct = computed(() => ((props.report?.satRate ?? 1) * 100))
 const ruleCount = computed(() => (props.report?.satisfied?.length || 0) + (props.report?.violated?.length || 0))
@@ -115,29 +108,6 @@ const gradeIcon = computed(() => {
   return '⚠️'
 })
 
-const getSuggestion = (item) => {
-  const rule = item?.rule
-  if (!rule) return null
-
-  // 放宽距离约束：
-  // - DISTANCE_AT_MOST：增大上限
-  // - DISTANCE_AT_LEAST：减小下限
-  if (rule.predicate === 'DISTANCE_AT_MOST') {
-    return { type: 'increase_param', ruleId: rule.id, key: 'distance', delta: 1 }
-  }
-  if (rule.predicate === 'DISTANCE_AT_LEAST') {
-    return { type: 'increase_param', ruleId: rule.id, key: 'distance', delta: -1 }
-  }
-
-  if (rule.priority === 'required') {
-    return { type: 'downgrade_priority', ruleId: rule.id, to: 'prefer' }
-  }
-  if (rule.priority === 'prefer') {
-    return { type: 'downgrade_priority', ruleId: rule.id, to: 'optional' }
-  }
-
-  return null
-}
 </script>
 
 <style scoped>
@@ -190,7 +160,6 @@ const getSuggestion = (item) => {
   fill: none;
   stroke-width: 3.5;
   stroke-linecap: round;
-  stroke-dasharray: 0 100;
   transition: stroke-dasharray 0.8s ease;
 }
 

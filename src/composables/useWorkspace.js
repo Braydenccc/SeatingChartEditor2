@@ -63,6 +63,8 @@ export function useWorkspace() {
         rules: (rules.value || []).map(r => ({
           enabled: r.enabled,
           priority: r.priority,
+          subjects: [...(r.subjects || [])],
+          // 兼容导出旧字段
           subjectMode: r.subjectMode,
           subjectsA: [...(r.subjectsA || [])],
           subjectsB: [...(r.subjectsB || [])],
@@ -234,35 +236,30 @@ export function useWorkspace() {
         }
 
         const normalizeRule = (rule) => {
+          if (Array.isArray(rule.subjects)) {
+            return { subjects: (rule.subjects || []).map(item => ({ ...item })) }
+          }
           if (rule.subjectMode === 'single' || rule.subjectMode === 'dual') {
+            const subjectsA = (rule.subjectsA || []).map(item => ({ ...item }))
+            const subjectsB = (rule.subjectsB || []).map(item => ({ ...item }))
             return {
-              subjectMode: rule.subjectMode,
-              subjectsA: (rule.subjectsA || []).map(item => ({ ...item })),
-              subjectsB: (rule.subjectsB || []).map(item => ({ ...item }))
+              subjects: [...subjectsA, ...subjectsB]
             }
           }
           const subject = rule.subject || {}
           if (subject.kind === 'student') {
-            return { subjectMode: 'single', subjectsA: [{ type: 'person', id: subject.id }], subjectsB: [] }
+            return { subjects: [{ type: 'person', id: subject.id }] }
           }
           if (subject.kind === 'tag') {
-            return { subjectMode: 'single', subjectsA: [{ type: 'tag', id: subject.tagId }], subjectsB: [] }
+            return { subjects: [{ type: 'tag', id: subject.tagId }] }
           }
           if (subject.kind === 'pair') {
-            return {
-              subjectMode: 'dual',
-              subjectsA: [{ type: 'person', id: subject.id1 }],
-              subjectsB: [{ type: 'person', id: subject.id2 }]
-            }
+            return { subjects: [{ type: 'person', id: subject.id1 }, { type: 'person', id: subject.id2 }] }
           }
           if (subject.kind === 'tag_pair') {
-            return {
-              subjectMode: 'dual',
-              subjectsA: [{ type: 'tag', id: subject.tagId1 }],
-              subjectsB: [{ type: 'tag', id: subject.tagId2 }]
-            }
+            return { subjects: [{ type: 'tag', id: subject.tagId1 }, { type: 'tag', id: subject.tagId2 }] }
           }
-          return { subjectMode: 'single', subjectsA: [], subjectsB: [] }
+          return { subjects: [] }
         }
 
         const remapEntry = (entry, oldStudentIdToNewIdMap, oldTagIdToNewIdMap) => {
@@ -285,18 +282,14 @@ export function useWorkspace() {
           workspace.rules.forEach(r => {
             const normalized = normalizeRule(r)
 
-            const remappedA = normalized.subjectsA.map(entry => remapEntry(entry, oldStudentIdToNewId, oldTagIdToNewId))
-            const remappedB = normalized.subjectsB.map(entry => remapEntry(entry, oldStudentIdToNewId, oldTagIdToNewId))
-            const subjectsA = remappedA.filter(e => !!e?.id)
-            const subjectsB = remappedB.filter(e => !!e?.id)
-            const droppedA = remappedA.length - subjectsA.length
-            const droppedB = remappedB.length - subjectsB.length
-            if (droppedA > 0 || droppedB > 0) {
-              totalDroppedSubjects += droppedA + droppedB
+            const remappedSubjects = normalized.subjects.map(entry => remapEntry(entry, oldStudentIdToNewId, oldTagIdToNewId))
+            const subjects = remappedSubjects.filter(e => !!e?.id)
+            const dropped = remappedSubjects.length - subjects.length
+            if (dropped > 0) {
+              totalDroppedSubjects += dropped
               warning('Workspace rule subject remap dropped entries', {
                 rule: r,
-                droppedA,
-                droppedB
+                dropped
               })
             }
 
@@ -304,14 +297,12 @@ export function useWorkspace() {
             if (newParams.tagId) newParams.tagId = oldTagIdToNewId[newParams.tagId]
             if (newParams.zoneId) newParams.zoneId = oldZoneIdToNewId[newParams.zoneId]
 
-            const hasValidSubjects = subjectsA.length > 0 && (normalized.subjectMode !== 'dual' || subjectsB.length > 0)
+            const hasValidSubjects = subjects.length > 0
             if (hasValidSubjects) {
               const result = addRule({
                 enabled: r.enabled ?? true,
                 priority: r.priority,
-                subjectMode: normalized.subjectMode,
-                subjectsA,
-                subjectsB,
+                subjects,
                 predicate: r.predicate,
                 params: newParams,
                 description: r.description || ''

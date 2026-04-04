@@ -1,0 +1,12 @@
+[
+  {
+    "id": "main",
+    "label": "全部测试",
+    "url": "https://test.sce.jbyc.cc/test"
+  },
+  {
+    "id": "rule",
+    "label": "智能排位规则",
+    "url": "https://test.sce.jbyc.cc/test/rule"
+  }
+]
