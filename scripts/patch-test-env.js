@@ -1,5 +1,67 @@
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
+
+const TEST_HOST = 'https://test.sce.jbyc.cc';
+
+/**
+ * Run git with explicit argv (no shell string), returning trimmed stdout.
+ * @param {string[]} args
+ * @returns {string}
+ */
+function runGit(args) {
+  try {
+    return execFileSync('git', args, { encoding: 'utf8' }).trim();
+  } catch (error) {
+    console.error(`Git command failed: git ${args.join(' ')}`);
+    throw error;
+  }
+}
+
+function encodeHtmlEntities(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function toStagingUrl(branch) {
+  if (branch === 'test') return TEST_HOST;
+  if (branch.startsWith('test/')) {
+    return `${TEST_HOST}/${branch.slice(5)}`;
+  }
+  return '';
+}
+
+function shouldSelectBranchOption(branch, currentBranch, hasCurrentBranchInList) {
+  if (branch === currentBranch) {
+    return true;
+  }
+
+  return branch === 'test' && !hasCurrentBranchInList;
+}
+
+function resolveCurrentBranch() {
+  const currentBranchFromGit = runGit(['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (currentBranchFromGit !== 'HEAD') {
+    return currentBranchFromGit;
+  }
+
+  const githubRefName = process.env.GITHUB_REF_NAME?.trim() || '';
+  if (githubRefName) {
+    return githubRefName;
+  }
+
+  const githubRef = process.env.GITHUB_REF?.trim() || '';
+  const refPrefix = 'refs/heads/';
+  if (githubRef.startsWith(refPrefix)) {
+    return githubRef.slice(refPrefix.length);
+  }
+
+  console.warn('Unable to resolve current branch in detached HEAD, fallback to test');
+  return 'test';
+}
 
 try {
   // 解决 GitHub Actions 容器环境下的 git 目录所有权安全限制
@@ -9,14 +71,43 @@ try {
     // Ignore errors if this fails (e.g. locally without perms)
   }
 
-  const commitSha = execSync('git log -1 --format=%h').toString().trim();
-  const commitMsg = execSync('git log -1 --format=%s').toString().trim().substring(0, 40);
+  const currentBranch = resolveCurrentBranch();
+  const localBranches = runGit(['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
+    .split('\n')
+    .map((b) => b.trim())
+    .filter(Boolean);
+  const remoteBranches = runGit(['for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin'])
+    .split('\n')
+    .map((b) => b.trim())
+    .filter((b) => b && !b.endsWith('/HEAD'))
+    .map((b) => b.replace(/^origin\//, ''));
 
-  console.log(`Patching test env with commit: ${commitSha}`);
+  const branchSet = new Set([...localBranches, ...remoteBranches]);
+  if (currentBranch === 'test' || currentBranch.startsWith('test/')) {
+    branchSet.add(currentBranch);
+  }
+  const branchList = Array.from(branchSet)
+    .filter((branch) => branch === 'test' || branch.startsWith('test/'))
+    .sort((a, b) => {
+      if (a === 'test') return -1;
+      if (b === 'test') return 1;
+      return a.localeCompare(b);
+    });
+
+  if (branchList.length === 0) {
+    branchList.push('test');
+  }
+  const hasCurrentBranchInList = branchList.includes(currentBranch);
+
+  console.log(`Patching test env with branch selector: ${currentBranch}`);
 
   // 1. index.html
   let indexHtml = fs.readFileSync('index.html', 'utf8');
-  indexHtml = indexHtml.replace('<title>座位表编辑器-scev2byccc</title>', '<title>[测试版] 座位表编辑器-scev2byccc</title>');
+  // 保留可能存在的 title 属性，同时避免重复注入 [test] 前缀
+  indexHtml = indexHtml.replace(/(<title(?:\s[^>]*)?>)([\s\S]*?)(<\/title>)/, (_, openTag, title, closeTag) => {
+    const cleanedTitle = String(title).trim().replace(/^\[test\]\s*/i, '');
+    return `${openTag}[test] ${cleanedTitle}${closeTag}`;
+  });
   fs.writeFileSync('index.html', indexHtml);
 
   // 2. LoginDialog.vue
@@ -31,15 +122,22 @@ try {
   // 3. AppHeader.vue
   const headerPath = 'src/components/layout/AppHeader.vue';
   let appHeader = fs.readFileSync(headerPath, 'utf8');
-  const badgeHtml = `<span class="commit-badge">${commitSha} ${commitMsg.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`;
+  const optionsHtml = branchList
+    .map((branch) => {
+      const url = toStagingUrl(branch);
+      const selected = shouldSelectBranchOption(branch, currentBranch, hasCurrentBranchInList) ? ' selected' : '';
+      return `<option value="${encodeHtmlEntities(url)}"${selected}>${encodeHtmlEntities(branch)}</option>`;
+    })
+    .join('');
+  const selectorHtml = `<select class="branch-selector" onchange="if (this.value) { window.location.href = this.value; }">${optionsHtml}</select>`;
   appHeader = appHeader.replace(
     '<h1 class="header-text">BraydenSCE V2</h1>',
-    `<h1 class="header-text">\n        BraydenSCE V2\n        ${badgeHtml}\n      </h1>`
+    `<h1 class="header-text">\n        BraydenSCE V2\n        ${selectorHtml}\n      </h1>`
   );
-  if (!appHeader.includes('.commit-badge')) {
+  if (!appHeader.includes('.branch-selector')) {
     appHeader = appHeader.replace(
       '</style>',
-      `.commit-badge { display: inline-block; font-size: 11px; font-weight: 400; font-family: monospace; background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; padding: 2px 8px; margin-left: 10px; vertical-align: middle; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n</style>`
+      `.branch-selector { display: inline-block; font-size: 11px; font-weight: 500; font-family: monospace; background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.95); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; padding: 2px 8px; margin-left: 10px; vertical-align: middle; max-width: 300px; cursor: pointer; }\n.branch-selector option { color: #1f2937; }\n</style>`
     );
   }
   fs.writeFileSync(headerPath, appHeader);

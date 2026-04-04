@@ -102,6 +102,18 @@ npm run deploy
 
 > 需要预先配置热铁盒的 `RTH_API_KEY` 环境变量。
 
+测试环境分支部署：
+
+```bash
+# 默认：将当前分支合并到 test 并部署到 https://test.sce.jbyc.cc
+npm run deploy:test
+
+# 指定路径：不修改 test 分支，直接部署当前分支到 https://test.sce.jbyc.cc/<path>
+npm run deploy:test -- <path>
+```
+
+`<path>` 仅允许字母、数字、`.`、`_`、`-`、`/`，且不能包含空段、`.`、`..` 或 `test` 段。
+
 ### Windows 安装包编译
 
 #### NSIS 独立安装包（约 20 MB）
