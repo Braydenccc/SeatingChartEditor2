@@ -8,7 +8,7 @@
 [![在线体验](https://img.shields.io/badge/%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-sce.jbyc.cc-23587b)](https://sce.jbyc.cc/)
 
 > 一个跨平台、现代化的座位表可视化编辑器。  
-> 支持在浏览器直接使用，也可下载 Windows 纯净桌面版（轻量级 Tauri 版 和 独立 Electron 版）。
+> 支持在浏览器直接使用，也可下载 Windows 纯净桌面版（主要使用 Tauri）。
 
 **在线体验：** <https://sce.jbyc.cc/> 
 
@@ -114,26 +114,20 @@ npm run deploy:test -- <path>
 
 `<path>` 仅允许字母、数字、`.`、`_`、`-`、`/`，且不能包含空段、`.`、`..` 或 `test` 段。
 
-### Windows 安装包编译
+### Windows 桌面版编译（Tauri 主流程）
 
-#### NSIS 独立安装包（约 20 MB）
+推荐流程：
 
 ```bash
-npm run build
+npm run build:web
+npm run build:lite
 ```
 
-自动依序完成：Vite 构建前端 → `pkg` 打包本地服务器为 `.exe` → NSIS 生成 `dist/BraydenSCE-Setup.exe`。
+说明：
 
-安装包功能：可自定义安装目录 · 自动创建桌面和开始菜单快捷方式 · 完成后可选立即启动 · 支持控制面板卸载。
-
-> **前提：** 需安装 [NSIS 3.x](https://nsis.sourceforge.io/) 并加入系统 PATH。
-
-#### 其他桌面版本
-
-| 命令 | 说明 |
-|------|------|
-| `npm run build:lite` | Tauri 轻量版（< 5 MB，需 Win10+ WebView2） |
-| `npm run build:full` | Electron 完整版（~ 110 MB，内置 Chromium） |
+- `npm run build:web`：构建前端资源（Vite）。
+- `npm run build:lite`：构建 Tauri 桌面便携版（当前主桌面构建入口）。
+- `npm run build:desktop`：与 `build:lite` 等价，作为桌面构建别名。
 
 
 ---
