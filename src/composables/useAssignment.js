@@ -632,8 +632,8 @@ export function useAssignment() {
         const seatDId = adjC.length > 0
           ? adjC[Math.floor(Math.random() * adjC.length)].id
           : (() => {
-              const dynamicAssignedSeatIds = [...current.values()]
-              return dynamicAssignedSeatIds[Math.floor(Math.random() * dynamicAssignedSeatIds.length)]
+              const dynamicAssignedSeats = [...current.values()]
+              return dynamicAssignedSeats[Math.floor(Math.random() * dynamicAssignedSeats.length)]
             })()
         const studentD = currentReverse.get(seatDId)
         
