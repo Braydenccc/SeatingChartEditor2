@@ -1,0 +1,66 @@
+const TEST_HOST = 'https://test.sce.jbyc.cc';
+const PATH_ALLOWED_CHARS_REGEX = /^[a-zA-Z0-9._/-]+$/;
+
+export function normalizeDeployPath(rawPath) {
+  return String(rawPath ?? '').trim().replace(/^\/+|\/+$/g, '');
+}
+
+export function validateDeployPath(rawPath) {
+  const safePath = normalizeDeployPath(rawPath);
+
+  if (!safePath) {
+    throw new Error('部署路径不能为空。');
+  }
+
+  if (!PATH_ALLOWED_CHARS_REGEX.test(safePath)) {
+    throw new Error('部署路径仅允许字母、数字、点(.)、下划线(_)、连字符(-)和斜杠(/)。');
+  }
+
+  const pathSegments = safePath.split('/').filter(Boolean);
+  if (pathSegments.length === 0) {
+    throw new Error('部署路径不能为空。');
+  }
+
+  for (const segment of pathSegments) {
+    if (segment === '.' || segment === '..') {
+      throw new Error('部署路径不能包含 . 或 .. 段。');
+    }
+
+    if (segment === 'test') {
+      throw new Error('部署路径不能包含名为 test 的段。');
+    }
+
+    if (segment.startsWith('.')) {
+      throw new Error('部署路径段不能以点(.)开头。');
+    }
+
+    if (segment.includes('..')) {
+      throw new Error('部署路径段不能包含连续点(..)。');
+    }
+  }
+
+  return safePath;
+}
+
+export function resolveStagingTarget(branchName) {
+  const normalizedBranch = String(branchName ?? '').trim();
+
+  if (normalizedBranch === 'test') {
+    return {
+      deploySite: 'test.sce.jbyc.cc',
+      siteUrl: TEST_HOST,
+      deployPath: '',
+    };
+  }
+
+  if (!normalizedBranch.startsWith('test/')) {
+    throw new Error(`无效分支：${normalizedBranch}，必须是 test 或 test/<path>。`);
+  }
+
+  const deployPath = validateDeployPath(normalizedBranch.slice(5));
+  return {
+    deploySite: `test.sce.jbyc.cc/${deployPath}`,
+    siteUrl: `${TEST_HOST}/${deployPath}`,
+    deployPath,
+  };
+}

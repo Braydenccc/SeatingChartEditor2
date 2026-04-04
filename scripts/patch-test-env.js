@@ -29,6 +29,14 @@ function toStagingUrl(branch) {
   return '';
 }
 
+function shouldSelectBranchOption(branch, currentBranch, hasCurrentBranchInList) {
+  if (branch === currentBranch) {
+    return true;
+  }
+
+  return branch === 'test' && !hasCurrentBranchInList;
+}
+
 try {
   // 解决 GitHub Actions 容器环境下的 git 目录所有权安全限制
   try {
@@ -63,6 +71,7 @@ try {
   if (branchList.length === 0) {
     branchList.push('test');
   }
+  const hasCurrentBranchInList = branchList.includes(currentBranch);
 
   console.log(`Patching test env with branch selector: ${currentBranch}`);
 
@@ -89,7 +98,7 @@ try {
   const optionsHtml = branchList
     .map((branch) => {
       const url = toStagingUrl(branch);
-      const selected = branch === currentBranch || (branch === 'test' && !branchList.includes(currentBranch)) ? ' selected' : '';
+      const selected = shouldSelectBranchOption(branch, currentBranch, hasCurrentBranchInList) ? ' selected' : '';
       return `<option value="${escapeHtml(url)}"${selected}>${escapeHtml(branch)}</option>`;
     })
     .join('');

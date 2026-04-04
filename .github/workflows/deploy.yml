@@ -80,30 +80,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
       - name: Resolve staging deploy path
         id: resolve-path
         shell: bash
         run: |
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          if [ "$BRANCH_NAME" == "test" ]; then
-            DEPLOY_SITE="test.sce.jbyc.cc"
-            SITE_URL="https://test.sce.jbyc.cc"
-          else
-            DEPLOY_PATH="${BRANCH_NAME#test/}"
-            if ! [[ "$DEPLOY_PATH" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
-              echo "::error::Invalid deploy path '$DEPLOY_PATH': only letters, numbers, dot, underscore, hyphen and slash are allowed."
-              exit 1
-            fi
-            IFS='/' read -r -a SEGMENTS <<< "$DEPLOY_PATH"
-            for segment in "${SEGMENTS[@]}"; do
-              if [ -z "$segment" ] || [ "$segment" = "." ] || [ "$segment" = ".." ] || [ "$segment" = "test" ]; then
-                echo "::error::Invalid deploy path segment '$segment'."
-                exit 1
-              fi
-            done
-            DEPLOY_SITE="test.sce.jbyc.cc/${DEPLOY_PATH}"
-            SITE_URL="https://test.sce.jbyc.cc/${DEPLOY_PATH}"
-          fi
+          RESOLVED=$(node ./scripts/resolve-staging-site.js "$BRANCH_NAME")
+          DEPLOY_SITE=$(echo "$RESOLVED" | node -e 'const data = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(data.deploySite);')
+          SITE_URL=$(echo "$RESOLVED" | node -e 'const data = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(data.siteUrl);')
           echo "deploy_site=$DEPLOY_SITE" >> "$GITHUB_OUTPUT"
           echo "site_url=$SITE_URL" >> "$GITHUB_OUTPUT"
 
