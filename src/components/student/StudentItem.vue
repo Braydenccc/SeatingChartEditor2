@@ -500,7 +500,7 @@ const deleteHandler = () => {
 
   .student-name-section {
     width: auto;
-    flex: 1 1 48%;
+    flex: 1 1 auto;
     min-width: 0;
   }
 
@@ -523,7 +523,7 @@ const deleteHandler = () => {
     display: flex;
     flex-wrap: nowrap;
     gap: 4px;
-    flex: 1 1 34%;
+    flex: 0 1 42%;
     min-width: 90px;
     max-width: none;
     position: relative;
@@ -539,6 +539,7 @@ const deleteHandler = () => {
     width: 16px;
     flex: 0 0 16px;
     align-self: stretch;
+    /* 渐变需与卡片背景一致，便于表达“可横向滚动”的边缘提示 */
     background: linear-gradient(to left, var(--student-item-bg), transparent);
     border-left: 1px solid var(--scroll-cue-divider);
     pointer-events: none;
