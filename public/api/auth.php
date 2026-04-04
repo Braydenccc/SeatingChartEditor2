@@ -102,7 +102,7 @@ try {
         if (!isValidUsername($username)) {
             respond(['success' => false, 'message' => '用户名格式无效']);
         }
-        if (!is_string($password) || strlen(trim($password)) < 6) {
+        if (strlen($password) < 6) {
             respond(['success' => false, 'message' => '密码至少 6 位']);
         }
 
@@ -128,7 +128,7 @@ try {
         ]);
         
     } elseif ($action === 'login') {
-        if (!isValidUsername($username) || !is_string($password) || $password === '') {
+        if (!isValidUsername($username) || $password === '') {
             respond(['success' => false, 'message' => '用户名或密码不正确']);
         }
 
