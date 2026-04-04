@@ -279,6 +279,56 @@ export function useAssignment() {
     return penalties
   }
 
+  /**
+   * 细粒度定位分组规则违规学生（避免整组粗标记）
+   */
+  const getGroupRuleViolatingStudentIds = (rule, expandedSubjects, assignment) => {
+    const { predicate, params } = rule
+    const positioned = []
+
+    for (const subj of expandedSubjects) {
+      if (subj.type !== 'single') continue
+      const seatId = assignment.get(subj.studentId)
+      if (!seatId) continue
+      const key = predicate === 'DISTRIBUTE_EVENLY'
+        ? (params.scope === 'group' ? parseSeatId(seatId).groupIndex : parseSeatId(seatId).rowIndex)
+        : (params.scope === 'group' ? parseSeatId(seatId).groupIndex : (getZoneForSeat(seatId)?.id ?? 'none'))
+      positioned.push({ studentId: subj.studentId, key })
+    }
+
+    if (positioned.length <= 1) return []
+
+    const counts = new Map()
+    for (const item of positioned) {
+      counts.set(item.key, (counts.get(item.key) ?? 0) + 1)
+    }
+    if (counts.size <= 1) return []
+
+    if (predicate === 'DISTRIBUTE_EVENLY') {
+      const values = [...counts.values()]
+      const max = Math.max(...values)
+      const min = Math.min(...values)
+      if (max <= min) return []
+      const heavyKeys = new Set(
+        [...counts.entries()].filter(([, count]) => count === max).map(([key]) => key)
+      )
+      return positioned
+        .filter(item => heavyKeys.has(item.key))
+        .map(item => item.studentId)
+    }
+
+    if (predicate === 'CLUSTER_TOGETHER') {
+      const dominantKey = [...counts.entries()]
+        .sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])))[0]?.[0]
+      if (dominantKey == null) return []
+      return positioned
+        .filter(item => item.key !== dominantKey)
+        .map(item => item.studentId)
+    }
+
+    return []
+  }
+
   // ==================== 新引擎：评分函数 ====================
 
   /**
@@ -508,11 +558,8 @@ export function useAssignment() {
         if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
           const groupPenalty = checkGroupViolation(rule, subjects, assignment)
           if (groupPenalty > 0) {
-            for (const subj of subjects) {
-              if (subj.type === 'single' && assignment.get(subj.studentId)) {
-                violating.add(subj.studentId)
-              }
-            }
+            const groupViolatingIds = getGroupRuleViolatingStudentIds(rule, subjects, assignment)
+            for (const studentId of groupViolatingIds) violating.add(studentId)
           }
           continue
         }
@@ -762,13 +809,16 @@ export function useAssignment() {
         if (penalty <= 0) {
           satisfied.push(rule)
         } else {
-          const names = subjects
-            .map(subj => studentList.find(st => st.id === subj.studentId)?.name ?? `ID:${subj.studentId}`)
+          const focusedStudentIds = getGroupRuleViolatingStudentIds(rule, subjects, solution)
+          const names = focusedStudentIds
+            .map(studentId => studentList.find(st => st.id === studentId)?.name ?? `ID:${studentId}`)
             .slice(0, 3)
           violated.push({
             rule,
             violatingSubjects: names,
-            reason: '分组约束未满足（存在明显分散/不均衡）'
+            reason: names.length > 0
+              ? `重点定位学生：${names.join('、')}${focusedStudentIds.length > 3 ? `…等${focusedStudentIds.length}人` : ''}`
+              : '分组约束未满足（存在明显分散/不均衡）'
           })
         }
         continue
