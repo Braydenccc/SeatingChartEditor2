@@ -15,6 +15,9 @@ if (!class_exists('Database')) {
     exit(1);
 }
 
+const MIN_TOKEN_LENGTH = 32;
+const MIN_PASSWORD_LENGTH = 6;
+
 function respond($payload, $code = 200) {
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
@@ -42,7 +45,7 @@ function issueSessionToken($sessionDb, $username) {
 }
 
 function isAuthorized($sessionDb, $username, $token) {
-    if (!is_string($username) || !is_string($token) || strlen($token) < 32) {
+    if (!is_string($username) || !is_string($token) || strlen($token) < MIN_TOKEN_LENGTH) {
         return false;
     }
     $saved = $sessionDb->get($username);
@@ -102,8 +105,8 @@ try {
         if (!isValidUsername($username)) {
             respond(['success' => false, 'message' => '用户名格式无效']);
         }
-        if (strlen($password) < 6) {
-            respond(['success' => false, 'message' => '密码至少 6 位']);
+        if (strlen($password) < MIN_PASSWORD_LENGTH) {
+            respond(['success' => false, 'message' => '密码至少 ' . MIN_PASSWORD_LENGTH . ' 位']);
         }
 
         // 检查用户是否已存在

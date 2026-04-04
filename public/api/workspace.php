@@ -15,6 +15,8 @@ if (!class_exists('Database')) {
     exit(1);
 }
 
+const MIN_TOKEN_LENGTH = 32;
+
 /**
  * 输出 JSON 响应并结束请求。
  *
@@ -38,7 +40,7 @@ function isValidUsername($username) {
 }
 
 function isAuthorized($sessionDb, $username, $token) {
-    if (!is_string($username) || !is_string($token) || strlen($token) < 32) {
+    if (!is_string($username) || !is_string($token) || strlen($token) < MIN_TOKEN_LENGTH) {
         return false;
     }
     $saved = $sessionDb->get($username);

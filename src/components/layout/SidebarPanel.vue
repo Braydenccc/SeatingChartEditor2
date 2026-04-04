@@ -561,19 +561,12 @@ const isExporting = ref(false)
 let lastExportObjectUrl = ''
 
 // 导出完成回调
-const onExported = async (url) => {
-  try {
-    const resp = await fetch(url)
-    const blob = await resp.blob()
-    const copiedUrl = URL.createObjectURL(blob)
-    if (lastExportObjectUrl) {
-      URL.revokeObjectURL(lastExportObjectUrl)
-    }
-    lastExportObjectUrl = copiedUrl
-    lastExportUrl.value = copiedUrl
-  } catch {
-    lastExportUrl.value = url
+const onExported = (url) => {
+  if (lastExportObjectUrl && lastExportObjectUrl !== url) {
+    URL.revokeObjectURL(lastExportObjectUrl)
   }
+  lastExportObjectUrl = url
+  lastExportUrl.value = url
 }
 
 // 工作区管理 (云端)
