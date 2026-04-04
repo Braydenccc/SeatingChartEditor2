@@ -17,10 +17,6 @@ export function validateDeployPath(rawPath) {
   }
 
   const pathSegments = safePath.split('/').filter(Boolean);
-  if (pathSegments.length === 0) {
-    throw new Error('部署路径不能为空。');
-  }
-
   for (const segment of pathSegments) {
     if (segment === 'test') {
       throw new Error('部署路径不能包含名为 test 的段。');

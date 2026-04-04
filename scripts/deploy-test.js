@@ -18,7 +18,7 @@ function runFileInherit(command, args) {
   execFileSync(command, args, { stdio: 'inherit' });
 }
 
-function shellQuote(value) {
+function posixShellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
@@ -32,9 +32,9 @@ if (!currentBranchRef) {
 
 if (!targetPath) {
   runInherit('git checkout test');
-  runInherit(`git merge ${shellQuote(currentBranchRef)} --no-edit`);
+  runInherit(`git merge ${posixShellQuote(currentBranchRef)} --no-edit`);
   runInherit('git push origin test');
-  runInherit(`git checkout ${shellQuote(currentBranchRef)}`);
+  runInherit(`git checkout ${posixShellQuote(currentBranchRef)}`);
   process.exit(0);
 }
 

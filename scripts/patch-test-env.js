@@ -12,7 +12,7 @@ function runGit(command) {
   }
 }
 
-function escapeHtml(text) {
+function encodeHtmlEntities(text) {
   return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -77,9 +77,9 @@ try {
 
   // 1. index.html
   let indexHtml = fs.readFileSync('index.html', 'utf8');
-  indexHtml = indexHtml.replace(/<title[^>]*>([\s\S]*?)<\/title>/, (_, title) => {
+  indexHtml = indexHtml.replace(/(<title[^>]*>)([\s\S]*?)(<\/title>)/, (_, openTag, title, closeTag) => {
     const cleanedTitle = String(title).trim().replace(/^\[test\]\s*/i, '');
-    return `<title>[test] ${cleanedTitle}</title>`;
+    return `${openTag}[test] ${cleanedTitle}${closeTag}`;
   });
   fs.writeFileSync('index.html', indexHtml);
 
@@ -99,7 +99,7 @@ try {
     .map((branch) => {
       const url = toStagingUrl(branch);
       const selected = shouldSelectBranchOption(branch, currentBranch, hasCurrentBranchInList) ? ' selected' : '';
-      return `<option value="${escapeHtml(url)}"${selected}>${escapeHtml(branch)}</option>`;
+      return `<option value="${encodeHtmlEntities(url)}"${selected}>${encodeHtmlEntities(branch)}</option>`;
     })
     .join('');
   const selectorHtml = `<select class="branch-selector" onchange="if (this.value) { window.location.href = this.value; }">${optionsHtml}</select>`;
