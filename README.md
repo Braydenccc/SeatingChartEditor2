@@ -116,18 +116,17 @@ npm run deploy:test -- <path>
 
 ### Windows 桌面版编译（Tauri 主流程）
 
-推荐流程：
+推荐流程（桌面打包）：
 
 ```bash
-npm run build:web
 npm run build:lite
 ```
 
 说明：
 
-- `npm run build:web`：构建前端资源（Vite）。
-- `npm run build:lite`：构建 Tauri 桌面便携版（当前主桌面构建入口）。
-- `npm run build:desktop`：与 `build:lite` 等价，作为桌面构建别名。
+- `npm run build:desktop`：构建 Tauri 桌面版（当前主桌面构建入口）。
+- `npm run build:lite`：与 `build:desktop` 等价，作为兼容入口。
+- `npm run build:web`：仅在需要执行前端单独校验/构建时使用。
 
 
 ---

@@ -29,11 +29,8 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
-      - name: Build Web
-        run: npm run build:web
-
       - name: Build Desktop (Tauri)
-        run: npm run build:lite
+        run: npm run build:desktop
 
       - name: Rename Artifacts
         shell: pwsh
@@ -41,17 +38,17 @@ jobs:
           $TAG = $env:GITHUB_REF_NAME
           # Ensure target dir exists for release upload staging.
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $SOURCE = "src-tauri/target/release/BraydenSCE.exe"
+          $SOURCE = "src-tauri/target/release/app.exe"
           if (-not (Test-Path $SOURCE)) {
             throw "Tauri desktop executable not found: $SOURCE"
           }
-          # 重命名 Tauri 桌面产物 (根据 tauri.conf.json 中的 productName)
-          Move-Item $SOURCE "dist/BraydenSCE-Tauri-Portable-$TAG.exe"
+          # 重命名 Tauri 桌面产物
+          Move-Item $SOURCE "dist/BraydenSCE-Desktop-$TAG.exe"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/BraydenSCE-Tauri-Portable-*.exe
+            dist/BraydenSCE-Desktop-*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
