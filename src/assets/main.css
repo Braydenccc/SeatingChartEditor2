@@ -2,7 +2,10 @@
 
 :root {
   --color-primary: #23587b;
+  --color-primary-rgb: 35, 88, 123;
   --color-primary-light: #2d6a94;
+  --color-surface: #fff;
+  --color-surface-rgb: 255, 255, 255;
   --color-bg-selected: #e8f4f8;
   --color-danger: #f44336;
   --color-danger-hover: #d32f2f;
