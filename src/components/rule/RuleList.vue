@@ -43,14 +43,14 @@
           />
           <span>全选当前筛选项</span>
         </label>
-        <div v-if="selectedRuleIds.length > 0" class="batch-actions">
+        <div class="batch-actions">
           <span class="batch-count">已选 {{ selectedRuleIds.length }} 条</span>
-          <button class="batch-btn required" @click="handleBatchSetPriority('required')">设为必须</button>
-          <button class="batch-btn prefer" @click="handleBatchSetPriority('prefer')">设为建议</button>
-          <button class="batch-btn optional" @click="handleBatchSetPriority('optional')">设为可选</button>
-          <button class="batch-btn" @click="handleBatchToggle(true)">启用</button>
-          <button class="batch-btn" @click="handleBatchToggle(false)">停用</button>
-          <button class="batch-btn danger" @click="handleBatchDelete">删除</button>
+          <button class="batch-btn required" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('required')">设为必须</button>
+          <button class="batch-btn prefer" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('prefer')">设为建议</button>
+          <button class="batch-btn optional" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('optional')">设为可选</button>
+          <button class="batch-btn" :disabled="!hasSelectedRules" @click="handleBatchToggle(true)">启用</button>
+          <button class="batch-btn" :disabled="!hasSelectedRules" @click="handleBatchToggle(false)">停用</button>
+          <button class="batch-btn danger" :disabled="!hasSelectedRules" @click="handleBatchDelete">删除</button>
         </div>
       </div>
     </div>
@@ -242,6 +242,7 @@ const isAllFilteredSelected = computed(() => {
   if (filteredRuleIds.value.length === 0) return false
   return filteredRuleIds.value.every(id => selectedRuleIds.value.includes(id))
 })
+const hasSelectedRules = computed(() => selectedRuleIds.value.length > 0)
 
 const isSelected = (ruleId) => selectedRuleIds.value.includes(ruleId)
 
@@ -443,6 +444,11 @@ defineExpose({ focusRule })
 
 .batch-btn:hover {
   border-color: #94a3b8;
+}
+
+.batch-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .batch-btn.required {

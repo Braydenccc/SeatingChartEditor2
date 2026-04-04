@@ -1245,7 +1245,8 @@ const formatLogTime = (timestamp) => {
 .options-bar {
   width: 80%;
   background: #ffffff;
-  overflow-y: auto;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
 }
 
 /* 响应式设计 - 平板和移动设备 */
