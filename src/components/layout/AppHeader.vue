@@ -331,7 +331,6 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
   .app-header {
-    height: 86px;
     padding: 0 18px;
   }
 
