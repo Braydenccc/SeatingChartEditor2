@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { useAuth } from './useAuth'
 import { useWebDav } from './useWebDav'
+import { getCookie } from './useAuth'
 
 export function useCloudWorkspace() {
     const { currentUser, token, authType, webdavConfig, backupMode } = useAuth()
@@ -46,7 +47,8 @@ export function useCloudWorkspace() {
             const response = await fetch('/api/workspace.php', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCookie('sce_csrf') || ''
                 },
                 body: JSON.stringify({
                     action,
