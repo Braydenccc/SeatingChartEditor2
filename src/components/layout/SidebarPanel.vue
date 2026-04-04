@@ -9,7 +9,7 @@
       <div class="tabs-bar">
         <button v-for="tab in tabs" :key="tab.id" class="tab-button" :class="{ active: activeTab === tab.id }"
           @click="setActiveTab(tab.id)">
-          <span class="material-symbols-rounded ui-icon tab-icon">{{ tab.icon }}</span>
+          <component :is="tab.icon" class="tab-icon ui-icon" />
           <span class="tab-label">{{ tab.label }}</span>
         </button>
       </div>
@@ -23,16 +23,16 @@
             <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" style="display: none"
               @change="handleLoadWorkspace" />
             <button class="option-button" @click="$refs.workspaceInput.click()">
-              <span class="btn-content"><span class="material-symbols-rounded ui-icon">folder_open</span>加载本地</span>
+              <span class="btn-content"><FolderOpen class="ui-icon" />加载本地</span>
             </button>
             <button class="option-button" @click="handleSaveWorkspace">
-              <span class="btn-content"><span class="material-symbols-rounded ui-icon">save</span>保存到本地</span>
+              <span class="btn-content"><Save class="ui-icon" />保存到本地</span>
             </button>
             <button class="option-button" @click="handleCloudLoad">
-              <span class="btn-content"><span class="material-symbols-rounded ui-icon">cloud_download</span>从云端加载</span>
+              <span class="btn-content"><CloudDownload class="ui-icon" />从云端加载</span>
             </button>
             <button class="option-button primary" @click="handleCloudSave">
-              <span class="btn-content"><span class="material-symbols-rounded ui-icon">cloud_upload</span>保存至云端</span>
+              <span class="btn-content"><CloudUpload class="ui-icon" />保存至云端</span>
             </button>
           </div>
 
@@ -185,7 +185,7 @@
                   </span>
                   <input class="zone-rot-name-input" v-model="group.name"
                     @click.stop title="点击修改组名" />
-                  <button class="zone-rot-del" @click="handleDeleteGroup(group.id)"><span class="material-symbols-rounded ui-icon">close</span></button>
+                  <button class="zone-rot-del" @click="handleDeleteGroup(group.id)"><X class="ui-icon" /></button>
                 </div>
 
                 <!-- 组内选区列表 -->
@@ -208,7 +208,7 @@
                     <!-- 互换箭头 -->
                     <span v-if="group.type === 'swap' && idx === 0" class="zone-rot-arrow">⇄</span>
                     <span class="zone-rot-count">{{ zone.seatIds.length }}座</span>
-                    <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)"><span class="material-symbols-rounded ui-icon">close</span></button>
+                    <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)"><X class="ui-icon" /></button>
                   </div>
 
                   <!-- 添加选区按钮（在组内） -->
@@ -261,7 +261,7 @@
             <!-- 操作按钮 -->
             <div class="assign-actions-grid">
               <button class="option-button rule-shortcut-btn" @click="showRuleEditor = true">
-                <span class="material-symbols-rounded ui-icon">rule</span>
+                <Scale class="ui-icon" />
                 <span class="rule-shortcut-text">规则管理</span>
                 <span v-if="ruleCount > 0" class="rule-badge">{{ ruleCount }}</span>
               </button>
@@ -291,7 +291,7 @@
                 </div>
                 <div v-if="precheckResult.blockingReasons.length > 0" class="precheck-list blocking">
                   <div v-for="(item, idx) in precheckResult.blockingReasons" :key="`b-${idx}`" class="precheck-item">
-                    <span class="material-symbols-rounded ui-icon">block</span>
+                    <CircleX class="ui-icon" />
                     <span>{{ item }}</span>
                   </div>
                 </div>
@@ -422,6 +422,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed, defineAsyncComponent } from 'vue'
+import { CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, Save, Scale, Shuffle, X } from 'lucide-vue-next'
 import LoadingSpinner from '../ui/LoadingSpinner.vue'
 
 const SeatRuleEditor = defineAsyncComponent({
@@ -545,10 +546,10 @@ const handleApplyZoneRotation = () => {
 }
 
 const tabs = [
-  { id: 1, label: '文件', icon: 'description' },
-  { id: 2, label: '编辑', icon: 'edit' },
-  { id: 3, label: '排位', icon: 'shuffle' },
-  { id: 4, label: '导出', icon: 'download' }
+  { id: 1, label: '文件', icon: FileText },
+  { id: 2, label: '编辑', icon: Edit3 },
+  { id: 3, label: '排位', icon: Shuffle },
+  { id: 4, label: '导出', icon: Download }
 ]
 
 // 座位配置表单

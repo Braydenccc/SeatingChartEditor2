@@ -126,7 +126,7 @@ export function useSeatRules() {
   }
 
   const renderRuleText = (rule) => {
-    const icon = PRIORITY_ICONS[rule.priority] ?? '❓'
+    const icon = PRIORITY_ICONS[rule.priority] ?? '?'
     const priorityLabel = PRIORITY_LABELS[rule.priority] ?? ''
     const { predicate, params } = rule
     const normalized = normalizeRuleShape(rule)

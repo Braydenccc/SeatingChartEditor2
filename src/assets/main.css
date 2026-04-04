@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:FILL@0;1');
 @import './base.css';
 
 :root {
@@ -29,23 +28,14 @@
   --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
 
-.material-symbols-rounded.ui-icon {
-  font-family: 'Material Symbols Rounded';
-  font-weight: normal;
-  font-style: normal;
-  letter-spacing: normal;
-  text-transform: none;
-  white-space: nowrap;
-  direction: ltr;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  font-variation-settings: 'FILL' 0;
-  font-size: 18px;
-  line-height: 1;
+.ui-icon {
+  width: 1em;
+  height: 1em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   vertical-align: middle;
+  flex-shrink: 0;
 }
 
 #app {

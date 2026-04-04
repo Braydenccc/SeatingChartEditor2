@@ -90,6 +90,16 @@ npm install
 npm run dev
 ```
 
+若在 Copilot/CI 新环境遇到 `vite: not found`，先执行：
+
+```bash
+rm -rf node_modules
+npm ci
+npm run build:web
+```
+
+该问题通常由依赖未安装完整或锁文件与依赖树不一致导致；仓库已提交更新后的 `package-lock.json`，请确保所有 Copilot 环境拉取最新提交后再执行构建。
+
 开发服务器默认运行在 `http://localhost:5173`。
 
 ### 云端部署

@@ -1,9 +1,10 @@
 <template>
   <header class="app-header">
     <div class="header-left">
-      <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
-        <div class="user-info" @click="toggleDropdown">
-          <span class="material-symbols-rounded ui-icon user-avatar" :title="authType === 'webdav' ? 'WebDAV 模式' : '普通账号'">{{ authType === 'webdav' ? 'cloud' : 'person' }}</span>
+        <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
+          <div class="user-info" @click="toggleDropdown">
+          <Cloud v-if="authType === 'webdav'" class="ui-icon user-avatar" :title="'WebDAV 模式'" />
+          <User v-else class="ui-icon user-avatar" :title="'普通账号'" />
           <span class="welcome-text">{{ currentUser?.username }}</span>
           <span class="dropdown-icon">▼</span>
         </div>
@@ -11,16 +12,16 @@
           <div v-if="showDropdown" class="user-dropdown">
             <!-- Sync Service Settings entry -->
             <button v-if="hasRetiehe" class="dropdown-item" @click="openSyncSettings">
-              <span class="material-symbols-rounded ui-icon item-icon">sync</span> 同步设置
+              <RefreshCw class="ui-icon item-icon" /> 同步设置
             </button>
             <div class="dropdown-divider" v-if="hasRetiehe"></div>
             
             <button class="dropdown-item" @click="openWorkspaceManagement">
-              <span class="material-symbols-rounded ui-icon item-icon">folder_managed</span> 工作区管理
+              <FolderOpen class="ui-icon item-icon" /> 工作区管理
             </button>
 
             <button v-if="!hasRetiehe" class="dropdown-item" @click="emit('open-login', 'login'); showDropdown = false">
-              <span class="material-symbols-rounded ui-icon item-icon">login</span> 登录 SCE 账号
+              <LogIn class="ui-icon item-icon" /> 登录 SCE 账号
             </button>
             
             <div class="dropdown-divider"></div>
@@ -32,7 +33,7 @@
         </Transition>
       </div>
       <button v-else class="auth-btn login-btn" @click="emit('open-login')">
-        <span class="material-symbols-rounded ui-icon btn-icon">cloud</span>登录
+        <Cloud class="ui-icon btn-icon" />登录
       </button>
 
       <h1 class="header-text">BraydenSCE V2</h1>
@@ -40,7 +41,7 @@
     <div class="header-right">
       <p class="header-subtitle">座位表编辑器 开发版本 <a href="https://afdian.com/a/brayden" target="_blank">byccc</a> 由<a href="https://host.retiehe.com/" target="_blank">热铁盒网页托管</a>提供服务</p>
       <a href="https://github.com/Braydenccc/SeatingCrartEditor2" target="_blank" class="github-link" title="Source Code">
-        <span class="material-symbols-rounded ui-icon github-icon">code</span>
+        <Github class="ui-icon github-icon" />
       </a>
     </div>
     
@@ -58,6 +59,7 @@
 
 <script setup>
 import { onMounted, ref, onBeforeUnmount, computed, defineAsyncComponent } from 'vue'
+import { Cloud, FolderOpen, Github, LogIn, RefreshCw, User } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 
 const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))

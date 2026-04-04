@@ -6,7 +6,7 @@
         <span class="tag-color-bar" :style="{ background: tag.color }"></span>
         <span class="tag-name">{{ tag.name }}</span>
         <div class="tag-actions">
-          <button class="tag-action-btn edit" @click="editTagHandler(tag)" title="编辑">✎</button>
+          <button class="tag-action-btn edit" @click="editTagHandler(tag)" title="编辑">编</button>
           <button class="tag-action-btn delete" :class="{ confirming: isDeletingTag(tag.id).value }"
             @click="deleteTagHandler(tag.id, tag.name)"
             :title="isDeletingTag(tag.id).value ? '再次点击确认' : '删除'">×</button>

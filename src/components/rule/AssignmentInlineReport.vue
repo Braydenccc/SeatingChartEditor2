@@ -16,7 +16,8 @@
           耗时 {{ duration ?? 0 }}ms · {{ ruleCount }} 个约束
         </div>
         <div class="in-report-status" :style="{ color: gradeColor }">
-          {{ gradeIcon }} {{ 
+          <component :is="gradeIconComponent" class="ui-icon grade-icon" />
+          {{ 
             satPct >= 95 ? '排位非常流畅' : 
             satPct >= 75 ? '排位基本符合预设' :
             satPct >= 50 ? '存在规则冲突需留意' : '规则冲突严重' 
@@ -30,7 +31,7 @@
       <div class="in-group-header fail-header">警告：未满足的规则 ({{ violatedRules.length }})</div>
       <div class="in-rule-rows">
         <div v-for="item in violatedRules" :key="item.rule.id" class="in-rule-row fail">
-          <span class="in-row-icon">未通过</span>
+          <CircleX class="ui-icon in-row-icon" />
           <div class="in-row-content">
             <span class="in-row-text">{{ renderRuleText(item.rule) }}</span>
             <span v-if="item.reason" class="in-row-reason">{{ item.reason }}</span>
@@ -49,7 +50,7 @@
       </div>
       <div class="in-rule-rows" v-show="showSatisfied">
         <div v-for="rule in satisfiedRules" :key="rule.id" class="in-rule-row ok">
-          <span class="in-row-icon">通过</span>
+          <Check class="ui-icon in-row-icon" />
           <div class="in-row-content">
             <span class="in-row-text">{{ renderRuleText(rule) }}</span>
           </div>
@@ -66,6 +67,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { AlertTriangle, Check, CircleAlert, CircleX, ShieldCheck } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
 
 const props = defineProps({
@@ -103,12 +105,12 @@ const gradeColor = computed(() => {
   return '#ef4444'
 })
 
-const gradeIcon = computed(() => {
+const gradeIconComponent = computed(() => {
   const pct = satPct.value
-  if (pct >= 95) return '优'
-  if (pct >= 75) return '良'
-  if (pct >= 50) return '中'
-  return '警告'
+  if (pct >= 95) return ShieldCheck
+  if (pct >= 75) return Check
+  if (pct >= 50) return CircleAlert
+  return AlertTriangle
 })
 
 </script>
