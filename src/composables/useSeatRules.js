@@ -275,16 +275,73 @@ export function useSeatRules() {
     return { valid: warnings.length === 0, warnings }
   }
 
-  const getSubjectStudentIds = (ruleLike) => {
+  const expandEntriesToStudentIds = (entries = []) => {
+    const ids = new Set()
+    for (const e of entries) {
+      if (!e?.id) continue
+      if (e.type === 'person') {
+        ids.add(e.id)
+        continue
+      }
+      if (e.type === 'tag') {
+        for (const s of students.value) {
+          if (s.tags?.includes(e.id)) ids.add(s.id)
+        }
+      }
+    }
+    return ids
+  }
+
+  const getExpandedSubjectIds = (ruleLike) => {
     const normalized = normalizeRuleShape(ruleLike)
-    const out = []
-    for (const e of normalized.subjectsA || []) {
-      if (e.type === 'person' && e.id) out.push(e.id)
+    return {
+      subjectMode: normalized.subjectMode || 'single',
+      subjectsA: expandEntriesToStudentIds(normalized.subjectsA || []),
+      subjectsB: expandEntriesToStudentIds(normalized.subjectsB || [])
     }
-    for (const e of normalized.subjectsB || []) {
-      if (e.type === 'person' && e.id) out.push(e.id)
+  }
+
+  const hasOverlap = (setA, setB) => {
+    for (const id of setA) {
+      if (setB.has(id)) return true
     }
-    return out
+    return false
+  }
+
+  const buildPairKeys = (subjectsA, subjectsB, ordered = false) => {
+    const keys = new Set()
+    const listA = [...subjectsA]
+    const listB = [...subjectsB]
+    for (const a of listA) {
+      for (const b of listB) {
+        if (a === b) continue
+        if (ordered) {
+          keys.add(`${a}>${b}`)
+        } else {
+          keys.add(a < b ? `${a}:${b}` : `${b}:${a}`)
+        }
+      }
+    }
+    return keys
+  }
+
+  const hasPairScopeOverlap = (r1, r2) => {
+    const s1 = getExpandedSubjectIds(r1)
+    const s2 = getExpandedSubjectIds(r2)
+    if (s1.subjectMode !== 'dual' || s2.subjectMode !== 'dual') return false
+
+    const ordered1 = !!PREDICATE_META[r1.predicate]?.ordered
+    const ordered2 = !!PREDICATE_META[r2.predicate]?.ordered
+    const keys1 = buildPairKeys(s1.subjectsA, s1.subjectsB, ordered1)
+    const keys2 = buildPairKeys(s2.subjectsA, s2.subjectsB, ordered2)
+    return hasOverlap(keys1, keys2)
+  }
+
+  const hasSingleScopeOverlap = (r1, r2) => {
+    const s1 = getExpandedSubjectIds(r1)
+    const s2 = getExpandedSubjectIds(r2)
+    if (s1.subjectMode !== 'single' || s2.subjectMode !== 'single') return false
+    return hasOverlap(s1.subjectsA, s2.subjectsA)
   }
 
   const detectConflicts = () => {
@@ -295,15 +352,11 @@ export function useSeatRules() {
       for (let j = i + 1; j < activeRules.length; j++) {
         const r1 = activeRules[i]
         const r2 = activeRules[j]
-        const ids1 = getSubjectStudentIds(r1)
-        const ids2 = getSubjectStudentIds(r2)
-        const overlap = ids1.filter(id => ids2.includes(id))
-        if (overlap.length === 0) continue
-
         if (
           (r1.predicate === 'MUST_BE_SEATMATES' && r2.predicate === 'MUST_NOT_BE_SEATMATES') ||
           (r1.predicate === 'MUST_NOT_BE_SEATMATES' && r2.predicate === 'MUST_BE_SEATMATES')
         ) {
+          if (!hasPairScopeOverlap(r1, r2)) continue
           conflicts.push({
             type: 'contradiction',
             ruleIds: [r1.id, r2.id],
@@ -315,6 +368,7 @@ export function useSeatRules() {
           (r1.predicate === 'MUST_BE_SAME_GROUP' && r2.predicate === 'MUST_NOT_BE_SAME_GROUP') ||
           (r1.predicate === 'MUST_NOT_BE_SAME_GROUP' && r2.predicate === 'MUST_BE_SAME_GROUP')
         ) {
+          if (!hasPairScopeOverlap(r1, r2)) continue
           conflicts.push({
             type: 'contradiction',
             ruleIds: [r1.id, r2.id],
@@ -326,11 +380,66 @@ export function useSeatRules() {
           (r1.predicate === 'MUST_BE_SEATMATES' && r2.predicate === 'MUST_NOT_BE_SAME_GROUP') ||
           (r1.predicate === 'MUST_NOT_BE_SAME_GROUP' && r2.predicate === 'MUST_BE_SEATMATES')
         ) {
+          if (!hasPairScopeOverlap(r1, r2)) continue
           conflicts.push({
             type: 'infeasible',
             ruleIds: [r1.id, r2.id],
             message: '不可行冲突：「必须同桌」要求同大组，与「必须不同大组」矛盾'
           })
+        }
+
+        if (
+          (r1.predicate === 'IN_ZONE' && r2.predicate === 'NOT_IN_ZONE') ||
+          (r1.predicate === 'NOT_IN_ZONE' && r2.predicate === 'IN_ZONE')
+        ) {
+          if (!hasSingleScopeOverlap(r1, r2)) continue
+          if (r1.params?.zoneId === r2.params?.zoneId) {
+            conflicts.push({
+              type: 'contradiction',
+              ruleIds: [r1.id, r2.id],
+              message: `规则冲突：「${renderRuleText(r1)}」与「${renderRuleText(r2)}」逻辑矛盾`
+            })
+          }
+        }
+
+        if (r1.predicate === 'IN_ROW_RANGE' && r2.predicate === 'IN_ROW_RANGE') {
+          if (!hasSingleScopeOverlap(r1, r2)) continue
+          const disjoint = r1.params?.maxRow < r2.params?.minRow || r2.params?.maxRow < r1.params?.minRow
+          if (disjoint) {
+            conflicts.push({
+              type: 'infeasible',
+              ruleIds: [r1.id, r2.id],
+              message: `不可行冲突：「${renderRuleText(r1)}」与「${renderRuleText(r2)}」排范围不相交`
+            })
+          }
+        }
+
+        if (r1.predicate === 'IN_GROUP_RANGE' && r2.predicate === 'IN_GROUP_RANGE') {
+          if (!hasSingleScopeOverlap(r1, r2)) continue
+          const disjoint = r1.params?.maxGroup < r2.params?.minGroup || r2.params?.maxGroup < r1.params?.minGroup
+          if (disjoint) {
+            conflicts.push({
+              type: 'infeasible',
+              ruleIds: [r1.id, r2.id],
+              message: `不可行冲突：「${renderRuleText(r1)}」与「${renderRuleText(r2)}」大组范围不相交`
+            })
+          }
+        }
+
+        if (
+          (r1.predicate === 'DISTANCE_AT_MOST' && r2.predicate === 'DISTANCE_AT_LEAST') ||
+          (r1.predicate === 'DISTANCE_AT_LEAST' && r2.predicate === 'DISTANCE_AT_MOST')
+        ) {
+          if (!hasPairScopeOverlap(r1, r2)) continue
+          const maxRule = r1.predicate === 'DISTANCE_AT_MOST' ? r1 : r2
+          const minRule = r1.predicate === 'DISTANCE_AT_LEAST' ? r1 : r2
+          if ((minRule.params?.distance ?? 0) > (maxRule.params?.distance ?? 0)) {
+            conflicts.push({
+              type: 'infeasible',
+              ruleIds: [r1.id, r2.id],
+              message: `不可行冲突：「${renderRuleText(r1)}」与「${renderRuleText(r2)}」距离上下界互斥`
+            })
+          }
         }
       }
     }
