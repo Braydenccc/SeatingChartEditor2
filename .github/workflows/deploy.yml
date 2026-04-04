@@ -1,5 +1,8 @@
 name: Deploy to Retinbox Web Hosting
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
