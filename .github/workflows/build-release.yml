@@ -21,11 +21,6 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install NSIS
-        run: |
-          choco install nsis -y
-          echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
       - name: Install dependencies
         run: npm install
 
@@ -34,26 +29,26 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
-      - name: Build Application (Installer)
-        run: npm run build:nsis
-
-      - name: Build Application (Portable)
-        run: npm run build:lite
+      - name: Build Desktop (Tauri)
+        run: npm run build:desktop
 
       - name: Rename Artifacts
         shell: pwsh
         run: |
           $TAG = $env:GITHUB_REF_NAME
-          # 重命名 Electron 安装包
-          Move-Item "dist/BraydenSCE-Setup.exe" "dist/BraydenSCE-Setup-$TAG.exe"
-          # 重命名 Tauri 便携版 (根据 tauri.conf.json 中的 productName)
-          Move-Item "src-tauri/target/release/BraydenSCE.exe" "dist/BraydenSCE-Portable-$TAG.exe"
+          # Ensure target dir exists for release upload staging.
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $SOURCE = "src-tauri/target/release/app.exe"
+          if (-not (Test-Path $SOURCE)) {
+            throw "Tauri desktop executable not found: $SOURCE"
+          }
+          # 重命名 Tauri 桌面产物
+          Move-Item $SOURCE "dist/BraydenSCE-Desktop-$TAG.exe"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/BraydenSCE-Setup-*.exe
-            dist/BraydenSCE-Portable-*.exe
+            dist/BraydenSCE-Desktop-*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -223,6 +223,7 @@ export function useSeatChart() {
     return seats.value.filter(seat =>
       seat.groupIndex === parsed.groupIndex &&
       seat.rowIndex === parsed.rowIndex &&
+      seat.columnIndex !== parsed.columnIndex &&
       seat.id !== seatId
     )
   }
