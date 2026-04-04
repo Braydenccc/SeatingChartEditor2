@@ -130,18 +130,19 @@ async function deleteRemoteFiles(domain, username, keys) {
 }
 
 /**
- * Upload a batch of text files in one JSON payload.
- * POST /host-v3/site/content  { domain, username, content: { "<key>": "<text>", ... } }
+ * Upload a single text file.
+ * POST /host-v3/site/content  { domain, username, key, content, type: "string" }
+ * This mirrors rth-cli.js's la() / watch-mode upload, which works for any path depth.
  */
-async function uploadTextBatch(domain, username, content) {
+async function uploadTextFile(domain, username, key, content) {
   const res = await fetch(`${API_BASE}/host-v3/site/content`, {
     method: 'POST',
     headers: { ...getHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ domain, username, content }),
+    body: JSON.stringify({ domain, username, key, content, type: 'string' }),
   });
-  if (!res.ok) throw new Error(`Upload text batch failed: ${res.status}`);
+  if (!res.ok) throw new Error(`Upload text ${key} failed: ${res.status}`);
   const data = await res.json();
-  if (!data.success) throw new Error(data.alert ?? data.errorLog ?? 'Text upload failed');
+  if (!data.success) throw new Error(data.alert ?? data.errorLog ?? `Text upload failed: ${key}`);
   return data;
 }
 
@@ -242,10 +243,6 @@ async function main() {
   }
 
   // 6. Upload new / changed files
-  const MAX_TEXT_FILE_SIZE = 100 * 1024; // 100 KB per file in text batch
-  const textBatch = {}; // remote key → content
-  const binaryPending = []; // { remoteKey, localPath }
-
   for (const localFile of localFiles) {
     if (shouldSkip(localFile)) {
       console.log('Skipped (not for browsers):', localFile);
@@ -274,24 +271,13 @@ async function main() {
 
     console.log('Uploading:', remoteKey);
 
-    if (isTextFile(localFile) && stat.size <= MAX_TEXT_FILE_SIZE) {
-      textBatch[remoteKey] = fs.readFileSync(localPath, 'utf8');
+    if (isTextFile(localFile)) {
+      // Text files: use single-file string upload (mirrors rth-cli.js watch mode la())
+      await uploadTextFile(site, username, remoteKey, fs.readFileSync(localPath, 'utf8'));
     } else {
-      // Large text files or binary files → individual upload
-      binaryPending.push({ remoteKey, localPath });
+      // Binary / compressed files: multipart upload
+      await uploadBinaryFile(site, username, remoteKey, localPath);
     }
-  }
-
-  // Upload text batch
-  if (Object.keys(textBatch).length > 0) {
-    console.log(`Uploading ${Object.keys(textBatch).length} text file(s) in batch...`);
-    await uploadTextBatch(site, username, textBatch);
-    console.log('Text files uploaded.');
-  }
-
-  // Upload binary / large files one by one
-  for (const { remoteKey, localPath } of binaryPending) {
-    await uploadBinaryFile(site, username, remoteKey, localPath);
   }
 
   console.log('Done.');
