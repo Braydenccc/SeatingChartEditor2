@@ -1245,7 +1245,7 @@ const formatLogTime = (timestamp) => {
 .options-bar {
   width: 80%;
   background: #ffffff;
-  overflow-y: scroll;
+  overflow-y: auto;
   scrollbar-gutter: stable;
 }
 
