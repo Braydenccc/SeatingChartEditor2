@@ -1,0 +1,12 @@
+[
+  {
+    "id": "main",
+    "label": "全部测试",
+    "url": "https://test.sce.jbyc.cc/test"
+  },
+  {
+    "id": "rule",
+    "label": "子测试 rule",
+    "url": "https://test.sce.jbyc.cc/test/rule"
+  }
+]
