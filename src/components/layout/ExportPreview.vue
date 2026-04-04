@@ -598,7 +598,8 @@ const handleDownload = async () => {
   try {
     const exportedBlob = await fetch(url).then((res) => res.blob())
     emit('exported', exportedBlob)
-  } catch {
+  } catch (err) {
+    console.warn('导出后更新侧边栏预览失败:', err)
     emit('exported', null)
   }
 }
