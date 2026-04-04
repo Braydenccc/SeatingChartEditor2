@@ -3,7 +3,7 @@
     <div class="header-left">
       <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
         <div class="user-info" @click="toggleDropdown">
-          <span class="user-avatar" :title="authType === 'webdav' ? 'WebDAV 模式' : '普通账号'">{{ authType === 'webdav' ? '云' : '用户' }}</span>
+          <span class="user-avatar" :title="authType === 'webdav' ? 'WebDAV 模式' : '普通账号'">{{ authType === 'webdav' ? '云' : '人' }}</span>
           <span class="welcome-text">{{ currentUser?.username }}</span>
           <span class="dropdown-icon">▼</span>
         </div>

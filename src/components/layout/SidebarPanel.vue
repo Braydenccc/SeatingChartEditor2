@@ -203,7 +203,7 @@
                     <input class="zone-rot-zone-name-input" v-model="zone.name" @click.stop/>
                     <!-- 循环箭头 -->
                     <span v-if="group.type === 'cycle'" class="zone-rot-arrow">
-                      {{ idx < group.zones.length - 1 ? '下' : '首' }}
+                      {{ idx < group.zones.length - 1 ? '续' : '回' }}
                     </span>
                     <!-- 互换箭头 -->
                     <span v-if="group.type === 'swap' && idx === 0" class="zone-rot-arrow">换</span>

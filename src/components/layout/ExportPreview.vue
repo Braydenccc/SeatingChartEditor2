@@ -8,7 +8,7 @@
         <!-- ── 标题栏 ── -->
         <div class="dialog-header">
           <h3>导出设置</h3>
-          <button class="close-btn" @click="$emit('close')">关</button>
+          <button class="close-btn" @click="$emit('close')">×</button>
         </div>
 
         <!-- ── Tab 栏 ── -->
