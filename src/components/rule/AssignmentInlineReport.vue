@@ -30,7 +30,7 @@
       <div class="in-group-header fail-header">未满足的规则 ({{ violatedRules.length }})</div>
       <div class="in-rule-rows">
         <div v-for="item in violatedRules" :key="item.rule.id" class="in-rule-row fail">
-          <span class="in-row-icon">失败</span>
+          <span class="in-row-icon">失</span>
           <div class="in-row-content">
             <span class="in-row-text">{{ renderRuleText(item.rule) }}</span>
             <span v-if="item.reason" class="in-row-reason">{{ item.reason }}</span>
@@ -49,7 +49,7 @@
       </div>
       <div class="in-rule-rows" v-show="showSatisfied">
         <div v-for="rule in satisfiedRules" :key="rule.id" class="in-rule-row ok">
-          <span class="in-row-icon">通过</span>
+          <span class="in-row-icon">过</span>
           <div class="in-row-content">
             <span class="in-row-text">{{ renderRuleText(rule) }}</span>
           </div>
@@ -108,7 +108,7 @@ const gradeIcon = computed(() => {
   if (pct >= 95) return '优'
   if (pct >= 75) return '良'
   if (pct >= 50) return '中'
-  return '警告'
+  return '警'
 })
 
 </script>

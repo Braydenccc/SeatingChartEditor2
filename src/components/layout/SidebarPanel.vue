@@ -203,10 +203,10 @@
                     <input class="zone-rot-zone-name-input" v-model="zone.name" @click.stop/>
                     <!-- 循环箭头 -->
                     <span v-if="group.type === 'cycle'" class="zone-rot-arrow">
-                      {{ idx < group.zones.length - 1 ? '下一步' : '回到首个' }}
+                      {{ idx < group.zones.length - 1 ? '下' : '首' }}
                     </span>
                     <!-- 互换箭头 -->
-                    <span v-if="group.type === 'swap' && idx === 0" class="zone-rot-arrow">互换</span>
+                    <span v-if="group.type === 'swap' && idx === 0" class="zone-rot-arrow">换</span>
                     <span class="zone-rot-count">{{ zone.seatIds.length }}座</span>
                     <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)">X</button>
                   </div>
