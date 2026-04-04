@@ -54,7 +54,12 @@
             @edit="handleEditRule"
           />
           <div class="tab-divider"></div>
-          <RuleBuilder :mode="editorMode" :editing-rule="editingRule" @added="onRuleAdded" />
+          <RuleBuilder
+            :mode="editorMode"
+            :editing-rule="editingRule"
+            @added="onRuleAdded"
+            @cancel-edit="editingRuleId = ''"
+          />
         </div>
 
         <!-- Tab 2: 对象类型说明（目前展示占位符，内容在 rules tab 中） -->
@@ -107,7 +112,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const { ruleCount, exportRules, importRules } = useSeatRules()
+const { rules, ruleCount, exportRules, importRules } = useSeatRules()
 const { success, warning, error } = useLogger()
 const ruleListRef = ref(null)
 
@@ -117,7 +122,7 @@ const editorMode = ref('quick')
 const editingRuleId = ref('')
 const editingRule = computed(() => {
   if (!editingRuleId.value) return null
-  return useSeatRules().rules.value.find(r => r.id === editingRuleId.value) || null
+  return rules.value.find(r => r.id === editingRuleId.value) || null
 })
 const tabs = computed(() => [
   { key: 'rules', icon: '📋', label: '规则总览', badge: ruleCount.value > 0 ? ruleCount.value : null },

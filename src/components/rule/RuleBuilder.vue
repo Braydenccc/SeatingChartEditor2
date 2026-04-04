@@ -165,13 +165,13 @@
 
     <div class="builder-footer">
       <button class="btn-add" :disabled="!canAdd" @click="handleAdd">{{ isEditing ? '保存修改' : '添加规则' }}</button>
-      <button class="btn-reset" @click="resetForm">{{ isEditing ? '取消编辑' : '重置' }}</button>
+      <button class="btn-reset" @click="handleReset">{{ isEditing ? '取消编辑' : '重置' }}</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useZoneData } from '@/composables/useZoneData'
@@ -183,7 +183,7 @@ import {
   getDefaultParams
 } from '@/constants/ruleTypes.js'
 
-const emit = defineEmits(['added'])
+const emit = defineEmits(['added', 'cancel-edit'])
 const props = defineProps({
   mode: {
     type: String,
@@ -364,6 +364,13 @@ const resetForm = () => {
   paramValues.value = {}
 }
 
+const handleReset = () => {
+  resetForm()
+  if (isEditing.value) {
+    emit('cancel-edit')
+  }
+}
+
 const applyEditingRule = (rule) => {
   if (!rule?.id) {
     resetForm()
@@ -380,7 +387,7 @@ const applyEditingRule = (rule) => {
   subjectsB.value = normalized.subjectsB?.length
     ? normalized.subjectsB.map(s => ({ ...s }))
     : [{ type: 'person', id: null }]
-  paramValues.value = { ...(rule.params || getDefaultParams(rule.predicate)) }
+  paramValues.value = { ...(rule.params || (rule.predicate ? getDefaultParams(rule.predicate) : {})) }
 }
 
 const applyQuickTemplate = (key) => {
