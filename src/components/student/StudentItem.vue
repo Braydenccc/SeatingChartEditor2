@@ -536,7 +536,7 @@ const deleteHandler = () => {
     width: 12px;
     flex: 0 0 12px;
     align-self: stretch;
-    background: linear-gradient(to left, #fff, rgba(255, 255, 255, 0));
+    background: linear-gradient(to left, var(--color-surface, #fff), transparent);
     pointer-events: none;
   }
 
