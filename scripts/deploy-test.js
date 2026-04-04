@@ -87,7 +87,7 @@ if (!envs.some(env => env.id === targetPath)) {
 }
 // ----------------------------------------
 
-const deployBranch = `test-${resolvedTarget.deployPath}`;
+const deployBranch = `test-${targetPath}`;
 
 runCommandInherit('git', ['push', 'origin', `HEAD:refs/heads/${deployBranch}`]);
 console.log(`已推送当前分支到 ${deployBranch}，将部署到 ${resolvedTarget.siteUrl}`);
