@@ -84,7 +84,7 @@ if (!$input || !isset($input['action'])) {
 
 $action = $input['action'];
 $username = isset($input['username']) ? trim($input['username']) : '';
-$password = isset($input['password']) ? (string) $input['password'] : '';
+$password = isset($input['password']) && is_string($input['password']) ? $input['password'] : '';
 $token = isset($input['token']) ? trim($input['token']) : '';
 
 $allowedActions = ['register', 'login', 'set_settings', 'get_settings'];
