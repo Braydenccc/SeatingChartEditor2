@@ -185,7 +185,7 @@
                   </span>
                   <input class="zone-rot-name-input" v-model="group.name"
                     @click.stop title="点击修改组名" />
-                  <button class="zone-rot-del" @click="handleDeleteGroup(group.id)">X</button>
+                  <button class="zone-rot-del" @click="handleDeleteGroup(group.id)">删</button>
                 </div>
 
                 <!-- 组内选区列表 -->
@@ -208,7 +208,7 @@
                     <!-- 互换箭头 -->
                     <span v-if="group.type === 'swap' && idx === 0" class="zone-rot-arrow">换</span>
                     <span class="zone-rot-count">{{ zone.seatIds.length }}座</span>
-                    <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)">X</button>
+                    <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)">删</button>
                   </div>
 
                   <!-- 添加选区按钮（在组内） -->
