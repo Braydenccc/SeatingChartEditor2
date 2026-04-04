@@ -214,13 +214,14 @@ const deleteHandler = () => {
 
 <style scoped>
 .student-item {
+  --student-item-bg: white;
   contain: layout style;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 14px 18px;
   margin-bottom: 10px;
-  background: white;
+  background: var(--student-item-bg);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   transition: all 0.2s ease;
@@ -536,7 +537,7 @@ const deleteHandler = () => {
     width: 12px;
     flex: 0 0 12px;
     align-self: stretch;
-    background: linear-gradient(to left, var(--color-surface, #fff), transparent);
+    background: linear-gradient(to left, var(--student-item-bg), transparent);
     pointer-events: none;
   }
 
