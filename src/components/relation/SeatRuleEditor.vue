@@ -51,9 +51,15 @@
             :focus-rule-id="focusRuleId"
             @export="handleExportRules"
             @import="handleImportRules"
+            @edit="handleEditRule"
           />
           <div class="tab-divider"></div>
-          <RuleBuilder :mode="editorMode" @added="onRuleAdded" />
+          <RuleBuilder
+            :mode="editorMode"
+            :editing-rule="editingRule"
+            @added="onRuleAdded"
+            @cancel-edit="editingRuleId = ''"
+          />
         </div>
 
         <!-- Tab 2: 对象类型说明（目前展示占位符，内容在 rules tab 中） -->
@@ -106,13 +112,18 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const { ruleCount, exportRules, importRules } = useSeatRules()
+const { rules, ruleCount, exportRules, importRules } = useSeatRules()
 const { success, warning, error } = useLogger()
 const ruleListRef = ref(null)
 
 // ==================== Tab 状态 ====================
 const activeTab = ref('rules')
 const editorMode = ref('quick')
+const editingRuleId = ref('')
+const editingRule = computed(() => {
+  if (!editingRuleId.value) return null
+  return rules.value.find(r => r.id === editingRuleId.value) || null
+})
 const tabs = computed(() => [
   { key: 'rules', icon: '📋', label: '规则总览', badge: ruleCount.value > 0 ? ruleCount.value : null },
   { key: 'personal', icon: '🏷️', label: '对象说明', badge: null }
@@ -153,6 +164,7 @@ const handleImportRules = () => {
     }
 
     if (result.imported > 0) {
+      editingRuleId.value = ''
       success(`规则导入成功：${result.imported} 条`)
     } else {
       warning('未导入任何规则')
@@ -164,7 +176,13 @@ const handleImportRules = () => {
   input.click()
 }
 
-const onRuleAdded = () => {}
+const onRuleAdded = () => {
+  editingRuleId.value = ''
+}
+
+const handleEditRule = (ruleId) => {
+  editingRuleId.value = ruleId
+}
 
 // 当模态框关闭时重置 tab
 watch(() => props.visible, (visible) => {
@@ -178,6 +196,7 @@ watch(() => props.visible, (visible) => {
 
 // 关闭模态框
 const close = () => {
+  editingRuleId.value = ''
   emit('close')
 }
 </script>

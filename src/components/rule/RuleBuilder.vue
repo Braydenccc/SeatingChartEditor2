@@ -1,6 +1,6 @@
 <template>
   <div class="rule-builder">
-    <h4 class="builder-title">添加新规则</h4>
+    <h4 class="builder-title">{{ isEditing ? '编辑规则' : '添加新规则' }}</h4>
 
     <div v-if="mode === 'quick'" class="quick-template-wrap">
       <label class="seg-label">快捷场景</label>
@@ -126,18 +126,19 @@
     </div>
 
     <div class="builder-footer">
-      <button class="btn-add" :disabled="!canAdd" @click="handleAdd">添加规则</button>
-      <button class="btn-reset" @click="resetForm">重置</button>
+      <button class="btn-add" :disabled="!canAdd" @click="handleAdd">{{ isEditing ? '保存修改' : '添加规则' }}</button>
+      <button class="btn-reset" @click="handleReset">{{ isEditing ? '取消编辑' : '重置' }}</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useZoneData } from '@/composables/useZoneData'
 import { useSeatRules } from '@/composables/useSeatRules'
+import { useLogger } from '@/composables/useLogger'
 import {
   RulePriority,
   RULE_TYPE_LABELS,
@@ -145,18 +146,23 @@ import {
   getDefaultParams
 } from '@/constants/ruleTypes.js'
 
-const emit = defineEmits(['added'])
+const emit = defineEmits(['added', 'cancel-edit'])
 const props = defineProps({
   mode: {
     type: String,
     default: 'quick'
+  },
+  editingRule: {
+    type: Object,
+    default: null
   }
 })
 
 const { students } = useStudentData()
 const { tags } = useTagData()
 const { zones } = useZoneData()
-const { addRule, validateRule, renderRuleText } = useSeatRules()
+const { addRule, updateRule, validateRule, renderRuleText, normalizeRuleShape } = useSeatRules()
+const { error } = useLogger()
 
 const QUICK_TEMPLATE_KEYS = {
   FRONT_ROW: 'front-row',
@@ -170,6 +176,7 @@ const selectedPriority = ref(RulePriority.PREFER)
 const description = ref('')
 const subjects = ref([{ type: 'person', id: null }])
 const paramValues = ref({})
+const isEditing = computed(() => !!props.editingRule?.id)
 
 const priorities = [
   { key: 'required', label: '强制必须' },
@@ -289,6 +296,16 @@ const onPredicateChange = () => {
 
 const handleAdd = () => {
   if (!canAdd.value) return
+  if (isEditing.value) {
+    const updated = updateRule(props.editingRule.id, currentRulePayload.value)
+    if (updated) {
+      emit('added', props.editingRule.id)
+      resetForm()
+      return
+    }
+    error('当前编辑的规则不存在，可能已被删除或覆盖，请刷新规则列表后重试。')
+    return
+  }
   const result = addRule(currentRulePayload.value)
   if (result.success) {
     emit('added', result.rule)
@@ -302,6 +319,32 @@ const resetForm = () => {
   description.value = ''
   subjects.value = [{ type: 'person', id: null }]
   paramValues.value = {}
+}
+
+const handleReset = () => {
+  resetForm()
+  if (isEditing.value) {
+    emit('cancel-edit')
+  }
+}
+
+const applyEditingRule = (rule) => {
+  if (!rule?.id) {
+    resetForm()
+    return
+  }
+  const normalized = normalizeRuleShape(rule)
+  subjectMode.value = normalized.subjectMode || 'single'
+  selectedPredicate.value = rule.predicate || ''
+  selectedPriority.value = rule.priority || RulePriority.PREFER
+  description.value = rule.description || ''
+  subjectsA.value = normalized.subjectsA?.length
+    ? normalized.subjectsA.map(s => ({ ...s }))
+    : [{ type: 'person', id: null }]
+  subjectsB.value = normalized.subjectsB?.length
+    ? normalized.subjectsB.map(s => ({ ...s }))
+    : [{ type: 'person', id: null }]
+  paramValues.value = { ...(rule.params || (rule.predicate ? getDefaultParams(rule.predicate) : {})) }
 }
 
 const applyQuickTemplate = (key) => {
@@ -336,6 +379,14 @@ const applyQuickTemplate = (key) => {
   const minSubjects = PREDICATE_META[selectedPredicate.value]?.minSubjects ?? 1
   ensureMinimumSubjects(minSubjects)
 }
+
+watch(
+  () => props.editingRule?.id ?? null,
+  () => {
+    applyEditingRule(props.editingRule)
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>

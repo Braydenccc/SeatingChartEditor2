@@ -146,6 +146,12 @@
             </div>
             <div class="detail-actions">
               <button
+                class="btn-edit"
+                @click="emit('edit', rule.id)"
+              >
+                编辑规则
+              </button>
+              <button
                 class="btn-delete"
                 :class="{ confirming: isDeletingRule(rule.id).value }"
                 @click="handleDelete(rule)"
@@ -183,7 +189,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['export', 'import'])
+const emit = defineEmits(['export', 'import', 'edit'])
 
 const { rules, renderRuleText, toggleRule, updateRule, deleteRule, clearAllRules, detectConflicts } = useSeatRules()
 const { students } = useStudentData()
@@ -811,6 +817,20 @@ defineExpose({ focusRule })
 .priority-chip.optional { background: #f1f5f9; color: #475569; } /* Darkened for readability */
 
 .detail-actions { display: flex; justify-content: flex-end; }
+
+.btn-edit {
+  padding: 5px 14px;
+  border: 1.5px solid #93c5fd;
+  border-radius: 6px;
+  background: white;
+  color: #1d4ed8;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-right: 8px;
+}
+
+.btn-edit:hover { background: #eff6ff; }
 
 .btn-delete {
   padding: 5px 14px;
