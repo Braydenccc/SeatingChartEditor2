@@ -497,7 +497,7 @@ const deleteHandler = () => {
 
   .student-name-section {
     width: auto;
-    flex: 1;
+    flex: 1 1 48%;
     min-width: 0;
   }
 
@@ -520,10 +520,24 @@ const deleteHandler = () => {
     display: flex;
     flex-wrap: nowrap;
     gap: 4px;
-    max-width: 40%;
+    flex: 1 1 34%;
+    min-width: 90px;
+    max-width: none;
+    position: relative;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .student-tags::after {
+    content: '';
+    position: sticky;
+    right: 0;
+    width: 12px;
+    flex: 0 0 12px;
+    align-self: stretch;
+    background: linear-gradient(to left, #fff, rgba(255, 255, 255, 0));
+    pointer-events: none;
   }
 
   .student-tag {
@@ -533,9 +547,16 @@ const deleteHandler = () => {
   }
 
   .remove-tag-btn {
-    width: 14px;
-    height: 14px;
-    font-size: 12px;
+    width: 16px;
+    height: 16px;
+    font-size: 11px;
+    position: relative;
+  }
+
+  .remove-tag-btn::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
   }
 
   .add-tag-to-student-btn {
@@ -543,9 +564,16 @@ const deleteHandler = () => {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     font-size: 14px;
+    position: relative;
+  }
+
+  .add-tag-to-student-btn::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
   }
 
   .tag-option {
