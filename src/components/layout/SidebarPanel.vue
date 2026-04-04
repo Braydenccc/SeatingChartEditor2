@@ -964,19 +964,28 @@ const detectDeskmateBindingConflicts = () => {
     return [...ids]
   }
 
+  const columnsPerGroup = Number(seatConfig.value?.columnsPerGroup || 0)
+  if (columnsPerGroup <= 1) {
+    return {
+      count: 1,
+      details: ['当前每大组列数为 1，不存在同桌位，所有“必须同桌”规则不可满足']
+    }
+  }
+
   const adjacency = new Map()
   const pairKeys = new Set()
+  const expandedPairs = []
 
   for (const rule of activeRules) {
-    if (rule.subjectMode !== 'dual') continue
-    const left = expandEntriesToStudentIds(rule.subjectsA)
-    const right = expandEntriesToStudentIds(rule.subjectsB)
-    for (const a of left) {
-      for (const b of right) {
-        if (a === b) continue
+    const ids = expandEntriesToStudentIds(rule.subjects || [])
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = ids[i]
+        const b = ids[j]
         const key = a < b ? `${a}:${b}` : `${b}:${a}`
         if (pairKeys.has(key)) continue
         pairKeys.add(key)
+        expandedPairs.push([a, b])
         if (!adjacency.has(a)) adjacency.set(a, new Set())
         if (!adjacency.has(b)) adjacency.set(b, new Set())
         adjacency.get(a).add(b)
@@ -986,11 +995,47 @@ const detectDeskmateBindingConflicts = () => {
   }
 
   const details = []
+  const seatsByGroupRow = new Map()
+  for (const seat of getAvailableSeats()) {
+    const key = `${seat.groupIndex}:${seat.rowIndex}`
+    if (!seatsByGroupRow.has(key)) seatsByGroupRow.set(key, 0)
+    seatsByGroupRow.set(key, seatsByGroupRow.get(key) + 1)
+  }
+  let maxFeasiblePairs = 0
+  for (const count of seatsByGroupRow.values()) {
+    maxFeasiblePairs += Math.floor((count * Math.max(0, count - 1)) / 2)
+  }
+  if (expandedPairs.length > maxFeasiblePairs) {
+    details.push(`同桌容量不足：当前最多可满足约 ${maxFeasiblePairs} 对同桌关系，但规则展开后需要 ${expandedPairs.length} 对`)
+  }
+  const maxDeskmatesPerStudent = columnsPerGroup - 1
   for (const [studentId, mates] of adjacency.entries()) {
-    if (mates.size <= 1) continue
+    if (mates.size <= maxDeskmatesPerStudent) continue
     const selfName = studentNameMap.get(studentId) || `学生#${studentId}`
     const mateNames = [...mates].map(id => studentNameMap.get(id) || `学生#${id}`)
-    details.push(`同桌绑定冲突：${selfName} 同时绑定了 ${mateNames.join('、')}`)
+    details.push(`同桌绑定冲突：${selfName} 绑定了 ${mateNames.join('、')}，超过当前列数可容纳上限（${maxDeskmatesPerStudent}）`)
+  }
+
+  const forbidRules = getActiveRules().filter(rule => rule.predicate === 'MUST_NOT_BE_SEATMATES')
+  if (forbidRules.length > 0 && expandedPairs.length > 0) {
+    const forbidPairKeys = new Set()
+    for (const rule of forbidRules) {
+      const ids = expandEntriesToStudentIds(rule.subjects || [])
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const a = ids[i]
+          const b = ids[j]
+          forbidPairKeys.add(a < b ? `${a}:${b}` : `${b}:${a}`)
+        }
+      }
+    }
+    for (const [a, b] of expandedPairs) {
+      const key = a < b ? `${a}:${b}` : `${b}:${a}`
+      if (!forbidPairKeys.has(key)) continue
+      const aName = studentNameMap.get(a) || `学生#${a}`
+      const bName = studentNameMap.get(b) || `学生#${b}`
+      details.push(`规则冲突：${aName} 与 ${bName} 同时存在“必须同桌”和“禁止同桌”`)
+    }
   }
 
   return { count: details.length, details }

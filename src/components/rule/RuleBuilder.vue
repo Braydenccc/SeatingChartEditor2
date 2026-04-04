@@ -15,21 +15,6 @@
 
     <div class="sentence-builder">
       <div class="builder-segment">
-        <label class="seg-label">针对对象</label>
-        <div class="chip-group">
-          <button
-            v-for="item in subjectModes"
-            :key="item.key"
-            class="chip-item"
-            :class="{ active: subjectMode === item.key }"
-            @click="setSubjectMode(item.key)"
-          >
-            {{ item.label }}
-          </button>
-        </div>
-      </div>
-
-      <div class="builder-segment">
         <label class="seg-label">应用规则</label>
         <div class="rule-selector-wrap">
           <select v-model="selectedPredicate" class="seg-select pred-select" @change="onPredicateChange">
@@ -63,8 +48,8 @@
 
     <div class="subject-section" v-if="selectedPredicate">
       <div class="subject-slot">
-        <div class="slot-title">对象集合 A</div>
-        <div v-for="(entry, index) in subjectsA" :key="`a-${index}`" class="subject-row">
+        <div class="slot-title">对象集合</div>
+        <div v-for="(entry, index) in subjects" :key="`s-${index}`" class="subject-row">
           <select v-model="entry.type" class="detail-select" @change="onEntryTypeChange(entry)">
             <option value="person">个人</option>
             <option value="tag">标签</option>
@@ -81,33 +66,10 @@
             </option>
           </select>
 
-          <button class="mini-btn danger" @click="removeEntry('A', index)">删除</button>
+          <button class="mini-btn danger" @click="removeEntry(index)">删除</button>
         </div>
-        <button class="mini-btn" @click="addEntry('A')">+ 添加对象</button>
-      </div>
-
-      <div class="subject-slot" v-if="subjectMode === 'dual'">
-        <div class="slot-title">对象集合 B</div>
-        <div v-for="(entry, index) in subjectsB" :key="`b-${index}`" class="subject-row">
-          <select v-model="entry.type" class="detail-select" @change="onEntryTypeChange(entry)">
-            <option value="person">个人</option>
-            <option value="tag">标签</option>
-          </select>
-
-          <select v-model="entry.id" class="detail-select">
-            <option :value="null">{{ entry.type === 'person' ? '选择学生…' : '选择标签…' }}</option>
-            <option
-              v-for="opt in getEntryOptions(entry.type)"
-              :key="opt.id"
-              :value="opt.id"
-            >
-              {{ opt.label }}
-            </option>
-          </select>
-
-          <button class="mini-btn danger" @click="removeEntry('B', index)">删除</button>
-        </div>
-        <button class="mini-btn" @click="addEntry('B')">+ 添加对象</button>
+        <button class="mini-btn" @click="addEntry">+ 添加对象</button>
+        <div class="warning-item" v-if="subjectHint">{{ subjectHint }}</div>
       </div>
 
       <div v-if="paramSpecs.length > 0" class="params-section">
@@ -203,18 +165,11 @@ const QUICK_TEMPLATE_KEYS = {
   SPREAD_GROUP: 'spread-group'
 }
 
-const subjectMode = ref('single')
 const selectedPredicate = ref('')
 const selectedPriority = ref(RulePriority.PREFER)
 const description = ref('')
-const subjectsA = ref([{ type: 'person', id: null }])
-const subjectsB = ref([{ type: 'person', id: null }])
+const subjects = ref([{ type: 'person', id: null }])
 const paramValues = ref({})
-
-const subjectModes = [
-  { key: 'single', label: '单对象' },
-  { key: 'dual', label: '双对象' }
-]
 
 const priorities = [
   { key: 'required', label: '强制必须' },
@@ -224,7 +179,7 @@ const priorities = [
 
 const predicateGroups = [
   {
-    label: 'A. 单对象规则',
+    label: 'A. 对象位置规则',
     predicates: [
       'IN_ROW_RANGE',
       'NOT_IN_COLUMN_TYPE',
@@ -236,7 +191,7 @@ const predicateGroups = [
     ]
   },
   {
-    label: 'B. 双对象规则',
+    label: 'B. 对象关系规则',
     predicates: [
       'MUST_BE_SEATMATES',
       'MUST_NOT_BE_SEATMATES',
@@ -255,7 +210,6 @@ const filteredPredicateGroups = computed(() => {
     .map(group => ({
       ...group,
       predicates: group.predicates
-        .filter(key => (PREDICATE_META[key]?.subjectMode || []).includes(subjectMode.value))
         .map(key => ({ key, label: RULE_TYPE_LABELS[key] }))
     }))
     .filter(group => group.predicates.length > 0)
@@ -267,9 +221,7 @@ const paramSpecs = computed(() => {
 })
 
 const currentRulePayload = computed(() => ({
-  subjectMode: subjectMode.value,
-  subjectsA: subjectsA.value.map(s => ({ ...s })),
-  subjectsB: subjectMode.value === 'dual' ? subjectsB.value.map(s => ({ ...s })) : [],
+  subjects: subjects.value.map(s => ({ ...s })),
   predicate: selectedPredicate.value,
   priority: selectedPriority.value,
   params: { ...paramValues.value },
@@ -283,6 +235,11 @@ const validationResult = computed(() => {
 
 const validationWarnings = computed(() => validationResult.value.warnings)
 const canAdd = computed(() => !!selectedPredicate.value && validationResult.value.valid)
+const subjectHint = computed(() => {
+  if (!selectedPredicate.value) return ''
+  const minSubjects = PREDICATE_META[selectedPredicate.value]?.minSubjects ?? 1
+  return minSubjects > 1 ? `当前规则至少需要 ${minSubjects} 个对象` : ''
+})
 
 const previewText = computed(() => {
   if (!selectedPredicate.value) return ''
@@ -307,30 +264,26 @@ const onEntryTypeChange = (entry) => {
   entry.id = null
 }
 
-const addEntry = (slot) => {
-  if (slot === 'A') subjectsA.value.push({ type: 'person', id: null })
-  else subjectsB.value.push({ type: 'person', id: null })
-}
-
-const removeEntry = (slot, index) => {
-  if (slot === 'A') {
-    subjectsA.value.splice(index, 1)
-    if (subjectsA.value.length === 0) subjectsA.value.push({ type: 'person', id: null })
-  } else {
-    subjectsB.value.splice(index, 1)
-    if (subjectsB.value.length === 0) subjectsB.value.push({ type: 'person', id: null })
+const ensureMinimumSubjects = (minSubjects) => {
+  while (subjects.value.length < minSubjects) {
+    subjects.value.push({ type: 'person', id: null })
   }
 }
 
-const setSubjectMode = (mode) => {
-  subjectMode.value = mode
-  selectedPredicate.value = ''
-  paramValues.value = {}
+const addEntry = () => {
+  subjects.value.push({ type: 'person', id: null })
+}
+
+const removeEntry = (index) => {
+  subjects.value.splice(index, 1)
+  if (subjects.value.length === 0) subjects.value.push({ type: 'person', id: null })
 }
 
 const onPredicateChange = () => {
   if (selectedPredicate.value) {
     paramValues.value = getDefaultParams(selectedPredicate.value)
+    const minSubjects = PREDICATE_META[selectedPredicate.value]?.minSubjects ?? 1
+    ensureMinimumSubjects(minSubjects)
   }
 }
 
@@ -344,37 +297,31 @@ const handleAdd = () => {
 }
 
 const resetForm = () => {
-  subjectMode.value = 'single'
   selectedPredicate.value = ''
   selectedPriority.value = RulePriority.PREFER
   description.value = ''
-  subjectsA.value = [{ type: 'person', id: null }]
-  subjectsB.value = [{ type: 'person', id: null }]
+  subjects.value = [{ type: 'person', id: null }]
   paramValues.value = {}
 }
 
 const applyQuickTemplate = (key) => {
   const quickTemplates = {
     [QUICK_TEMPLATE_KEYS.FRONT_ROW]: {
-      mode: 'single',
       priority: RulePriority.REQUIRED,
       predicate: 'IN_ROW_RANGE',
       params: () => getDefaultParams('IN_ROW_RANGE')
     },
     [QUICK_TEMPLATE_KEYS.AVOID_WINDOW]: {
-      mode: 'single',
       priority: RulePriority.PREFER,
       predicate: 'NOT_IN_COLUMN_TYPE',
       params: () => ({ ...getDefaultParams('NOT_IN_COLUMN_TYPE'), columnType: 'wall' })
     },
     [QUICK_TEMPLATE_KEYS.DESKMATES]: {
-      mode: 'dual',
       priority: RulePriority.REQUIRED,
       predicate: 'MUST_BE_SEATMATES',
       params: () => getDefaultParams('MUST_BE_SEATMATES')
     },
     [QUICK_TEMPLATE_KEYS.SPREAD_GROUP]: {
-      mode: 'single',
       priority: RulePriority.PREFER,
       predicate: 'DISTRIBUTE_EVENLY',
       params: () => ({ ...getDefaultParams('DISTRIBUTE_EVENLY'), scope: 'group' })
@@ -383,10 +330,11 @@ const applyQuickTemplate = (key) => {
 
   const tpl = quickTemplates[key]
   if (!tpl) return
-  setSubjectMode(tpl.mode)
   selectedPriority.value = tpl.priority
   selectedPredicate.value = tpl.predicate
   paramValues.value = tpl.params()
+  const minSubjects = PREDICATE_META[selectedPredicate.value]?.minSubjects ?? 1
+  ensureMinimumSubjects(minSubjects)
 }
 </script>
 

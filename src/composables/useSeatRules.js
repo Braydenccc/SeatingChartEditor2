@@ -21,8 +21,9 @@ const rules = ref([])
 let _idCounter = 1
 // 规则数据模型版本：
 // v3: legacy subject.kind（student/pair/tag/tag_pair）
-// v4: subjectMode + subjectsA/subjectsB（支持个人/标签混合多对象）
-const CURRENT_RULE_VERSION = 4
+// v4: subjectMode + subjectsA/subjectsB（兼容层）
+// v5: subjects（统一多对象）
+const CURRENT_RULE_VERSION = 5
 
 function genId() {
   return `rule-${Date.now()}-${_idCounter++}`
@@ -39,54 +40,54 @@ const normalizeSubjectEntry = (entry) => {
 const normalizeRuleShape = (ruleData) => {
   if (!ruleData) {
     return {
-      subjectMode: 'single',
-      subjectsA: [],
-      subjectsB: []
+      subjects: []
+    }
+  }
+
+  if (Array.isArray(ruleData.subjects)) {
+    return {
+      subjects: ruleData.subjects.map(normalizeSubjectEntry).filter(Boolean)
     }
   }
 
   if (ruleData.subjectMode === 'single' || ruleData.subjectMode === 'dual') {
+    const subjectsA = (ruleData.subjectsA || []).map(normalizeSubjectEntry).filter(Boolean)
+    const subjectsB = (ruleData.subjectsB || []).map(normalizeSubjectEntry).filter(Boolean)
     return {
-      subjectMode: ruleData.subjectMode,
-      subjectsA: (ruleData.subjectsA || []).map(normalizeSubjectEntry).filter(Boolean),
-      subjectsB: (ruleData.subjectsB || []).map(normalizeSubjectEntry).filter(Boolean)
+      subjects: [...subjectsA, ...subjectsB]
     }
   }
 
   const subject = ruleData.subject || {}
   if (subject.kind === 'student') {
     return {
-      subjectMode: 'single',
-      subjectsA: [{ type: 'person', id: subject.id ?? null }],
-      subjectsB: []
+      subjects: [{ type: 'person', id: subject.id ?? null }]
     }
   }
   if (subject.kind === 'tag') {
     return {
-      subjectMode: 'single',
-      subjectsA: [{ type: 'tag', id: subject.tagId ?? null }],
-      subjectsB: []
+      subjects: [{ type: 'tag', id: subject.tagId ?? null }]
     }
   }
   if (subject.kind === 'pair') {
     return {
-      subjectMode: 'dual',
-      subjectsA: [{ type: 'person', id: subject.id1 ?? null }],
-      subjectsB: [{ type: 'person', id: subject.id2 ?? null }]
+      subjects: [
+        { type: 'person', id: subject.id1 ?? null },
+        { type: 'person', id: subject.id2 ?? null }
+      ]
     }
   }
   if (subject.kind === 'tag_pair') {
     return {
-      subjectMode: 'dual',
-      subjectsA: [{ type: 'tag', id: subject.tagId1 ?? null }],
-      subjectsB: [{ type: 'tag', id: subject.tagId2 ?? null }]
+      subjects: [
+        { type: 'tag', id: subject.tagId1 ?? null },
+        { type: 'tag', id: subject.tagId2 ?? null }
+      ]
     }
   }
 
   return {
-    subjectMode: 'single',
-    subjectsA: [],
-    subjectsB: []
+    subjects: []
   }
 }
 
@@ -130,15 +131,10 @@ export function useSeatRules() {
     const { predicate, params } = rule
     const normalized = normalizeRuleShape(rule)
 
-    let subjectText = ''
-    if (normalized.subjectMode === 'single') {
-      subjectText = getSubjectsText(normalized.subjectsA)
-    } else {
-      const ordered = PREDICATE_META[predicate]?.ordered
-      const left = getSubjectsText(normalized.subjectsA)
-      const right = getSubjectsText(normalized.subjectsB)
-      subjectText = ordered ? `${left} → ${right}` : `${left} ↔ ${right}`
-    }
+    const relation = PREDICATE_META[predicate]?.relation || 'single'
+    const subjectText = relation === 'single'
+      ? getSubjectsText(normalized.subjects)
+      : `对象集合(${getSubjectsText(normalized.subjects)})`
 
     let predicateText = ''
     switch (predicate) {
@@ -208,24 +204,14 @@ export function useSeatRules() {
     }
 
     const normalized = normalizeRuleShape(ruleData)
-    const { subjectMode, subjectsA, subjectsB } = normalized
+    const { subjects } = normalized
 
-    if (!subjectMode) {
-      return { valid: false, warnings: ['请选择针对对象模式'] }
-    }
-    if (!meta.subjectMode?.includes(subjectMode)) {
-      return {
-        valid: false,
-        warnings: [`谓词「${RULE_TYPE_LABELS[ruleData.predicate]}」不支持对象模式「${subjectMode}」`]
-      }
+    if (!Array.isArray(subjects) || subjects.length === 0) {
+      return { valid: false, warnings: ['对象集合不能为空'] }
     }
 
-    if (!Array.isArray(subjectsA) || subjectsA.length === 0) {
-      return { valid: false, warnings: ['对象集合 A 不能为空'] }
-    }
-
-    if (subjectMode === 'dual' && (!Array.isArray(subjectsB) || subjectsB.length === 0)) {
-      return { valid: false, warnings: ['双对象规则需要对象集合 B'] }
+    if (subjects.length < (meta.minSubjects ?? 1)) {
+      return { valid: false, warnings: [`谓词「${RULE_TYPE_LABELS[ruleData.predicate]}」至少需要 ${meta.minSubjects} 个对象`] }
     }
 
     const validateEntry = (entry, label) => {
@@ -238,20 +224,12 @@ export function useSeatRules() {
       }
     }
 
-    subjectsA.forEach(entry => validateEntry(entry, 'A'))
-    if (subjectMode === 'dual') subjectsB.forEach(entry => validateEntry(entry, 'B'))
+    subjects.forEach(entry => validateEntry(entry, '对象集合'))
 
     const getEntryKey = (e) => `${e.type}:${e.id}`
-    const selectedA = subjectsA.filter(e => e?.id !== null && e?.id !== undefined)
-    const uniqueA = new Set(selectedA.map(getEntryKey))
-    if (uniqueA.size !== selectedA.length) warnings.push('集合 A 存在重复对象')
-    if (subjectMode === 'dual') {
-      const selectedB = subjectsB.filter(e => e?.id !== null && e?.id !== undefined)
-      const uniqueB = new Set(selectedB.map(getEntryKey))
-      if (uniqueB.size !== selectedB.length) warnings.push('集合 B 存在重复对象')
-      const overlap = selectedA.filter(e => uniqueB.has(getEntryKey(e)))
-      if (overlap.length > 0) warnings.push('集合 A 与集合 B 存在重复对象')
-    }
+    const selected = subjects.filter(e => e?.id !== null && e?.id !== undefined)
+    const unique = new Set(selected.map(getEntryKey))
+    if (unique.size !== selected.length) warnings.push('对象集合存在重复对象')
 
     for (const paramSpec of meta.params) {
       const val = ruleData.params?.[paramSpec.key]
@@ -295,9 +273,7 @@ export function useSeatRules() {
   const getExpandedSubjectIds = (ruleLike) => {
     const normalized = normalizeRuleShape(ruleLike)
     return {
-      subjectMode: normalized.subjectMode || 'single',
-      subjectsA: expandEntriesToStudentIds(normalized.subjectsA || []),
-      subjectsB: expandEntriesToStudentIds(normalized.subjectsB || [])
+      subjects: expandEntriesToStudentIds(normalized.subjects || [])
     }
   }
 
@@ -308,18 +284,15 @@ export function useSeatRules() {
     return false
   }
 
-  const buildPairKeys = (subjectsA, subjectsB, ordered = false) => {
+  const buildPairKeys = (subjects, ordered = false) => {
     const keys = new Set()
-    const listA = [...subjectsA]
-    const listB = [...subjectsB]
-    for (const a of listA) {
-      for (const b of listB) {
-        if (a === b) continue
-        if (ordered) {
-          keys.add(`${a}>${b}`)
-        } else {
-          keys.add(a < b ? `${a}:${b}` : `${b}:${a}`)
-        }
+    const list = [...subjects]
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i]
+        const b = list[j]
+        keys.add(ordered ? `${a}>${b}` : (a < b ? `${a}:${b}` : `${b}:${a}`))
+        if (ordered) keys.add(`${b}>${a}`)
       }
     }
     return keys
@@ -328,20 +301,17 @@ export function useSeatRules() {
   const hasPairScopeOverlap = (r1, r2) => {
     const s1 = getExpandedSubjectIds(r1)
     const s2 = getExpandedSubjectIds(r2)
-    if (s1.subjectMode !== 'dual' || s2.subjectMode !== 'dual') return false
-
     const ordered1 = !!PREDICATE_META[r1.predicate]?.ordered
     const ordered2 = !!PREDICATE_META[r2.predicate]?.ordered
-    const keys1 = buildPairKeys(s1.subjectsA, s1.subjectsB, ordered1)
-    const keys2 = buildPairKeys(s2.subjectsA, s2.subjectsB, ordered2)
+    const keys1 = buildPairKeys(s1.subjects, ordered1)
+    const keys2 = buildPairKeys(s2.subjects, ordered2)
     return hasOverlap(keys1, keys2)
   }
 
   const hasSingleScopeOverlap = (r1, r2) => {
     const s1 = getExpandedSubjectIds(r1)
     const s2 = getExpandedSubjectIds(r2)
-    if (s1.subjectMode !== 'single' || s2.subjectMode !== 'single') return false
-    return hasOverlap(s1.subjectsA, s2.subjectsA)
+    return hasOverlap(s1.subjects, s2.subjects)
   }
 
   const detectConflicts = () => {
@@ -449,14 +419,20 @@ export function useSeatRules() {
 
   const toStoredRule = (ruleData) => {
     const normalized = normalizeRuleShape(ruleData)
+    const meta = PREDICATE_META[ruleData.predicate] || {}
+    const subjectMode = meta.relation === 'single' ? 'single' : 'dual'
+    const subjectsA = [...normalized.subjects]
+    const subjectsB = []
     return {
       id: genId(),
       version: CURRENT_RULE_VERSION,
       enabled: ruleData.enabled ?? true,
       priority: ruleData.priority ?? RulePriority.PREFER,
-      subjectMode: normalized.subjectMode,
-      subjectsA: [...normalized.subjectsA],
-      subjectsB: [...normalized.subjectsB],
+      subjects: [...normalized.subjects],
+      // 兼容旧字段
+      subjectMode,
+      subjectsA,
+      subjectsB,
       predicate: ruleData.predicate,
       params: { ...(ruleData.params ?? getDefaultParams(ruleData.predicate)) },
       description: ruleData.description ?? '',
@@ -467,7 +443,7 @@ export function useSeatRules() {
   const addRule = (ruleData) => {
     const { valid, warnings } = validateRule(ruleData)
     const normalized = normalizeRuleShape(ruleData)
-    const hasRequiredFields = ruleData.predicate && normalized.subjectMode
+    const hasRequiredFields = ruleData.predicate
 
     if (!hasRequiredFields || !valid) {
       return { success: false, warnings }
@@ -512,7 +488,7 @@ export function useSeatRules() {
     const student = students.value.find(s => s.id === studentId)
     return rules.value.filter(r => {
       const normalized = normalizeRuleShape(r)
-      const allEntries = [...(normalized.subjectsA || []), ...(normalized.subjectsB || [])]
+      const allEntries = [...(normalized.subjects || [])]
       const byPerson = allEntries.some(e => e.type === 'person' && e.id === studentId)
       if (byPerson) return true
       const byTag = allEntries.some(e => e.type === 'tag' && student?.tags?.includes(e.id))
@@ -523,13 +499,8 @@ export function useSeatRules() {
   const getPairRulesFor = (id1, id2) => {
     return rules.value.filter(r => {
       const normalized = normalizeRuleShape(r)
-      if (normalized.subjectMode !== 'dual') return false
-      const peopleA = normalized.subjectsA.filter(e => e.type === 'person').map(e => e.id)
-      const peopleB = normalized.subjectsB.filter(e => e.type === 'person').map(e => e.id)
-      return (
-        (peopleA.includes(id1) && peopleB.includes(id2)) ||
-        (peopleA.includes(id2) && peopleB.includes(id1))
-      )
+      const people = normalized.subjects.filter(e => e.type === 'person').map(e => e.id)
+      return people.includes(id1) && people.includes(id2)
     })
   }
 
