@@ -85,7 +85,7 @@ jobs:
         shell: bash
         run: |
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          if [ "$BRANCH_NAME" = "test" ]; then
+          if [ "$BRANCH_NAME" == "test" ]; then
             DEPLOY_SITE="test.sce.jbyc.cc"
             SITE_URL="https://test.sce.jbyc.cc"
           else

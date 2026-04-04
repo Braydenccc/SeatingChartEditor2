@@ -1,7 +1,12 @@
 import { execFileSync, execSync } from 'node:child_process';
 
 function run(command) {
-  return execSync(command, { stdio: 'pipe', encoding: 'utf8' }).trim();
+  try {
+    return execSync(command, { stdio: 'pipe', encoding: 'utf8' }).trim();
+  } catch (error) {
+    console.error(`命令执行失败: ${command}`);
+    throw error;
+  }
 }
 
 function runInherit(command) {

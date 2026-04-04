@@ -4,7 +4,12 @@ import { execSync } from 'child_process';
 const TEST_HOST = 'https://test.sce.jbyc.cc';
 
 function runGit(command) {
-  return execSync(command).toString().trim();
+  try {
+    return execSync(command).toString().trim();
+  } catch (error) {
+    console.error(`Git command failed: ${command}`);
+    throw error;
+  }
 }
 
 function escapeHtml(text) {
@@ -43,7 +48,10 @@ try {
     .filter((b) => b && !b.endsWith('/HEAD'))
     .map((b) => b.replace(/^origin\//, ''));
 
-  const branchSet = new Set([...localBranches, ...remoteBranches, currentBranch]);
+  const branchSet = new Set([...localBranches, ...remoteBranches]);
+  if (currentBranch === 'test' || currentBranch.startsWith('test/')) {
+    branchSet.add(currentBranch);
+  }
   const branchList = Array.from(branchSet)
     .filter((branch) => branch === 'test' || branch.startsWith('test/'))
     .sort((a, b) => {
@@ -53,7 +61,7 @@ try {
     });
 
   if (branchList.length === 0) {
-    branchList.push(currentBranch);
+    branchList.push('test');
   }
 
   console.log(`Patching test env with branch selector: ${currentBranch}`);
@@ -78,7 +86,7 @@ try {
   const optionsHtml = branchList
     .map((branch) => {
       const url = toStagingUrl(branch);
-      const selected = branch === currentBranch ? ' selected' : '';
+      const selected = branch === currentBranch || (branch === 'test' && !branchList.includes(currentBranch)) ? ' selected' : '';
       return `<option value="${escapeHtml(url)}"${selected}>${escapeHtml(branch)}</option>`;
     })
     .join('');
