@@ -62,7 +62,7 @@ export function useImageExport() {
     }
   }
 
-  // 导出为图片，返回 Promise<string> (data URL)
+  // 导出为图片，返回 Promise<string> (blob object URL)
   const exportToImage = () => {
     return new Promise((resolve, reject) => {
       try {
@@ -242,8 +242,14 @@ export function useImageExport() {
 
         ctx.restore()
 
-        // 转为 data URL
-        resolve(canvas.toDataURL('image/png'))
+        // 转为 Blob URL（避免 base64）
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('图片导出失败：无法生成 Blob'))
+            return
+          }
+          resolve(URL.createObjectURL(blob))
+        }, 'image/png')
       } catch (err) {
         reject(err)
       }

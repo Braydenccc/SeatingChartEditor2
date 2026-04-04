@@ -53,6 +53,8 @@ const getOrCreateCsrfToken = () => {
     return csrfToken
 }
 
+export { getOrCreateCsrfToken }
+
 // Initialize from cookies
 const initAuth = () => {
     const savedUser = getCookie('sce_user')

@@ -264,6 +264,7 @@ const excelScrollRef = ref(null)
 const excelContentRef = ref(null)
 const excelScale = ref(1)
 let excelResizeObserver = null
+let lastPreviewObjectUrl = ''
 
 const updateExcelScale = () => {
   if (!excelScrollRef.value || !excelContentRef.value || activeTab.value !== 'excel') return
@@ -557,7 +558,12 @@ const generatePreview = () => {
   debounceTimer = setTimeout(async () => {
     isGenerating.value = true
     try {
-      previewUrl.value = await exportToImage()
+      const nextUrl = await exportToImage()
+      if (lastPreviewObjectUrl) {
+        URL.revokeObjectURL(lastPreviewObjectUrl)
+      }
+      lastPreviewObjectUrl = nextUrl
+      previewUrl.value = nextUrl
     } catch {
       previewUrl.value = ''
     } finally {
@@ -571,7 +577,14 @@ const handleDownload = async () => {
   let url = previewUrl.value
   if (!url) {
     isGenerating.value = true
-    try { url = await exportToImage(); previewUrl.value = url }
+    try {
+      url = await exportToImage()
+      previewUrl.value = url
+      if (lastPreviewObjectUrl) {
+        URL.revokeObjectURL(lastPreviewObjectUrl)
+      }
+      lastPreviewObjectUrl = url
+    }
     catch { return }
     finally { isGenerating.value = false }
   }
@@ -582,7 +595,13 @@ const handleDownload = async () => {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
-  emit('exported', url)
+  try {
+    const exportedBlob = await fetch(url).then((res) => res.blob())
+    emit('exported', exportedBlob)
+  } catch (err) {
+    console.warn('导出后更新侧边栏预览失败:', err)
+    emit('exported', null)
+  }
 }
 
 // ── 下载 Excel ──
@@ -777,6 +796,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
   if (excelResizeObserver) excelResizeObserver.disconnect()
+  if (lastPreviewObjectUrl) {
+    URL.revokeObjectURL(lastPreviewObjectUrl)
+    lastPreviewObjectUrl = ''
+  }
 })
 </script>
 
