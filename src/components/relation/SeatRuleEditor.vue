@@ -63,6 +63,9 @@
             <div>
               <p class="tip-title">对象类型说明</p>
               <p class="tip-desc">个人对象：针对单个学生；标签对象：针对某类学生（如“住宿”标签）。请在「📋 规则总览」中创建并组合使用。</p>
+              <div class="tip-actions">
+                <button class="tip-action-btn" @click="activeTab = 'rules'">去规则总览创建规则</button>
+              </div>
             </div>
           </div>
         </div>
@@ -363,6 +366,26 @@ const close = () => {
   font-size: 13px;
   color: #475569; /* Darkened for readability */
   line-height: 1.6;
+}
+
+.tip-actions {
+  margin-top: 12px;
+}
+
+.tip-action-btn {
+  border: 1px solid #23587b;
+  background: #23587b;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tip-action-btn:hover {
+  background: #2d6a94;
+  border-color: #2d6a94;
 }
 
 
