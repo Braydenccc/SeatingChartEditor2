@@ -27,9 +27,9 @@ function encodeHtmlEntities(text) {
 }
 
 function toStagingUrl(branch) {
-  if (branch === 'test') return TEST_HOST;
+  if (branch === 'test') return `${TEST_HOST}/test`;
   if (branch.startsWith('test/')) {
-    return `${TEST_HOST}/${branch.slice(5)}`;
+    return `${TEST_HOST}/test/${branch.slice(5)}`;
   }
   return '';
 }

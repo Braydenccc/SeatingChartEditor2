@@ -39,8 +39,8 @@ export function resolveStagingTarget(branchName) {
 
   if (normalizedBranch === 'test') {
     return {
-      deploySite: 'test.sce.jbyc.cc',
-      siteUrl: TEST_HOST,
+      deploySite: 'test.sce.jbyc.cc/test',
+      siteUrl: `${TEST_HOST}/test`,
       deployPath: '',
     };
   }
@@ -51,8 +51,8 @@ export function resolveStagingTarget(branchName) {
 
   const deployPath = validateDeploySubPath(normalizedBranch.slice(5));
   return {
-    deploySite: `test.sce.jbyc.cc/${deployPath}`,
-    siteUrl: `${TEST_HOST}/${deployPath}`,
+    deploySite: `test.sce.jbyc.cc/test/${deployPath}`,
+    siteUrl: `${TEST_HOST}/test/${deployPath}`,
     deployPath,
   };
 }
