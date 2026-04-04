@@ -936,6 +936,15 @@ const detectDeskmateBindingConflicts = () => {
     return { count: 0, details: [] }
   }
 
+  const studentNameMap = new Map(students.value.map(student => [student.id, student.name || `学生#${student.id}`]))
+  const tagToStudentIds = new Map()
+  for (const student of students.value) {
+    for (const tagId of (student.tags || [])) {
+      if (!tagToStudentIds.has(tagId)) tagToStudentIds.set(tagId, new Set())
+      tagToStudentIds.get(tagId).add(student.id)
+    }
+  }
+
   const expandEntriesToStudentIds = (entries = []) => {
     const ids = new Set()
     for (const entry of entries) {
@@ -945,8 +954,10 @@ const detectDeskmateBindingConflicts = () => {
         continue
       }
       if (entry.type === 'tag') {
-        for (const student of students.value) {
-          if (student.tags?.includes(entry.id)) ids.add(student.id)
+        const studentIds = tagToStudentIds.get(entry.id)
+        if (!studentIds) continue
+        for (const studentId of studentIds) {
+          ids.add(studentId)
         }
       }
     }
@@ -962,7 +973,7 @@ const detectDeskmateBindingConflicts = () => {
     const right = expandEntriesToStudentIds(rule.subjectsB)
     for (const a of left) {
       for (const b of right) {
-        if (!a || !b || a === b) continue
+        if (a === b) continue
         const key = a < b ? `${a}:${b}` : `${b}:${a}`
         if (pairKeys.has(key)) continue
         pairKeys.add(key)
@@ -977,11 +988,8 @@ const detectDeskmateBindingConflicts = () => {
   const details = []
   for (const [studentId, mates] of adjacency.entries()) {
     if (mates.size <= 1) continue
-    const selfName = students.value.find(s => s.id === studentId)?.name || `学生#${studentId}`
-    const mateNames = [...mates].map(id => {
-      const found = students.value.find(s => s.id === id)
-      return found?.name || `学生#${id}`
-    })
+    const selfName = studentNameMap.get(studentId) || `学生#${studentId}`
+    const mateNames = [...mates].map(id => studentNameMap.get(id) || `学生#${id}`)
     details.push(`同桌绑定冲突：${selfName} 同时绑定了 ${mateNames.join('、')}`)
   }
 
