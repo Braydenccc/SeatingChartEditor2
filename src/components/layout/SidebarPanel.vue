@@ -418,7 +418,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed, defineAsyncComponent } from 'vue'
 import LoadingSpinner from '../ui/LoadingSpinner.vue'
 
 const SeatRuleEditor = defineAsyncComponent({
@@ -587,10 +587,23 @@ const tagSettingsLocal = ref({})
 const showExportDialog = ref(false)
 const lastExportUrl = ref('')
 const isExporting = ref(false)
+let lastExportObjectUrl = ''
 
 // 导出完成回调
-const onExported = (url) => {
-  lastExportUrl.value = url
+const onExported = (payload) => {
+  if (!(payload instanceof Blob)) {
+    if (lastExportObjectUrl) {
+      URL.revokeObjectURL(lastExportObjectUrl)
+      lastExportObjectUrl = ''
+    }
+    lastExportUrl.value = ''
+    return
+  }
+  if (lastExportObjectUrl) {
+    URL.revokeObjectURL(lastExportObjectUrl)
+  }
+  lastExportObjectUrl = URL.createObjectURL(payload)
+  lastExportUrl.value = lastExportObjectUrl
 }
 
 // 工作区管理 (云端)
@@ -754,6 +767,13 @@ onMounted(() => {
   configForm.value = { ...configForm.value, ...seatConfig.value }
 })
 
+onBeforeUnmount(() => {
+  if (lastExportObjectUrl) {
+    URL.revokeObjectURL(lastExportObjectUrl)
+    lastExportObjectUrl = ''
+  }
+})
+
 // ==================== 示意图辅助函数 ====================
 const DIAGRAM_SIZE = 9
 const DIAGRAM_CENTER = 4 // 0-indexed 中心 (4, 4)
@@ -839,12 +859,16 @@ const handleQuickExport = async () => {
 
   isExporting.value = true
   try {
-    const dataUrl = await exportToImage()
-    lastExportUrl.value = dataUrl
+    const imageUrl = await exportToImage()
+    if (lastExportObjectUrl) {
+      URL.revokeObjectURL(lastExportObjectUrl)
+    }
+    lastExportObjectUrl = imageUrl
+    lastExportUrl.value = imageUrl
 
     // 自动下载
     const link = document.createElement('a')
-    link.href = dataUrl
+    link.href = imageUrl
     const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     link.download = `座位表_${ts}.png`
     document.body.appendChild(link)
