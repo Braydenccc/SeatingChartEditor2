@@ -7,8 +7,7 @@
           <circle class="in-ring-bg" cx="20" cy="20" r="16" />
           <circle class="in-ring-fill" cx="20" cy="20" r="16"
             pathLength="100"
-            :stroke-dasharray="`${satPct} ${100 - satPct}`"
-            :style="{ stroke: gradeColor }" />
+            :style="{ stroke: gradeColor, strokeDasharray: `${satPct} ${100 - satPct}` }" />
         </svg>
         <span class="in-ring-pct">{{ Math.round(satPct) }}%</span>
       </div>
@@ -85,7 +84,11 @@ const emit = defineEmits(['focus-rule', 'apply-suggestion'])
 const { renderRuleText } = useSeatRules()
 const showSatisfied = ref(false)
 
-const satPct = computed(() => ((props.report?.satRate ?? 1) * 100))
+const satPct = computed(() => {
+  const raw = Number(props.report?.satRate ?? 1) * 100
+  if (!Number.isFinite(raw)) return 0
+  return Math.min(100, Math.max(0, raw))
+})
 const ruleCount = computed(() => (props.report?.satisfied?.length || 0) + (props.report?.violated?.length || 0))
 
 const violatedRules = computed(() => props.report?.violated || [])
