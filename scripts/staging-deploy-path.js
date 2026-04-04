@@ -19,7 +19,7 @@ export function validateDeploySubPath(rawPath) {
   const pathSegments = safePath.split('/').filter(Boolean);
   for (const segment of pathSegments) {
     if (segment === 'test') {
-      throw new Error('部署路径不能包含名为 test 的段。');
+      throw new Error('部署路径不能包含名称为 "test" 的段。');
     }
 
     if (segment.startsWith('.')) {

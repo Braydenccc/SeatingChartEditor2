@@ -77,6 +77,7 @@ try {
 
   // 1. index.html
   let indexHtml = fs.readFileSync('index.html', 'utf8');
+  // 保留可能存在的 title 属性，同时避免重复注入 [test] 前缀
   indexHtml = indexHtml.replace(/(<title(?:\s[^>]*)?>)([\s\S]*?)(<\/title>)/, (_, openTag, title, closeTag) => {
     const cleanedTitle = String(title).trim().replace(/^\[test\]\s*/i, '');
     return `${openTag}[test] ${cleanedTitle}${closeTag}`;

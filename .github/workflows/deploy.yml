@@ -94,8 +94,9 @@ jobs:
         run: |
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           RESOLVED=$(node ./scripts/resolve-staging-site.js "$BRANCH_NAME")
-          DEPLOY_SITE=$(echo "$RESOLVED" | node -e 'const data = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(data.deploySite);')
-          SITE_URL=$(echo "$RESOLVED" | node -e 'const data = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(data.siteUrl);')
+          readarray -t RESOLVED_LINES < <(echo "$RESOLVED" | node -e 'const data = JSON.parse(require("fs").readFileSync(0, "utf8")); console.log(data.deploySite); console.log(data.siteUrl);')
+          DEPLOY_SITE="${RESOLVED_LINES[0]}"
+          SITE_URL="${RESOLVED_LINES[1]}"
           echo "deploy_site=$DEPLOY_SITE" >> "$GITHUB_OUTPUT"
           echo "site_url=$SITE_URL" >> "$GITHUB_OUTPUT"
 

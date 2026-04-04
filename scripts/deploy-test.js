@@ -19,6 +19,7 @@ function runFileInherit(command, args) {
 }
 
 function posixShellQuote(value) {
+  // Wrap with single quotes and escape embedded single quotes as '\'' (close, escaped quote, reopen)
   return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
 
