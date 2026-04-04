@@ -1,30 +1,41 @@
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { resolveStagingTarget } from './staging-deploy-path.js';
 
-function run(command) {
+function runCommand(executable, args) {
   try {
-    return execSync(command, { stdio: 'pipe', encoding: 'utf8' }).trim();
+    return execFileSync(executable, args, { stdio: 'pipe', encoding: 'utf8' }).trim();
   } catch (error) {
-    console.error(`命令执行失败: ${command}`);
+    console.error(`命令执行失败: ${executable} ${args.join(' ')}`);
     throw error;
   }
 }
 
-function runInherit(command) {
-  execSync(command, { stdio: 'inherit' });
+function runCommandInherit(executable, args) {
+  execFileSync(executable, args, { stdio: 'inherit' });
 }
 
-function runFileInherit(command, args) {
-  execFileSync(command, args, { stdio: 'inherit' });
-}
+function resolveCurrentBranchForDeploy() {
+  const branchFromGit = runCommand('git', ['symbolic-ref', '-q', '--short', 'HEAD']);
+  if (branchFromGit) {
+    return branchFromGit;
+  }
 
-function posixShellQuote(value) {
-  // Wrap with single quotes and escape embedded single quotes as '\'' (close, escaped quote, reopen)
-  return `'${String(value).replace(/'/g, "'\\''")}'`;
+  const githubRefName = process.env.GITHUB_REF_NAME?.trim() || '';
+  if (githubRefName) {
+    return githubRefName;
+  }
+
+  const githubRef = process.env.GITHUB_REF?.trim() || '';
+  const refPrefix = 'refs/heads/';
+  if (githubRef.startsWith(refPrefix)) {
+    return githubRef.slice(refPrefix.length);
+  }
+
+  return '';
 }
 
 const targetPath = process.argv[2]?.trim();
-const currentBranchRef = run('git symbolic-ref -q --short HEAD');
+const currentBranchRef = resolveCurrentBranchForDeploy();
 
 if (!currentBranchRef) {
   console.error('detached HEAD 状态下无法部署，请先切换到分支。');
@@ -32,10 +43,10 @@ if (!currentBranchRef) {
 }
 
 if (!targetPath) {
-  runInherit('git checkout test');
-  runInherit(`git merge ${posixShellQuote(currentBranchRef)} --no-edit`);
-  runInherit('git push origin test');
-  runInherit(`git checkout ${posixShellQuote(currentBranchRef)}`);
+  runCommandInherit('git', ['checkout', 'test']);
+  runCommandInherit('git', ['merge', currentBranchRef, '--no-edit']);
+  runCommandInherit('git', ['push', 'origin', 'test']);
+  runCommandInherit('git', ['checkout', currentBranchRef]);
   process.exit(0);
 }
 
@@ -49,5 +60,5 @@ try {
 
 const deployBranch = `test/${resolvedTarget.deployPath}`;
 
-runFileInherit('git', ['push', 'origin', `HEAD:refs/heads/${deployBranch}`]);
+runCommandInherit('git', ['push', 'origin', `HEAD:refs/heads/${deployBranch}`]);
 console.log(`已推送当前分支到 ${deployBranch}，将部署到 ${resolvedTarget.siteUrl}`);

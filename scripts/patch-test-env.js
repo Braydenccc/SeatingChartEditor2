@@ -1,13 +1,18 @@
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 
 const TEST_HOST = 'https://test.sce.jbyc.cc';
 
-function runGit(command) {
+/**
+ * Run git with explicit argv (no shell string), returning trimmed stdout.
+ * @param {string[]} args
+ * @returns {string}
+ */
+function runGit(args) {
   try {
-    return execSync(command).toString().trim();
+    return execFileSync('git', args, { encoding: 'utf8' }).trim();
   } catch (error) {
-    console.error(`Git command failed: ${command}`);
+    console.error(`Git command failed: git ${args.join(' ')}`);
     throw error;
   }
 }
@@ -37,6 +42,27 @@ function shouldSelectBranchOption(branch, currentBranch, hasCurrentBranchInList)
   return branch === 'test' && !hasCurrentBranchInList;
 }
 
+function resolveCurrentBranch() {
+  const currentBranchFromGit = runGit(['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (currentBranchFromGit !== 'HEAD') {
+    return currentBranchFromGit;
+  }
+
+  const githubRefName = process.env.GITHUB_REF_NAME?.trim() || '';
+  if (githubRefName) {
+    return githubRefName;
+  }
+
+  const githubRef = process.env.GITHUB_REF?.trim() || '';
+  const refPrefix = 'refs/heads/';
+  if (githubRef.startsWith(refPrefix)) {
+    return githubRef.slice(refPrefix.length);
+  }
+
+  console.warn('Unable to resolve current branch in detached HEAD, fallback to test');
+  return 'test';
+}
+
 try {
   // 解决 GitHub Actions 容器环境下的 git 目录所有权安全限制
   try {
@@ -45,12 +71,12 @@ try {
     // Ignore errors if this fails (e.g. locally without perms)
   }
 
-  const currentBranch = runGit('git rev-parse --abbrev-ref HEAD');
-  const localBranches = runGit("git for-each-ref --format='%(refname:short)' refs/heads")
+  const currentBranch = resolveCurrentBranch();
+  const localBranches = runGit(['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
     .split('\n')
     .map((b) => b.trim())
     .filter(Boolean);
-  const remoteBranches = runGit("git for-each-ref --format='%(refname:short)' refs/remotes/origin")
+  const remoteBranches = runGit(['for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin'])
     .split('\n')
     .map((b) => b.trim())
     .filter((b) => b && !b.endsWith('/HEAD'))
