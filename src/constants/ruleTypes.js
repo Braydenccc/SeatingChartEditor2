@@ -30,9 +30,9 @@ export const PRIORITY_COLORS = {
 }
 
 export const PRIORITY_ICONS = {
-  required: '🔴',
-  prefer: '🟡',
-  optional: '⚪'
+  required: '必',
+  prefer: '优',
+  optional: '选'
 }
 
 // ==================== 主体类型（兼容旧字段展示） ====================

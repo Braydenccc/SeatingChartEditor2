@@ -23,16 +23,16 @@
             <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" style="display: none"
               @change="handleLoadWorkspace" />
             <button class="option-button" @click="$refs.workspaceInput.click()">
-              <span>📂 加载本地</span>
+              <span>加载本地</span>
             </button>
             <button class="option-button" @click="handleSaveWorkspace">
-              <span>💾 保存到本地</span>
+              <span>保存到本地</span>
             </button>
             <button class="option-button" @click="handleCloudLoad">
-              <span>☁️ 从云端加载</span>
+              <span>从云端加载</span>
             </button>
             <button class="option-button primary" @click="handleCloudSave">
-              <span>☁️ 保存至云端</span>
+              <span>保存至云端</span>
             </button>
           </div>
 
@@ -160,7 +160,7 @@
           <template v-if="shiftMode === 'zone'">
             <!-- 编辑状态提示 -->
             <div v-if="editingZoneId" class="zone-rot-editing-hint">
-              ✏ 正在编辑选区，请在座位表上点击座位以选入/取消
+              正在编辑选区，请在座位表上点击座位以选入/取消
               <button class="zone-rot-hint-close" @click="handleStopEditing">完成</button>
             </div>
 
@@ -185,7 +185,7 @@
                   </span>
                   <input class="zone-rot-name-input" v-model="group.name"
                     @click.stop title="点击修改组名" />
-                  <button class="zone-rot-del" @click="handleDeleteGroup(group.id)">✕</button>
+                  <button class="zone-rot-del" @click="handleDeleteGroup(group.id)">X</button>
                 </div>
 
                 <!-- 组内选区列表 -->
@@ -203,12 +203,12 @@
                     <input class="zone-rot-zone-name-input" v-model="zone.name" @click.stop/>
                     <!-- 循环箭头 -->
                     <span v-if="group.type === 'cycle'" class="zone-rot-arrow">
-                      {{ idx < group.zones.length - 1 ? '→' : '↩' }}
+                      {{ idx < group.zones.length - 1 ? '下一步' : '回到首个' }}
                     </span>
                     <!-- 互换箭头 -->
-                    <span v-if="group.type === 'swap' && idx === 0" class="zone-rot-arrow">⇄</span>
+                    <span v-if="group.type === 'swap' && idx === 0" class="zone-rot-arrow">互换</span>
                     <span class="zone-rot-count">{{ zone.seatIds.length }}座</span>
-                    <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)">✕</button>
+                    <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)">X</button>
                   </div>
 
                   <!-- 添加选区按钮（在组内） -->
@@ -217,7 +217,7 @@
                   </button>
 
                   <!-- 校验错误 -->
-                  <div v-if="getGroupError(group)" class="zone-rot-group-error">⚠ {{ getGroupError(group) }}</div>
+                  <div v-if="getGroupError(group)" class="zone-rot-group-error">警告：{{ getGroupError(group) }}</div>
                 </div>
               </div>
             </div>
@@ -261,7 +261,7 @@
             <!-- 操作按钮 -->
             <div class="assign-actions-grid">
               <button class="option-button rule-shortcut-btn" @click="showRuleEditor = true">
-                <span class="rule-shortcut-icon">📋</span>
+                <span class="rule-shortcut-icon">规</span>
                 <span class="rule-shortcut-text">规则管理</span>
                 <span v-if="ruleCount > 0" class="rule-badge">{{ ruleCount }}</span>
               </button>
@@ -290,10 +290,10 @@
                   <span>冲突 {{ precheckResult.conflictCount }}</span>
                 </div>
                 <div v-if="precheckResult.blockingReasons.length > 0" class="precheck-list blocking">
-                  <div v-for="(item, idx) in precheckResult.blockingReasons" :key="`b-${idx}`">⛔ {{ item }}</div>
+                  <div v-for="(item, idx) in precheckResult.blockingReasons" :key="`b-${idx}`">阻断：{{ item }}</div>
                 </div>
                 <div v-if="precheckResult.warnings.length > 0" class="precheck-list warning">
-                  <div v-for="(item, idx) in precheckResult.warnings" :key="`w-${idx}`">⚠ {{ item }}</div>
+                  <div v-for="(item, idx) in precheckResult.warnings" :key="`w-${idx}`">警告：{{ item }}</div>
                 </div>
               </div>
             </div>
@@ -542,10 +542,10 @@ const handleApplyZoneRotation = () => {
 }
 
 const tabs = [
-  { id: 1, label: '文件', icon: '📁' },
-  { id: 2, label: '编辑', icon: '✏️' },
-  { id: 3, label: '排位', icon: '🔀' },
-  { id: 4, label: '导出', icon: '📤' }
+  { id: 1, label: '文件', icon: '文' },
+  { id: 2, label: '编辑', icon: '编' },
+  { id: 3, label: '排位', icon: '排' },
+  { id: 4, label: '导出', icon: '导' }
 ]
 
 // 座位配置表单

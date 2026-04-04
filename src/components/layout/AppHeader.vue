@@ -3,7 +3,7 @@
     <div class="header-left">
       <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
         <div class="user-info" @click="toggleDropdown">
-          <span class="user-avatar" :title="authType === 'webdav' ? 'WebDAV 模式' : '普通账号'">{{ authType === 'webdav' ? '☁️' : '👤' }}</span>
+          <span class="user-avatar" :title="authType === 'webdav' ? 'WebDAV 模式' : '普通账号'">{{ authType === 'webdav' ? '云' : '用户' }}</span>
           <span class="welcome-text">{{ currentUser?.username }}</span>
           <span class="dropdown-icon">▼</span>
         </div>
@@ -11,16 +11,16 @@
           <div v-if="showDropdown" class="user-dropdown">
             <!-- Sync Service Settings entry -->
             <button v-if="hasRetiehe" class="dropdown-item" @click="openSyncSettings">
-              <span class="item-icon">⚙️</span> 同步设置
+              <span class="item-icon">设置</span> 同步设置
             </button>
             <div class="dropdown-divider" v-if="hasRetiehe"></div>
             
             <button class="dropdown-item" @click="openWorkspaceManagement">
-              <span class="item-icon">☁️</span> 工作区管理
+              <span class="item-icon">云</span> 工作区管理
             </button>
 
             <button v-if="!hasRetiehe" class="dropdown-item" @click="emit('open-login', 'login'); showDropdown = false">
-              <span class="item-icon">➕</span> 登录 SCE 账号
+              <span class="item-icon">新增</span> 登录 SCE 账号
             </button>
             
             <div class="dropdown-divider"></div>
@@ -32,7 +32,7 @@
         </Transition>
       </div>
       <button v-else class="auth-btn login-btn" @click="emit('open-login')">
-        <span class="btn-icon">☁️</span>登录
+        <span class="btn-icon">云</span>登录
       </button>
 
       <h1 class="header-text">BraydenSCE V2</h1>

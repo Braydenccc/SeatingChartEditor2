@@ -68,7 +68,7 @@
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <div>
               <p class="tip-title">对象类型说明</p>
-              <p class="tip-desc">个人对象：针对单个学生；标签对象：针对某类学生（如“住宿”标签）。请在「📋 规则总览」中创建并组合使用。</p>
+              <p class="tip-desc">个人对象：针对单个学生；标签对象：针对某类学生（如“住宿”标签）。请在「规则总览」中创建并组合使用。</p>
               <div class="tip-actions">
                 <button class="tip-action-btn" @click="activeTab = 'rules'">去规则总览创建规则</button>
               </div>
@@ -125,8 +125,8 @@ const editingRule = computed(() => {
   return rules.value.find(r => r.id === editingRuleId.value) || null
 })
 const tabs = computed(() => [
-  { key: 'rules', icon: '📋', label: '规则总览', badge: ruleCount.value > 0 ? ruleCount.value : null },
-  { key: 'personal', icon: '🏷️', label: '对象说明', badge: null }
+  { key: 'rules', icon: '规', label: '规则总览', badge: ruleCount.value > 0 ? ruleCount.value : null },
+  { key: 'personal', icon: '类', label: '对象说明', badge: null }
 ])
 
 // 当弹窗打开时，跳转到 initialTab 指定的 Tab

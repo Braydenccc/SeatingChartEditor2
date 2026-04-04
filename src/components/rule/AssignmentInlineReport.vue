@@ -27,10 +27,10 @@
 
     <!-- Body / Violations List (if any) -->
     <div class="in-report-body" v-if="violatedRules.length > 0">
-      <div class="in-group-header fail-header">⚠️ 未满足的规则 ({{ violatedRules.length }})</div>
+      <div class="in-group-header fail-header">未满足的规则 ({{ violatedRules.length }})</div>
       <div class="in-rule-rows">
         <div v-for="item in violatedRules" :key="item.rule.id" class="in-rule-row fail">
-          <span class="in-row-icon">❌</span>
+          <span class="in-row-icon">失败</span>
           <div class="in-row-content">
             <span class="in-row-text">{{ renderRuleText(item.rule) }}</span>
             <span v-if="item.reason" class="in-row-reason">{{ item.reason }}</span>
@@ -44,12 +44,12 @@
     
     <div class="in-report-body" v-if="satisfiedRules.length > 0">
       <div class="in-group-header toggle-btn" @click="showSatisfied = !showSatisfied">
-        ✅ 成功满足的规则 ({{ satisfiedRules.length }})
+        成功满足的规则 ({{ satisfiedRules.length }})
         <span class="toggle-icon">{{ showSatisfied ? '收起 ∧' : '展开 ∨' }}</span>
       </div>
       <div class="in-rule-rows" v-show="showSatisfied">
         <div v-for="rule in satisfiedRules" :key="rule.id" class="in-rule-row ok">
-          <span class="in-row-icon">✅</span>
+          <span class="in-row-icon">通过</span>
           <div class="in-row-content">
             <span class="in-row-text">{{ renderRuleText(rule) }}</span>
           </div>
@@ -58,7 +58,7 @@
     </div>
 
     <div v-if="ruleCount === 0" class="in-no-rules-tip">
-      <span style="font-size: 16px;">💡</span>
+      <span style="font-size: 12px;">提示</span>
       <span>本次排位未使用任何约束，为随机结果。</span>
     </div>
   </div>
@@ -105,10 +105,10 @@ const gradeColor = computed(() => {
 
 const gradeIcon = computed(() => {
   const pct = satPct.value
-  if (pct >= 95) return '🎉'
-  if (pct >= 75) return '✨'
-  if (pct >= 50) return '📊'
-  return '⚠️'
+  if (pct >= 95) return '优'
+  if (pct >= 75) return '良'
+  if (pct >= 50) return '中'
+  return '警告'
 })
 
 </script>
