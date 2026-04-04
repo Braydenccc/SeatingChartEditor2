@@ -34,9 +34,12 @@
 
             <!-- 单云时显示目标提示条 -->
             <div v-else class="save-target-banner">
-              <span class="banner-icon">{{ hasRetiehe ? '☁️' : '📡' }}</span>
+              <span class="material-symbols-rounded ui-icon banner-icon">{{ hasRetiehe ? 'cloud' : 'storage' }}</span>
               <span>保存至：<strong>{{ hasRetiehe ? 'SCE 云服务' : 'WebDAV 网盘' }}</strong></span>
-              <span v-if="backupMode && hasWebdav !== false" class="backup-hint">· 同时备份至 WebDAV ✓</span>
+              <span v-if="backupMode && hasWebdav !== false" class="backup-hint">
+                <span class="material-symbols-rounded ui-icon backup-hint-icon">check_circle</span>
+                同时备份至 WebDAV
+              </span>
             </div>
 
             <div class="form-group">
@@ -87,12 +90,12 @@
             </div>
             <!-- 单云时显示来源说明 -->
             <div v-else class="cloud-source-label">
-              <span>{{ hasRetiehe ? '☁️ SCE 云服务' : '📡 WebDAV 网盘' }}</span>
+              <span>{{ hasRetiehe ? 'SCE 云服务' : 'WebDAV 网盘' }}</span>
               <span v-if="backupMode" class="backup-tag">备份模式</span>
             </div>
             
             <div v-if="!currentTabWorkspaces || currentTabWorkspaces.length === 0" class="empty-state mt-2">
-              <div class="empty-icon">📭</div>
+              <div class="material-symbols-rounded ui-icon empty-icon">inbox</div>
               <p>{{ activeTab === 'webdav' ? 'WebDAV 网盘上' : 'SCE 云端' }}暂无工作区</p>
               <p class="empty-hint">切换到「保存」模式将当前编辑内容上传到云端</p>
             </div>
@@ -103,7 +106,7 @@
                 class="workspace-card"
               >
                 <div class="card-content" @click="handleLoad(ws.fileId, ws.source)">
-                  <div class="card-icon">📁</div>
+                  <div class="material-symbols-rounded ui-icon card-icon">folder</div>
                   <div class="card-details">
                     <h4 class="ws-name">{{ ws.metadata.name }}</h4>
                     <p class="ws-meta">
@@ -113,7 +116,9 @@
                   </div>
                 </div>
                 <div class="card-actions">
-                  <button class="icon-btn delete-btn" title="删除此工作区" @click.stop="confirmDelete(ws)">🗑️</button>
+                  <button class="icon-btn delete-btn" title="删除此工作区" @click.stop="confirmDelete(ws)">
+                    <span class="material-symbols-rounded ui-icon">delete</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -365,22 +370,22 @@ const formatSize = (bytes) => {
 .save-target-selection {
   display: flex;
   gap: 16px;
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
   padding: 10px 12px;
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
 }
 
 .save-target-banner {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #f0f7ff;
-  border: 1px solid #bfdbfe;
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-border);
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 13px;
-  color: #1e40af;
+  color: var(--color-info);
   margin-bottom: 16px;
 }
 
@@ -389,13 +394,20 @@ const formatSize = (bytes) => {
 }
 
 .backup-hint {
-  color: #059669;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-success);
   font-weight: 500;
+}
+
+.backup-hint .backup-hint-icon {
+  font-size: 14px;
 }
 
 .cloud-tabs {
   display: flex;
-  background: #f1f5f9;
+  background: var(--color-bg-soft);
   padding: 4px;
   border-radius: 8px;
   margin-bottom: 4px;
@@ -406,7 +418,7 @@ const formatSize = (bytes) => {
   padding: 8px 0;
   border: none;
   background: transparent;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-weight: 500;
   border-radius: 6px;
   cursor: pointer;
@@ -414,9 +426,9 @@ const formatSize = (bytes) => {
 }
 
 .cloud-tabs button.active {
-  background: white;
-  color: #23587b;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .cloud-source-label {
@@ -424,15 +436,15 @@ const formatSize = (bytes) => {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-weight: 500;
   padding: 6px 0;
   margin-bottom: 4px;
 }
 
 .backup-tag {
-  background: #d1fae5;
-  color: #065f46;
+  background: var(--color-success-bg);
+  color: var(--color-success);
   font-size: 11px;
   padding: 2px 7px;
   border-radius: 999px;
@@ -444,12 +456,12 @@ const formatSize = (bytes) => {
 }
 
 .cloud-workspace-dialog {
-  background: white;
+  background: var(--color-surface);
   width: 90%;
   max-width: 500px;
   max-height: 80vh;
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -465,14 +477,14 @@ const formatSize = (bytes) => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border);
   border-radius: 12px 12px 0 0;
 }
 
 .dialog-header h3 {
   margin: 0;
-  color: #23587b;
+  color: var(--color-primary);
   font-size: 18px;
 }
 
@@ -480,7 +492,7 @@ const formatSize = (bytes) => {
   background: none;
   border: none;
   font-size: 24px;
-  color: #666;
+  color: var(--color-text-muted);
   cursor: pointer;
   line-height: 1;
   padding: 0;
@@ -498,15 +510,15 @@ const formatSize = (bytes) => {
   align-items: center;
   justify-content: center;
   padding: 40px 0;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .spinner {
   width: 30px;
   height: 30px;
-  border: 3px solid rgba(35, 88, 123, 0.1);
+  border: 3px solid rgba(var(--color-primary-rgb), 0.1);
   border-radius: 50%;
-  border-top-color: #23587b;
+  border-top-color: var(--color-primary);
   animation: spin 1s ease-in-out infinite;
   margin-bottom: 16px;
 }
@@ -522,7 +534,7 @@ const formatSize = (bytes) => {
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 500;
 }
@@ -530,7 +542,7 @@ const formatSize = (bytes) => {
 .form-group input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   font-size: 15px;
   box-sizing: border-box;
@@ -538,13 +550,13 @@ const formatSize = (bytes) => {
 
 .form-group input:focus {
   outline: none;
-  border-color: #23587b;
-  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1);
 }
 
 .section-title {
   font-size: 14px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-bottom: 10px;
   font-weight: 500;
 }
@@ -552,13 +564,13 @@ const formatSize = (bytes) => {
 .workspace-list.small {
   max-height: 150px;
   overflow-y: auto;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
 }
 
 .workspace-item {
   padding: 10px 12px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-bg-soft);
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -568,12 +580,12 @@ const formatSize = (bytes) => {
 }
 
 .workspace-item:hover {
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
 }
 
 .workspace-item.selected {
-  background: #eff6ff;
-  border-left: 3px solid #3b82f6;
+  background: var(--color-info-bg);
+  border-left: 3px solid var(--color-info);
 }
 
 .ws-info {
@@ -584,7 +596,7 @@ const formatSize = (bytes) => {
 
 .ws-name {
   font-weight: 500;
-  color: #334155;
+  color: var(--color-text-primary);
   font-size: 15px;
   margin: 0;
   white-space: nowrap;
@@ -594,7 +606,7 @@ const formatSize = (bytes) => {
 
 .ws-time {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--color-text-muted);
 }
 
 .dialog-actions {
@@ -604,7 +616,7 @@ const formatSize = (bytes) => {
 .btn-primary {
   width: 100%;
   padding: 12px;
-  background: #23587b;
+  background: var(--color-primary);
   color: white;
   border: none;
   border-radius: 6px;
@@ -629,15 +641,15 @@ const formatSize = (bytes) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 12px;
   transition: all 0.2s;
 }
 
 .workspace-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  border-color: #cbd5e1;
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-strong);
 }
 
 .card-content {
@@ -650,7 +662,7 @@ const formatSize = (bytes) => {
 
 .card-icon {
   font-size: 24px;
-  background: #f1f5f9;
+  background: var(--color-bg-soft);
   width: 44px;
   height: 44px;
   display: flex;
@@ -662,7 +674,7 @@ const formatSize = (bytes) => {
 .ws-meta {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   line-height: 1.4;
 }
 
@@ -673,22 +685,22 @@ const formatSize = (bytes) => {
   padding: 8px;
   cursor: pointer;
   border-radius: 4px;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   transition: all 0.2s;
 }
 
 .delete-btn:hover {
-  background: #fee2e2;
-  color: #ef4444;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
 }
 
 .empty-state {
   text-align: center;
   padding: 32px 20px;
-  color: #94a3b8;
-  background: #f8fafc;
+  color: var(--color-text-muted);
+  background: var(--color-bg-subtle);
   border-radius: 8px;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--color-border-strong);
 }
 
 .empty-state .empty-icon {
@@ -699,21 +711,21 @@ const formatSize = (bytes) => {
 .empty-state p {
   margin: 0 0 4px;
   font-size: 14px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .empty-state .empty-hint {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--color-text-muted);
 }
 
 .error-message {
-  color: #ef4444;
+  color: var(--color-danger-text);
   font-size: 13px;
-  background: #fef2f2;
+  background: var(--color-danger-bg);
   padding: 8px 12px;
   border-radius: 6px;
-  border-left: 3px solid #ef4444;
+  border-left: 3px solid var(--color-danger-text);
   margin-top: 16px;
 }
 

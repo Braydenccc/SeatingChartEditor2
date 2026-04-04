@@ -9,7 +9,7 @@
       <div class="tabs-bar">
         <button v-for="tab in tabs" :key="tab.id" class="tab-button" :class="{ active: activeTab === tab.id }"
           @click="setActiveTab(tab.id)">
-          <span class="tab-icon">{{ tab.icon }}</span>
+          <span class="material-symbols-rounded ui-icon tab-icon">{{ tab.icon }}</span>
           <span class="tab-label">{{ tab.label }}</span>
         </button>
       </div>
@@ -23,16 +23,16 @@
             <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" style="display: none"
               @change="handleLoadWorkspace" />
             <button class="option-button" @click="$refs.workspaceInput.click()">
-              <span>📂 加载本地</span>
+              <span class="btn-content"><span class="material-symbols-rounded ui-icon">folder_open</span>加载本地</span>
             </button>
             <button class="option-button" @click="handleSaveWorkspace">
-              <span>💾 保存到本地</span>
+              <span class="btn-content"><span class="material-symbols-rounded ui-icon">save</span>保存到本地</span>
             </button>
             <button class="option-button" @click="handleCloudLoad">
-              <span>☁️ 从云端加载</span>
+              <span class="btn-content"><span class="material-symbols-rounded ui-icon">cloud_download</span>从云端加载</span>
             </button>
             <button class="option-button primary" @click="handleCloudSave">
-              <span>☁️ 保存至云端</span>
+              <span class="btn-content"><span class="material-symbols-rounded ui-icon">cloud_upload</span>保存至云端</span>
             </button>
           </div>
 
@@ -160,7 +160,7 @@
           <template v-if="shiftMode === 'zone'">
             <!-- 编辑状态提示 -->
             <div v-if="editingZoneId" class="zone-rot-editing-hint">
-              ✏ 正在编辑选区，请在座位表上点击座位以选入/取消
+              正在编辑选区，请在座位表上点击座位以选入/取消
               <button class="zone-rot-hint-close" @click="handleStopEditing">完成</button>
             </div>
 
@@ -185,7 +185,7 @@
                   </span>
                   <input class="zone-rot-name-input" v-model="group.name"
                     @click.stop title="点击修改组名" />
-                  <button class="zone-rot-del" @click="handleDeleteGroup(group.id)">✕</button>
+                  <button class="zone-rot-del" @click="handleDeleteGroup(group.id)"><span class="material-symbols-rounded ui-icon">close</span></button>
                 </div>
 
                 <!-- 组内选区列表 -->
@@ -208,7 +208,7 @@
                     <!-- 互换箭头 -->
                     <span v-if="group.type === 'swap' && idx === 0" class="zone-rot-arrow">⇄</span>
                     <span class="zone-rot-count">{{ zone.seatIds.length }}座</span>
-                    <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)">✕</button>
+                    <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)"><span class="material-symbols-rounded ui-icon">close</span></button>
                   </div>
 
                   <!-- 添加选区按钮（在组内） -->
@@ -217,7 +217,7 @@
                   </button>
 
                   <!-- 校验错误 -->
-                  <div v-if="getGroupError(group)" class="zone-rot-group-error">⚠ {{ getGroupError(group) }}</div>
+                  <div v-if="getGroupError(group)" class="zone-rot-group-error">警告：{{ getGroupError(group) }}</div>
                 </div>
               </div>
             </div>
@@ -261,7 +261,7 @@
             <!-- 操作按钮 -->
             <div class="assign-actions-grid">
               <button class="option-button rule-shortcut-btn" @click="showRuleEditor = true">
-                <span class="rule-shortcut-icon">📋</span>
+                <span class="material-symbols-rounded ui-icon">rule</span>
                 <span class="rule-shortcut-text">规则管理</span>
                 <span v-if="ruleCount > 0" class="rule-badge">{{ ruleCount }}</span>
               </button>
@@ -290,10 +290,13 @@
                   <span>冲突 {{ precheckResult.conflictCount }}</span>
                 </div>
                 <div v-if="precheckResult.blockingReasons.length > 0" class="precheck-list blocking">
-                  <div v-for="(item, idx) in precheckResult.blockingReasons" :key="`b-${idx}`">⛔ {{ item }}</div>
+                  <div v-for="(item, idx) in precheckResult.blockingReasons" :key="`b-${idx}`" class="precheck-item">
+                    <span class="material-symbols-rounded ui-icon">block</span>
+                    <span>{{ item }}</span>
+                  </div>
                 </div>
                 <div v-if="precheckResult.warnings.length > 0" class="precheck-list warning">
-                  <div v-for="(item, idx) in precheckResult.warnings" :key="`w-${idx}`">⚠ {{ item }}</div>
+                  <div v-for="(item, idx) in precheckResult.warnings" :key="`w-${idx}`">警告：{{ item }}</div>
                 </div>
               </div>
             </div>
@@ -542,10 +545,10 @@ const handleApplyZoneRotation = () => {
 }
 
 const tabs = [
-  { id: 1, label: '文件', icon: '📁' },
-  { id: 2, label: '编辑', icon: '✏️' },
-  { id: 3, label: '排位', icon: '🔀' },
-  { id: 4, label: '导出', icon: '📤' }
+  { id: 1, label: '文件', icon: 'description' },
+  { id: 2, label: '编辑', icon: 'edit' },
+  { id: 3, label: '排位', icon: 'shuffle' },
+  { id: 4, label: '导出', icon: 'download' }
 ]
 
 // 座位配置表单
@@ -1912,8 +1915,18 @@ const formatLogTime = (timestamp) => {
 /* ==================== tab-icon (desktop 隐藏) ==================== */
 .tab-icon {
   display: none;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
+}
+
+.btn-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zone-rot-del .ui-icon {
+  font-size: 14px;
 }
 
 /* ==================== 移动端遮罩 ==================== */
@@ -2020,7 +2033,7 @@ const formatLogTime = (timestamp) => {
 
   .tab-icon {
     display: block;
-    font-size: 20px;
+    font-size: 18px;
     line-height: 1;
   }
 
@@ -2106,7 +2119,7 @@ const formatLogTime = (timestamp) => {
   }
 
   .tab-icon {
-    font-size: 18px;
+    font-size: 16px;
   }
 
   .tab-label {
@@ -2815,6 +2828,16 @@ const formatLogTime = (timestamp) => {
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
+}
+
+.precheck-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.precheck-item .ui-icon {
+  font-size: 14px;
 }
 
 .precheck-list.blocking {

@@ -121,7 +121,7 @@
 
     <div v-if="validationWarnings.length > 0" class="validation-warnings">
       <div v-for="(w, i) in validationWarnings" :key="i" class="warning-item">
-        ⚠️ {{ w }}
+        警告：{{ w }}
       </div>
     </div>
 
