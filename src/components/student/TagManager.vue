@@ -463,6 +463,36 @@ const deleteTagHandler = (tagId, tagName) => {
   transform: translateY(0);
 }
 
+@media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
+  .tag-list {
+    padding: 8px 12px;
+    gap: 6px;
+    max-height: 112px;
+  }
+
+  .tag-item {
+    height: 24px;
+    line-height: 24px;
+    font-size: 12px;
+  }
+
+  .tag-name {
+    font-size: 11px;
+    padding: 0 6px;
+  }
+
+  .tag-action-btn {
+    width: 22px;
+    font-size: 12px;
+  }
+
+  .add-tag-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+  }
+}
+
 /* 响应式设计 - 移动设备 */
 @media (max-width: 768px) {
   .tag-manager {

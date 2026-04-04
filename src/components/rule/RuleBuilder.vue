@@ -2,26 +2,33 @@
   <div class="rule-builder">
     <h4 class="builder-title">添加新规则</h4>
 
-    <!-- 句子式构建器 -->
-    <!-- 句子式构建器 -->
+    <div v-if="mode === 'quick'" class="quick-template-wrap">
+      <label class="seg-label">快捷场景</label>
+      <div class="quick-template-grid">
+        <button class="quick-template-btn" @click="applyQuickTemplate('front-row')">前排优先</button>
+        <button class="quick-template-btn" @click="applyQuickTemplate('avoid-window')">避开窗边</button>
+        <button class="quick-template-btn" @click="applyQuickTemplate('deskmates')">同桌绑定</button>
+        <button class="quick-template-btn" @click="applyQuickTemplate('spread-group')">分组分散</button>
+      </div>
+      <p class="quick-template-tip">提示：点击后可继续修改对象、参数和优先级。</p>
+    </div>
+
     <div class="sentence-builder">
-      <!-- Step 1: 主体类型 -->
       <div class="builder-segment">
         <label class="seg-label">针对对象</label>
         <div class="chip-group">
-          <button 
-            v-for="kind in subjectKinds" 
-            :key="kind.key"
+          <button
+            v-for="item in subjectModes"
+            :key="item.key"
             class="chip-item"
-            :class="{ active: subjectKind === kind.key }"
-            @click="setSubjectKind(kind.key)"
+            :class="{ active: subjectMode === item.key }"
+            @click="setSubjectMode(item.key)"
           >
-            {{ kind.label }}
+            {{ item.label }}
           </button>
         </div>
       </div>
 
-      <!-- Step 2: 谓词（规则类型）-->
       <div class="builder-segment">
         <label class="seg-label">应用规则</label>
         <div class="rule-selector-wrap">
@@ -37,7 +44,6 @@
         </div>
       </div>
 
-      <!-- Step 3: 优先级 -->
       <div class="builder-segment">
         <label class="seg-label">重要程度</label>
         <div class="priority-pills">
@@ -55,82 +61,59 @@
       </div>
     </div>
 
-    <!-- 主体详细选择 -->
     <div class="subject-section" v-if="selectedPredicate">
-      <div class="subject-inputs">
-        <!-- 单个学生 -->
-        <template v-if="subjectKind === 'student'">
-          <div class="input-group">
-            <label>学生</label>
-            <select v-model="subjectStudentId" class="detail-select">
-              <option :value="null">选择学生…</option>
-              <option v-for="s in students" :key="s.id" :value="s.id">
-                {{ s.studentNumber || '-' }} {{ s.name || '未命名' }}
-              </option>
-            </select>
-          </div>
-        </template>
+      <div class="subject-slot">
+        <div class="slot-title">对象集合 A</div>
+        <div v-for="(entry, index) in subjectsA" :key="`a-${index}`" class="subject-row">
+          <select v-model="entry.type" class="detail-select" @change="onEntryTypeChange(entry)">
+            <option value="person">个人</option>
+            <option value="tag">标签</option>
+          </select>
 
-        <!-- 学生对 -->
-        <template v-if="subjectKind === 'pair'">
-          <div class="input-group">
-            <label>学生 A</label>
-            <select v-model="subjectId1" class="detail-select">
-              <option :value="null">选择学生…</option>
-              <option v-for="s in students" :key="s.id" :value="s.id" :disabled="s.id === subjectId2">
-                {{ s.studentNumber || '-' }} {{ s.name || '未命名' }}
-              </option>
-            </select>
-          </div>
-          <div class="pair-arrow">→</div>
-          <div class="input-group">
-            <label>学生 B</label>
-            <select v-model="subjectId2" class="detail-select">
-              <option :value="null">选择学生…</option>
-              <option v-for="s in students" :key="s.id" :value="s.id" :disabled="s.id === subjectId1">
-                {{ s.studentNumber || '-' }} {{ s.name || '未命名' }}
-              </option>
-            </select>
-          </div>
-        </template>
+          <select v-model="entry.id" class="detail-select">
+            <option :value="null">{{ entry.type === 'person' ? '选择学生…' : '选择标签…' }}</option>
+            <option
+              v-for="opt in getEntryOptions(entry.type)"
+              :key="opt.id"
+              :value="opt.id"
+            >
+              {{ opt.label }}
+            </option>
+          </select>
 
-        <!-- 标签 -->
-        <template v-if="subjectKind === 'tag'">
-          <div class="input-group">
-            <label>标签</label>
-            <select v-model="subjectTagId" class="detail-select">
-              <option :value="null">选择标签…</option>
-              <option v-for="t in tags" :key="t.id" :value="t.id">{{ t.name }}</option>
-            </select>
-          </div>
-        </template>
-
-        <!-- 标签对 -->
-        <template v-if="subjectKind === 'tag_pair'">
-          <div class="input-group">
-            <label>标签 A</label>
-            <select v-model="subjectTagId1" class="detail-select">
-              <option :value="null">选择标签…</option>
-              <option v-for="t in tags" :key="t.id" :value="t.id" :disabled="t.id === subjectTagId2">{{ t.name }}</option>
-            </select>
-          </div>
-          <div class="pair-arrow">×</div>
-          <div class="input-group">
-            <label>标签 B</label>
-            <select v-model="subjectTagId2" class="detail-select">
-              <option :value="null">选择标签…</option>
-              <option v-for="t in tags" :key="t.id" :value="t.id" :disabled="t.id === subjectTagId1">{{ t.name }}</option>
-            </select>
-          </div>
-        </template>
+          <button class="mini-btn danger" @click="removeEntry('A', index)">删除</button>
+        </div>
+        <button class="mini-btn" @click="addEntry('A')">+ 添加对象</button>
       </div>
 
-      <!-- 谓词参数 -->
+      <div class="subject-slot" v-if="subjectMode === 'dual'">
+        <div class="slot-title">对象集合 B</div>
+        <div v-for="(entry, index) in subjectsB" :key="`b-${index}`" class="subject-row">
+          <select v-model="entry.type" class="detail-select" @change="onEntryTypeChange(entry)">
+            <option value="person">个人</option>
+            <option value="tag">标签</option>
+          </select>
+
+          <select v-model="entry.id" class="detail-select">
+            <option :value="null">{{ entry.type === 'person' ? '选择学生…' : '选择标签…' }}</option>
+            <option
+              v-for="opt in getEntryOptions(entry.type)"
+              :key="opt.id"
+              :value="opt.id"
+            >
+              {{ opt.label }}
+            </option>
+          </select>
+
+          <button class="mini-btn danger" @click="removeEntry('B', index)">删除</button>
+        </div>
+        <button class="mini-btn" @click="addEntry('B')">+ 添加对象</button>
+      </div>
+
       <div v-if="paramSpecs.length > 0" class="params-section">
         <template v-for="param in paramSpecs" :key="param.key">
           <div class="input-group">
             <label>{{ param.label }}</label>
-            <!-- 数字输入 -->
             <input
               v-if="param.type === 'number'"
               v-model.number="paramValues[param.key]"
@@ -138,7 +121,6 @@
               :min="param.min ?? 1"
               class="detail-input"
             />
-            <!-- 下拉选择 -->
             <select
               v-else-if="param.type === 'select'"
               v-model="paramValues[param.key]"
@@ -148,7 +130,6 @@
                 {{ opt.label }}
               </option>
             </select>
-            <!-- 选区选择 -->
             <select
               v-else-if="param.type === 'zone'"
               v-model="paramValues[param.key]"
@@ -161,15 +142,12 @@
         </template>
       </div>
 
-      <!-- 备注（可选） -->
       <div class="input-group">
         <label>备注（选填）</label>
         <input v-model="description" type="text" class="detail-input" placeholder="为这条规则添加说明…" />
       </div>
     </div>
 
-    <!-- 预览文本 -->
-    <!-- 智能预览卡片 -->
     <div v-if="previewText" class="builder-preview-section">
       <label class="seg-label">效果预览</label>
       <div class="smart-preview-card" :class="selectedPriority">
@@ -179,113 +157,95 @@
       </div>
     </div>
 
-    <!-- 验证警告 -->
     <div v-if="validationWarnings.length > 0" class="validation-warnings">
       <div v-for="(w, i) in validationWarnings" :key="i" class="warning-item">
         ⚠️ {{ w }}
       </div>
     </div>
 
-    <!-- 添加按钮 -->
     <div class="builder-footer">
-      <button class="btn-add" :disabled="!canAdd" @click="handleAdd">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        添加规则
-      </button>
+      <button class="btn-add" :disabled="!canAdd" @click="handleAdd">添加规则</button>
       <button class="btn-reset" @click="resetForm">重置</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useZoneData } from '@/composables/useZoneData'
 import { useSeatRules } from '@/composables/useSeatRules'
 import {
   RulePriority,
-  PRIORITY_LABELS,
-  PRIORITY_COLORS,
-  PRIORITY_ICONS,
-  PREDICATE_META,
   RULE_TYPE_LABELS,
-  getDefaultParams,
-  SubjectKind
+  PREDICATE_META,
+  getDefaultParams
 } from '@/constants/ruleTypes.js'
 
 const emit = defineEmits(['added'])
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'quick'
+  }
+})
 
 const { students } = useStudentData()
 const { tags } = useTagData()
 const { zones } = useZoneData()
 const { addRule, validateRule, renderRuleText } = useSeatRules()
 
-// ==================== 表单状态 ====================
-const subjectKind = ref('student')
+const QUICK_TEMPLATE_KEYS = {
+  FRONT_ROW: 'front-row',
+  AVOID_WINDOW: 'avoid-window',
+  DESKMATES: 'deskmates',
+  SPREAD_GROUP: 'spread-group'
+}
+
+const subjectMode = ref('single')
 const selectedPredicate = ref('')
 const selectedPriority = ref(RulePriority.PREFER)
 const description = ref('')
-
-// 主体字段
-const subjectStudentId = ref(null)
-const subjectId1 = ref(null)
-const subjectId2 = ref(null)
-const subjectTagId = ref(null)
-const subjectTagId1 = ref(null)
-const subjectTagId2 = ref(null)
-
-// 谓词参数
+const subjectsA = ref([{ type: 'person', id: null }])
+const subjectsB = ref([{ type: 'person', id: null }])
 const paramValues = ref({})
 
-const subjectKinds = [
-  { key: 'student', label: '单个学生' },
-  { key: 'pair', label: '学生搭档' },
-  { key: 'tag', label: '标签分组' },
-  { key: 'tag_pair', label: '标签对比' }
+const subjectModes = [
+  { key: 'single', label: '单对象' },
+  { key: 'dual', label: '双对象' }
 ]
 
 const priorities = [
-  { key: 'required', label: '强制必须', color: '#ef4444', icon: '🔴' },
-  { key: 'prefer', label: '建议尽量', color: '#f59e0b', icon: '🟡' },
-  { key: 'optional', label: '可选参考', color: '#94a3b8', icon: '⚪' }
+  { key: 'required', label: '强制必须' },
+  { key: 'prefer', label: '建议尽量' },
+  { key: 'optional', label: '可选参考' }
 ]
 
-const setSubjectKind = (kind) => {
-  subjectKind.value = kind
-  onSubjectKindChange()
-}
-
-// ==================== 谓词分组 ====================
 const predicateGroups = [
   {
-    label: 'A. 单人位置规则',
+    label: 'A. 单对象规则',
     predicates: [
-      { key: 'IN_ROW_RANGE', kinds: ['student', 'tag'] },
-      { key: 'NOT_IN_COLUMN_TYPE', kinds: ['student', 'tag'] },
-      { key: 'IN_ZONE', kinds: ['student', 'tag'] },
-      { key: 'NOT_IN_ZONE', kinds: ['student', 'tag'] },
-      { key: 'IN_GROUP_RANGE', kinds: ['student', 'tag'] }
+      'IN_ROW_RANGE',
+      'NOT_IN_COLUMN_TYPE',
+      'IN_ZONE',
+      'NOT_IN_ZONE',
+      'IN_GROUP_RANGE',
+      'DISTRIBUTE_EVENLY',
+      'CLUSTER_TOGETHER'
     ]
   },
   {
-    label: 'B. 对关系规则',
+    label: 'B. 双对象规则',
     predicates: [
-      { key: 'MUST_BE_SEATMATES', kinds: ['pair', 'tag_pair'] },
-      { key: 'MUST_NOT_BE_SEATMATES', kinds: ['pair', 'tag_pair'] },
-      { key: 'DISTANCE_AT_MOST', kinds: ['pair', 'tag_pair'] },
-      { key: 'DISTANCE_AT_LEAST', kinds: ['pair', 'tag_pair'] },
-      { key: 'NOT_BLOCK_VIEW', kinds: ['pair'] },
-      { key: 'MUST_BE_SAME_GROUP', kinds: ['pair', 'tag_pair'] },
-      { key: 'MUST_NOT_BE_SAME_GROUP', kinds: ['pair', 'tag_pair'] },
-      { key: 'MUST_BE_ADJACENT_ROW', kinds: ['pair', 'tag_pair'] }
-    ]
-  },
-  {
-    label: 'C. 分组分散规则',
-    predicates: [
-      { key: 'DISTRIBUTE_EVENLY', kinds: ['tag'] },
-      { key: 'CLUSTER_TOGETHER', kinds: ['tag'] }
+      'MUST_BE_SEATMATES',
+      'MUST_NOT_BE_SEATMATES',
+      'DISTANCE_AT_MOST',
+      'DISTANCE_AT_LEAST',
+      'NOT_BLOCK_VIEW',
+      'MUST_BE_SAME_GROUP',
+      'MUST_NOT_BE_SAME_GROUP',
+      'MUST_BE_ADJACENT_ROW'
     ]
   }
 ]
@@ -295,71 +255,75 @@ const filteredPredicateGroups = computed(() => {
     .map(group => ({
       ...group,
       predicates: group.predicates
-        .filter(p => p.kinds.includes(subjectKind.value))
-        .map(p => ({ ...p, label: RULE_TYPE_LABELS[p.key] }))
+        .filter(key => (PREDICATE_META[key]?.subjectMode || []).includes(subjectMode.value))
+        .map(key => ({ key, label: RULE_TYPE_LABELS[key] }))
     }))
     .filter(group => group.predicates.length > 0)
 })
 
-// ==================== 参数规格 ====================
 const paramSpecs = computed(() => {
   if (!selectedPredicate.value) return []
   return PREDICATE_META[selectedPredicate.value]?.params ?? []
 })
 
-// ==================== 主体对象 ====================
-const currentSubject = computed(() => {
-  if (subjectKind.value === 'student') {
-    return { kind: 'student', id: subjectStudentId.value }
-  }
-  if (subjectKind.value === 'pair') {
-    return { kind: 'pair', id1: subjectId1.value, id2: subjectId2.value }
-  }
-  if (subjectKind.value === 'tag') {
-    return { kind: 'tag', tagId: subjectTagId.value }
-  }
-  if (subjectKind.value === 'tag_pair') {
-    return { kind: 'tag_pair', tagId1: subjectTagId1.value, tagId2: subjectTagId2.value }
-  }
-  return null
-})
+const currentRulePayload = computed(() => ({
+  subjectMode: subjectMode.value,
+  subjectsA: subjectsA.value.map(s => ({ ...s })),
+  subjectsB: subjectMode.value === 'dual' ? subjectsB.value.map(s => ({ ...s })) : [],
+  predicate: selectedPredicate.value,
+  priority: selectedPriority.value,
+  params: { ...paramValues.value },
+  description: description.value
+}))
 
-// ==================== 验证 ====================
 const validationResult = computed(() => {
-  if (!selectedPredicate.value || !currentSubject.value) return { valid: false, warnings: [] }
-  return validateRule({
-    predicate: selectedPredicate.value,
-    subject: currentSubject.value,
-    priority: selectedPriority.value,
-    params: paramValues.value
-  })
+  if (!selectedPredicate.value) return { valid: false, warnings: [] }
+  return validateRule(currentRulePayload.value)
 })
 
 const validationWarnings = computed(() => validationResult.value.warnings)
-const canAdd = computed(() => {
-  if (!selectedPredicate.value) return false
-  return validationResult.value.valid
-})
+const canAdd = computed(() => !!selectedPredicate.value && validationResult.value.valid)
 
-// ==================== 预览文本 ====================
 const previewText = computed(() => {
-  if (!selectedPredicate.value || !currentSubject.value) return ''
+  if (!selectedPredicate.value) return ''
   try {
-    const tempRule = {
+    return renderRuleText({
       id: 'preview',
-      priority: selectedPriority.value,
-      subject: currentSubject.value,
-      predicate: selectedPredicate.value,
-      params: paramValues.value
-    }
-    return renderRuleText(tempRule)
+      ...currentRulePayload.value
+    })
   } catch {
     return ''
   }
 })
 
-// ==================== 事件处理 ====================
-const onSubjectKindChange = () => {
+const getEntryOptions = (type) => {
+  if (type === 'person') {
+    return students.value.map(s => ({ id: s.id, label: `${s.studentNumber || '-'} ${s.name || '未命名'}` }))
+  }
+  return tags.value.map(t => ({ id: t.id, label: t.name }))
+}
+
+const onEntryTypeChange = (entry) => {
+  entry.id = null
+}
+
+const addEntry = (slot) => {
+  if (slot === 'A') subjectsA.value.push({ type: 'person', id: null })
+  else subjectsB.value.push({ type: 'person', id: null })
+}
+
+const removeEntry = (slot, index) => {
+  if (slot === 'A') {
+    subjectsA.value.splice(index, 1)
+    if (subjectsA.value.length === 0) subjectsA.value.push({ type: 'person', id: null })
+  } else {
+    subjectsB.value.splice(index, 1)
+    if (subjectsB.value.length === 0) subjectsB.value.push({ type: 'person', id: null })
+  }
+}
+
+const setSubjectMode = (mode) => {
+  subjectMode.value = mode
   selectedPredicate.value = ''
   paramValues.value = {}
 }
@@ -372,15 +336,7 @@ const onPredicateChange = () => {
 
 const handleAdd = () => {
   if (!canAdd.value) return
-
-  const result = addRule({
-    priority: selectedPriority.value,
-    subject: currentSubject.value,
-    predicate: selectedPredicate.value,
-    params: { ...paramValues.value },
-    description: description.value
-  })
-
+  const result = addRule(currentRulePayload.value)
   if (result.success) {
     emit('added', result.rule)
     resetForm()
@@ -388,293 +344,86 @@ const handleAdd = () => {
 }
 
 const resetForm = () => {
-  subjectKind.value = 'student'
+  subjectMode.value = 'single'
   selectedPredicate.value = ''
   selectedPriority.value = RulePriority.PREFER
   description.value = ''
-  subjectStudentId.value = null
-  subjectId1.value = null
-  subjectId2.value = null
-  subjectTagId.value = null
-  subjectTagId1.value = null
-  subjectTagId2.value = null
+  subjectsA.value = [{ type: 'person', id: null }]
+  subjectsB.value = [{ type: 'person', id: null }]
   paramValues.value = {}
+}
+
+const applyQuickTemplate = (key) => {
+  const quickTemplates = {
+    [QUICK_TEMPLATE_KEYS.FRONT_ROW]: {
+      mode: 'single',
+      priority: RulePriority.REQUIRED,
+      predicate: 'IN_ROW_RANGE',
+      params: () => getDefaultParams('IN_ROW_RANGE')
+    },
+    [QUICK_TEMPLATE_KEYS.AVOID_WINDOW]: {
+      mode: 'single',
+      priority: RulePriority.PREFER,
+      predicate: 'NOT_IN_COLUMN_TYPE',
+      params: () => ({ ...getDefaultParams('NOT_IN_COLUMN_TYPE'), columnType: 'wall' })
+    },
+    [QUICK_TEMPLATE_KEYS.DESKMATES]: {
+      mode: 'dual',
+      priority: RulePriority.REQUIRED,
+      predicate: 'MUST_BE_SEATMATES',
+      params: () => getDefaultParams('MUST_BE_SEATMATES')
+    },
+    [QUICK_TEMPLATE_KEYS.SPREAD_GROUP]: {
+      mode: 'single',
+      priority: RulePriority.PREFER,
+      predicate: 'DISTRIBUTE_EVENLY',
+      params: () => ({ ...getDefaultParams('DISTRIBUTE_EVENLY'), scope: 'group' })
+    }
+  }
+
+  const tpl = quickTemplates[key]
+  if (!tpl) return
+  setSubjectMode(tpl.mode)
+  selectedPriority.value = tpl.priority
+  selectedPredicate.value = tpl.predicate
+  paramValues.value = tpl.params()
 }
 </script>
 
 <style scoped>
-.rule-builder {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.builder-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #23587b;
-}
-
-/* ==================== 句子构建器 ==================== */
-.sentence-builder {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #eef2f6;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-}
-
-.builder-segment {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.seg-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: #475569;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.chip-group {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.chip-item {
-  padding: 8px 14px;
-  background: #f1f5f9;
-  border: 1px solid transparent;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #475569; /* Darkened for readability */
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.chip-item:hover { background: #e2e8f0; color: #1e293b; }
-.chip-item.active {
-  background: var(--color-primary);
-  color: white;
-  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.25);
-}
-
-.rule-selector-wrap {
-  position: relative;
-}
-
-.seg-select {
-  width: 100%;
-  padding: 10px 14px;
-  background: #fff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 13px;
-  color: #1e293b;
-  outline: none;
-  cursor: pointer;
-  appearance: none;
-  transition: all 0.2s;
-}
-
-.seg-select:focus { border-color: var(--color-primary); background: #f8fafc; }
-
-.priority-pills {
-  display: flex;
-  gap: 8px;
-}
-
-.priority-pill {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px;
-  background: #f8fafc;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #475569; /* Darkened for readability */
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.pill-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #cbd5e1;
-}
-
-.priority-pill.active.required { border-color: #ef4444; background: #fff1f2; color: #ef4444; }
-.priority-pill.active.required .pill-dot { background: #ef4444; }
-
-.priority-pill.active.prefer { border-color: #f59e0b; background: #fffbeb; color: #b45309; }
-.priority-pill.active.prefer .pill-dot { background: #f59e0b; }
-
-.priority-pill.active.optional { border-color: #64748b; background: #f1f5f9; color: #1e293b; }
-.priority-pill.active.optional .pill-dot { background: #64748b; }
-
-/* ==================== 主体选择区 ==================== */
-.subject-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  background: #f8fafc;
-  border-radius: 10px;
-  border: 1.5px solid #e2e8f0;
-}
-
-.subject-inputs {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.params-section {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding-top: 10px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 140px;
-  flex: 1;
-}
-
-.input-group label {
-  font-size: 11px;
-  color: #475569; /* Darkened for readability */
-  font-weight: 500;
-}
-
-.detail-select,
-.detail-input {
-  padding: 7px 10px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  background: white;
-  font-size: 13px;
-  color: #334155;
-  outline: none;
-  width: 100%;
-  box-sizing: border-box;
-  transition: border-color 0.2s;
-}
-
-.detail-select:focus,
-.detail-input:focus { border-color: #23587b; }
-
-.pair-arrow {
-  font-size: 18px;
-  font-weight: 700;
-  color: #64748b; /* Darkened for readability */
-  padding-bottom: 8px;
-  flex-shrink: 0;
-}
-
-/* ==================== 预览文本 ==================== */
-.builder-preview-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.smart-preview-card {
-  padding: 12px 16px;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-
-.smart-preview-card.required { border-left: 4px solid #ef4444; }
-.smart-preview-card.prefer { border-left: 4px solid #f59e0b; }
-.smart-preview-card.optional { border-left: 4px solid #cbd5e1; } /* Lighter border, but better context */
-
-.preview-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-
-
-.preview-text-content {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-/* ==================== 警告 ==================== */
-.validation-warnings {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.warning-item {
-  font-size: 12px;
-  color: #92400e;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  border-radius: 6px;
-  padding: 6px 10px;
-}
-
-/* ==================== 底部按钮 ==================== */
-.builder-footer {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-add {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 18px;
-  background: #23587b;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-add:hover:not(:disabled) { background: #1a4260; transform: translateY(-1px); }
-.btn-add:disabled { background: #e2e8f0; color: #64748b; cursor: not-allowed; transform: none; }
-
-.btn-reset {
-  padding: 10px 16px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  background: white;
-  font-size: 13px;
-  color: #475569; /* Darkened for readability */
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-reset:hover { border-color: #94a3b8; color: #334155; }
+.rule-builder { display: flex; flex-direction: column; gap: 14px; }
+.builder-title { margin: 0; font-size: 14px; font-weight: 600; color: #23587b; }
+.quick-template-wrap { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.quick-template-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.quick-template-btn { border: 1px solid #dbe3ea; background: white; color: #334155; border-radius: 8px; padding: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.quick-template-tip { margin: 0; font-size: 12px; color: #64748b; }
+.sentence-builder { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: white; border-radius: 12px; border: 1px solid #eef2f6; }
+.builder-segment { display: flex; flex-direction: column; gap: 8px; }
+.seg-label { font-size: 12px; color: #64748b; font-weight: 600; }
+.chip-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-item { border: 1px solid #dbe3ea; background: white; color: #334155; border-radius: 999px; font-size: 12px; padding: 6px 12px; cursor: pointer; }
+.chip-item.active { background: #23587b; color: white; border-color: #23587b; }
+.rule-selector-wrap { position: relative; }
+.seg-select { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #dbe3ea; }
+.priority-pills { display: flex; gap: 8px; }
+.priority-pill { border: 1px solid #dbe3ea; background: white; border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+.priority-pill.active { border-color: #23587b; color: #23587b; }
+.subject-section { border: 1px solid #eef2f6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.subject-slot { display: flex; flex-direction: column; gap: 8px; }
+.slot-title { font-size: 12px; color: #334155; font-weight: 600; }
+.subject-row { display: grid; grid-template-columns: 120px 1fr auto; gap: 8px; }
+.mini-btn { border: 1px solid #dbe3ea; background: white; border-radius: 8px; font-size: 12px; padding: 6px 10px; cursor: pointer; }
+.mini-btn.danger { color: #b91c1c; border-color: #fecaca; }
+.input-group { display: flex; flex-direction: column; gap: 6px; }
+.input-group label { font-size: 12px; font-weight: 600; color: #1f2937; }
+.detail-select, .detail-input { width: 100%; padding: 8px 10px; border: 1px solid #dbe3ea; border-radius: 8px; }
+.params-section { display: flex; flex-direction: column; gap: 10px; }
+.builder-preview-section { display: flex; flex-direction: column; gap: 8px; }
+.smart-preview-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; background: #f8fafc; }
+.preview-text-content { font-size: 13px; color: #334155; }
+.validation-warnings { display: flex; flex-direction: column; gap: 6px; }
+.warning-item { color: #b45309; font-size: 12px; }
+.builder-footer { display: flex; gap: 8px; }
+.btn-add, .btn-reset { border-radius: 8px; padding: 8px 12px; border: 1px solid #dbe3ea; background: white; cursor: pointer; }
+.btn-add[disabled] { opacity: 0.5; cursor: not-allowed; }
 </style>

@@ -556,6 +556,34 @@ onUnmounted(() => {
   background: color-mix(in srgb, var(--zone-color, #E0E0E0) 40%, var(--color-bg-selected));
 }
 
+@media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
+  .seat-item {
+    height: 68px;
+    border-radius: 10px;
+  }
+
+  .student-display {
+    gap: 5px;
+    padding: 5px;
+  }
+
+  .student-name {
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .student-number {
+    font-size: 11px;
+    min-width: 34px;
+    padding: 1px 8px;
+  }
+
+  .empty-text,
+  .seat-placeholder {
+    font-size: 11px;
+  }
+}
+
 /* 响应式调整 */
 @media (max-width: 1200px) {
   .student-number {

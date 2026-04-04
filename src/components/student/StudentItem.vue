@@ -20,13 +20,13 @@
         </span>
       </div>
 
-      <div class="student-tags">
+      <div class="student-tags" aria-label="可横向滚动查看更多标签">
         <span v-for="tagId in student.tags" :key="tagId" class="student-tag"
           :style="{ background: getTagColor(tagId) }">
           {{ getTagName(tagId) }}
-          <button class="remove-tag-btn" @click="removeTag(tagId)">×</button>
+          <button class="remove-tag-btn" :aria-label="`移除标签 ${getTagName(tagId)}`" @click="removeTag(tagId)">×</button>
         </span>
-        <button ref="addBtnRef" class="add-tag-to-student-btn" @click.stop="toggleTagPicker">+</button>
+        <button ref="addBtnRef" class="add-tag-to-student-btn" aria-label="添加标签" @click.stop="toggleTagPicker">+</button>
       </div>
     </div>
 
@@ -214,13 +214,19 @@ const deleteHandler = () => {
 
 <style scoped>
 .student-item {
+  --student-item-bg: var(--color-surface);
+  /* 使用负 inset 扩展命中区域：绝对定位伪元素会向四周外扩 */
+  --touch-target-outset: -8px;
+  /* 移动端为姓名/删除按钮保留空间，标签区采用保守基准宽度 */
+  --mobile-tags-flex-basis: 42%;
+  --scroll-cue-divider: rgba(var(--color-primary-rgb), 0.25);
   contain: layout style;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 14px 18px;
   margin-bottom: 10px;
-  background: white;
+  background: var(--student-item-bg);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   transition: all 0.2s ease;
@@ -442,6 +448,39 @@ const deleteHandler = () => {
   box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
 }
 
+@media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
+  .student-item {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+
+  .student-info {
+    gap: 8px;
+  }
+
+  .student-number {
+    min-width: 52px;
+    padding: 4px 8px;
+    font-size: 13px;
+  }
+
+  .student-name {
+    font-size: 14px;
+    padding: 3px 6px;
+    min-height: 24px;
+  }
+
+  .student-tag {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+
+  .delete-student-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
 @keyframes pulse {
 
   0%,
@@ -497,7 +536,7 @@ const deleteHandler = () => {
 
   .student-name-section {
     width: auto;
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
   }
 
@@ -515,13 +554,67 @@ const deleteHandler = () => {
     font-size: 14px;
   }
 
-  /* 移动端隐藏标签以节省空间 */
+  /* 移动端保留标签编辑能力 */
   .student-tags {
-    display: none;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    flex: 0 1 var(--mobile-tags-flex-basis);
+    min-width: 90px;
+    max-width: none;
+    position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .student-tags::after {
+    content: '';
+    position: sticky;
+    right: 0;
+    width: 16px;
+    flex: 0 0 16px;
+    align-self: stretch;
+    /* 渐变需与卡片背景一致，便于表达“可横向滚动”的边缘提示 */
+    background: linear-gradient(to left, var(--student-item-bg), rgba(var(--color-surface-rgb), 0));
+    border-left: 1px solid var(--scroll-cue-divider);
+    pointer-events: none;
+  }
+
+  .student-tag {
+    flex-shrink: 0;
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+
+  .remove-tag-btn {
+    width: 16px;
+    height: 16px;
+    font-size: 11px;
+    position: relative;
+  }
+
+  .remove-tag-btn::before {
+    content: '';
+    position: absolute;
+    inset: var(--touch-target-outset);
   }
 
   .add-tag-to-student-btn {
-    display: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+    position: relative;
+  }
+
+  .add-tag-to-student-btn::before {
+    content: '';
+    position: absolute;
+    inset: var(--touch-target-outset);
   }
 
   .tag-option {

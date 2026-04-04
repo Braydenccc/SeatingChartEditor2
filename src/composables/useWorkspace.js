@@ -10,7 +10,7 @@ import { setCookie, getCookie } from './useAuth'
 const LAST_WORKSPACE_COOKIE = 'sce_last_workspace'
 
 const FILE_EXT = '.sce'
-const CURRENT_VERSION = '2.0'
+const CURRENT_VERSION = '2.1'
 
 export function useWorkspace() {
   const { students, addStudent, updateStudent, clearAllStudents } = useStudentData()
@@ -19,7 +19,7 @@ export function useWorkspace() {
   const { exportSettings } = useExportSettings()
   const { zones, clearAllZones, addZone, updateZone } = useZoneData()
   const { rules, clearAllRules, addRule } = useSeatRules()
-  const { success, error } = useLogger()
+  const { success, warning, error } = useLogger()
 
   // 生成工作区 JSON 数据 (用于云端或本地保存)
   const getWorkspaceJson = () => {
@@ -63,7 +63,10 @@ export function useWorkspace() {
         rules: (rules.value || []).map(r => ({
           enabled: r.enabled,
           priority: r.priority,
-          subject: { ...r.subject },
+          subjectMode: r.subjectMode,
+          subjectsA: [...(r.subjectsA || [])],
+          subjectsB: [...(r.subjectsB || [])],
+          subject: r.subject ? { ...r.subject } : undefined,
           predicate: r.predicate,
           params: { ...r.params },
           description: r.description
@@ -230,49 +233,106 @@ export function useWorkspace() {
           })
         }
 
+        const normalizeRule = (rule) => {
+          if (rule.subjectMode === 'single' || rule.subjectMode === 'dual') {
+            return {
+              subjectMode: rule.subjectMode,
+              subjectsA: (rule.subjectsA || []).map(item => ({ ...item })),
+              subjectsB: (rule.subjectsB || []).map(item => ({ ...item }))
+            }
+          }
+          const subject = rule.subject || {}
+          if (subject.kind === 'student') {
+            return { subjectMode: 'single', subjectsA: [{ type: 'person', id: subject.id }], subjectsB: [] }
+          }
+          if (subject.kind === 'tag') {
+            return { subjectMode: 'single', subjectsA: [{ type: 'tag', id: subject.tagId }], subjectsB: [] }
+          }
+          if (subject.kind === 'pair') {
+            return {
+              subjectMode: 'dual',
+              subjectsA: [{ type: 'person', id: subject.id1 }],
+              subjectsB: [{ type: 'person', id: subject.id2 }]
+            }
+          }
+          if (subject.kind === 'tag_pair') {
+            return {
+              subjectMode: 'dual',
+              subjectsA: [{ type: 'tag', id: subject.tagId1 }],
+              subjectsB: [{ type: 'tag', id: subject.tagId2 }]
+            }
+          }
+          return { subjectMode: 'single', subjectsA: [], subjectsB: [] }
+        }
+
+        const remapEntry = (entry, oldStudentIdToNewIdMap, oldTagIdToNewIdMap) => {
+          if (!entry) return null
+          if (entry.type === 'person') {
+            return { ...entry, id: oldStudentIdToNewIdMap[entry.id] }
+          }
+          if (entry.type === 'tag') {
+            return { ...entry, id: oldTagIdToNewIdMap[entry.id] }
+          }
+          return entry
+        }
+
         // 恢复智能排位规则
         if (workspace.rules && Array.isArray(workspace.rules)) {
           clearAllRules()
+          let totalDroppedSubjects = 0
+          let totalDroppedRules = 0
 
           workspace.rules.forEach(r => {
-            // ID 重映射
-            const newSubject = { ...r.subject }
-            if (newSubject.kind === 'student') {
-              newSubject.id = oldStudentIdToNewId[newSubject.id]
-            } else if (newSubject.kind === 'pair') {
-              newSubject.id1 = oldStudentIdToNewId[newSubject.id1]
-              newSubject.id2 = oldStudentIdToNewId[newSubject.id2]
-            } else if (newSubject.kind === 'tag') {
-              newSubject.tagId = oldTagIdToNewId[newSubject.tagId]
-            } else if (newSubject.kind === 'tag_pair') {
-              newSubject.tagId1 = oldTagIdToNewId[newSubject.tagId1]
-              newSubject.tagId2 = oldTagIdToNewId[newSubject.tagId2]
+            const normalized = normalizeRule(r)
+
+            const remappedA = normalized.subjectsA.map(entry => remapEntry(entry, oldStudentIdToNewId, oldTagIdToNewId))
+            const remappedB = normalized.subjectsB.map(entry => remapEntry(entry, oldStudentIdToNewId, oldTagIdToNewId))
+            const subjectsA = remappedA.filter(e => !!e?.id)
+            const subjectsB = remappedB.filter(e => !!e?.id)
+            const droppedA = remappedA.length - subjectsA.length
+            const droppedB = remappedB.length - subjectsB.length
+            if (droppedA > 0 || droppedB > 0) {
+              totalDroppedSubjects += droppedA + droppedB
+              warning('Workspace rule subject remap dropped entries', {
+                rule: r,
+                droppedA,
+                droppedB
+              })
             }
 
             const newParams = { ...r.params }
             if (newParams.tagId) newParams.tagId = oldTagIdToNewId[newParams.tagId]
             if (newParams.zoneId) newParams.zoneId = oldZoneIdToNewId[newParams.zoneId]
 
-            // 只有主体 ID 都映射成功才添加
-            const subjectValid = (kind) => {
-              if (kind === 'student') return !!newSubject.id
-              if (kind === 'pair') return !!newSubject.id1 && !!newSubject.id2
-              if (kind === 'tag') return !!newSubject.tagId
-              if (kind === 'tag_pair') return !!newSubject.tagId1 && !!newSubject.tagId2
-              return true
-            }
-
-            if (subjectValid(newSubject.kind)) {
-              addRule({
+            const hasValidSubjects = subjectsA.length > 0 && (normalized.subjectMode !== 'dual' || subjectsB.length > 0)
+            if (hasValidSubjects) {
+              const result = addRule({
                 enabled: r.enabled ?? true,
                 priority: r.priority,
-                subject: newSubject,
+                subjectMode: normalized.subjectMode,
+                subjectsA,
+                subjectsB,
                 predicate: r.predicate,
                 params: newParams,
                 description: r.description || ''
               })
+              if (!result?.success) {
+                totalDroppedRules += 1
+                warning('Workspace rule skipped due to validation failure', {
+                  rule: r,
+                  warnings: result?.warnings || []
+                })
+              }
+            } else {
+              totalDroppedRules += 1
             }
           })
+
+          if (totalDroppedSubjects > 0 || totalDroppedRules > 0) {
+            warning(
+              `工作区规则迁移时丢失了 ${totalDroppedSubjects} 个对象条目，跳过了 ${totalDroppedRules} 条无效规则，请检查规则配置。`
+            )
+          }
         }
 
         resolve(true)

@@ -11,7 +11,7 @@ import { useStudentData } from './useStudentData'
 import { useSeatChart } from './useSeatChart'
 import { useZoneData } from './useZoneData'
 import { useSeatRules } from './useSeatRules'
-import { PENALTY_WEIGHTS, RulePriority } from '../constants/ruleTypes.js'
+import { PENALTY_WEIGHTS, RulePriority, PREDICATE_META } from '../constants/ruleTypes.js'
 
 export function useAssignment() {
   const { students } = useStudentData()
@@ -72,40 +72,80 @@ export function useAssignment() {
 
   // ==================== 新引擎：主体展开 ====================
 
-  /**
-   * 将规则 subject 展开为具体的 { studentId } 或 { studentId1, studentId2 } 数组
-   */
-  const expandSubject = (subject, studentList) => {
+  const normalizeRuleSubjects = (rule) => {
+    if (rule.subjectMode === 'single' || rule.subjectMode === 'dual') {
+      return {
+        subjectMode: rule.subjectMode,
+        subjectsA: rule.subjectsA || [],
+        subjectsB: rule.subjectsB || []
+      }
+    }
+
+    const subject = rule.subject || {}
     if (subject.kind === 'student') {
-      return [{ type: 'single', studentId: subject.id }]
+      return { subjectMode: 'single', subjectsA: [{ type: 'person', id: subject.id }], subjectsB: [] }
     }
-
-    if (subject.kind === 'pair') {
-      return [{ type: 'pair', studentId1: subject.id1, studentId2: subject.id2 }]
-    }
-
     if (subject.kind === 'tag') {
-      const taggedStudents = studentList.filter(s =>
-        s.tags && s.tags.includes(subject.tagId)
-      )
-      return taggedStudents.map(s => ({ type: 'single', studentId: s.id }))
+      return { subjectMode: 'single', subjectsA: [{ type: 'tag', id: subject.tagId }], subjectsB: [] }
     }
-
+    if (subject.kind === 'pair') {
+      return {
+        subjectMode: 'dual',
+        subjectsA: [{ type: 'person', id: subject.id1 }],
+        subjectsB: [{ type: 'person', id: subject.id2 }]
+      }
+    }
     if (subject.kind === 'tag_pair') {
-      const group1 = studentList.filter(s => s.tags && s.tags.includes(subject.tagId1))
-      const group2 = studentList.filter(s => s.tags && s.tags.includes(subject.tagId2))
-      const pairs = []
-      for (const s1 of group1) {
-        for (const s2 of group2) {
-          if (s1.id !== s2.id) {
-            pairs.push({ type: 'pair', studentId1: s1.id, studentId2: s2.id })
-          }
+      return {
+        subjectMode: 'dual',
+        subjectsA: [{ type: 'tag', id: subject.tagId1 }],
+        subjectsB: [{ type: 'tag', id: subject.tagId2 }]
+      }
+    }
+    return { subjectMode: 'single', subjectsA: [], subjectsB: [] }
+  }
+
+  const expandEntriesToStudentIds = (entries, studentList) => {
+    const ids = new Set()
+    for (const entry of entries || []) {
+      if (!entry?.id) continue
+      if (entry.type === 'person') ids.add(entry.id)
+      if (entry.type === 'tag') {
+        for (const s of studentList) {
+          if (s.tags && s.tags.includes(entry.id)) ids.add(s.id)
         }
       }
-      return pairs
+    }
+    return [...ids]
+  }
+
+  /**
+   * 将规则主体展开为具体的 { studentId } 或 { studentId1, studentId2 } 数组
+   */
+  const expandSubject = (rule, studentList) => {
+    const normalized = normalizeRuleSubjects(rule)
+    const groupA = expandEntriesToStudentIds(normalized.subjectsA, studentList)
+    const groupB = expandEntriesToStudentIds(normalized.subjectsB, studentList)
+
+    if (normalized.subjectMode === 'single') {
+      return groupA.map(studentId => ({ type: 'single', studentId }))
     }
 
-    return []
+    const pairs = []
+    const seenUnorderedPairs = new Set()
+    const isOrderedPredicate = !!PREDICATE_META[rule.predicate]?.ordered
+    for (const a of groupA) {
+      for (const b of groupB) {
+        if (a === b) continue
+        if (!isOrderedPredicate) {
+          const key = a < b ? `${a}:${b}` : `${b}:${a}`
+          if (seenUnorderedPairs.has(key)) continue
+          seenUnorderedPairs.add(key)
+        }
+        pairs.push({ type: 'pair', studentId1: a, studentId2: b })
+      }
+    }
+    return pairs
   }
 
   // ==================== 新引擎：违规检测 ====================
@@ -239,6 +279,56 @@ export function useAssignment() {
     return penalties
   }
 
+  /**
+   * 细粒度定位分组规则违规学生（避免整组粗标记）
+   */
+  const getGroupRuleViolatingStudentIds = (rule, expandedSubjects, assignment) => {
+    const { predicate, params } = rule
+    const positioned = []
+
+    for (const subj of expandedSubjects) {
+      if (subj.type !== 'single') continue
+      const seatId = assignment.get(subj.studentId)
+      if (!seatId) continue
+      const key = predicate === 'DISTRIBUTE_EVENLY'
+        ? (params.scope === 'group' ? parseSeatId(seatId).groupIndex : parseSeatId(seatId).rowIndex)
+        : (params.scope === 'group' ? parseSeatId(seatId).groupIndex : (getZoneForSeat(seatId)?.id ?? 'none'))
+      positioned.push({ studentId: subj.studentId, key })
+    }
+
+    if (positioned.length <= 1) return []
+
+    const counts = new Map()
+    for (const item of positioned) {
+      counts.set(item.key, (counts.get(item.key) ?? 0) + 1)
+    }
+    if (counts.size <= 1) return []
+
+    if (predicate === 'DISTRIBUTE_EVENLY') {
+      const values = [...counts.values()]
+      const max = Math.max(...values)
+      const min = Math.min(...values)
+      if (max <= min) return []
+      const heavyKeys = new Set(
+        [...counts.entries()].filter(([, count]) => count === max).map(([key]) => key)
+      )
+      return positioned
+        .filter(item => heavyKeys.has(item.key))
+        .map(item => item.studentId)
+    }
+
+    if (predicate === 'CLUSTER_TOGETHER') {
+      const dominantKey = [...counts.entries()]
+        .sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])))[0]?.[0]
+      if (dominantKey == null) return []
+      return positioned
+        .filter(item => item.key !== dominantKey)
+        .map(item => item.studentId)
+    }
+
+    return []
+  }
+
   // ==================== 新引擎：评分函数 ====================
 
   /**
@@ -252,7 +342,7 @@ export function useAssignment() {
 
     for (const rule of activeRules) {
       const weight = PENALTY_WEIGHTS[rule.priority] ?? PENALTY_WEIGHTS.optional
-      const subjects = expandSubject(rule.subject, studentList)
+      const subjects = expandSubject(rule, studentList)
 
       // 分组谓词单独处理
       if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
@@ -309,7 +399,7 @@ export function useAssignment() {
       if (rule.priority !== RulePriority.REQUIRED) continue
       if (!['IN_ROW_RANGE', 'IN_GROUP_RANGE'].includes(rule.predicate)) continue
 
-      const subjects = expandSubject(rule.subject, studentList)
+      const subjects = expandSubject(rule, studentList)
       for (const subj of subjects) {
         if (subj.type !== 'single') continue
         if (assignedStudents.has(subj.studentId)) continue
@@ -336,7 +426,7 @@ export function useAssignment() {
       if (rule.priority !== RulePriority.REQUIRED) continue
       if (rule.predicate !== 'MUST_BE_SEATMATES') continue
 
-      const subjects = expandSubject(rule.subject, studentList)
+      const subjects = expandSubject(rule, studentList)
       for (const subj of subjects) {
         if (subj.type !== 'pair') continue
         if (assignedStudents.has(subj.studentId1) || assignedStudents.has(subj.studentId2)) continue
@@ -464,7 +554,15 @@ export function useAssignment() {
     const computeViolatingStudents = (assignment) => {
       const violating = new Set()
       for (const rule of activeRules) {
-        const subjects = expandSubject(rule.subject, studentList)
+        const subjects = expandSubject(rule, studentList)
+        if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
+          const groupPenalty = checkGroupViolation(rule, subjects, assignment)
+          if (groupPenalty > 0) {
+            const groupViolatingIds = getGroupRuleViolatingStudentIds(rule, subjects, assignment)
+            for (const studentId of groupViolatingIds) violating.add(studentId)
+          }
+          continue
+        }
         for (const subj of subjects) {
           const { violated } = checkViolation(rule, subj, assignment)
           if (violated) {
@@ -486,7 +584,7 @@ export function useAssignment() {
     const partnerMap = new Map()
     activeRules.forEach(r => {
       if (r.priority === RulePriority.REQUIRED && r.predicate === 'MUST_BE_SEATMATES') {
-        const subjects = expandSubject(r.subject, studentList)
+        const subjects = expandSubject(r, studentList)
         subjects.forEach(s => {
           if (s.type === 'pair') {
             partnerMap.set(s.studentId1, s.studentId2)
@@ -578,7 +676,12 @@ export function useAssignment() {
         if (studentC === studentA || studentC === partner) { stagnationCounter++; continue; }
         const seatC = current.get(studentC)
         const adjC = getAdjacentSeats(seatC)
-        const seatDId = adjC.length > 0 ? adjC[Math.floor(Math.random() * adjC.length)].id : assignedStudentIds[Math.floor(Math.random() * n)]
+        const seatDId = adjC.length > 0
+          ? adjC[Math.floor(Math.random() * adjC.length)].id
+          : (() => {
+              const dynamicAssignedSeats = [...current.values()]
+              return dynamicAssignedSeats[Math.floor(Math.random() * dynamicAssignedSeats.length)]
+            })()
         const studentD = currentReverse.get(seatDId)
         
         if (studentD && studentD !== studentA && studentD !== partner && studentD !== studentC) {
@@ -700,7 +803,26 @@ export function useAssignment() {
     const violated = []
 
     for (const rule of activeRules) {
-      const subjects = expandSubject(rule.subject, studentList)
+      const subjects = expandSubject(rule, studentList)
+      if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
+        const penalty = checkGroupViolation(rule, subjects, solution)
+        if (penalty <= 0) {
+          satisfied.push(rule)
+        } else {
+          const focusedStudentIds = getGroupRuleViolatingStudentIds(rule, subjects, solution)
+          const names = focusedStudentIds
+            .map(studentId => studentList.find(st => st.id === studentId)?.name ?? `ID:${studentId}`)
+            .slice(0, 3)
+          violated.push({
+            rule,
+            violatingSubjects: names,
+            reason: names.length > 0
+              ? `重点定位学生：${names.join('、')}${focusedStudentIds.length > 3 ? `…等${focusedStudentIds.length}人` : ''}`
+              : '分组约束未满足（存在明显分散/不均衡）'
+          })
+        }
+        continue
+      }
       let isFullySatisfied = true
       const violationDetails = []
 
@@ -763,8 +885,6 @@ export function useAssignment() {
     const startTime = Date.now()
 
     try {
-      clearAllSeats()
-
       const studentList = students.value.map(s => ({ ...s }))
       const availableSeats = getAvailableSeats()
 
@@ -853,4 +973,3 @@ export function useAssignment() {
     runSmartAssignment
   }
 }
-

@@ -35,16 +35,22 @@ export const PRIORITY_ICONS = {
   optional: '⚪'
 }
 
-// ==================== 主体类型 ====================
+// ==================== 主体模式 ====================
 
-export const SubjectKind = {
-  STUDENT: 'student',
-  PAIR: 'pair',
-  TAG: 'tag',
-  TAG_PAIR: 'tag_pair'
+export const SubjectMode = {
+  SINGLE: 'single',
+  DUAL: 'dual'
 }
 
+export const SUBJECT_MODE_LABELS = {
+  single: '单对象',
+  dual: '双对象'
+}
+
+// 兼容旧字段展示
 export const SUBJECT_KIND_LABELS = {
+  single: '单对象',
+  dual: '双对象',
   student: '单个学生',
   pair: '学生对',
   tag: '标签分组',
@@ -114,17 +120,17 @@ export const RULE_TYPE_DESCRIPTIONS = {
   CLUSTER_TOGETHER: '同标签学生尽量聚集在同一区域'
 }
 
-// 谓词元数据：适用的 subject 类型 + 参数规格
+// 谓词元数据：适用的主体模式 + 参数规格
 export const PREDICATE_META = {
   IN_ROW_RANGE: {
-    subjectKinds: ['student', 'tag'],
+    subjectMode: ['single'],
     params: [
       { key: 'minRow', label: '最前排', type: 'number', min: 1, default: 1 },
       { key: 'maxRow', label: '最后排', type: 'number', min: 1, default: 3 }
     ]
   },
   NOT_IN_COLUMN_TYPE: {
-    subjectKinds: ['student', 'tag'],
+    subjectMode: ['single'],
     params: [
       {
         key: 'columnType',
@@ -141,46 +147,46 @@ export const PREDICATE_META = {
     ]
   },
   IN_ZONE: {
-    subjectKinds: ['student', 'tag'],
+    subjectMode: ['single'],
     params: [
       { key: 'zoneId', label: '选区', type: 'zone', default: null }
     ]
   },
   NOT_IN_ZONE: {
-    subjectKinds: ['student', 'tag'],
+    subjectMode: ['single'],
     params: [
       { key: 'zoneId', label: '选区', type: 'zone', default: null }
     ]
   },
   IN_GROUP_RANGE: {
-    subjectKinds: ['student', 'tag'],
+    subjectMode: ['single'],
     params: [
       { key: 'minGroup', label: '最左大组', type: 'number', min: 1, default: 1 },
       { key: 'maxGroup', label: '最右大组', type: 'number', min: 1, default: 2 }
     ]
   },
   MUST_BE_SEATMATES: {
-    subjectKinds: ['pair', 'tag_pair'],
+    subjectMode: ['dual'],
     params: []
   },
   MUST_NOT_BE_SEATMATES: {
-    subjectKinds: ['pair', 'tag_pair'],
+    subjectMode: ['dual'],
     params: []
   },
   DISTANCE_AT_MOST: {
-    subjectKinds: ['pair', 'tag_pair'],
+    subjectMode: ['dual'],
     params: [
       { key: 'distance', label: '最大距离', type: 'number', min: 1, default: 2 }
     ]
   },
   DISTANCE_AT_LEAST: {
-    subjectKinds: ['pair', 'tag_pair'],
+    subjectMode: ['dual'],
     params: [
       { key: 'distance', label: '最小距离', type: 'number', min: 1, default: 3 }
     ]
   },
   NOT_BLOCK_VIEW: {
-    subjectKinds: ['pair'],
+    subjectMode: ['dual'],
     params: [
       {
         key: 'tolerance',
@@ -196,19 +202,19 @@ export const PREDICATE_META = {
     ordered: true // id1 不遮挡 id2（有序）
   },
   MUST_BE_SAME_GROUP: {
-    subjectKinds: ['pair', 'tag_pair'],
+    subjectMode: ['dual'],
     params: []
   },
   MUST_NOT_BE_SAME_GROUP: {
-    subjectKinds: ['pair', 'tag_pair'],
+    subjectMode: ['dual'],
     params: []
   },
   MUST_BE_ADJACENT_ROW: {
-    subjectKinds: ['pair', 'tag_pair'],
+    subjectMode: ['dual'],
     params: []
   },
   DISTRIBUTE_EVENLY: {
-    subjectKinds: ['tag'],
+    subjectMode: ['single'],
     params: [
       {
         key: 'scope',
@@ -223,7 +229,7 @@ export const PREDICATE_META = {
     ]
   },
   CLUSTER_TOGETHER: {
-    subjectKinds: ['tag'],
+    subjectMode: ['single'],
     params: [
       {
         key: 'scope',
@@ -255,10 +261,10 @@ export const SCOPE_LABELS = {
 }
 
 /**
- * 获取指定谓词适用的主体类型列表
+ * 获取指定谓词适用的主体模式列表
  */
-export function getCompatibleSubjectKinds(predicate) {
-  return PREDICATE_META[predicate]?.subjectKinds ?? []
+export function getCompatibleSubjectModes(predicate) {
+  return PREDICATE_META[predicate]?.subjectMode ?? []
 }
 
 /**

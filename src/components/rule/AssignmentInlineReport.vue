@@ -35,6 +35,16 @@
           <div class="in-row-content">
             <span class="in-row-text">{{ renderRuleText(item.rule) }}</span>
             <span v-if="item.reason" class="in-row-reason">{{ item.reason }}</span>
+            <div class="in-row-actions">
+              <button class="in-action-btn" @click="emit('focus-rule', item)">定位规则</button>
+              <button
+                v-if="getSuggestion(item)"
+                class="in-action-btn primary"
+                @click="emit('apply-suggestion', getSuggestion(item))"
+              >
+                一键修正建议
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -70,6 +80,7 @@ const props = defineProps({
   report: { type: Object, default: null },
   duration: { type: Number, default: 0 }
 })
+const emit = defineEmits(['focus-rule', 'apply-suggestion'])
 
 const { renderRuleText } = useSeatRules()
 const showSatisfied = ref(false)
@@ -103,6 +114,30 @@ const gradeIcon = computed(() => {
   if (pct >= 50) return '📊'
   return '⚠️'
 })
+
+const getSuggestion = (item) => {
+  const rule = item?.rule
+  if (!rule) return null
+
+  // 放宽距离约束：
+  // - DISTANCE_AT_MOST：增大上限
+  // - DISTANCE_AT_LEAST：减小下限
+  if (rule.predicate === 'DISTANCE_AT_MOST') {
+    return { type: 'increase_param', ruleId: rule.id, key: 'distance', delta: 1 }
+  }
+  if (rule.predicate === 'DISTANCE_AT_LEAST') {
+    return { type: 'increase_param', ruleId: rule.id, key: 'distance', delta: -1 }
+  }
+
+  if (rule.priority === 'required') {
+    return { type: 'downgrade_priority', ruleId: rule.id, to: 'prefer' }
+  }
+  if (rule.priority === 'prefer') {
+    return { type: 'downgrade_priority', ruleId: rule.id, to: 'optional' }
+  }
+
+  return null
+}
 </script>
 
 <style scoped>
@@ -264,6 +299,29 @@ const gradeIcon = computed(() => {
   border-radius: 4px;
   align-self: flex-start;
   font-weight: 500;
+}
+
+.in-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.in-action-btn {
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #334155;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.in-action-btn.primary {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .in-no-rules-tip {

@@ -33,6 +33,26 @@
           </button>
         </div>
       </div>
+
+      <div v-if="filteredRules.length > 0" class="batch-toolbar">
+        <label class="batch-select-all">
+          <input
+            type="checkbox"
+            :checked="isAllFilteredSelected"
+            @change="toggleSelectAllFiltered"
+          />
+          <span>全选当前筛选项</span>
+        </label>
+        <div class="batch-actions">
+          <span class="batch-count">已选 {{ selectedRuleIds.length }} 条</span>
+          <button class="batch-btn required" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('required')">设为必须</button>
+          <button class="batch-btn prefer" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('prefer')">设为建议</button>
+          <button class="batch-btn optional" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('optional')">设为可选</button>
+          <button class="batch-btn" :disabled="!hasSelectedRules" @click="handleBatchToggle(true)">启用</button>
+          <button class="batch-btn" :disabled="!hasSelectedRules" @click="handleBatchToggle(false)">停用</button>
+          <button class="batch-btn danger" :disabled="!hasSelectedRules" @click="handleBatchDelete">删除</button>
+        </div>
+      </div>
     </div>
 
     <!-- 冲突警告 -->
@@ -58,21 +78,30 @@
 
     <!-- 规则列表 -->
     <transition-group name="rule-list-anim" tag="div" class="rules-container">
-      <div
-        v-for="rule in filteredRules"
-        :key="rule.id"
-        class="rule-item"
+        <div
+          v-for="rule in filteredRules"
+          :key="rule.id"
+          class="rule-item"
+          :data-rule-id="rule.id"
         :class="{
           disabled: !rule.enabled,
           expanded: expandedId === rule.id,
           [rule.priority]: true
         }"
-      >
-        <!-- 主行 -->
-        <div class="rule-main" @click="toggleExpand(rule.id)">
-          <div class="rule-priority-bar" :style="{ background: PRIORITY_COLORS[rule.priority] }"></div>
+        >
+          <!-- 主行 -->
+          <div class="rule-main" @click="toggleExpand(rule.id)">
+            <div class="rule-priority-bar" :style="{ background: PRIORITY_COLORS[rule.priority] }"></div>
 
-          <div class="rule-toggle">
+            <div class="rule-select" @click.stop>
+              <input
+                type="checkbox"
+                :checked="isSelected(rule.id)"
+                @change="toggleSelectRule(rule.id)"
+              />
+            </div>
+
+            <div class="rule-toggle">
             <label class="toggle-switch" @click.stop>
               <input type="checkbox" :checked="rule.enabled" @change="handleToggle(rule.id)" />
               <span class="toggle-knob"></span>
@@ -95,8 +124,16 @@
           <div v-if="expandedId === rule.id" class="rule-detail">
             <div class="rule-detail-grid">
               <div class="detail-item">
-                <span class="detail-key">主体类型</span>
-                <span class="detail-val">{{ SUBJECT_KIND_LABELS[rule.subject.kind] }}</span>
+                <span class="detail-key">对象模式</span>
+                <span class="detail-val">{{ SUBJECT_KIND_LABELS[rule.subjectMode || 'single'] }}</span>
+              </div>
+              <div class="detail-item full-width">
+                <span class="detail-key">对象集合 A</span>
+                <span class="detail-val">{{ formatSubjects(rule.subjectsA || []) }}</span>
+              </div>
+              <div v-if="(rule.subjectMode || 'single') === 'dual'" class="detail-item full-width">
+                <span class="detail-key">对象集合 B</span>
+                <span class="detail-val">{{ formatSubjects(rule.subjectsB || []) }}</span>
               </div>
               <div class="detail-item">
                 <span class="detail-key">谓词</span>
@@ -132,9 +169,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useConfirmAction } from '@/composables/useConfirmAction'
+import { useStudentData } from '@/composables/useStudentData'
+import { useTagData } from '@/composables/useTagData'
 import {
   PRIORITY_COLORS,
   PRIORITY_ICONS,
@@ -146,15 +185,25 @@ import {
   SCOPE_LABELS
 } from '@/constants/ruleTypes.js'
 
+const props = defineProps({
+  focusRuleId: {
+    type: String,
+    default: ''
+  }
+})
+
 const emit = defineEmits(['export', 'import'])
 
-const { rules, renderRuleText, toggleRule, deleteRule, clearAllRules, detectConflicts } = useSeatRules()
+const { rules, renderRuleText, toggleRule, updateRule, deleteRule, clearAllRules, detectConflicts } = useSeatRules()
+const { students } = useStudentData()
+const { tags } = useTagData()
 const { requestConfirm, isConfirming } = useConfirmAction()
 
 const searchQuery = ref('')
 const filterPriority = ref('all')
 const expandedId = ref(null)
 const showConflicts = ref(false)
+const selectedRuleIds = ref([])
 
 const priorityTabs = [
   { key: 'all', label: '全部' },
@@ -188,12 +237,66 @@ const filteredRules = computed(() => {
   return list
 })
 
+const filteredRuleIds = computed(() => filteredRules.value.map(r => r.id))
+const isAllFilteredSelected = computed(() => {
+  if (filteredRuleIds.value.length === 0) return false
+  return filteredRuleIds.value.every(id => selectedRuleIds.value.includes(id))
+})
+const hasSelectedRules = computed(() => selectedRuleIds.value.length > 0)
+
+const isSelected = (ruleId) => selectedRuleIds.value.includes(ruleId)
+
+const toggleSelectRule = (ruleId) => {
+  if (selectedRuleIds.value.includes(ruleId)) {
+    selectedRuleIds.value = selectedRuleIds.value.filter(id => id !== ruleId)
+  } else {
+    selectedRuleIds.value = [...selectedRuleIds.value, ruleId]
+  }
+}
+
+const toggleSelectAllFiltered = () => {
+  if (isAllFilteredSelected.value) {
+    selectedRuleIds.value = selectedRuleIds.value.filter(id => !filteredRuleIds.value.includes(id))
+    return
+  }
+  const merged = new Set([...selectedRuleIds.value, ...filteredRuleIds.value])
+  selectedRuleIds.value = [...merged]
+}
+
 const toggleExpand = (id) => {
   expandedId.value = expandedId.value === id ? null : id
 }
 
 const handleToggle = (ruleId) => {
   toggleRule(ruleId)
+}
+
+const clearInvalidSelections = () => {
+  const idSet = new Set(rules.value.map(r => r.id))
+  selectedRuleIds.value = selectedRuleIds.value.filter(id => idSet.has(id))
+}
+
+const handleBatchSetPriority = (priority) => {
+  selectedRuleIds.value.forEach(ruleId => {
+    updateRule(ruleId, { priority })
+  })
+}
+
+const handleBatchToggle = (enabled) => {
+  selectedRuleIds.value.forEach(ruleId => {
+    updateRule(ruleId, { enabled })
+  })
+}
+
+const handleBatchDelete = () => {
+  const count = selectedRuleIds.value.length
+  if (count === 0) return
+  if (!confirm(`确定删除已选 ${count} 条规则？此操作不可撤销。`)) return
+  selectedRuleIds.value.forEach(ruleId => deleteRule(ruleId))
+  selectedRuleIds.value = []
+  if (expandedId.value && !rules.value.find(r => r.id === expandedId.value)) {
+    expandedId.value = null
+  }
 }
 
 const getDeletingKey = (id) => `deleteRule-${id}`
@@ -214,6 +317,7 @@ const handleClearAll = () => {
   if (confirm(`确定清空全部 ${rules.value.length} 条规则？此操作不可撤销。`)) {
     clearAllRules()
     expandedId.value = null
+    selectedRuleIds.value = []
   }
 }
 
@@ -229,6 +333,50 @@ const formatParamValue = (predicate, key, value) => {
   if (key === 'tolerance') return value === 0 ? '仅正后方' : '正后方±1列'
   return String(value)
 }
+
+const formatSubjects = (subjects) => {
+  if (!subjects?.length) return '-'
+  return subjects.map(s => {
+    if (s.type === 'person') {
+      const student = students.value.find(st => st.id === s.id)
+      return student?.name || `学生#${s.id}`
+    }
+    if (s.type === 'tag') {
+      const tag = tags.value.find(t => t.id === s.id)
+      return tag?.name || `标签#${s.id}`
+    }
+    return '-'
+  }).join('、')
+}
+
+const focusRule = async (ruleId) => {
+  if (!ruleId) return false
+  const target = rules.value.find(r => r.id === ruleId)
+  if (!target) return false
+
+  if (filterPriority.value !== 'all' && target.priority !== filterPriority.value) {
+    filterPriority.value = 'all'
+  }
+  if (searchQuery.value.trim()) {
+    searchQuery.value = ''
+  }
+  expandedId.value = ruleId
+
+  await nextTick()
+  const node = document.querySelector(`.rule-item[data-rule-id="${ruleId}"]`)
+  node?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  return true
+}
+
+watch(() => props.focusRuleId, (id) => {
+  if (id) {
+    focusRule(id)
+  }
+})
+
+watch(rules, clearInvalidSelections, { deep: true })
+
+defineExpose({ focusRule })
 </script>
 
 <style scoped>
@@ -248,6 +396,83 @@ const formatParamValue = (predicate, key, value) => {
   padding: 12px;
   border-radius: 12px;
   border: 1px solid #eef2f6;
+}
+
+.batch-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.batch-select-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #334155;
+  user-select: none;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.batch-count {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.batch-btn {
+  border: 1px solid #dbe3ea;
+  background: #fff;
+  color: #334155;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.batch-btn:hover {
+  border-color: #94a3b8;
+}
+
+.batch-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.batch-btn.required {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.batch-btn.prefer {
+  color: #b45309;
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.batch-btn.optional {
+  color: #475569;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.batch-btn.danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fef2f2;
 }
 
 .search-box {
@@ -468,6 +693,12 @@ const formatParamValue = (predicate, key, value) => {
   user-select: none;
 }
 
+.rule-select {
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+}
+
 .rule-priority-bar {
   width: 0;
   align-self: stretch;
@@ -475,14 +706,22 @@ const formatParamValue = (predicate, key, value) => {
 }
 
 /* 开关 */
-.rule-toggle { flex-shrink: 0; padding-left: 12px; }
+.rule-toggle {
+  flex-shrink: 0;
+  padding-left: 12px;
+  display: flex;
+  align-items: center;
+}
 
 .toggle-switch {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   position: relative;
   width: 34px;
   height: 20px;
   cursor: pointer;
+  vertical-align: middle;
 }
 
 .toggle-switch input { display: none; }

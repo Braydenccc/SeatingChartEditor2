@@ -329,6 +329,28 @@ onBeforeUnmount(() => {
   transform: scale(1.1);
 }
 
+@media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
+  .app-header {
+    padding: 0 18px;
+  }
+
+  .header-left {
+    gap: 14px;
+  }
+
+  .header-text {
+    font-size: 24px;
+  }
+
+  .header-subtitle {
+    font-size: 15px;
+  }
+
+  .user-info {
+    padding: 6px 12px;
+  }
+}
+
 /* 响应式设计 - 平板 */
 @media (max-width: 1024px) {
   .app-header {

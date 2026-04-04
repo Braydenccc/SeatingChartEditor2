@@ -43,6 +43,17 @@ import SeatChart from '../seat/SeatChart.vue'
   }
 }
 
+/* 低分辨率桌面优化 */
+@media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
+  .editor {
+    min-height: 55%;
+  }
+
+  .student-list-area {
+    min-height: 240px;
+  }
+}
+
 /* 响应式设计 - 平板 */
 @media (max-width: 1024px) {
   .editor-panel {

@@ -22,23 +22,50 @@
       </div>
 
       <div class="modal-body">
+        <div class="mode-switch-bar">
+          <div class="mode-switch-left">
+            <button
+              class="mode-btn"
+              :class="{ active: editorMode === 'quick' }"
+              @click="editorMode = 'quick'"
+            >
+              快速模式
+            </button>
+            <button
+              class="mode-btn"
+              :class="{ active: editorMode === 'pro' }"
+              @click="editorMode = 'pro'"
+            >
+              专业模式
+            </button>
+          </div>
+          <span class="mode-hint">
+            {{ editorMode === 'quick' ? '推荐：按场景快速建规则' : '高级：按对象和参数精细控制' }}
+          </span>
+        </div>
+
         <!-- Tab 1: 规则总览 -->
         <div v-show="activeTab === 'rules'" class="tab-content">
           <RuleList
+            ref="ruleListRef"
+            :focus-rule-id="focusRuleId"
             @export="handleExportRules"
             @import="handleImportRules"
           />
           <div class="tab-divider"></div>
-          <RuleBuilder @added="onRuleAdded" />
+          <RuleBuilder :mode="editorMode" @added="onRuleAdded" />
         </div>
 
-        <!-- Tab 2: 个人/分组规则（目前展示占位符，内容在 rules tab 中） -->
+        <!-- Tab 2: 对象类型说明（目前展示占位符，内容在 rules tab 中） -->
         <div v-show="activeTab === 'personal'" class="tab-content">
           <div class="placeholder-tip">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <div>
-              <p class="tip-title">个人 / 分组规则</p>
-              <p class="tip-desc">请在「📋 规则总览」标签中添加个人位置规则（IN_ROW_RANGE、NOT_IN_COLUMN_TYPE 等）和标签分组规则（DISTRIBUTE_EVENLY 等）。</p>
+              <p class="tip-title">对象类型说明</p>
+              <p class="tip-desc">个人对象：针对单个学生；标签对象：针对某类学生（如“住宿”标签）。请在「📋 规则总览」中创建并组合使用。</p>
+              <div class="tip-actions">
+                <button class="tip-action-btn" @click="activeTab = 'rules'">去规则总览创建规则</button>
+              </div>
             </div>
           </div>
         </div>
@@ -56,9 +83,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { useStudentData } from '@/composables/useStudentData'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useSeatRules } from '@/composables/useSeatRules'
+import { useLogger } from '@/composables/useLogger'
 import RuleBuilder from '@/components/rule/RuleBuilder.vue'
 import RuleList from '@/components/rule/RuleList.vue'
 
@@ -70,19 +97,25 @@ const props = defineProps({
   initialTab: {
     type: String,
     default: 'rules'
+  },
+  focusRuleId: {
+    type: String,
+    default: ''
   }
 })
 
 const emit = defineEmits(['close'])
 
-const { students } = useStudentData()
 const { ruleCount, exportRules, importRules } = useSeatRules()
+const { success, warning, error } = useLogger()
+const ruleListRef = ref(null)
 
 // ==================== Tab 状态 ====================
 const activeTab = ref('rules')
+const editorMode = ref('quick')
 const tabs = computed(() => [
   { key: 'rules', icon: '📋', label: '规则总览', badge: ruleCount.value > 0 ? ruleCount.value : null },
-  { key: 'personal', icon: '🏷️', label: '个人/分组', badge: null }
+  { key: 'personal', icon: '🏷️', label: '对象说明', badge: null }
 ])
 
 // 当弹窗打开时，跳转到 initialTab 指定的 Tab
@@ -104,10 +137,42 @@ const handleExportRules = () => {
   URL.revokeObjectURL(url)
 }
 
+const handleImportRules = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json,application/json'
+  input.onchange = async (event) => {
+    const file = event.target?.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    const result = importRules(text)
+    if (!result.success) {
+      const firstErr = result.errors?.[0]
+      error(firstErr?.message || '规则导入失败')
+      return
+    }
+
+    if (result.imported > 0) {
+      success(`规则导入成功：${result.imported} 条`)
+    } else {
+      warning('未导入任何规则')
+    }
+    if (result.errors?.length) {
+      warning(`有 ${result.errors.length} 条规则导入失败，请检查格式或参数`)
+    }
+  }
+  input.click()
+}
+
+const onRuleAdded = () => {}
+
 // 当模态框关闭时重置 tab
 watch(() => props.visible, (visible) => {
-  if (!visible) {
-    //
+  if (visible && props.focusRuleId) {
+    activeTab.value = 'rules'
+    nextTick(() => {
+      ruleListRef.value?.focusRule?.(props.focusRuleId)
+    })
   }
 })
 
@@ -214,6 +279,64 @@ const close = () => {
   gap: 20px;
 }
 
+.mode-switch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  min-height: 44px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.mode-switch-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dbe3ea;
+  background: white;
+  color: #334155;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  min-height: 30px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.mode-btn:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+
+.mode-btn.active {
+  background: #23587b;
+  border-color: #23587b;
+  color: white;
+  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.28);
+}
+
+.mode-hint {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+}
+
 .tab-divider {
   height: 2px;
   background: linear-gradient(to right, #e2e8f0, transparent);
@@ -243,6 +366,26 @@ const close = () => {
   font-size: 13px;
   color: #475569; /* Darkened for readability */
   line-height: 1.6;
+}
+
+.tip-actions {
+  margin-top: 12px;
+}
+
+.tip-action-btn {
+  border: 1px solid #23587b;
+  background: #23587b;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tip-action-btn:hover {
+  background: #2d6a94;
+  border-color: #2d6a94;
 }
 
 

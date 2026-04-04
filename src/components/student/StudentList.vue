@@ -248,6 +248,35 @@ const handleDeleteStudent = (studentId) => {
   background: #888;
 }
 
+@media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
+  .student-list-header {
+    padding: 10px 12px;
+  }
+
+  .student-list-header h3 {
+    font-size: 16px;
+  }
+
+  .student-count-control label,
+  .student-count-input,
+  .add-student-btn {
+    font-size: 13px;
+  }
+
+  .student-count-input {
+    width: 62px;
+    padding: 4px 8px;
+  }
+
+  .add-student-btn {
+    padding: 6px 12px;
+  }
+
+  .student-items {
+    padding: 8px;
+  }
+}
+
 /* 响应式设计 - 移动设备 */
 @media (max-width: 768px) {
   .student-list-container {

@@ -712,6 +712,37 @@ const showOverlay = computed(() => editingZoneId.value !== null)
   color: #23587b;
 }
 
+@media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
+  .seat-chart-info {
+    padding: 10px 14px;
+    font-size: 13px;
+    gap: 6px;
+  }
+
+  .seat-chart {
+    gap: 26px;
+    padding: 22px 14px;
+  }
+
+  .seat-group {
+    gap: 10px;
+  }
+
+  .group-label {
+    font-size: 14px;
+    padding: 6px 10px;
+  }
+
+  .group-content {
+    gap: 12px;
+  }
+
+  .seat-column {
+    width: 104px;
+    gap: 9px;
+  }
+}
+
 /* ==================== 响应式 ==================== */
 @media (max-width: 768px) {
   .seat-chart-container {
