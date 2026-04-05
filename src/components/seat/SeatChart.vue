@@ -61,13 +61,13 @@
       <!-- 缩放控件 -->
       <div class="zoom-controls">
         <button class="zoom-btn" @click.stop="zoomOut" :disabled="scale <= MIN_SCALE" title="缩小">
-          <span>−</span>
+          <Minus :size="16" stroke-width="2.5" />
         </button>
         <button class="zoom-label" @click.stop="handleFitZoom" title="自适应大小">
           {{ Math.round(scale * 100) }}%
         </button>
         <button class="zoom-btn" @click.stop="zoomIn" :disabled="scale >= MAX_SCALE" title="放大">
-          <span>+</span>
+          <Plus :size="16" stroke-width="2.5" />
         </button>
       </div>
     </div>
@@ -76,6 +76,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
+import { Minus, Plus } from 'lucide-vue-next'
 import SeatItem from './SeatItem.vue'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useEditMode } from '@/composables/useEditMode'

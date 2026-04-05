@@ -42,9 +42,13 @@
           :style="{ background: getTagColor(tagId) }"
         >
           {{ getTagName(tagId) }}
-          <button class="remove-tag-btn" @click.stop="removeTag(tagId)">×</button>
+          <button class="remove-tag-btn" @click.stop="removeTag(tagId)">
+            <X :size="10" stroke-width="2.5" />
+          </button>
         </span>
-        <button ref="addBtnRef" class="add-tag-btn" @click.stop="toggleTagPicker">+</button>
+        <button ref="addBtnRef" class="add-tag-btn" @click.stop="toggleTagPicker">
+          <Plus :size="12" stroke-width="2.5" />
+        </button>
       </div>
 
       <div class="zone-info">
@@ -78,6 +82,7 @@
 
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { X, Plus } from 'lucide-vue-next'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
 

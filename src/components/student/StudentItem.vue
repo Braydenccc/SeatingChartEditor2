@@ -24,9 +24,13 @@
         <span v-for="tagId in student.tags" :key="tagId" class="student-tag"
           :style="{ background: getTagColor(tagId) }">
           {{ getTagName(tagId) }}
-          <button class="remove-tag-btn" :aria-label="`移除标签 ${getTagName(tagId)}`" @click="removeTag(tagId)">×</button>
+          <button class="remove-tag-btn" :aria-label="`移除标签 ${getTagName(tagId)}`" @click="removeTag(tagId)">
+            <X :size="10" stroke-width="2.5" />
+          </button>
         </span>
-        <button ref="addBtnRef" class="add-tag-to-student-btn" aria-label="添加标签" @click.stop="toggleTagPicker">+</button>
+        <button ref="addBtnRef" class="add-tag-to-student-btn" aria-label="添加标签" @click.stop="toggleTagPicker">
+          <Plus :size="14" stroke-width="2.5" />
+        </button>
       </div>
     </div>
 
@@ -49,6 +53,7 @@
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
+import { X, Plus } from 'lucide-vue-next'
 import { useStudentData } from '@/composables/useStudentData'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'

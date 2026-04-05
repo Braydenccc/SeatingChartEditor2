@@ -6,13 +6,19 @@
         <span class="tag-color-bar" :style="{ background: tag.color }"></span>
         <span class="tag-name">{{ tag.name }}</span>
         <div class="tag-actions">
-          <button class="tag-action-btn edit" @click="editTagHandler(tag)" title="编辑">编</button>
+          <button class="tag-action-btn edit" @click="editTagHandler(tag)" title="编辑">
+            <Pencil :size="11" stroke-width="2" />
+          </button>
           <button class="tag-action-btn delete" :class="{ confirming: isDeletingTag(tag.id).value }"
             @click="deleteTagHandler(tag.id, tag.name)"
-            :title="isDeletingTag(tag.id).value ? '再次点击确认' : '删除'">×</button>
+            :title="isDeletingTag(tag.id).value ? '再次点击确认' : '删除'">
+            <X :size="12" stroke-width="2.5" />
+          </button>
         </div>
       </div>
-      <button class="add-tag-btn" @click="showAddDialog" title="新建标签">+</button>
+      <button class="add-tag-btn" @click="showAddDialog" title="新建标签">
+        <Plus :size="14" stroke-width="2.5" />
+      </button>
     </div>
 
     <!-- 添加/编辑标签对话框 -->
@@ -42,6 +48,7 @@
 
 <script setup>
 import { ref, nextTick, computed } from 'vue'
+import { Pencil, X, Plus } from 'lucide-vue-next'
 import EmptyState from '../ui/EmptyState.vue'
 import { getNextColor } from '@/constants/tagColors'
 import { useConfirmAction } from '@/composables/useConfirmAction'

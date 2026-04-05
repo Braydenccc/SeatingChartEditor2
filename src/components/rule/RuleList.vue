@@ -4,9 +4,11 @@
     <!-- 搜索与筛选工具栏 -->
     <div class="rule-toolbar">
       <div class="search-box">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <Search :size="15" color="#94a3b8" stroke-width="2.5" />
         <input v-model="searchQuery" type="text" placeholder="搜索规则、学生、备注..." />
-        <button v-if="searchQuery" class="clear-search" @click="searchQuery = ''">×</button>
+        <button v-if="searchQuery" class="clear-search" @click="searchQuery = ''" aria-label="清空搜索">
+          <X :size="12" />
+        </button>
       </div>
 
       <div class="filter-row">
@@ -23,13 +25,13 @@
         </div>
         <div class="toolbar-actions">
           <button class="action-btn" @click="emit('export')" title="导出规则">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <Download :size="14" />
           </button>
           <button class="action-btn" @click="emit('import')" title="导入规则">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <Upload :size="14" />
           </button>
           <button v-if="rules.length > 0" class="action-btn danger" @click="handleClearAll" title="清空全部">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <Trash2 :size="14" />
           </button>
         </div>
       </div>
@@ -57,7 +59,7 @@
 
     <!-- 冲突警告 -->
     <div v-if="conflicts.length > 0" class="conflict-banner">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <AlertTriangle :size="16" />
       发现 {{ conflicts.length }} 条逻辑冲突规则
       <button class="conflict-detail-btn" @click="showConflicts = !showConflicts">
         {{ showConflicts ? '收起' : '查看' }}
@@ -72,7 +74,7 @@
 
     <!-- 空状态 -->
     <div v-if="filteredRules.length === 0" class="empty-state">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+      <ClipboardList :size="40" color="#cbd5e1" stroke-width="1.5" />
       <p>{{ filterPriority === 'all' ? '暂无规则，请在上方添加' : '该优先级下没有规则' }}</p>
     </div>
 
@@ -114,7 +116,7 @@
 
           <div class="rule-actions">
             <span class="rule-chevron" :class="{ open: expandedId === rule.id }">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              <ChevronDown :size="14" />
             </span>
           </div>
         </div>
@@ -168,6 +170,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { Search, X, Download, Upload, Trash2, AlertTriangle, ClipboardList, ChevronDown } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useStudentData } from '@/composables/useStudentData'
@@ -504,6 +507,8 @@ defineExpose({ focusRule })
   right: 8px;
   width: 20px;
   height: 20px;
+  padding: 0;
+  line-height: 0;
   border: none;
   background: #e2e8f0;
   color: #64748b;
@@ -511,8 +516,12 @@ defineExpose({ focusRule })
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
   cursor: pointer;
+}
+
+.clear-search svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .filter-row {

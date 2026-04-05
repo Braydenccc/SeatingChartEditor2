@@ -399,18 +399,20 @@
   </div>
 
   <!-- 导出设置弹窗 -->
-  <ExportDialog :visible="showExportDialog" @close="showExportDialog = false" @exported="onExported" />
+  <ExportDialog v-if="showExportDialog" :visible="showExportDialog" @close="showExportDialog = false" @exported="onExported" />
 
   <!-- 云端工作区弹窗 -->
-  <CloudWorkspaceDialog 
-    :visible="showCloudDialog" 
-    :mode="cloudDialogMode" 
-    @update:visible="showCloudDialog = $event" 
+  <CloudWorkspaceDialog
+    v-if="showCloudDialog"
+    :visible="showCloudDialog"
+    :mode="cloudDialogMode"
+    @update:visible="showCloudDialog = $event"
     @success="handleCloudSuccess"
   />
 
   <!-- 座位规则编辑器模态框 -->
   <SeatRuleEditor
+    v-if="showRuleEditor"
     :visible="showRuleEditor"
     initialTab="rules"
     :focus-rule-id="focusedRuleId"
@@ -423,23 +425,10 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed, defineAsyncComponent } from 'vue'
 import { CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, Save, Scale, Shuffle, X } from 'lucide-vue-next'
-import LoadingSpinner from '../ui/LoadingSpinner.vue'
 
-const SeatRuleEditor = defineAsyncComponent({
-  loader: () => import('../relation/SeatRuleEditor.vue'),
-  loadingComponent: LoadingSpinner,
-  delay: 200
-})
-const ExportDialog = defineAsyncComponent({
-  loader: () => import('./ExportPreview.vue'),
-  loadingComponent: LoadingSpinner,
-  delay: 200
-})
-const CloudWorkspaceDialog = defineAsyncComponent({
-  loader: () => import('../workspace/CloudWorkspaceDialog.vue'),
-  loadingComponent: LoadingSpinner,
-  delay: 200
-})
+const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
+const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
+const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
 
 import { useSidebar } from '@/composables/useSidebar'
 import { useSeatChart } from '@/composables/useSeatChart'

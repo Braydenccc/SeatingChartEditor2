@@ -3,7 +3,9 @@
     <div class="modal-container">
       <div class="modal-header">
         <h3>座位规则 & 联系编辑</h3>
-        <button class="close-btn" @click="close">×</button>
+        <button class="close-btn" @click="close" aria-label="关闭">
+          <X :size="18" stroke-width="2" />
+        </button>
       </div>
 
       <!-- tab 导航 -->
@@ -15,7 +17,7 @@
           :class="{ active: activeTab === tab.key }"
           @click="activeTab = tab.key"
         >
-          <span class="tab-icon">{{ tab.icon }}</span>
+          <component :is="tab.icon" :size="15" stroke-width="1.8" />
           <span class="tab-label">{{ tab.label }}</span>
           <span v-if="tab.badge" class="tab-badge">{{ tab.badge }}</span>
         </button>
@@ -90,6 +92,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { X, List, Users } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useLogger } from '@/composables/useLogger'
 import RuleBuilder from '@/components/rule/RuleBuilder.vue'
@@ -125,8 +128,8 @@ const editingRule = computed(() => {
   return rules.value.find(r => r.id === editingRuleId.value) || null
 })
 const tabs = computed(() => [
-  { key: 'rules', icon: '规', label: '规则总览', badge: ruleCount.value > 0 ? ruleCount.value : null },
-  { key: 'personal', icon: '类', label: '对象说明', badge: null }
+  { key: 'rules', icon: List, label: '规则总览', badge: ruleCount.value > 0 ? ruleCount.value : null },
+  { key: 'personal', icon: Users, label: '对象说明', badge: null }
 ])
 
 // 当弹窗打开时，跳转到 initialTab 指定的 Tab
