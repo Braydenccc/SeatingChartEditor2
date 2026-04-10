@@ -16,27 +16,29 @@ jobs:
     name: 🚀 Production (sce.jbyc.cc)
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    container:
-      image: shangzheny/rth-host-helper@sha256:789428be24aefa9c839075687bd8ca0e0819776ef439b81e7610a36eebc107fc
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build:web
 
       # 第 1 次尝试
       - name: Deploy (1/3)
         id: d1
         continue-on-error: true
-        uses: rthsoftware/host-auto-deploy@3e5e4a34333b20df886e9366f6b37b54b2f67a1e
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        with:
-          site: "sce.jbyc.cc"
-          build: "build:web"
-          outdir: "dist"
+        run: node scripts/deploy-staging.js --site sce.jbyc.cc --outdir dist
 
       # 第 2 次尝试（仅在第 1 次失败后执行）
       - name: Wait before retry (1→2)
@@ -49,13 +51,9 @@ jobs:
         id: d2
         if: steps.d1.outcome == 'failure'
         continue-on-error: true
-        uses: rthsoftware/host-auto-deploy@3e5e4a34333b20df886e9366f6b37b54b2f67a1e
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        with:
-          site: "sce.jbyc.cc"
-          build: "build:web"
-          outdir: "dist"
+        run: node scripts/deploy-staging.js --site sce.jbyc.cc --outdir dist
 
       # 第 3 次尝试（仅在第 2 次失败后执行）
       - name: Wait before retry (2→3)
@@ -66,13 +64,10 @@ jobs:
 
       - name: Deploy (3/3)
         if: steps.d2.outcome == 'failure'
-        uses: rthsoftware/host-auto-deploy@3e5e4a34333b20df886e9366f6b37b54b2f67a1e
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        with:
-          site: "sce.jbyc.cc"
-          build: "build:web"
-          outdir: "dist"
+        run: node scripts/deploy-staging.js --site sce.jbyc.cc --outdir dist
+
 
   # ── 测试环境：test 分支 → test.sce.jbyc.cc ────────────────────────────────
   deploy-staging:
