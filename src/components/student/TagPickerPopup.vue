@@ -49,24 +49,29 @@ const popupStyle = computed(() => {
   const maxHeight = 240
   const margin = 8
 
-  // 获取触发器在视窗中的坐标（响应式更新）
   let left = triggerBounds.left.value
-  
-  // 水平方向：防止溢出右侧
+
   if (left + width + margin > windowWidth.value) {
     left = Math.max(margin, windowWidth.value - width - margin)
   }
   if (left < margin) left = margin
 
-  // 垂直方向：优先显示在按钮下方，空间不足时改为上方
   const spaceBelow = windowHeight.value - triggerBounds.bottom.value - margin
   const spaceAbove = triggerBounds.top.value - margin
   let top
-  
+  let adjustedMaxHeight = maxHeight
+
   if (spaceBelow >= Math.min(maxHeight, 80) || spaceBelow >= spaceAbove) {
     top = triggerBounds.bottom.value + 6
+    if (top + adjustedMaxHeight > windowHeight.value - margin) {
+      adjustedMaxHeight = Math.max(windowHeight.value - top - margin, 80)
+    }
   } else {
     top = triggerBounds.top.value - Math.min(maxHeight, spaceAbove) - 6
+    if (top < margin) {
+      top = margin
+      adjustedMaxHeight = Math.min(maxHeight, spaceAbove)
+    }
   }
 
   return {
@@ -74,7 +79,7 @@ const popupStyle = computed(() => {
     top: `${top}px`,
     left: `${left}px`,
     minWidth: `${width}px`,
-    maxHeight: `${maxHeight}px`,
+    maxHeight: `${adjustedMaxHeight}px`,
     zIndex: 9999
   }
 })
