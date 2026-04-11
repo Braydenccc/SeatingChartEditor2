@@ -156,110 +156,173 @@ export function useAssignment() {
 
   /**
    * 检查单条规则是否违规
-   * @param {object} rule - 规则对象
+   * @param {object} rule - 规则对象（支持 not 字段取反）
    * @param {object} subject - 已展开的 subject（{ type, studentId } 或 { type, studentId1, studentId2 }）
    * @param {Map} assignment - studentId -> seatId 的映射
    * @returns {{ violated: boolean, excess?: number }} 违规信息
    */
   const checkViolation = (rule, subject, assignment) => {
-    const { predicate, params } = rule
+    const { predicate, params, not } = rule
 
     const getSeat = (studentId) => assignment.get(studentId)
 
-    if (subject.type === 'single') {
-      const seatId = getSeat(subject.studentId)
-      if (!seatId) return { violated: false } // 未分配，跳过
+    // 内部检测函数
+    const detect = () => {
+      if (subject.type === 'single') {
+        const seatId = getSeat(subject.studentId)
+        if (!seatId) return { violated: false }
 
-      switch (predicate) {
-        case 'IN_ROW_RANGE':
-          return { violated: !isInRowRange(seatId, params.minRow, params.maxRow) }
-        case 'NOT_IN_COLUMN_TYPE':
-          return { violated: isColumnType(seatId, params.columnType) }
-        case 'IN_ZONE': {
-          const zone = getZoneForSeat(seatId)
-          return { violated: !zone || zone.id !== params.zoneId }
+        switch (predicate) {
+          case 'IN_ROW_RANGE':
+            return { violated: !isInRowRange(seatId, params.minRow, params.maxRow) }
+          case 'NOT_IN_COLUMN_TYPE':
+            return { violated: isColumnType(seatId, params.columnType) }
+          case 'IN_ZONE': {
+            const zone = getZoneForSeat(seatId)
+            return { violated: !zone || zone.id !== params.zoneId }
+          }
+          case 'NOT_IN_ZONE': {
+            const zone = getZoneForSeat(seatId)
+            return { violated: zone?.id === params.zoneId }
+          }
+          case 'IN_GROUP_RANGE':
+            return { violated: !isInGroupRange(seatId, params.minGroup, params.maxGroup) }
+          default:
+            return { violated: false }
         }
-        case 'NOT_IN_ZONE': {
-          const zone = getZoneForSeat(seatId)
-          return { violated: zone?.id === params.zoneId }
-        }
-        case 'IN_GROUP_RANGE':
-          return { violated: !isInGroupRange(seatId, params.minGroup, params.maxGroup) }
-        default:
-          return { violated: false }
       }
+
+      if (subject.type === 'pair') {
+        const seatId1 = getSeat(subject.studentId1)
+        const seatId2 = getSeat(subject.studentId2)
+        if (!seatId1 || !seatId2) return { violated: false }
+
+        switch (predicate) {
+          case 'MUST_BE_SEATMATES':
+            return { violated: !areDeskmates(seatId1, seatId2) }
+          case 'MUST_NOT_BE_SEATMATES':
+            return { violated: areDeskmates(seatId1, seatId2) }
+          case 'DISTANCE_AT_MOST': {
+            const dist = getSeatDistance(seatId1, seatId2)
+            const violated = dist > params.distance
+            const excess = violated ? dist - params.distance : 0
+            return { violated, excess }
+          }
+          case 'DISTANCE_AT_LEAST': {
+            const dist = getSeatDistance(seatId1, seatId2)
+            const violated = dist < params.distance
+            const excess = violated ? params.distance - dist : 0
+            return { violated, excess }
+          }
+          case 'NOT_BLOCK_VIEW': {
+            const tolerance = params.tolerance ?? 0
+            return { violated: isDirectlyBehind(seatId1, seatId2, tolerance) }
+          }
+          case 'MUST_BE_SAME_GROUP': {
+            const p1 = parseSeatId(seatId1)
+            const p2 = parseSeatId(seatId2)
+            return { violated: p1.groupIndex !== p2.groupIndex }
+          }
+          case 'MUST_NOT_BE_SAME_GROUP': {
+            const p1 = parseSeatId(seatId1)
+            const p2 = parseSeatId(seatId2)
+            return { violated: p1.groupIndex === p2.groupIndex }
+          }
+          case 'MUST_BE_ADJACENT_ROW':
+            return { violated: !isAdjacentRow(seatId1, seatId2) }
+          default:
+            return { violated: false }
+        }
+      }
+
+      return { violated: false }
     }
 
-    if (subject.type === 'pair') {
-      const seatId1 = getSeat(subject.studentId1)
-      const seatId2 = getSeat(subject.studentId2)
-      if (!seatId1 || !seatId2) return { violated: false }
-
-      switch (predicate) {
-        case 'MUST_BE_SEATMATES':
-          return { violated: !areDeskmates(seatId1, seatId2) }
-        case 'MUST_NOT_BE_SEATMATES':
-          return { violated: areDeskmates(seatId1, seatId2) }
-        case 'DISTANCE_AT_MOST': {
-          const dist = getSeatDistance(seatId1, seatId2)
-          const violated = dist > params.distance
-          const excess = violated ? dist - params.distance : 0
-          return { violated, excess }
-        }
-        case 'DISTANCE_AT_LEAST': {
-          const dist = getSeatDistance(seatId1, seatId2)
-          const violated = dist < params.distance
-          const excess = violated ? params.distance - dist : 0
-          return { violated, excess }
-        }
-        case 'NOT_BLOCK_VIEW': {
-          // id1 不能在 id2 后方（id1 遮挡 id2）
-          const tolerance = params.tolerance ?? 0
-          return { violated: isDirectlyBehind(seatId1, seatId2, tolerance) }
-        }
-        case 'MUST_BE_SAME_GROUP': {
-          const p1 = parseSeatId(seatId1)
-          const p2 = parseSeatId(seatId2)
-          return { violated: p1.groupIndex !== p2.groupIndex }
-        }
-        case 'MUST_NOT_BE_SAME_GROUP': {
-          const p1 = parseSeatId(seatId1)
-          const p2 = parseSeatId(seatId2)
-          return { violated: p1.groupIndex === p2.groupIndex }
-        }
-        case 'MUST_BE_ADJACENT_ROW':
-          return { violated: !isAdjacentRow(seatId1, seatId2) }
-        default:
-          return { violated: false }
-      }
+    // 执行检测并应用 NOT 取反
+    const result = detect()
+    if (not) {
+      // 取反：violated 变为 !violated
+      return { ...result, violated: !result.violated, excess: undefined }
     }
-
-    return { violated: false }
+    return result
   }
 
   /**
    * 检查分组分散/聚集谓词（需要整体视角）
+   * DISTRIBUTE_EVENLY: 基于直线距离的两两分散（最大化最小距离）
+   * CLUSTER_TOGETHER: 基于区域聚集
    */
   const checkGroupViolation = (rule, expandedSubjects, assignment) => {
     const { predicate, params } = rule
     let penalties = 0
 
     if (predicate === 'DISTRIBUTE_EVENLY') {
-      // 统计各大组/排的标签学生数量，方差越大违规越重
-      const counts = new Map()
+      // 收集已分配学生的座位信息
+      const positioned = []
       for (const subj of expandedSubjects) {
         const seatId = assignment.get(subj.studentId)
         if (!seatId) continue
-        const key = params.scope === 'group'
-          ? parseSeatId(seatId).groupIndex
-          : parseSeatId(seatId).rowIndex
-        counts.set(key, (counts.get(key) ?? 0) + 1)
+        const parsed = parseSeatId(seatId)
+        // 计算全局列号：跨大组的连续坐标
+        const { columnsPerGroup } = seatConfig.value
+        const globalCol = parsed.groupIndex * columnsPerGroup + parsed.columnIndex
+        positioned.push({
+          studentId: subj.studentId,
+          seatId,
+          globalCol,
+          row: parsed.rowIndex
+        })
       }
-      const values = [...counts.values()]
-      if (values.length > 1) {
-        const max = Math.max(...values)
-        const min = Math.min(...values)
-        penalties = (max - min) * PENALTY_WEIGHTS[rule.priority] * 0.1
+
+      if (positioned.length <= 1) return 0
+
+      // 计算所有学生两两之间的欧几里得距离
+      let minDistance = Infinity
+      let totalDistance = 0
+      let pairCount = 0
+      const closePairs = [] // 记录距离过近的学生对
+
+      for (let i = 0; i < positioned.length; i++) {
+        for (let j = i + 1; j < positioned.length; j++) {
+          const a = positioned[i]
+          const b = positioned[j]
+          // 欧几里得距离（使用全局坐标）
+          const colDiff = Math.abs(a.globalCol - b.globalCol)
+          const rowDiff = Math.abs(a.row - b.row)
+          const distance = Math.sqrt(colDiff * colDiff + rowDiff * rowDiff)
+
+          totalDistance += distance
+          pairCount++
+
+          if (distance < minDistance) {
+            minDistance = distance
+          }
+
+          // 距离小于阈值时记录（阈值=2，约等于"相邻或隔一个座位"）
+          if (distance < 2) {
+            closePairs.push({ studentId1: a.studentId, studentId2: b.studentId, distance })
+          }
+        }
+      }
+
+      const avgDistance = pairCount > 0 ? totalDistance / pairCount : 0
+
+      // 惩罚策略：
+      // 1. 最小距离惩罚：如果最近的一对学生坐得太近（<2），按不足程度惩罚
+      if (minDistance < 2) {
+        penalties += (2 - minDistance) * PENALTY_WEIGHTS[rule.priority] * 0.5
+      }
+
+      // 2. 过近pair惩罚：每对距离<2的学生对都额外惩罚
+      for (const pair of closePairs) {
+        penalties += (2 - pair.distance) * PENALTY_WEIGHTS[rule.priority] * 0.3
+      }
+
+      // 3. 平均距离奖励/惩罚：鼓励整体分布均匀
+      // 理想平均距离与座位布局相关，这里用经验值
+      const idealMinAvg = Math.sqrt(positioned.length) * 1.5
+      if (avgDistance < idealMinAvg && positioned.length > 2) {
+        penalties += (idealMinAvg - avgDistance) * PENALTY_WEIGHTS[rule.priority] * 0.1
       }
     }
 
@@ -285,43 +348,72 @@ export function useAssignment() {
 
   /**
    * 细粒度定位分组规则违规学生（避免整组粗标记）
+   * DISTRIBUTE_EVENLY: 返回距离过近的学生（参与近距离pair的学生）
+   * CLUSTER_TOGETHER: 返回不在聚集区域的学生
    */
   const getGroupRuleViolatingStudentIds = (rule, expandedSubjects, assignment) => {
     const { predicate, params } = rule
-    const positioned = []
-
-    for (const subj of expandedSubjects) {
-      if (subj.type !== 'single') continue
-      const seatId = assignment.get(subj.studentId)
-      if (!seatId) continue
-      const key = predicate === 'DISTRIBUTE_EVENLY'
-        ? (params.scope === 'group' ? parseSeatId(seatId).groupIndex : parseSeatId(seatId).rowIndex)
-        : (params.scope === 'group' ? parseSeatId(seatId).groupIndex : (getZoneForSeat(seatId)?.id ?? 'none'))
-      positioned.push({ studentId: subj.studentId, key })
-    }
-
-    if (positioned.length <= 1) return []
-
-    const counts = new Map()
-    for (const item of positioned) {
-      counts.set(item.key, (counts.get(item.key) ?? 0) + 1)
-    }
-    if (counts.size <= 1) return []
 
     if (predicate === 'DISTRIBUTE_EVENLY') {
-      const values = [...counts.values()]
-      const max = Math.max(...values)
-      const min = Math.min(...values)
-      if (max <= min) return []
-      const heavyKeys = new Set(
-        [...counts.entries()].filter(([, count]) => count === max).map(([key]) => key)
-      )
-      return positioned
-        .filter(item => heavyKeys.has(item.key))
-        .map(item => item.studentId)
+      // 收集已分配学生的座位信息
+      const positioned = []
+      for (const subj of expandedSubjects) {
+        if (subj.type !== 'single') continue
+        const seatId = assignment.get(subj.studentId)
+        if (!seatId) continue
+        const parsed = parseSeatId(seatId)
+        const { columnsPerGroup } = seatConfig.value
+        const globalCol = parsed.groupIndex * columnsPerGroup + parsed.columnIndex
+        positioned.push({
+          studentId: subj.studentId,
+          globalCol,
+          row: parsed.rowIndex
+        })
+      }
+
+      if (positioned.length <= 1) return []
+
+      // 找出所有距离过近的pair（距离<2）
+      const violatingStudentIds = new Set()
+      const threshold = 2
+
+      for (let i = 0; i < positioned.length; i++) {
+        for (let j = i + 1; j < positioned.length; j++) {
+          const a = positioned[i]
+          const b = positioned[j]
+          const colDiff = Math.abs(a.globalCol - b.globalCol)
+          const rowDiff = Math.abs(a.row - b.row)
+          const distance = Math.sqrt(colDiff * colDiff + rowDiff * rowDiff)
+
+          if (distance < threshold) {
+            // 距离过近，两个学生都标记为违规
+            violatingStudentIds.add(a.studentId)
+            violatingStudentIds.add(b.studentId)
+          }
+        }
+      }
+
+      return [...violatingStudentIds]
     }
 
     if (predicate === 'CLUSTER_TOGETHER') {
+      const positioned = []
+      for (const subj of expandedSubjects) {
+        if (subj.type !== 'single') continue
+        const seatId = assignment.get(subj.studentId)
+        if (!seatId) continue
+        const key = params.scope === 'group' ? parseSeatId(seatId).groupIndex : (getZoneForSeat(seatId)?.id ?? 'none')
+        positioned.push({ studentId: subj.studentId, key })
+      }
+
+      if (positioned.length <= 1) return []
+
+      const counts = new Map()
+      for (const item of positioned) {
+        counts.set(item.key, (counts.get(item.key) ?? 0) + 1)
+      }
+      if (counts.size <= 1) return []
+
       const dominantKey = [...counts.entries()]
         .sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])))[0]?.[0]
       if (dominantKey == null) return []
@@ -346,6 +438,45 @@ export function useAssignment() {
 
     for (const rule of activeRules) {
       const weight = PENALTY_WEIGHTS[rule.priority] ?? PENALTY_WEIGHTS.optional
+
+      // 支持复合规则（多规则组合）
+      if (rule.subRules && rule.subRules.length > 1) {
+        // 对每条子规则分别评估
+        const subScores = []
+        for (const subRule of rule.subRules) {
+          if (!subRule.predicate) continue
+          const subSubjects = expandSubject(subRule, studentList)
+          let subScore = 0
+
+          // 分组谓词单独处理
+          if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
+            subScore = checkGroupViolation(subRule, subSubjects, assignment)
+          } else {
+            for (const subject of subSubjects) {
+              const { violated, excess = 0 } = checkViolation(subRule, subject, assignment)
+              if (violated) {
+                subScore -= weight
+                if (excess > 0) {
+                  subScore -= excess * weight * 0.1
+                }
+              }
+            }
+          }
+          subScores.push(subScore)
+        }
+
+        // 应用 AND/OR 逻辑
+        if (rule.logicOperator === 'OR') {
+          // OR: 取最佳（最接近0）的子分数
+          score += Math.max(...subScores)
+        } else {
+          // AND: 累加所有子规则的惩罚
+          score += subScores.reduce((sum, s) => sum + s, 0)
+        }
+        continue
+      }
+
+      // 单条规则评估（原有逻辑）
       const subjects = expandSubject(rule, studentList)
 
       // 分组谓词单独处理
@@ -358,7 +489,6 @@ export function useAssignment() {
         const { violated, excess = 0 } = checkViolation(rule, subject, assignment)
         if (violated) {
           score -= weight
-          // 梯度惩罚：对于距离类规则，违反程度越深惩罚越多
           if (excess > 0) {
             score -= excess * weight * 0.1
           }
@@ -501,6 +631,242 @@ export function useAssignment() {
     return assignment
   }
 
+  // ==================== 新引擎：模拟退火辅助类 ====================
+
+  class AnnealingState {
+    constructor(initialAssignment, activeRules, studentList, availableSeats) {
+      this.current = new Map(initialAssignment)
+      this.best = new Map(initialAssignment)
+      this.currentScore = evaluateScore(this.current, activeRules, studentList)
+      this.bestScore = this.currentScore
+      this.currentReverse = this.buildReverse(this.current)
+      this.emptySeats = this.buildEmptySeats(availableSeats)
+      this.stagnationCounter = 0
+      this.stagnationSinceBest = 0
+    }
+
+    buildReverse(assignment) {
+      const rev = new Map()
+      for (const [sid, seat] of assignment.entries()) {
+        rev.set(seat, sid)
+      }
+      return rev
+    }
+
+    buildEmptySeats(availableSeats) {
+      return availableSeats
+        .map(s => s.id)
+        .filter(id => !this.currentReverse.has(id))
+    }
+
+    updateBestIfBetter() {
+      if (this.currentScore > this.bestScore) {
+        this.bestScore = this.currentScore
+        this.best = new Map(this.current)
+        this.stagnationCounter = 0
+        this.stagnationSinceBest = 0
+        return true
+      }
+      return false
+    }
+
+    incrementStagnation() {
+      this.stagnationCounter++
+      this.stagnationSinceBest++
+    }
+  }
+
+  class ReheatStrategy {
+    constructor(config) {
+      this.config = config
+    }
+
+    shouldTrigger(state, reheatCount) {
+      throw new Error('Must implement shouldTrigger')
+    }
+
+    execute(state, reheatCount, activeRules, studentList, availableSeats) {
+      throw new Error('Must implement execute')
+    }
+  }
+
+  class SoftJitterReheat extends ReheatStrategy {
+    shouldTrigger(state, reheatCount) {
+      return state.stagnationCounter > this.config.baseThreshold && 
+             reheatCount < this.config.maxReheats &&
+             state.stagnationSinceBest <= this.config.baseThreshold * 4
+    }
+
+    execute(state, reheatCount, activeRules, studentList, availableSeats) {
+      const intensity = 0.5 * Math.pow(0.7, reheatCount - 1)
+      const newTemp = this.config.tStart * intensity
+      
+      state.current = new Map(state.best)
+      state.currentReverse = state.buildReverse(state.current)
+      
+      const pStrength = Math.max(1, Math.floor(state.current.size * 0.05))
+      for (let p = 0; p < pStrength; p++) {
+        const ids = [...state.current.keys()]
+        const s1 = ids[Math.floor(Math.random() * ids.length)]
+        const s2 = ids[Math.floor(Math.random() * ids.length)]
+        if (s1 === s2) continue
+        
+        const seat1 = state.current.get(s1)
+        const seat2 = state.current.get(s2)
+        state.current.set(s1, seat2)
+        state.current.set(s2, seat1)
+        state.currentReverse.set(seat1, s2)
+        state.currentReverse.set(seat2, s1)
+      }
+      
+      state.stagnationCounter = 0
+      state.currentScore = evaluateScore(state.current, activeRules, studentList)
+      state.emptySeats = state.buildEmptySeats(availableSeats)
+      return { newTemp, reheatType: 'soft_jitter' }
+    }
+  }
+
+  class GlobalShakeupReheat extends ReheatStrategy {
+    shouldTrigger(state, reheatCount) {
+      return state.stagnationCounter > this.config.baseThreshold && 
+             reheatCount < this.config.maxReheats &&
+             state.stagnationSinceBest > this.config.baseThreshold * 4
+    }
+
+    execute(state, reheatCount, activeRules, studentList, availableSeats) {
+      const intensity = 0.8 * Math.pow(0.8, reheatCount / 2)
+      const newTemp = this.config.tStart * intensity
+      
+      const shuffleCount = Math.max(2, Math.floor(state.current.size * 0.15))
+      for (let p = 0; p < shuffleCount; p++) {
+        const ids = [...state.current.keys()]
+        const s1 = ids[Math.floor(Math.random() * ids.length)]
+        const s2 = ids[Math.floor(Math.random() * ids.length)]
+        if (s1 === s2) continue
+        
+        const seat1 = state.current.get(s1)
+        const seat2 = state.current.get(s2)
+        state.current.set(s1, seat2)
+        state.current.set(s2, seat1)
+        state.currentReverse.set(seat1, s2)
+        state.currentReverse.set(seat2, s1)
+      }
+      
+      state.stagnationSinceBest = 0
+      state.stagnationCounter = 0
+      state.currentScore = evaluateScore(state.current, activeRules, studentList)
+      state.emptySeats = state.buildEmptySeats(availableSeats)
+      return { newTemp, reheatType: 'global_shakeup' }
+    }
+  }
+
+  class ReheatManager {
+    constructor(strategies) {
+      this.strategies = strategies
+      this.reheatCount = 0
+    }
+
+    tryReheat(state, activeRules, studentList, availableSeats) {
+      for (const strategy of this.strategies) {
+        if (strategy.shouldTrigger(state, this.reheatCount)) {
+          this.reheatCount++
+          const result = strategy.execute(state, this.reheatCount, activeRules, studentList, availableSeats)
+          return { shouldReheat: true, ...result }
+        }
+      }
+      return { shouldReheat: false }
+    }
+  }
+
+  class ProbabilityAdjuster {
+    constructor(config) {
+      this.config = config
+    }
+
+    getViolatingStudentProbability(stagnationSinceBest) {
+      return this.config.baseProbViolating + 
+             Math.min(this.config.maxProbIncrease, stagnationSinceBest / this.config.stagnationScale)
+    }
+
+    getEmptySeatProbability(stagnationSinceBest) {
+      const baseProb = this.config.baseProbEmpty
+      const bonus = stagnationSinceBest > this.config.stagnationThreshold 
+        ? this.config.emptySeatBonus 
+        : 0
+      return baseProb + bonus
+    }
+  }
+
+  const buildPartnerMap = (activeRules, studentList) => {
+    const partnerMap = new Map()
+    activeRules.forEach(r => {
+      if (r.priority === RulePriority.REQUIRED && r.predicate === 'MUST_BE_SEATMATES') {
+        const subjects = expandSubject(r, studentList)
+        subjects.forEach(s => {
+          if (s.type === 'pair') {
+            partnerMap.set(s.studentId1, s.studentId2)
+            partnerMap.set(s.studentId2, s.studentId1)
+          }
+        })
+      }
+    })
+    return partnerMap
+  }
+
+  const computeViolatingStudents = (assignment, activeRules, studentList) => {
+    const violating = new Set()
+    for (const rule of activeRules) {
+      // 支持复合规则（多规则组合）
+      if (rule.subRules && rule.subRules.length > 1) {
+        for (const subRule of rule.subRules) {
+          if (!subRule.predicate) continue
+          const subSubjects = expandSubject(subRule, studentList)
+          if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
+            const groupPenalty = checkGroupViolation(subRule, subSubjects, assignment)
+            if (groupPenalty > 0) {
+              const groupViolatingIds = getGroupRuleViolatingStudentIds(subRule, subSubjects, assignment)
+              for (const studentId of groupViolatingIds) violating.add(studentId)
+            }
+            continue
+          }
+          for (const subj of subSubjects) {
+            const { violated } = checkViolation(subRule, subj, assignment)
+            if (violated) {
+              if (subj.type === 'single') violating.add(subj.studentId)
+              if (subj.type === 'pair') {
+                violating.add(subj.studentId1)
+                violating.add(subj.studentId2)
+              }
+            }
+          }
+        }
+        continue
+      }
+
+      // 单条规则评估（原有逻辑）
+      const subjects = expandSubject(rule, studentList)
+      if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
+        const groupPenalty = checkGroupViolation(rule, subjects, assignment)
+        if (groupPenalty > 0) {
+          const groupViolatingIds = getGroupRuleViolatingStudentIds(rule, subjects, assignment)
+          for (const studentId of groupViolatingIds) violating.add(studentId)
+        }
+        continue
+      }
+      for (const subj of subjects) {
+        const { violated } = checkViolation(rule, subj, assignment)
+        if (violated) {
+          if (subj.type === 'single') violating.add(subj.studentId)
+          if (subj.type === 'pair') {
+            violating.add(subj.studentId1)
+            violating.add(subj.studentId2)
+          }
+        }
+      }
+    }
+    return [...violating]
+  }
+
   // ==================== 新引擎：模拟退火主循环 ====================
 
   /**
@@ -519,280 +885,203 @@ export function useAssignment() {
       onProgress = null
     } = config
 
-    let current = new Map(initialAssignment)
-    let currentScore = evaluateScore(current, activeRules, studentList)
-    let best = new Map(current)
-    let bestScore = currentScore
-
-    if (bestScore === 0) {
-      return { solution: best, score: bestScore, reheatCount: 0 }
-    }
-
-    // 构建 seat -> student 反向映射（加速交换操作）
-    const buildReverse = (assignment) => {
-      const rev = new Map()
-      for (const [sid, seat] of assignment.entries()) {
-        rev.set(seat, sid)
-      }
-      return rev
-    }
-    let currentReverse = buildReverse(current)
-
-    const assignedStudentIds = [...current.keys()]
-    const n = assignedStudentIds.length
-
-    // 计算初始的空座位
-    let emptySeats = availableSeats
-      .map(s => s.id)
-      .filter(id => !currentReverse.has(id))
-
-    const cooling = Math.pow(tEnd / tStart, 1 / iterations)
-    let stagnationCounter = 0
-    let stagnationSinceBest = 0
-    let reheatCount = 0
-    const maxReheats = 20
-    // 灵敏的停滞阈值：针对总迭代次数进行动态计算
-    const baseReheatThreshold = Math.max(800, Math.floor(iterations * 0.05))
-
-    // 预先计算哪些学生当前违规（用于偏向选择）
-    const computeViolatingStudents = (assignment) => {
-      const violating = new Set()
-      for (const rule of activeRules) {
-        const subjects = expandSubject(rule, studentList)
-        if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
-          const groupPenalty = checkGroupViolation(rule, subjects, assignment)
-          if (groupPenalty > 0) {
-            const groupViolatingIds = getGroupRuleViolatingStudentIds(rule, subjects, assignment)
-            for (const studentId of groupViolatingIds) violating.add(studentId)
-          }
-          continue
-        }
-        for (const subj of subjects) {
-          const { violated } = checkViolation(rule, subj, assignment)
-          if (violated) {
-            if (subj.type === 'single') violating.add(subj.studentId)
-            if (subj.type === 'pair') {
-              violating.add(subj.studentId1)
-              violating.add(subj.studentId2)
-            }
-          }
-        }
-      }
-      return [...violating]
-    }
-
-    let violatingStudents = computeViolatingStudents(current)
-    let T = tStart
+    const state = new AnnealingState(initialAssignment, activeRules, studentList, availableSeats)
     
-    // 建立同桌映射（加速“成对移动”变异）
-    const partnerMap = new Map()
-    activeRules.forEach(r => {
-      if (r.priority === RulePriority.REQUIRED && r.predicate === 'MUST_BE_SEATMATES') {
-        const subjects = expandSubject(r, studentList)
-        subjects.forEach(s => {
-          if (s.type === 'pair') {
-            partnerMap.set(s.studentId1, s.studentId2)
-            partnerMap.set(s.studentId2, s.studentId1)
-          }
-        })
-      }
+    if (state.bestScore === 0) {
+      return { solution: state.best, score: state.bestScore, reheatCount: 0 }
+    }
+
+    const baseReheatThreshold = Math.max(800, Math.floor(iterations * 0.05))
+    
+    const reheatManager = new ReheatManager([
+      new SoftJitterReheat({ tStart, baseThreshold: baseReheatThreshold, maxReheats: 20 }),
+      new GlobalShakeupReheat({ tStart, baseThreshold: baseReheatThreshold, maxReheats: 20 })
+    ])
+    
+    const probAdjuster = new ProbabilityAdjuster({
+      baseProbViolating: 0.7,
+      maxProbIncrease: 0.25,
+      stagnationScale: 10000,
+      baseProbEmpty: 0.2,
+      stagnationThreshold: 5000,
+      emptySeatBonus: 0.15
     })
+
+    const partnerMap = buildPartnerMap(activeRules, studentList)
+    const assignedStudentIds = [...state.current.keys()]
+    let violatingStudents = computeViolatingStudents(state.current, activeRules, studentList)
+    
+    const cooling = Math.pow(tEnd / tStart, 1 / iterations)
+    let T = tStart
 
     for (let i = 0; i < iterations; i++) {
       T *= cooling
 
-      // 重加热（Reheating）机制：长时间找不到更好解
-      if (stagnationCounter > baseReheatThreshold && reheatCount < 20) {
-        reheatCount++
-        
-        // 两级重加热策略
-        const isTier2 = stagnationSinceBest > baseReheatThreshold * 4
-        
-        if (isTier2) {
-          // 二级重加热：Global Shakeup 大地震
-          const intensity = 0.8 * Math.pow(0.8, reheatCount / 2)
-          T = tStart * intensity
-          
-          // 对 15% 的学生进行大乱排
-          const shuffleCount = Math.max(2, Math.floor(n * 0.15))
-          for (let p = 0; p < shuffleCount; p++) {
-            const s1 = assignedStudentIds[Math.floor(Math.random() * n)]
-            const s2 = assignedStudentIds[Math.floor(Math.random() * n)]
-            if (s1 === s2) continue
-            const seat1 = current.get(s1)
-            const seat2 = current.get(s2)
-            current.set(s1, seat2)
-            current.set(s2, seat1)
-            currentReverse.set(seat1, s2)
-            currentReverse.set(seat2, s1)
-          }
-          stagnationSinceBest = 0
-        } else {
-          // 一级重加热：Soft Jitter 微调
-          const intensity = 0.5 * Math.pow(0.7, reheatCount - 1)
-          T = tStart * intensity
-          
-          // 回退并添加微量扰动 (5%)
-          current = new Map(best)
-          currentReverse = buildReverse(current)
-          const pStrength = Math.max(1, Math.floor(n * 0.05))
-          for (let p = 0; p < pStrength; p++) {
-            const s1 = assignedStudentIds[Math.floor(Math.random() * n)]
-            const s2 = assignedStudentIds[Math.floor(Math.random() * n)]
-            if (s1 === s2) continue
-            const seat1 = current.get(s1)
-            const seat2 = current.get(s2)
-            current.set(s1, seat2)
-            current.set(s2, seat1)
-            currentReverse.set(seat1, s2)
-            currentReverse.set(seat2, s1)
-          }
-        }
-        
-        stagnationCounter = 0
-        currentScore = evaluateScore(current, activeRules, studentList)
-        emptySeats = availableSeats.map(s => s.id).filter(id => !currentReverse.has(id))
-        violatingStudents = computeViolatingStudents(current)
+      const reheatResult = reheatManager.tryReheat(state, activeRules, studentList, availableSeats)
+      if (reheatResult.shouldReheat) {
+        T = reheatResult.newTemp
+        violatingStudents = computeViolatingStudents(state.current, activeRules, studentList)
       }
 
-      // 动态调整尝试概率
-      const probViolating = 0.7 + Math.min(0.25, stagnationSinceBest / 10000)
-      const probEmpty = 0.2 + (stagnationSinceBest > 5000 ? 0.15 : 0)
+      const probViolating = probAdjuster.getViolatingStudentProbability(state.stagnationSinceBest)
+      const probEmpty = probAdjuster.getEmptySeatProbability(state.stagnationSinceBest)
       
-      const useEmptySeat = emptySeats.length > 0 && Math.random() < probEmpty
+      const useEmptySeat = state.emptySeats.length > 0 && Math.random() < probEmpty
       
       let studentA
       if (violatingStudents.length > 0 && Math.random() < probViolating) {
         studentA = violatingStudents[Math.floor(Math.random() * violatingStudents.length)]
       } else {
-        studentA = assignedStudentIds[Math.floor(Math.random() * n)]
+        studentA = assignedStudentIds[Math.floor(Math.random() * assignedStudentIds.length)]
       }
 
       const isPairMove = partnerMap.has(studentA) && Math.random() < 0.3
-      const seatA = current.get(studentA)
-
+      const seatA = state.current.get(studentA)
+      let moveResult = null
+      
       if (isPairMove && !useEmptySeat) {
-        const partner = partnerMap.get(studentA)
-        const seatPartner = current.get(partner)
-        
-        // 尝试成对交换
-        const studentC = assignedStudentIds[Math.floor(Math.random() * n)]
-        if (studentC === studentA || studentC === partner) { stagnationCounter++; continue; }
-        const seatC = current.get(studentC)
-        const adjC = getAdjacentSeats(seatC)
-        const seatDId = adjC.length > 0
-          ? adjC[Math.floor(Math.random() * adjC.length)].id
-          : (() => {
-              const dynamicAssignedSeats = [...current.values()]
-              return dynamicAssignedSeats[Math.floor(Math.random() * dynamicAssignedSeats.length)]
-            })()
-        const studentD = currentReverse.get(seatDId)
-        
-        if (studentD && studentD !== studentA && studentD !== partner && studentD !== studentC) {
-          const seatD = current.get(studentD)
-          // 交换 (A,Partner) 和 (C,D)
-          current.set(studentA, seatC); current.set(partner, seatD)
-          current.set(studentC, seatA); current.set(studentD, seatPartner)
-          currentReverse.set(seatC, studentA); currentReverse.set(seatD, partner)
-          currentReverse.set(seatA, studentC); currentReverse.set(seatPartner, studentD)
-          
-          const newScore = evaluateScore(current, activeRules, studentList)
-          const delta = newScore - currentScore
-          if (delta >= 0 || Math.random() < Math.exp(delta / T)) {
-            currentScore = newScore
-            if (currentScore > bestScore) {
-              bestScore = currentScore; best = new Map(current); stagnationCounter = 0
-              if (bestScore === 0) break
+        moveResult = tryPairMove(
+          state, studentA, partnerMap, assignedStudentIds, 
+          T, activeRules, studentList
+        )
+      } else {
+        moveResult = trySingleMove(
+          state, studentA, assignedStudentIds, useEmptySeat, 
+          T, activeRules, studentList
+        )
+      }
+
+      if (moveResult) {
+        if (moveResult.accepted) {
+          state.currentScore = moveResult.newScore
+          if (moveResult.useEmptySeat && moveResult.emptySeatIdx >= 0) {
+            state.emptySeats[moveResult.emptySeatIdx] = seatA
+          }
+          if (state.updateBestIfBetter()) {
+            if (state.bestScore === 0) {
+              if (onProgress) onProgress(100)
+              break
             }
           } else {
-            // 撤销
-            current.set(studentA, seatA); current.set(partner, seatPartner)
-            current.set(studentC, seatC); current.set(studentD, seatD)
-            currentReverse.set(seatA, studentA); currentReverse.set(seatPartner, partner)
-            currentReverse.set(seatC, studentC); currentReverse.set(seatD, studentD)
-            stagnationCounter++
-          }
-          continue
-        }
-      }
-
-      // 常规单人移动
-      let seatB
-      let studentB
-      let emptySeatIdx = -1
-
-      if (useEmptySeat) {
-        emptySeatIdx = Math.floor(Math.random() * emptySeats.length)
-        seatB = emptySeats[emptySeatIdx]
-        current.set(studentA, seatB)
-        currentReverse.delete(seatA)
-        currentReverse.set(seatB, studentA)
-      } else {
-        studentB = assignedStudentIds[Math.floor(Math.random() * n)]
-        if (studentA === studentB) {
-          stagnationCounter++
-          continue
-        }
-        seatB = current.get(studentB)
-        current.set(studentA, seatB)
-        current.set(studentB, seatA)
-        currentReverse.set(seatA, studentB)
-        currentReverse.set(seatB, studentA)
-      }
-
-      const newScore = evaluateScore(current, activeRules, studentList)
-      const delta = newScore - currentScore
-
-      if (delta >= 0 || Math.random() < Math.exp(delta / T)) {
-        currentScore = newScore
-        if (useEmptySeat) {
-          emptySeats[emptySeatIdx] = seatA
-        }
-
-        if (currentScore > bestScore) {
-          bestScore = currentScore
-          best = new Map(current)
-          stagnationCounter = 0
-          stagnationSinceBest = 0 // 重置全局停滞
-          if (bestScore === 0) {
-            if (onProgress) onProgress(100)
-            break
+            state.incrementStagnation()
           }
         } else {
-          stagnationCounter++
-          stagnationSinceBest++
-        }
-
-        if (i % 500 === 0) {
-          violatingStudents = computeViolatingStudents(current)
+          state.incrementStagnation()
         }
       } else {
-        stagnationCounter++
-        if (useEmptySeat) {
-          current.set(studentA, seatA)
-          currentReverse.delete(seatB)
-          currentReverse.set(seatA, studentA)
-        } else {
-          current.set(studentA, seatA)
-          current.set(studentB, seatB)
-          currentReverse.set(seatA, studentA)
-          currentReverse.set(seatB, studentB)
-        }
+        state.incrementStagnation()
+      }
+
+      if (i % 500 === 0) {
+        violatingStudents = computeViolatingStudents(state.current, activeRules, studentList)
       }
 
       if (onProgress && i % 1000 === 0) {
         onProgress(Math.round((i / iterations) * 100), {
           i,
           iterations,
-          score: currentScore,
-          bestScore,
-          reheatCount
+          score: state.currentScore,
+          bestScore: state.bestScore,
+          reheatCount: reheatManager.reheatCount
         })
         await new Promise(r => setTimeout(r, 0))
       }
     }
 
-    return { solution: best, score: bestScore, reheatCount }
+    return { solution: state.best, score: state.bestScore, reheatCount: reheatManager.reheatCount }
+  }
+
+  const tryPairMove = (state, studentA, partnerMap, assignedStudentIds, T, activeRules, studentList) => {
+    const partner = partnerMap.get(studentA)
+    const seatPartner = state.current.get(partner)
+    const seatA = state.current.get(studentA)
+    
+    const studentC = assignedStudentIds[Math.floor(Math.random() * assignedStudentIds.length)]
+    if (studentC === studentA || studentC === partner) {
+      return null
+    }
+    
+    const seatC = state.current.get(studentC)
+    const adjC = getAdjacentSeats(seatC)
+    const seatDId = adjC.length > 0
+      ? adjC[Math.floor(Math.random() * adjC.length)].id
+      : [...state.current.values()][Math.floor(Math.random() * state.current.size)]
+    
+    const studentD = state.currentReverse.get(seatDId)
+    
+    if (!studentD || studentD === studentA || studentD === partner || studentD === studentC) {
+      return null
+    }
+    
+    const seatD = state.current.get(studentD)
+    
+    state.current.set(studentA, seatC)
+    state.current.set(partner, seatD)
+    state.current.set(studentC, seatA)
+    state.current.set(studentD, seatPartner)
+    state.currentReverse.set(seatC, studentA)
+    state.currentReverse.set(seatD, partner)
+    state.currentReverse.set(seatA, studentC)
+    state.currentReverse.set(seatPartner, studentD)
+    
+    const newScore = evaluateScore(state.current, activeRules, studentList)
+    const delta = newScore - state.currentScore
+    const accepted = delta >= 0 || Math.random() < Math.exp(delta / T)
+    
+    if (!accepted) {
+      state.current.set(studentA, seatA)
+      state.current.set(partner, seatPartner)
+      state.current.set(studentC, seatC)
+      state.current.set(studentD, seatD)
+      state.currentReverse.set(seatA, studentA)
+      state.currentReverse.set(seatPartner, partner)
+      state.currentReverse.set(seatC, studentC)
+      state.currentReverse.set(seatD, studentD)
+    }
+    
+    return { accepted, newScore, useEmptySeat: false, emptySeatIdx: -1 }
+  }
+
+  const trySingleMove = (state, studentA, assignedStudentIds, useEmptySeat, T, activeRules, studentList) => {
+    const seatA = state.current.get(studentA)
+    let seatB, studentB, emptySeatIdx = -1
+    
+    if (useEmptySeat) {
+      emptySeatIdx = Math.floor(Math.random() * state.emptySeats.length)
+      seatB = state.emptySeats[emptySeatIdx]
+      state.current.set(studentA, seatB)
+      state.currentReverse.delete(seatA)
+      state.currentReverse.set(seatB, studentA)
+    } else {
+      studentB = assignedStudentIds[Math.floor(Math.random() * assignedStudentIds.length)]
+      if (studentA === studentB) {
+        return null
+      }
+      seatB = state.current.get(studentB)
+      state.current.set(studentA, seatB)
+      state.current.set(studentB, seatA)
+      state.currentReverse.set(seatA, studentB)
+      state.currentReverse.set(seatB, studentA)
+    }
+    
+    const newScore = evaluateScore(state.current, activeRules, studentList)
+    const delta = newScore - state.currentScore
+    const accepted = delta >= 0 || Math.random() < Math.exp(delta / T)
+    
+    if (!accepted) {
+      if (useEmptySeat) {
+        state.current.set(studentA, seatA)
+        state.currentReverse.delete(seatB)
+        state.currentReverse.set(seatA, studentA)
+      } else {
+        state.current.set(studentA, seatA)
+        state.current.set(studentB, seatB)
+        state.currentReverse.set(seatA, studentA)
+        state.currentReverse.set(seatB, studentB)
+      }
+    }
+    
+    return { accepted, newScore, useEmptySeat, emptySeatIdx }
   }
 
   // ==================== 新引擎：穷举 + 剪枝回溯 ====================

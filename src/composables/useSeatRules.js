@@ -126,7 +126,94 @@ export function useSeatRules() {
   }
 
   const renderRuleText = (rule) => {
-    const icon = PRIORITY_ICONS[rule.priority] ?? '?'
+    const priorityLabel = PRIORITY_LABELS[rule.priority] ?? ''
+    const normalized = normalizeRuleShape(rule)
+
+    // 支持复合规则（多规则组合）
+    if (rule.subRules && rule.subRules.length > 1) {
+      const logicOp = rule.logicOperator === 'OR' ? ' 或 ' : ' 且 '
+      const subTexts = rule.subRules.map((sr, idx) => {
+        const text = renderSingleRuleText(sr.predicate, sr.params, sr.not, normalized.subjects, priorityLabel)
+        return sr.not ? `[非]${text}` : text
+      })
+      return `${getSubjectsText(normalized.subjects)} · (${subTexts.join(logicOp)})`
+    }
+
+    // 单条规则（支持 not 取反）
+    return renderSingleRuleText(rule.predicate, rule.params, rule.not, normalized.subjects, priorityLabel)
+  }
+
+  /**
+   * 渲染单条规则的文本
+   */
+  const renderSingleRuleText = (predicate, params, not, subjects, priorityLabel) => {
+    const relation = PREDICATE_META[predicate]?.relation || 'single'
+    const subjectText = relation === 'single'
+      ? getSubjectsText(subjects)
+      : `对象集合(${getSubjectsText(subjects)})`
+
+    let predicateText = ''
+    switch (predicate) {
+      case 'IN_ROW_RANGE':
+        predicateText = `${priorityLabel}坐在第 ${params.minRow}～${params.maxRow} 排`
+        break
+      case 'NOT_IN_COLUMN_TYPE':
+        predicateText = `${priorityLabel}不坐在${COLUMN_TYPE_LABELS[params.columnType] ?? params.columnType}`
+        break
+      case 'IN_ZONE':
+        predicateText = `${priorityLabel}在「${getZoneName(params.zoneId)}」选区`
+        break
+      case 'NOT_IN_ZONE':
+        predicateText = `${priorityLabel}不在「${getZoneName(params.zoneId)}」选区`
+        break
+      case 'IN_GROUP_RANGE':
+        predicateText = `${priorityLabel}在第 ${params.minGroup}～${params.maxGroup} 大组`
+        break
+      case 'MUST_BE_SEATMATES':
+        predicateText = '必须同桌'
+        break
+      case 'MUST_NOT_BE_SEATMATES':
+        predicateText = '禁止同桌'
+        break
+      case 'DISTANCE_AT_MOST':
+        predicateText = `${priorityLabel}距离不超过 ${params.distance} 个座位`
+        break
+      case 'DISTANCE_AT_LEAST':
+        predicateText = `${priorityLabel}距离至少 ${params.distance} 个座位`
+        break
+      case 'NOT_BLOCK_VIEW': {
+        const tol = params.tolerance === 1 ? '（含斜向）' : ''
+        predicateText = `不可遮挡视线${tol}`
+        break
+      }
+      case 'MUST_BE_SAME_GROUP':
+        predicateText = '必须同大组'
+        break
+      case 'MUST_NOT_BE_SAME_GROUP':
+        predicateText = '必须不同大组'
+        break
+      case 'MUST_BE_ADJACENT_ROW':
+        predicateText = `${priorityLabel}相邻排`
+        break
+      case 'DISTRIBUTE_EVENLY':
+        predicateText = `${priorityLabel}互相保持距离（最大化直线距离）`
+        break
+      case 'CLUSTER_TOGETHER':
+        predicateText = `${priorityLabel}聚集在同一${SCOPE_LABELS[params.scope] ?? params.scope}`
+        break
+      default:
+        predicateText = RULE_TYPE_LABELS[predicate] ?? predicate
+    }
+
+    // 应用 NOT 取反前缀
+    if (not) {
+      predicateText = `[非]${predicateText}`
+    }
+
+    return `${subjectText} · ${predicateText}`
+  }
+
+  const renderRuleTextWithoutPriority = (rule) => {
     const priorityLabel = PRIORITY_LABELS[rule.priority] ?? ''
     const { predicate, params } = rule
     const normalized = normalizeRuleShape(rule)
@@ -180,7 +267,7 @@ export function useSeatRules() {
         predicateText = `${priorityLabel}相邻排`
         break
       case 'DISTRIBUTE_EVENLY':
-        predicateText = `${priorityLabel}分散到不同${SCOPE_LABELS[params.scope] ?? params.scope}`
+        predicateText = `${priorityLabel}互相保持距离（最大化直线距离）`
         break
       case 'CLUSTER_TOGETHER':
         predicateText = `${priorityLabel}聚集在同一${SCOPE_LABELS[params.scope] ?? params.scope}`
@@ -189,7 +276,7 @@ export function useSeatRules() {
         predicateText = RULE_TYPE_LABELS[predicate] ?? predicate
     }
 
-    return `${icon} ${subjectText} · ${predicateText}`
+    return `${subjectText} · ${predicateText}`
   }
 
   const validateRule = (ruleData) => {
@@ -436,7 +523,16 @@ export function useSeatRules() {
       predicate: ruleData.predicate,
       params: { ...(ruleData.params ?? getDefaultParams(ruleData.predicate)) },
       description: ruleData.description ?? '',
-      createdAt: ruleData.createdAt ?? Date.now()
+      createdAt: ruleData.createdAt ?? Date.now(),
+      // 新增字段：NOT 取反 和 多规则组合
+      not: ruleData.not ?? false,
+      logicOperator: ruleData.logicOperator ?? null,
+      subRules: ruleData.subRules ? ruleData.subRules.map(sr => ({
+        predicate: sr.predicate,
+        not: sr.not ?? false,
+        subjects: sr.subjects || [],
+        params: { ...sr.params }
+      })) : null
     }
   }
 
@@ -560,6 +656,7 @@ export function useSeatRules() {
     getPairRulesFor,
 
     renderRuleText,
+    renderRuleTextWithoutPriority,
 
     validateRule,
     detectConflicts,

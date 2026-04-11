@@ -11,7 +11,7 @@ import { authMockPlugin } from './vite.mock.plugin.js'
 export default defineConfig({
   base: './', // Allow relative paths for electron/tauri builds
   server: {
-    host: 'localhost',
+    host: '0.0.0.0',
   },
   plugins: [
     vue(),

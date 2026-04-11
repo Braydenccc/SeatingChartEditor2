@@ -136,11 +136,85 @@ const formatCellContent = (template, context) => {
     s: context.serialLabel,
     j: context.serialLabel
   }
-  const replaced = source.replace(/%([%nirgsj])/g, (m, token) => {
+  
+  const parseInlineStyle = (styleStr) => {
+    const style = {}
+    if (!styleStr) return style
+    const parts = styleStr.split(',')
+    parts.forEach(part => {
+      const [key, value] = part.split(':').map(s => s.trim())
+      if (!key) return
+      const lowerKey = key.toLowerCase()
+      if (lowerKey === 'bold' || lowerKey === 'italic') {
+        style[lowerKey] = value === undefined || value === '' || value === 'true'
+      } else if (lowerKey === 'color') {
+        style.color = normalizeHexColor(value || '000000', '000000')
+      } else if (lowerKey === 'size' || lowerKey === 'sz') {
+        const sz = parseInt(value)
+        if (!isNaN(sz)) style.sz = sz
+      }
+    })
+    return style
+  }
+  
+  const formatWithStyles = (template, context) => {
+    const parts = []
+    let currentText = ''
+    let index = 0
+    while (index < template.length) {
+      if (template[index] === '%') {
+        if (index + 1 < template.length) {
+          const token = template[index + 1]
+          if (tokenMap.hasOwnProperty(token) || token === '%') {
+            if (currentText) {
+              parts.push({ type: 'text', content: currentText })
+              currentText = ''
+            }
+            if (token === '%') {
+              parts.push({ type: 'text', content: '%' })
+              index += 2
+            } else {
+              let style = null
+              let advance = 2
+              if (index + 2 < template.length && template[index + 2] === '[') {
+                const endBracket = template.indexOf(']', index + 3)
+                if (endBracket !== -1) {
+                  const styleStr = template.substring(index + 3, endBracket)
+                  style = parseInlineStyle(styleStr)
+                  advance = endBracket - index + 1
+                }
+              }
+              const content = tokenMap[token] ?? ''
+              if (content) {
+                parts.push({ type: 'placeholder', token, content, style })
+              }
+              index += advance
+            }
+            continue
+          }
+        }
+        currentText += '%'
+        index++
+      } else {
+        currentText += template[index]
+        index++
+      }
+    }
+    if (currentText) {
+      parts.push({ type: 'text', content: currentText })
+    }
+    return parts
+  }
+  
+  const parts = formatWithStyles(source, context)
+  const replaced = source.replace(/%([%nirgsj])(?:\[([^\]]*)\])?/g, (m, token) => {
     if (token === '%') return '%'
     return tokenMap[token] ?? ''
   })
-  return trimEdgeEmptyLines(replaced)
+  return {
+    text: trimEdgeEmptyLines(replaced),
+    richParts: parts
+  }
 }
 
 const trimEdgeEmptyLines = (text) => {
@@ -379,10 +453,37 @@ export function useExcelData() {
       showGroupGap     = true,
       title            = '班级座位表',
       borderColor      = '#000000',
+      showBorders      = true,
+      borderStyle      = 'thin',
+      innerBorderStyle = 'thin',
+      outerBorderStyle = 'thin',
+      innerBorderColor = '#000000',
+      outerBorderColor = '#000000',
       cellFormat       = '%n\n%i',
       rowNumberScheme  = 'arabic',
       groupNumberScheme = 'arabic',
-      serialNumberScheme = 'arabic'
+      serialNumberScheme = 'arabic',
+      
+      titleFontBold    = true,
+      titleFontSize    = 16,
+      titleFontColor   = '#1F4E78',
+      titleFillColor   = '',
+
+      headerFontBold   = true,
+      headerFontSize   = 12,
+      headerFontColor  = '#1F4E78',
+      headerFillColor  = '',
+
+      seatFontBold     = false,
+      seatFontSize     = 12,
+      seatFontColor    = '#000000',
+
+      rowNumFillColor  = '',
+      podiumFillColor  = '',
+      seatFillColor    = '',
+      emptyFillColor   = '',
+      vacantFillColor  = '',
+      tagHeaderFillColor = ''
     } = options
 
     const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig
@@ -390,75 +491,133 @@ export function useExcelData() {
 
     // ── 纯净无底色排版 (完全贴合普通表格预览，只做对齐和描边) ──
     const borderRgb = normalizeHexColor(borderColor, '000000')
-    const MONO_FILL_COLOR = 'F2F2F2'
-    const COLOR_FILL_COLOR = 'DCEEFF'
-    const MONO_FONT_COLOR = '000000'
-    const COLOR_FONT_COLOR = '1F4E78'
-    const isMono = colorMode === 'bw'
-    const accentFill = isMono ? MONO_FILL_COLOR : COLOR_FILL_COLOR
-    const accentFont = isMono ? MONO_FONT_COLOR : COLOR_FONT_COLOR
-    const accent = {
-      fill: { patternType: 'solid', fgColor: { rgb: accentFill } }
+    const innerBorderRgb = normalizeHexColor(innerBorderColor, '000000')
+    const outerBorderRgb = normalizeHexColor(outerBorderColor, '000000')
+    const titleFontRgb = normalizeHexColor(titleFontColor, '1F4E78')
+    const headerFontRgb = normalizeHexColor(headerFontColor, '1F4E78')
+    const seatFontRgb = normalizeHexColor(seatFontColor, '000000')
+
+    const titleFillRgb   = normalizeHexColor(titleFillColor, '') || null
+    const headerFillRgb  = normalizeHexColor(headerFillColor, '') || null
+    const rowNumFillRgb  = normalizeHexColor(rowNumFillColor, '') || null
+    const podiumFillRgb  = normalizeHexColor(podiumFillColor, '') || null
+    const seatFillRgb    = normalizeHexColor(seatFillColor, '') || null
+    const emptyFillRgb   = normalizeHexColor(emptyFillColor, '') || null
+    const vacantFillRgb  = normalizeHexColor(vacantFillColor, '') || null
+    const tagHeaderFillRgb = normalizeHexColor(tagHeaderFillColor, '') || null
+
+    const buildFill = (colorRgb) => {
+      if (!colorRgb) return {}
+      return { fill: { patternType: 'solid', fgColor: { rgb: colorRgb } } }
     }
-    const thinBorder = (clr = borderRgb) => ({
-      top:    { style: 'thin', color: { rgb: clr } },
-      bottom: { style: 'thin', color: { rgb: clr } },
-      left:   { style: 'thin', color: { rgb: clr } },
-      right:  { style: 'thin', color: { rgb: clr } }
+    
+    const createBorder = (style, color) => {
+      if (!showBorders) return {};
+      return {
+        top:    { style, color: { rgb: color } },
+        bottom: { style, color: { rgb: color } },
+        left:   { style, color: { rgb: color } },
+        right:  { style, color: { rgb: color } }
+      }
+    }
+
+    const createBorderSide = (style, color) => {
+      if (!showBorders) return {};
+      return { style, color: { rgb: color } }
+    }
+    
+    const thinBorder = (clr = borderRgb) => createBorder(borderStyle, clr)
+    const innerBorder = () => createBorder(innerBorderStyle, innerBorderRgb)
+    const outerBorderObj = () => createBorder(outerBorderStyle, outerBorderRgb)
+    const cellEdgeBorder = (isTop, isBottom, isLeft, isRight) => ({
+      top:    isTop    ? createBorderSide(outerBorderStyle, outerBorderRgb) : createBorderSide(innerBorderStyle, innerBorderRgb),
+      bottom: isBottom ? createBorderSide(outerBorderStyle, outerBorderRgb) : createBorderSide(innerBorderStyle, innerBorderRgb),
+      left:   isLeft   ? createBorderSide(outerBorderStyle, outerBorderRgb) : createBorderSide(innerBorderStyle, innerBorderRgb),
+      right:  isRight  ? createBorderSide(outerBorderStyle, outerBorderRgb) : createBorderSide(innerBorderStyle, innerBorderRgb)
     })
+    
+    const buildRichText = (parts, baseFont = {}) => {
+      const rich = []
+      parts.forEach(part => {
+        if (part.type === 'text') {
+          rich.push({
+            t: part.content,
+            s: { font: baseFont }
+          })
+        } else if (part.type === 'placeholder') {
+          const font = { ...baseFont }
+          if (part.style) {
+            if (part.style.bold !== undefined) font.bold = part.style.bold
+            if (part.style.size !== undefined) font.sz = part.style.size
+            if (part.style.color !== undefined) {
+              font.color = { rgb: normalizeHexColor(part.style.color, '000000') }
+            }
+          }
+          rich.push({
+            t: part.content,
+            s: { font }
+          })
+        }
+      })
+      return rich
+    }
     // 居中对齐参数
     const center = { horizontal: 'center', vertical: 'center', wrapText: true }
 
     // 原生单元格属性
     const styleHeader = {
-      font: { bold: true, sz: nameFontSize, color: { rgb: accentFont } },
+      font: { bold: headerFontBold, sz: headerFontSize, color: { rgb: headerFontRgb } },
       alignment: center,
       border: thinBorder(),
-      fill: accent.fill
+      ...buildFill(headerFillRgb)
     }
     const styleTitle = {
-      font: { bold: true, sz: nameFontSize + 4, color: { rgb: accentFont } },
+      font: { bold: titleFontBold, sz: titleFontSize, color: { rgb: titleFontRgb } },
       alignment: center,
       border: thinBorder(),
-      fill: accent.fill
+      ...buildFill(titleFillRgb)
     }
     const styleRowNum = {
-      font: { bold: true, sz: nameFontSize - 1, color: { rgb: accentFont } },
+      font: { bold: headerFontBold, sz: headerFontSize, color: { rgb: headerFontRgb } },
       alignment: center,
       border: thinBorder(),
-      fill: accent.fill
+      ...buildFill(rowNumFillRgb)
     }
     const styleSeatName = {
-      font: { bold: true, sz: nameFontSize, color: { rgb: '000000' } },
+      font: { bold: true, sz: seatFontSize, color: { rgb: seatFontRgb } },
       alignment: center,
-      border: thinBorder()
+      border: innerBorder(),
+      ...buildFill(seatFillRgb)
     }
     const styleSeat = {
-      font: { sz: nameFontSize, color: { rgb: '000000' } },
+      font: { bold: seatFontBold, sz: seatFontSize, color: { rgb: seatFontRgb } },
       alignment: center,
-      border: thinBorder()
+      border: innerBorder(),
+      ...buildFill(seatFillRgb)
     }
     const styleEmpty = {
-      font: { sz: nameFontSize, color: { rgb: '000000' } },
+      font: { bold: seatFontBold, sz: seatFontSize, color: { rgb: seatFontRgb } },
       alignment: center,
-      border: thinBorder()
+      border: innerBorder(),
+      ...buildFill(emptyFillRgb)
     }
     const styleVacant = {
-      font: { sz: nameFontSize, color: { rgb: '000000' } },
+      font: { bold: seatFontBold, sz: seatFontSize, color: { rgb: seatFontRgb } },
       alignment: center,
-      border: thinBorder()
+      border: innerBorder(),
+      ...buildFill(vacantFillRgb)
     }
     const stylePodium = {
-      font: { bold: true, sz: nameFontSize, color: { rgb: accentFont } },
+      font: { bold: headerFontBold, sz: headerFontSize, color: { rgb: headerFontRgb } },
       alignment: center,
       border: thinBorder(),
-      fill: accent.fill
+      ...buildFill(podiumFillRgb)
     }
     const styleTagHeader = {
-      font: { bold: true, sz: nameFontSize, color: { rgb: accentFont } },
+      font: { bold: headerFontBold, sz: headerFontSize, color: { rgb: headerFontRgb } },
       alignment: center,
       border: thinBorder(),
-      fill: accent.fill
+      ...buildFill(tagHeaderFillRgb)
     }
 
     // ── 布局计算 ──
@@ -479,32 +638,49 @@ export function useExcelData() {
     const ws = {}
     const merges = []
 
-    const setCell = (r, c, v, s, t = 's') => {
-      ws[XLSX.utils.encode_cell({ r, c })] = { v, t, s }
+    const setCell = (r, c, v, s, t = 's', richText = null, borderOverride = null) => {
+      const finalStyle = borderOverride ? { ...s, border: borderOverride } : s
+      const cell = { s: finalStyle }
+      if (richText) {
+        cell.v = v
+        cell.t = 'r'
+        cell.r = richText
+      } else {
+        cell.v = v
+        cell.t = t
+      }
+      ws[XLSX.utils.encode_cell({ r, c })] = cell
     }
+
+    const totalRows = totalSeatRows
+    const isTopEdge = (r) => r === 0
+    const isBottomEdge = (r) => r === totalRows - 1
+    const isLeftEdge = (c) => c === 0
+    const isRightEdge = (c) => c === totalCols - 1
+    const edgeBd = (r, c) => cellEdgeBorder(isTopEdge(r), isBottomEdge(r), isLeftEdge(c), isRightEdge(c))
 
     // ── 标题行 ──
     if (showTitle) {
-      for (let c = 0; c < totalCols; c++) setCell(0, c, c === 0 ? title : '', styleTitle)
+      for (let c = 0; c < totalCols; c++) setCell(0, c, c === 0 ? title : '', styleTitle, 's', null, edgeBd(0, c))
       merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } })
     }
 
     // ── 讲台行（翻转时，放在组号上方） ──
     if (showPodium && reverseOrder) {
       const pRow = titleRowOffset
-      for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', stylePodium)
+      for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', stylePodium, 's', null, edgeBd(pRow, c))
       merges.push({ s: { r: pRow, c: 0 }, e: { r: pRow, c: totalCols - 1 } })
     }
 
     // ── 组号行 ──
     if (showGroupLabels) {
       const hRow = titleRowOffset + podiumTopOffset
-      if (showRowNumbers) setCell(hRow, 0, '', styleHeader)
+      if (showRowNumbers) setCell(hRow, 0, '', styleHeader, 's', null, edgeBd(hRow, 0))
       for (let g = 0; g < groupCount; g++) {
         const sc = groupStartCol(g)
         const groupLabel = precomputedGroupLabels[g]
-        setCell(hRow, sc, `第 ${groupLabel} 组`, styleHeader)
-        for (let c = 1; c < columnsPerGroup; c++) setCell(hRow, sc + c, '', styleHeader)
+        setCell(hRow, sc, `第 ${groupLabel} 组`, styleHeader, 's', null, edgeBd(hRow, sc))
+        for (let c = 1; c < columnsPerGroup; c++) setCell(hRow, sc + c, '', styleHeader, 's', null, edgeBd(hRow, sc + c))
         if (columnsPerGroup > 1) merges.push({ s: { r: hRow, c: sc }, e: { r: hRow, c: sc + columnsPerGroup - 1 } })
       }
     }
@@ -517,7 +693,7 @@ export function useExcelData() {
       // 行号显示：前端座位(srcRow=N-1)显示1，最后端(srcRow=0)显示N
       const displayRow = seatsPerColumn - srcRow
       const rowLabel = formatIndex(displayRow, rowNumberScheme)
-      if (showRowNumbers) setCell(eRow, 0, `第${rowLabel}排`, styleRowNum)
+      if (showRowNumbers) setCell(eRow, 0, `第${rowLabel}排`, styleRowNum, 's', null, edgeBd(eRow, 0))
       for (let g = 0; g < groupCount; g++) {
         const groupLabel = precomputedGroupLabels[g]
         for (let c = 0; c < columnsPerGroup; c++) {
@@ -526,31 +702,35 @@ export function useExcelData() {
           const serial = g * seatsPerGroup + c * seatsPerColumn + (r + 1)
           const serialLabel = formatIndex(serial, serialNumberScheme)
           if (!seat) {
-            setCell(eRow, eCol, '', styleSeat)
+            setCell(eRow, eCol, '', styleSeat, 's', null, edgeBd(eRow, eCol))
           } else if (seat.isEmpty) {
-            setCell(eRow, eCol, '空置', styleEmpty)
+            setCell(eRow, eCol, '空置', styleEmpty, 's', null, edgeBd(eRow, eCol))
           } else if (seat.studentId) {
             const stu = studentMap.get(seat.studentId)
             if (stu) {
-              const txt = formatCellContent(cellFormat, {
+              const content = formatCellContent(cellFormat, {
                 name: stu.name || '未命名',
                 studentId: showStudentId ? (stu.studentNumber || '') : '',
                 rowLabel,
                 groupLabel,
                 serialLabel
               })
-              setCell(eRow, eCol, txt, styleSeatName)
+
+              const baseFont = { bold: true, sz: seatFontSize, color: { rgb: seatFontRgb } }
+              const richText = buildRichText(content.richParts, baseFont)
+
+              setCell(eRow, eCol, content.text, styleSeatName, 's', richText, edgeBd(eRow, eCol))
             } else {
-              setCell(eRow, eCol, '', styleSeat)
+              setCell(eRow, eCol, '', styleSeat, 's', null, edgeBd(eRow, eCol))
             }
           } else {
-            setCell(eRow, eCol, '', styleVacant)
+            setCell(eRow, eCol, '', styleVacant, 's', null, edgeBd(eRow, eCol))
           }
         }
         // 组间空列
         if (showGroupGap && g < groupCount - 1) {
           const gapCol = groupStartCol(g) + columnsPerGroup
-          setCell(eRow, gapCol, '', {}) // 纯空白无样式
+          setCell(eRow, gapCol, '', {}, 's', null, edgeBd(eRow, gapCol))
         }
       }
     }
@@ -558,7 +738,7 @@ export function useExcelData() {
     // ── 讲台行（正序时，放在最后） ──
     if (showPodium && !reverseOrder) {
       const pRow = headerRowOffset + seatsPerColumn
-      for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', stylePodium)
+      for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', stylePodium, 's', null, edgeBd(pRow, c))
       merges.push({ s: { r: pRow, c: 0 }, e: { r: pRow, c: totalCols - 1 } })
     }
 

@@ -47,10 +47,48 @@
   <style>
     :root { --color-primary: #23587b; }
     body, html { margin: 0; padding: 0; font-family: 'Inter', -apple-system, system-ui, sans-serif; background: #f5f5f5; }
-    .loading-overlay { position: fixed; inset: 0; background: #f5f5f5; z-index: 10000; transition: opacity 0.3s; }
-    .app-header-placeholder { height: 100px; background: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.15); width: 100%; }
-    @media (max-width: 1024px) { .app-header-placeholder { height: 90px; } }
-    @media (max-width: 768px) { .app-header-placeholder { height: 48px; } }
+    
+    .app-header-placeholder { height: 100px; background: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.15); width: 100%; position: relative; z-index: 10; }
+    
+    .initial-loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: calc(100vh - 100px);
+      background: #f5f5f5;
+      gap: 16px;
+    }
+    
+    .initial-spinner {
+      width: 42px;
+      height: 42px;
+      border: 3px solid rgba(35, 88, 123, 0.1);
+      border-top: 3px solid var(--color-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    .initial-loading-text {
+      color: var(--color-primary);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 1024px) { 
+      .app-header-placeholder { height: 90px; } 
+      .initial-loading-container { height: calc(100vh - 90px); }
+    }
+    @media (max-width: 768px) { 
+      .app-header-placeholder { height: 48px; } 
+      .initial-loading-container { height: calc(100vh - 48px); }
+    }
   </style>
 </head>
 
@@ -58,7 +96,10 @@
   <div id="app">
     <!-- 关键路径占位符：在 Vue 挂载前显示的 HTML 结构 -->
     <div class="app-header-placeholder"></div>
-    <div style="height: calc(100vh - 100px); background: #f5f5f5;"></div>
+    <div class="initial-loading-container">
+      <div class="initial-spinner"></div>
+      <div class="initial-loading-text">正在加载应用...</div>
+    </div>
   </div>
   <script type="module" src="/src/main.js"></script>
 </body>
