@@ -18,6 +18,12 @@
     <div v-else-if="hasStudent" class="student-display">
       <div class="student-name">{{ studentInfo.name || '未命名' }}</div>
       <div class="student-number">{{ studentInfo.studentNumber || '-' }}</div>
+      <div v-if="hasTags" class="student-tags">
+        <span v-for="tag in studentTags" :key="tag.id" class="tag-dot"
+          :style="{ backgroundColor: tag.color }"
+          :title="tag.name">
+        </span>
+      </div>
     </div>
     <div v-else class="empty-seat">
       <span class="seat-placeholder">空位</span>
@@ -31,6 +37,7 @@ import { useStudentData } from '@/composables/useStudentData'
 import { useEditMode } from '@/composables/useEditMode'
 import { useZoneData } from '@/composables/useZoneData'
 import { useZoneRotation } from '@/composables/useZoneRotation'
+import { useTagData } from '@/composables/useTagData'
 
 const props = defineProps({
   seat: {
@@ -45,6 +52,7 @@ const { students, selectedStudentId } = useStudentData()
 const { currentMode, firstSelectedSeat, EditMode } = useEditMode()
 const { visibleZoneSeats, selectedZoneId, toggleSeatInZone } = useZoneData()
 const { editingZoneId, getRotZoneHighlights, toggleSeatInEditingZone } = useZoneRotation()
+const { tags, showTagsInSeatChart } = useTagData()
 
 const isDragOver = ref(false)
 const isDragging = ref(false)
@@ -71,8 +79,17 @@ const hasStudent = computed(() => {
 
 const studentInfo = computed(() => {
   if (!hasStudent.value) return null
-  return students.value.find(s => s.id === props.seat.studentId) || { name: '未知', studentNumber: null }
+  return students.value.find(s => s.id === props.seat.studentId) || { name: '未知', studentNumber: null, tags: [] }
 })
+
+const studentTags = computed(() => {
+  if (!showTagsInSeatChart.value || !studentInfo.value || !studentInfo.value.tags) return []
+  return tags.value.filter(tag => 
+    studentInfo.value.tags.includes(tag.id) && tag.showInSeatChart !== false
+  )
+})
+
+const hasTags = computed(() => studentTags.value.length > 0)
 
 const isFirstSelected = computed(() => {
   return currentMode.value === EditMode.SWAP && firstSelectedSeat.value === props.seat.id
@@ -313,6 +330,11 @@ const handleTouchMove = (e) => {
       const seatEl = findParentSeat(targetEl)
       if (seatEl && seatEl.dataset.seatId !== props.seat.id) {
         seatEl.classList.add('drag-over')
+      } else {
+        const studentListEl = findParentByClass(targetEl, 'student-items')
+        if (studentListEl && props.seat.studentId != null) {
+          studentListEl.classList.add('drag-over')
+        }
       }
     }
   })
@@ -361,7 +383,18 @@ const handleTouchEnd = (e) => {
 
   if (!targetEl) return
   const seatEl = findParentSeat(targetEl)
-  if (!seatEl || seatEl.dataset.seatId === props.seat.id) return
+  if (!seatEl || seatEl.dataset.seatId === props.seat.id) {
+    // 检测是否拖到候选列表区域
+    const studentListEl = findParentByClass(targetEl, 'student-items')
+    if (studentListEl && props.seat.studentId != null) {
+      const event = new CustomEvent('touch-seat-to-list', {
+        bubbles: true,
+        detail: { seatId: props.seat.id, studentId: props.seat.studentId }
+      })
+      studentListEl.dispatchEvent(event)
+    }
+    return
+  }
 
   const targetSeatId = seatEl.dataset.seatId
   // 触摸拖拽总是执行交换/分配
@@ -385,8 +418,20 @@ const findParentSeat = (el) => {
   return current
 }
 
+const findParentByClass = (el, className) => {
+  let current = el
+  while (current) {
+    if (current.classList?.contains(className)) return current
+    current = current.parentElement
+  }
+  return null
+}
+
 const clearAllTouchHighlights = () => {
   document.querySelectorAll('.seat-item.drag-over').forEach(el => {
+    el.classList.remove('drag-over')
+  })
+  document.querySelectorAll('.student-items.drag-over').forEach(el => {
     el.classList.remove('drag-over')
   })
 }
@@ -497,9 +542,26 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   padding: 8px;
   width: 100%;
+}
+
+.student-tags {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.tag-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .student-number {
@@ -563,7 +625,7 @@ onUnmounted(() => {
   }
 
   .student-display {
-    gap: 5px;
+    gap: 3px;
     padding: 5px;
   }
 
@@ -576,6 +638,11 @@ onUnmounted(() => {
     font-size: 11px;
     min-width: 34px;
     padding: 1px 8px;
+  }
+
+  .tag-dot {
+    width: 5px;
+    height: 5px;
   }
 
   .empty-text,
@@ -610,6 +677,11 @@ onUnmounted(() => {
     padding: 2px 6px;
   }
 
+  .tag-dot {
+    width: 4px;
+    height: 4px;
+  }
+
   .empty-text,
   .seat-placeholder {
     font-size: 11px;
@@ -623,7 +695,7 @@ onUnmounted(() => {
   }
 
   .student-display {
-    gap: 4px;
+    gap: 3px;
     padding: 4px;
   }
 
@@ -635,6 +707,11 @@ onUnmounted(() => {
     font-size: 10px;
     padding: 1px 6px;
     min-width: 30px;
+  }
+
+  .tag-dot {
+    width: 3px;
+    height: 3px;
   }
 
   .empty-text,

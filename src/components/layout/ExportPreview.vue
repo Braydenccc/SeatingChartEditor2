@@ -8,7 +8,9 @@
         <!-- ── 标题栏 ── -->
         <div class="dialog-header">
           <h3>导出设置</h3>
-          <button class="close-btn" @click="$emit('close')">×</button>
+          <button class="close-btn" @click="$emit('close')" aria-label="关闭">
+            <X :size="18" stroke-width="2" />
+          </button>
         </div>
 
         <!-- ── Tab 栏 ── -->
@@ -131,12 +133,52 @@
                   <label class="radio-item"><input type="radio" value="color" v-model="exportSettings.excelColorMode" /><span>彩色</span></label>
                   <label class="radio-item"><input type="radio" value="bw" v-model="exportSettings.excelColorMode" /><span>单色</span></label>
                 </div>
+                <div class="setting-row" style="margin-top:6px">
+                  <label>边框颜色:</label>
+                  <input v-model="exportSettings.excelBorderColor" type="color" />
+                </div>
                 <div class="spacing-grid" style="margin-top:8px">
                   <div class="num-input"><label>姓名字号(pt)</label><input type="number" v-model.number="exportSettings.excelNameFontSize" min="8" max="24" /></div>
                   <div class="num-input"><label>学号字号(pt)</label><input type="number" v-model.number="exportSettings.excelIdFontSize" min="6" max="18" /></div>
                   <div class="num-input"><label>列宽(字符)</label><input type="number" v-model.number="exportSettings.excelCellWidth" min="6" max="30" /></div>
                   <div class="num-input"><label>行高(点)</label><input type="number" v-model.number="exportSettings.excelSeatRowHeight" min="20" max="100" /></div>
                 </div>
+              </div>
+
+              <div class="settings-section">
+                <h4>格式化</h4>
+                <div class="setting-row">
+                  <label>单元格内容模板:</label>
+                  <textarea
+                    v-model="exportSettings.excelCellFormat"
+                    rows="3"
+                    class="format-textarea"
+                    placeholder="%n&#10;%i"
+                  ></textarea>
+                  <div class="format-hint">支持占位符：%n 姓名，%i 学号，%r 行号，%g 组号，%s/%j 序号，%% 百分号</div>
+                  <div class="format-hint">说明：关闭“格子内显示学号”后，模板中的 %i 会输出空文本。</div>
+                </div>
+                <div class="spacing-grid">
+                  <div class="num-input">
+                    <label>行号方案</label>
+                    <select v-model="exportSettings.excelRowNumberScheme">
+                      <option v-for="item in numberSchemeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
+                  </div>
+                  <div class="num-input">
+                    <label>组号方案</label>
+                    <select v-model="exportSettings.excelGroupNumberScheme">
+                      <option v-for="item in numberSchemeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
+                  </div>
+                  <div class="num-input">
+                    <label>序号方案</label>
+                    <select v-model="exportSettings.excelSerialNumberScheme">
+                      <option v-for="item in numberSchemeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="format-hint" style="margin-top:6px">提示：带圈数字仅支持 1-20，超过范围会自动回退为阿拉伯数字。</div>
               </div>
 
               <div class="settings-section">
@@ -208,15 +250,25 @@
           <button class="btn secondary" @click="$emit('close')">关闭</button>
           <template v-if="activeTab === 'image'">
             <button v-if="authType === 'webdav'" class="btn primary" style="background:#0ea5e9;" :disabled="isGenerating || isUploading" @click="handleCloudExportImage">
+              <Loader2 v-if="isUploading" :size="14" stroke-width="2" class="spin-icon" />
+              <CloudUpload v-else :size="14" stroke-width="2" />
               {{ isUploading ? '上传中...' : '保存至云盘' }}
             </button>
-            <button class="btn primary" :disabled="isGenerating || isUploading" @click="handleDownload">下载图片</button>
+            <button class="btn primary" :disabled="isGenerating || isUploading" @click="handleDownload">
+              <Loader2 v-if="isGenerating" :size="14" stroke-width="2" class="spin-icon" />
+              <Download v-else :size="14" stroke-width="2" />
+              下载图片
+            </button>
           </template>
           <template v-if="activeTab === 'excel'">
             <button v-if="authType === 'webdav'" class="btn excel" style="background:#059669;" :disabled="isExcelDownloading || isUploading" @click="handleCloudExportExcel">
+              <Loader2 v-if="isUploading" :size="14" stroke-width="2" class="spin-icon" />
+              <CloudUpload v-else :size="14" stroke-width="2" />
               {{ isUploading ? '上传中...' : '保存至云盘' }}
             </button>
             <button class="btn excel" :disabled="isExcelDownloading || isUploading" @click="handleExcelDownload">
+              <Loader2 v-if="isExcelDownloading" :size="14" stroke-width="2" class="spin-icon" />
+              <Download v-else :size="14" stroke-width="2" />
               {{ isExcelDownloading ? '生成中...' : '下载 Excel' }}
             </button>
           </template>
@@ -228,6 +280,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { X, CloudUpload, Download, Loader2 } from 'lucide-vue-next'
 import { useExportSettings } from '@/composables/useExportSettings'
 import { useImageExport } from '@/composables/useImageExport'
 import { useTagData } from '@/composables/useTagData'
@@ -281,6 +334,14 @@ const updateExcelScale = () => {
 
 const excelActiveSheetIndex = ref(0)
 const excelSheetNames = ref([])
+const numberSchemeOptions = [
+  { value: 'arabic', label: '12' },
+  { value: 'alpha', label: 'AB' },
+  { value: 'chineseUpper', label: '壹贰' },
+  { value: 'chineseLower', label: '一二' },
+  { value: 'roman', label: 'I II' },
+  { value: 'circled', label: '①②（1-20）' }
+]
 
 // overlay 点击关闭保护（防止从弹窗内拖出后关闭）
 const overlayMouseDownSelf = ref(false)
@@ -319,6 +380,11 @@ const updateExcelWorkbook = async () => {
         reverseOrder:     es.excelReverseOrder,
         showGroupGap:     es.excelShowGroupGap,
         colorMode:        es.excelColorMode,
+        borderColor:      es.excelBorderColor,
+        cellFormat:       es.excelCellFormat,
+        rowNumberScheme:   es.excelRowNumberScheme,
+        groupNumberScheme: es.excelGroupNumberScheme,
+        serialNumberScheme: es.excelSerialNumberScheme,
         nameFontSize:     es.excelNameFontSize,
         idFontSize:       es.excelIdFontSize,
         cellWidth:        es.excelCellWidth,
@@ -349,6 +415,11 @@ watch(
     exportSettings.value.excelReverseOrder,
     exportSettings.value.excelShowGroupGap,
     exportSettings.value.excelColorMode,
+    exportSettings.value.excelBorderColor,
+    exportSettings.value.excelCellFormat,
+    exportSettings.value.excelRowNumberScheme,
+    exportSettings.value.excelGroupNumberScheme,
+    exportSettings.value.excelSerialNumberScheme,
     exportSettings.value.excelNameFontSize,
     exportSettings.value.excelIdFontSize,
     exportSettings.value.excelCellWidth,
@@ -624,6 +695,11 @@ const handleExcelDownload = async () => {
         reverseOrder:     es.excelReverseOrder,
         showGroupGap:     es.excelShowGroupGap,
         colorMode:        es.excelColorMode,
+        borderColor:      es.excelBorderColor,
+        cellFormat:       es.excelCellFormat,
+        rowNumberScheme:   es.excelRowNumberScheme,
+        groupNumberScheme: es.excelGroupNumberScheme,
+        serialNumberScheme: es.excelSerialNumberScheme,
         nameFontSize:     es.excelNameFontSize,
         idFontSize:       es.excelIdFontSize,
         cellWidth:        es.excelCellWidth,
@@ -697,6 +773,11 @@ const handleCloudExportExcel = async () => {
         reverseOrder:     es.excelReverseOrder,
         showGroupGap:     es.excelShowGroupGap,
         colorMode:        es.excelColorMode,
+        borderColor:      es.excelBorderColor,
+        cellFormat:       es.excelCellFormat,
+        rowNumberScheme:   es.excelRowNumberScheme,
+        groupNumberScheme: es.excelGroupNumberScheme,
+        serialNumberScheme: es.excelSerialNumberScheme,
         nameFontSize:     es.excelNameFontSize,
         idFontSize:       es.excelIdFontSize,
         cellWidth:        es.excelCellWidth,
@@ -908,7 +989,30 @@ onBeforeUnmount(() => {
 .setting-row input[type="text"] {
   padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; transition: border-color 0.2s;
 }
+.setting-row textarea,
+.num-input select {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+}
+.setting-row input[type="color"] {
+  width: 100%;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+}
 .setting-row input[type="text"]:focus { outline: none; border-color: #23587b; }
+.setting-row textarea:focus,
+.num-input select:focus,
+.setting-row input[type="color"]:focus { outline: none; border-color: #23587b; }
+.format-textarea { resize: vertical; min-height: 64px; }
+.format-hint { color: #888; font-size: 11px; line-height: 1.4; }
 
 .check-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; font-size: 13px; color: #444; }
 .check-item input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
@@ -1045,6 +1149,7 @@ onBeforeUnmount(() => {
   padding: 12px 20px; border-top: 1px solid #e8eef2; flex-shrink: 0;
 }
 .btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 8px 20px; border-radius: 8px; font-size: 13px;
   font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
 }

@@ -25,10 +25,10 @@
         </div>
         <div class="toolbar-actions">
           <button class="action-btn" @click="emit('export')" title="导出规则">
-            <Download :size="14" />
+            <FileOutput :size="14" />
           </button>
           <button class="action-btn" @click="emit('import')" title="导入规则">
-            <Upload :size="14" />
+            <FileInput :size="14" />
           </button>
           <button v-if="rules.length > 0" class="action-btn danger" @click="handleClearAll" title="清空全部">
             <Trash2 :size="14" />
@@ -170,7 +170,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
-import { Search, X, Download, Upload, Trash2, AlertTriangle, ClipboardList, ChevronDown } from 'lucide-vue-next'
+import { Search, X, FileOutput, FileInput, Trash2, AlertTriangle, ClipboardList, ChevronDown } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useStudentData } from '@/composables/useStudentData'

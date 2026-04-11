@@ -3,20 +3,15 @@
     <!-- Header -->
     <div class="in-report-header" :class="gradeClass">
       <div class="in-score-ring">
-        <svg viewBox="0 0 40 40" class="in-ring-svg">
-          <circle class="in-ring-bg" cx="20" cy="20" r="16" />
-          <circle class="in-ring-fill" cx="20" cy="20" r="16"
-            pathLength="100"
-            :style="{ stroke: gradeColor, strokeDasharray: `${satPct} ${100 - satPct}` }" />
-        </svg>
-        <span class="in-ring-pct">{{ Math.round(satPct) }}%</span>
+        <component :is="gradeIconComponent" :size="32" :stroke-width="2" :color="gradeColor" />
+        <span class="in-ring-pct" :style="{ color: gradeColor }">{{ Math.round(satPct) }}%</span>
       </div>
       <div class="in-report-summary">
         <div class="in-report-meta">
           耗时 {{ duration ?? 0 }}ms · {{ ruleCount }} 个约束
         </div>
         <div class="in-report-status" :style="{ color: gradeColor }">
-          <component :is="gradeIconComponent" class="ui-icon grade-icon" />
+          <component :is="gradeIconComponent" :size="14" stroke-width="2" />
           {{ 
             satPct >= 95 ? '排位非常流畅' : 
             satPct >= 75 ? '排位基本符合预设' :
@@ -31,7 +26,7 @@
       <div class="in-group-header fail-header">警告：未满足的规则 ({{ violatedRules.length }})</div>
       <div class="in-rule-rows">
         <div v-for="item in violatedRules" :key="item.rule.id" class="in-rule-row fail">
-          <CircleX class="ui-icon in-row-icon" />
+          <CircleX :size="14" stroke-width="2" />
           <div class="in-row-content">
             <span class="in-row-text">{{ renderRuleText(item.rule) }}</span>
             <span v-if="item.reason" class="in-row-reason">{{ item.reason }}</span>
@@ -44,13 +39,13 @@
     </div>
     
     <div class="in-report-body" v-if="satisfiedRules.length > 0">
-      <div class="in-group-header toggle-btn" @click="showSatisfied = !showSatisfied">
-        已满足的规则 ({{ satisfiedRules.length }})
-        <span class="toggle-icon">{{ showSatisfied ? '收起 ∧' : '展开 ∨' }}</span>
-      </div>
+        <div class="in-group-header toggle-btn" @click="showSatisfied = !showSatisfied">
+          已满足的规则 ({{ satisfiedRules.length }})
+          <ChevronDown :size="14" stroke-width="2" :style="{ transform: showSatisfied ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }" />
+        </div>
       <div class="in-rule-rows" v-show="showSatisfied">
         <div v-for="rule in satisfiedRules" :key="rule.id" class="in-rule-row ok">
-          <Check class="ui-icon in-row-icon" />
+          <Check :size="14" stroke-width="2" />
           <div class="in-row-content">
             <span class="in-row-text">{{ renderRuleText(rule) }}</span>
           </div>
@@ -67,7 +62,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { AlertTriangle, Check, CircleAlert, CircleX, ShieldCheck } from 'lucide-vue-next'
+import { AlertTriangle, Check, ChevronDown, CircleAlert, CircleX, ShieldCheck } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
 
 const props = defineProps({
@@ -141,42 +136,21 @@ const gradeIconComponent = computed(() => {
 .in-report-header.grade-c { background: linear-gradient(135deg, #fff7ed, #ffedd5); }
 .in-report-header.grade-d { background: linear-gradient(135deg, #fef2f2, #fee2e2); }
 
-/* 评分环 */
+/* 评分环替换为图标+百分比标签 */
 .in-score-ring {
-  position: relative;
-  width: 42px;
-  height: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   flex-shrink: 0;
-}
-
-.in-ring-svg {
-  width: 42px;
-  height: 42px;
-  transform: rotate(-90deg);
-}
-
-.in-ring-bg {
-  fill: none;
-  stroke: rgba(0,0,0,0.06);
-  stroke-width: 3.5;
-}
-
-.in-ring-fill {
-  fill: none;
-  stroke-width: 3.5;
-  stroke-linecap: round;
-  transition: stroke-dasharray 0.8s ease;
+  min-width: 52px;
 }
 
 .in-ring-pct {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
-  color: #334155;
+  line-height: 1;
 }
 
 .in-report-summary { flex: 1; }
@@ -190,6 +164,9 @@ const gradeIconComponent = computed(() => {
 .in-report-status {
   font-size: 13px;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* 主体内容 */
@@ -224,11 +201,7 @@ const gradeIconComponent = computed(() => {
 .in-group-header.toggle-btn:hover {
   background: #f1f5f9;
 }
-.toggle-icon {
-  color: #94a3b8;
-  font-size: 11px;
-  font-weight: normal;
-}
+/* .toggle-icon: replaced by ChevronDown component */
 
 .in-rule-rows {
   display: flex;
@@ -254,7 +227,7 @@ const gradeIconComponent = computed(() => {
 .in-rule-row.fail { background: white; }
 .in-rule-row.ok { }
 
-.in-row-icon { font-size: 13px; margin-top: 1px; }
+/* .in-row-icon: size controlled by :size prop */
 
 .in-row-content {
   flex: 1;

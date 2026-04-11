@@ -67,7 +67,7 @@
         <!-- Tab 2: 对象类型说明（目前展示占位符，内容在 rules tab 中） -->
         <div v-show="activeTab === 'personal'" class="tab-content">
           <div class="placeholder-tip">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <Users :size="32" color="#94a3b8" stroke-width="1.5" />
             <div>
               <p class="tip-title">对象类型说明</p>
               <p class="tip-desc">个人对象：针对单个学生；标签对象：针对某类学生（如“住宿”标签）。请在「规则总览」中创建并组合使用。</p>
@@ -292,7 +292,7 @@ const close = () => {
   box-shadow: 0 2px 4px rgba(35, 88, 123, 0.2);
 }
 
-.tab-icon { font-size: 16px; }
+/* .tab-icon: size controlled by :size prop on <component :is> */
 
 /* ==================== Tab 内容 ==================== */
 .tab-content {

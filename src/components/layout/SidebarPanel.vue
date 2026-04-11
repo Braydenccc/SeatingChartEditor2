@@ -9,7 +9,7 @@
       <div class="tabs-bar">
         <button v-for="tab in tabs" :key="tab.id" class="tab-button" :class="{ active: activeTab === tab.id }"
           @click="setActiveTab(tab.id)">
-          <component :is="tab.icon" class="tab-icon ui-icon" />
+          <component :is="tab.icon" :size="16" stroke-width="2" />
           <span class="tab-label">{{ tab.label }}</span>
         </button>
       </div>
@@ -23,16 +23,16 @@
             <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" style="display: none"
               @change="handleLoadWorkspace" />
             <button class="option-button" @click="$refs.workspaceInput.click()">
-              <span class="btn-content"><FolderOpen class="ui-icon" />加载本地</span>
+              <span class="btn-content"><FolderOpen :size="14" stroke-width="2" />加载本地</span>
             </button>
             <button class="option-button" @click="handleSaveWorkspace">
-              <span class="btn-content"><Save class="ui-icon" />保存到本地</span>
+              <span class="btn-content"><Save :size="14" stroke-width="2" />保存到本地</span>
             </button>
             <button class="option-button" @click="handleCloudLoad">
-              <span class="btn-content"><CloudDownload class="ui-icon" />从云端加载</span>
+              <span class="btn-content"><CloudDownload :size="14" stroke-width="2" />从云端加载</span>
             </button>
             <button class="option-button primary" @click="handleCloudSave">
-              <span class="btn-content"><CloudUpload class="ui-icon" />保存至云端</span>
+              <span class="btn-content"><CloudUpload :size="14" stroke-width="2" />保存至云端</span>
             </button>
           </div>
 
@@ -40,15 +40,21 @@
             <h3>名单管理</h3>
           </div>
           <div class="options-group">
+            <button class="option-button" @click="showRosterDialog = true">
+              <span class="btn-content"><Users :size="14" stroke-width="2" />编辑名单</span>
+            </button>
+            <button class="option-button" @click="showTagSettingsDialog = true">
+              <span class="btn-content"><Tag :size="14" stroke-width="2" />标签设置</span>
+            </button>
             <button class="option-button" @click="handleDownloadTemplate">
-              <span>下载名单模板</span>
+              <span class="btn-content"><Download :size="14" stroke-width="2" />下载名单模板</span>
             </button>
             <input ref="excelInput" type="file" accept=".xlsx,.xls" style="display: none" @change="handleImportExcel" />
             <button class="option-button" @click="$refs.excelInput.click()">
-              <span>从Excel导入名单</span>
+              <span class="btn-content"><FileInput :size="14" stroke-width="2" />从Excel导入名单</span>
             </button>
             <button class="option-button" @click="handleExportExcel">
-              <span>导出名单到Excel</span>
+              <span class="btn-content"><FileOutput :size="14" stroke-width="2" />导出名单到Excel</span>
             </button>
           </div>
         </div>
@@ -72,7 +78,7 @@
               <input id="seatsPerColumn" v-model.number="configForm.seatsPerColumn" type="number" min="1" max="10" />
             </div>
             <button class="option-button primary" @click="applyConfig">
-              <span>应用配置</span>
+              <span class="btn-content"><Check :size="14" stroke-width="2.5" />应用配置</span>
             </button>
           </div>
 
@@ -82,15 +88,15 @@
           <div class="options-group">
             <button id="swapSeat" class="option-button" :class="{ active: currentMode === EditMode.SWAP }"
               @click="toggleSwapMode">
-              <span>交换座位</span>
+              <span class="btn-content"><ArrowLeftRight :size="14" stroke-width="2" />交换座位</span>
             </button>
             <button id="clearSeat" class="option-button" :class="{ active: currentMode === EditMode.CLEAR }"
               @click="toggleClearMode">
-              <span>清空座位</span>
+              <span class="btn-content"><Trash2 :size="14" stroke-width="2" />清空座位</span>
             </button>
             <button id="emptySeat" class="option-button" :class="{ active: currentMode === EditMode.EMPTY_EDIT }"
               @click="toggleEmptyEditMode">
-              <span>空置座位</span>
+              <span class="btn-content"><LayoutGrid :size="14" stroke-width="2" />空置座位</span>
             </button>
           </div>
           <div class="tab-header">
@@ -151,7 +157,7 @@
                 </div>
               </div>
               <button id="shiftSeat" class="option-button primary" @click="applySeatShift">
-                <span>应用轮换</span>
+                <span class="btn-content"><RefreshCcw :size="14" stroke-width="2" />应用轮换</span>
               </button>
             </div>
           </template>
@@ -168,8 +174,8 @@
               <div class="zone-rot-section-header">
                 <span class="zone-rot-section-title">轮换组</span>
                 <div style="display:flex;gap:4px">
-                  <button class="zone-rot-add-btn" @click="handleAddGroup('cycle')">＋ 循环</button>
-                  <button class="zone-rot-add-btn" @click="handleAddGroup('swap')">＋ 互换</button>
+                  <button class="zone-rot-add-btn" @click="handleAddGroup('cycle')"><RefreshCcw :size="11" stroke-width="2" /> 循环</button>
+                  <button class="zone-rot-add-btn" @click="handleAddGroup('swap')"><ArrowLeftRight :size="11" stroke-width="2" /> 互换</button>
                 </div>
               </div>
 
@@ -185,7 +191,7 @@
                   </span>
                   <input class="zone-rot-name-input" v-model="group.name"
                     @click.stop title="点击修改组名" />
-                  <button class="zone-rot-del" @click="handleDeleteGroup(group.id)"><X class="ui-icon" /></button>
+                  <button class="zone-rot-del" @click="handleDeleteGroup(group.id)"><X :size="12" stroke-width="2.5" /></button>
                 </div>
 
                 <!-- 组内选区列表 -->
@@ -208,12 +214,12 @@
                     <!-- 互换箭头 -->
                     <span v-if="group.type === 'swap' && idx === 0" class="zone-rot-arrow">⇄</span>
                     <span class="zone-rot-count">{{ zone.seatIds.length }}座</span>
-                    <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)"><X class="ui-icon" /></button>
+                    <button class="zone-rot-del" @click.stop="handleDeleteZoneFromGroup(group.id, zone.id)"><X :size="12" stroke-width="2.5" /></button>
                   </div>
 
                   <!-- 添加选区按钮（在组内） -->
                   <button class="zone-rot-add-zone-btn" @click="handleAddZoneToGroup(group.id)">
-                    ＋ 添加选区
+                    <ListFilter :size="11" stroke-width="2" /> 添加选区
                   </button>
 
                   <!-- 校验错误 -->
@@ -223,7 +229,7 @@
             </div>
 
             <button class="option-button primary" @click="handleApplyZoneRotation">
-              <span>应用选区轮换</span>
+              <span class="btn-content"><RefreshCcw :size="14" stroke-width="2" />应用选区轮换</span>
             </button>
           </template>
 
@@ -261,20 +267,24 @@
             <!-- 操作按钮 -->
             <div class="assign-actions-grid">
               <button class="option-button rule-shortcut-btn" @click="showRuleEditor = true">
-                <Scale class="ui-icon" />
+                <Scale :size="15" stroke-width="2" />
                 <span class="rule-shortcut-text">规则管理</span>
                 <span v-if="ruleCount > 0" class="rule-badge">{{ ruleCount }}</span>
               </button>
               <button id="applyAssign" class="option-button primary main-assign-btn" 
                 :disabled="isAssigning || (precheckResult && !precheckResult.pass)" @click="handleRunAssignment">
-                <span>{{ isAssigning ? '执行中...' : (precheckResult && !precheckResult.pass ? '先修复阻断项' : '开始排位') }}</span>
+                <span class="btn-content">
+                  <Loader2 v-if="isAssigning" :size="14" stroke-width="2" class="spin-icon" />
+                  <Play v-else :size="14" stroke-width="2" />
+                  {{ isAssigning ? '执行中...' : (precheckResult && !precheckResult.pass ? '先修复阻断项' : '开始排位') }}
+                </span>
               </button>
             </div>
 
             <div class="assign-card-section precheck-section">
               <div class="precheck-header">
                 <span class="section-label">执行前预检查</span>
-                <button class="precheck-btn" @click="handleRunPrecheck">运行预检查</button>
+                <button class="precheck-btn" @click="handleRunPrecheck"><Sliders :size="12" stroke-width="2" /> 运行预检查</button>
               </div>
               <div v-if="precheckResult" class="precheck-summary" :class="`risk-${precheckResult.risk}`">
                 <div class="precheck-main-line">
@@ -291,7 +301,7 @@
                 </div>
                 <div v-if="precheckResult.blockingReasons.length > 0" class="precheck-list blocking">
                   <div v-for="(item, idx) in precheckResult.blockingReasons" :key="`b-${idx}`" class="precheck-item">
-                    <CircleX class="ui-icon" />
+                    <CircleX :size="14" stroke-width="2" />
                     <span>{{ item }}</span>
                   </div>
                 </div>
@@ -358,7 +368,7 @@
           </div>
           <div class="options-group">
             <button class="option-button" @click="showExportDialog = true">
-              <span>导出设置</span>
+              <span class="btn-content"><Settings2 :size="14" stroke-width="2" />导出设置</span>
             </button>
           </div>
 
@@ -371,7 +381,11 @@
 
           <div class="options-group">
             <button class="option-button primary" :disabled="isExporting" @click="handleQuickExport">
-              <span>{{ isExporting ? '正在生成...' : '导出' }}</span>
+              <span class="btn-content">
+                <Loader2 v-if="isExporting" :size="14" stroke-width="2" class="spin-icon" />
+                <FileOutput v-else :size="14" stroke-width="2" />
+                {{ isExporting ? '正在生成...' : '导出' }}
+              </span>
             </button>
           </div>
         </div>
@@ -419,16 +433,23 @@
     @close="showRuleEditor = false"
   />
 
+  <!-- 编辑名单弹窗 -->
+  <StudentRosterDialog v-model:visible="showRosterDialog" />
+
+  <!-- 标签设置弹窗 -->
+  <TagSettingsDialog v-model:visible="showTagSettingsDialog" />
 
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed, defineAsyncComponent } from 'vue'
-import { CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, Save, Scale, Shuffle, X } from 'lucide-vue-next'
+import { ArrowLeftRight, Check, CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, LayoutGrid, ListFilter, Loader2, Play, RefreshCcw, Save, Scale, Settings2, Shuffle, Sliders, Tag, Trash2, FileInput, FileOutput, Users, X } from 'lucide-vue-next'
 
 const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
 const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
 const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
+const StudentRosterDialog = defineAsyncComponent(() => import('../student/StudentRosterDialog.vue'))
+const TagSettingsDialog = defineAsyncComponent(() => import('../student/TagSettingsDialog.vue'))
 
 import { useSidebar } from '@/composables/useSidebar'
 import { useSeatChart } from '@/composables/useSeatChart'
@@ -538,7 +559,7 @@ const tabs = [
   { id: 1, label: '文件', icon: FileText },
   { id: 2, label: '编辑', icon: Edit3 },
   { id: 3, label: '排位', icon: Shuffle },
-  { id: 4, label: '导出', icon: Download }
+  { id: 4, label: '导出', icon: FileOutput }
 ]
 
 // 座位配置表单
@@ -578,6 +599,8 @@ const tagSettingsLocal = ref({})
 
 // 导出弹窗状态
 const showExportDialog = ref(false)
+const showRosterDialog = ref(false)
+const showTagSettingsDialog = ref(false)
 const lastExportUrl = ref('')
 const isExporting = ref(false)
 let lastExportObjectUrl = ''
@@ -1905,19 +1928,25 @@ const formatLogTime = (timestamp) => {
 /* ==================== tab-icon (desktop 隐藏) ==================== */
 .tab-icon {
   display: none;
-  font-size: 18px;
-  line-height: 1;
 }
+
 
 .btn-content {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
-.zone-rot-del .ui-icon {
-  font-size: 14px;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
+.spin-icon {
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+/* .zone-rot-del icons use :size prop */
 
 /* ==================== 移动端遮罩 ==================== */
 .mobile-overlay {
@@ -2826,9 +2855,7 @@ const formatLogTime = (timestamp) => {
   gap: 4px;
 }
 
-.precheck-item .ui-icon {
-  font-size: 14px;
-}
+/* .precheck-item icons use :size prop */
 
 .precheck-list.blocking {
   color: #b91c1c;

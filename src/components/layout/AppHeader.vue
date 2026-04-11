@@ -3,8 +3,8 @@
     <div class="header-left">
         <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
           <div class="user-info" @click="toggleDropdown">
-          <Cloud v-if="authType === 'webdav'" class="ui-icon user-avatar" :title="'WebDAV 模式'" />
-          <User v-else class="ui-icon user-avatar" :title="'普通账号'" />
+          <Cloud v-if="authType === 'webdav'" :size="18" stroke-width="1.8" :title="'WebDAV 模式'" />
+          <User v-else :size="18" stroke-width="1.8" :title="'普通账号'" />
           <span class="welcome-text">{{ currentUser?.username }}</span>
           <span class="dropdown-icon">▼</span>
         </div>
@@ -12,16 +12,16 @@
           <div v-if="showDropdown" class="user-dropdown">
             <!-- Sync Service Settings entry -->
             <button v-if="hasRetiehe" class="dropdown-item" @click="openSyncSettings">
-              <RefreshCw class="ui-icon item-icon" /> 同步设置
+              <RefreshCw :size="15" stroke-width="2" /> 同步设置
             </button>
             <div class="dropdown-divider" v-if="hasRetiehe"></div>
             
             <button class="dropdown-item" @click="openWorkspaceManagement">
-              <FolderOpen class="ui-icon item-icon" /> 工作区管理
+              <FolderOpen :size="15" stroke-width="2" /> 工作区管理
             </button>
 
             <button v-if="!hasRetiehe" class="dropdown-item" @click="emit('open-login', 'login'); showDropdown = false">
-              <LogIn class="ui-icon item-icon" /> 登录 SCE 账号
+              <LogIn :size="15" stroke-width="2" /> 登录 SCE 账号
             </button>
             
             <div class="dropdown-divider"></div>
@@ -33,7 +33,7 @@
         </Transition>
       </div>
       <button v-else class="auth-btn login-btn" @click="emit('open-login')">
-        <Cloud class="ui-icon btn-icon" />登录
+        <Cloud :size="15" stroke-width="2" />登录
       </button>
 
       <h1 class="header-text">BraydenSCE V2</h1>
@@ -41,7 +41,7 @@
     <div class="header-right">
       <p class="header-subtitle">座位表编辑器 开发版本 <a href="https://afdian.com/a/brayden" target="_blank">byccc</a> 由<a href="https://host.retiehe.com/" target="_blank">热铁盒网页托管</a>提供服务</p>
       <a href="https://github.com/Braydenccc/SeatingCrartEditor2" target="_blank" class="github-link" title="Source Code">
-        <Github class="ui-icon github-icon" />
+        <Github :size="26" stroke-width="1.8" />
       </a>
     </div>
     
@@ -173,9 +173,7 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
-.item-icon {
-  font-size: 16px;
-}
+/* .item-icon: size controlled by :size prop */
 
 .dropdown-item:hover {
   background: var(--color-bg-subtle);
@@ -258,7 +256,7 @@ onBeforeUnmount(() => {
 }
 
 .user-avatar {
-  font-size: 16px;
+  flex-shrink: 0;
 }
 
 .welcome-text {
@@ -298,9 +296,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.btn-icon {
-  font-size: 16px;
-}
+/* .btn-icon: size controlled by :size prop */
 
 .header-right {
   display: flex;
@@ -328,9 +324,7 @@ onBeforeUnmount(() => {
   transition: opacity 0.2s, transform 0.2s;
 }
 
-.github-icon {
-  font-size: 28px;
-}
+/* .github-icon: size controlled by :size prop */
 
 .github-link:hover {
   opacity: 1;

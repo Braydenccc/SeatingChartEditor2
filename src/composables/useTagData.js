@@ -6,6 +6,9 @@ const tags = ref([])
 let nextTagId = 1
 let colorIndex = 0
 
+// 全局设置：是否在座位表中显示标签
+const showTagsInSeatChart = ref(true)
+
 // 初始化默认标签
 export function initializeTags() {
   if (tags.value.length === 0) {
@@ -13,7 +16,8 @@ export function initializeTags() {
       tags.value.push({
         id: nextTagId++,
         name: tag.name,
-        color: tag.color
+        color: tag.color,
+        showInSeatChart: true
       })
     })
     colorIndex = DEFAULT_TAGS.length
@@ -27,7 +31,8 @@ export function useTagData() {
     tags.value.push({
       id: nextTagId++,
       name: tagData.name,
-      color: color
+      color: color,
+      showInSeatChart: tagData.showInSeatChart !== false
     })
   }
 
@@ -37,6 +42,9 @@ export function useTagData() {
     if (tag) {
       tag.name = tagData.name
       tag.color = tagData.color
+      if (tagData.showInSeatChart !== undefined) {
+        tag.showInSeatChart = tagData.showInSeatChart
+      }
     }
   }
 
@@ -52,11 +60,18 @@ export function useTagData() {
     colorIndex = 0
   }
 
+  // 设置全局标签显示开关
+  const setShowTagsInSeatChart = (show) => {
+    showTagsInSeatChart.value = show
+  }
+
   return {
     tags,
+    showTagsInSeatChart,
     addTag,
     editTag,
     deleteTag,
-    clearAllTags
+    clearAllTags,
+    setShowTagsInSeatChart
   }
 }
