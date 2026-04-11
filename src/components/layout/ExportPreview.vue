@@ -210,15 +210,25 @@
           <button class="btn secondary" @click="$emit('close')">关闭</button>
           <template v-if="activeTab === 'image'">
             <button v-if="authType === 'webdav'" class="btn primary" style="background:#0ea5e9;" :disabled="isGenerating || isUploading" @click="handleCloudExportImage">
+              <Loader2 v-if="isUploading" :size="14" stroke-width="2" class="spin-icon" />
+              <CloudUpload v-else :size="14" stroke-width="2" />
               {{ isUploading ? '上传中...' : '保存至云盘' }}
             </button>
-            <button class="btn primary" :disabled="isGenerating || isUploading" @click="handleDownload">下载图片</button>
+            <button class="btn primary" :disabled="isGenerating || isUploading" @click="handleDownload">
+              <Loader2 v-if="isGenerating" :size="14" stroke-width="2" class="spin-icon" />
+              <Download v-else :size="14" stroke-width="2" />
+              下载图片
+            </button>
           </template>
           <template v-if="activeTab === 'excel'">
             <button v-if="authType === 'webdav'" class="btn excel" style="background:#059669;" :disabled="isExcelDownloading || isUploading" @click="handleCloudExportExcel">
+              <Loader2 v-if="isUploading" :size="14" stroke-width="2" class="spin-icon" />
+              <CloudUpload v-else :size="14" stroke-width="2" />
               {{ isUploading ? '上传中...' : '保存至云盘' }}
             </button>
             <button class="btn excel" :disabled="isExcelDownloading || isUploading" @click="handleExcelDownload">
+              <Loader2 v-if="isExcelDownloading" :size="14" stroke-width="2" class="spin-icon" />
+              <Download v-else :size="14" stroke-width="2" />
               {{ isExcelDownloading ? '生成中...' : '下载 Excel' }}
             </button>
           </template>
@@ -230,7 +240,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { X } from 'lucide-vue-next'
+import { X, CloudUpload, Download, Loader2 } from 'lucide-vue-next'
 import { useExportSettings } from '@/composables/useExportSettings'
 import { useImageExport } from '@/composables/useImageExport'
 import { useTagData } from '@/composables/useTagData'
@@ -1048,6 +1058,7 @@ onBeforeUnmount(() => {
   padding: 12px 20px; border-top: 1px solid #e8eef2; flex-shrink: 0;
 }
 .btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 8px 20px; border-radius: 8px; font-size: 13px;
   font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
 }

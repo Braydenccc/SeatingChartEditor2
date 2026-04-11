@@ -24,7 +24,10 @@ globs:
 | 删除 | Trash2 | 14px |
 | 缩小/放大 | Minus/Plus | 16px |
 | 搜索 | Search | 15px |
-| 下载/上传 | Download/Upload | 14px |
+| 下载 | Download | 14px |
+| 上传 | CloudUpload / Upload | 14px |
+| 导出 | FileOutput | 14px |
+| 导入 | FileInput | 14px |
 | 警告 | AlertTriangle | 16px |
 | 展开/收起 | ChevronDown | 14px |
 | 空状态 | ClipboardList | 40px |

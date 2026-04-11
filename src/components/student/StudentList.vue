@@ -12,6 +12,10 @@
           <Shuffle :size="16" stroke-width="2.5" />
           <span>随机排位</span>
         </button>
+        <button class="icon-btn" title="标签设置" @click="showTagSettingsDialog = true">
+          <Tag :size="16" stroke-width="2.5" />
+          <span>标签设置</span>
+        </button>
         <button class="icon-btn" title="编辑名单" @click="showRosterDialog = true">
           <Users :size="16" stroke-width="2.5" />
           <span>编辑名单</span>
@@ -40,21 +44,24 @@
     </div>
     
     <StudentRosterDialog v-model:visible="showRosterDialog" />
+    <TagSettingsDialog v-model:visible="showTagSettingsDialog" />
   </div>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Shuffle, Users } from 'lucide-vue-next'
+import { Shuffle, Users, Tag } from 'lucide-vue-next'
 import CandidateItem from './CandidateItem.vue'
 import EmptyState from '../ui/EmptyState.vue'
 import StudentRosterDialog from './StudentRosterDialog.vue'
+import TagSettingsDialog from './TagSettingsDialog.vue'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useLogger } from '@/composables/useLogger'
 
 const showRosterDialog = ref(false)
+const showTagSettingsDialog = ref(false)
 
 const { tags } = useTagData()
 const { students, updateStudent, deleteStudent } = useStudentData()

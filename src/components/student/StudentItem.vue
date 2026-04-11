@@ -53,7 +53,7 @@
         
         <teleport to="body">
           <transition name="dropdown-pop">
-            <div v-if="showTagDropdown" class="tag-dropdown" :style="dropdownStyle">
+            <div v-if="showTagDropdown" ref="dropdownRef" class="tag-dropdown" :style="dropdownStyle" @click.stop>
               <div class="dropdown-header">选择标签</div>
               <div class="tag-options">
                 <template v-for="tag in availableTags" :key="tag.id">
@@ -129,11 +129,12 @@ const handleDelete = () => {
 // ================= 标签逻辑 =================
 const showTagDropdown = ref(false)
 const wrapperRef = ref(null)
+const dropdownRef = ref(null)
 const dropdownStyle = ref({})
 
 onClickOutside(wrapperRef, () => {
   showTagDropdown.value = false
-})
+}, { ignore: [dropdownRef] })
 
 const unassignedTags = computed(() => {
   return props.availableTags.filter(t => !localTags.value.includes(t.id))
@@ -415,6 +416,8 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
 <!-- Teleport 到 body 的下拉菜单不受 scoped 限制，需独立全局样式 -->
 <style>
 .tag-dropdown {
+  position: fixed;
+  z-index: 9999;
   width: 160px;
   background: white;
   border-radius: 10px;

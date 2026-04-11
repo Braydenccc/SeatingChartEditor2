@@ -43,15 +43,18 @@
             <button class="option-button" @click="showRosterDialog = true">
               <span class="btn-content"><Users :size="14" stroke-width="2" />编辑名单</span>
             </button>
+            <button class="option-button" @click="showTagSettingsDialog = true">
+              <span class="btn-content"><Tag :size="14" stroke-width="2" />标签设置</span>
+            </button>
             <button class="option-button" @click="handleDownloadTemplate">
-              <span class="btn-content"><ArrowDownToLine :size="14" stroke-width="2" />下载名单模板</span>
+              <span class="btn-content"><Download :size="14" stroke-width="2" />下载名单模板</span>
             </button>
             <input ref="excelInput" type="file" accept=".xlsx,.xls" style="display: none" @change="handleImportExcel" />
             <button class="option-button" @click="$refs.excelInput.click()">
-              <span class="btn-content"><Upload :size="14" stroke-width="2" />从Excel导入名单</span>
+              <span class="btn-content"><FileInput :size="14" stroke-width="2" />从Excel导入名单</span>
             </button>
             <button class="option-button" @click="handleExportExcel">
-              <span class="btn-content"><ArrowUpToLine :size="14" stroke-width="2" />导出名单到Excel</span>
+              <span class="btn-content"><FileOutput :size="14" stroke-width="2" />导出名单到Excel</span>
             </button>
           </div>
         </div>
@@ -380,7 +383,7 @@
             <button class="option-button primary" :disabled="isExporting" @click="handleQuickExport">
               <span class="btn-content">
                 <Loader2 v-if="isExporting" :size="14" stroke-width="2" class="spin-icon" />
-                <ImageDown v-else :size="14" stroke-width="2" />
+                <FileOutput v-else :size="14" stroke-width="2" />
                 {{ isExporting ? '正在生成...' : '导出' }}
               </span>
             </button>
@@ -433,17 +436,20 @@
   <!-- 编辑名单弹窗 -->
   <StudentRosterDialog v-model:visible="showRosterDialog" />
 
+  <!-- 标签设置弹窗 -->
+  <TagSettingsDialog v-model:visible="showTagSettingsDialog" />
 
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed, defineAsyncComponent } from 'vue'
-import { ArrowDownToLine, ArrowLeftRight, ArrowUpToLine, Check, CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, ImageDown, LayoutGrid, ListFilter, Loader2, Play, RefreshCcw, Save, Scale, Settings2, Shuffle, Sliders, Trash2, Upload, Users, X } from 'lucide-vue-next'
+import { ArrowLeftRight, Check, CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, LayoutGrid, ListFilter, Loader2, Play, RefreshCcw, Save, Scale, Settings2, Shuffle, Sliders, Tag, Trash2, FileInput, FileOutput, Users, X } from 'lucide-vue-next'
 
 const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
 const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
 const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
 const StudentRosterDialog = defineAsyncComponent(() => import('../student/StudentRosterDialog.vue'))
+const TagSettingsDialog = defineAsyncComponent(() => import('../student/TagSettingsDialog.vue'))
 
 import { useSidebar } from '@/composables/useSidebar'
 import { useSeatChart } from '@/composables/useSeatChart'
@@ -553,7 +559,7 @@ const tabs = [
   { id: 1, label: '文件', icon: FileText },
   { id: 2, label: '编辑', icon: Edit3 },
   { id: 3, label: '排位', icon: Shuffle },
-  { id: 4, label: '导出', icon: Download }
+  { id: 4, label: '导出', icon: FileOutput }
 ]
 
 // 座位配置表单
@@ -594,6 +600,7 @@ const tagSettingsLocal = ref({})
 // 导出弹窗状态
 const showExportDialog = ref(false)
 const showRosterDialog = ref(false)
+const showTagSettingsDialog = ref(false)
 const lastExportUrl = ref('')
 const isExporting = ref(false)
 let lastExportObjectUrl = ''
