@@ -414,6 +414,9 @@ const clearAllTouchHighlights = () => {
   document.querySelectorAll('.seat-item.drag-over').forEach(el => {
     el.classList.remove('drag-over')
   })
+  document.querySelectorAll('.student-items.drag-over').forEach(el => {
+    el.classList.remove('drag-over')
+  })
 }
 
 onUnmounted(() => {
