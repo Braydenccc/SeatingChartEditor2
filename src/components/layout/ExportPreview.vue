@@ -154,6 +154,7 @@
                     placeholder="%n&#10;%i"
                   ></textarea>
                   <div class="format-hint">支持占位符：%n 姓名，%i 学号，%r 行号，%g 组号，%s/%j 序号，%% 百分号</div>
+                  <div class="format-hint">说明：关闭“格子内显示学号”后，模板中的 %i 会输出空文本。</div>
                 </div>
                 <div class="spacing-grid">
                   <div class="num-input">
@@ -175,6 +176,7 @@
                     </select>
                   </div>
                 </div>
+                <div class="format-hint" style="margin-top:6px">提示：带圈数字仅支持 1-20，超过范围会自动回退为阿拉伯数字。</div>
               </div>
 
               <div class="settings-section">
@@ -325,7 +327,7 @@ const numberSchemeOptions = [
   { value: 'chineseUpper', label: '壹贰' },
   { value: 'chineseLower', label: '一二' },
   { value: 'roman', label: 'I II' },
-  { value: 'circled', label: '①②' }
+  { value: 'circled', label: '①②（1-20）' }
 ]
 
 // overlay 点击关闭保护（防止从弹窗内拖出后关闭）

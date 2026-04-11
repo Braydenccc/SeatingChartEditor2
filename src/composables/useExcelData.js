@@ -91,6 +91,7 @@ const toChineseNumber = (num, digits, smallUnits) => {
     needZeroBetween = false
   }
 
+  // 中文小写读数习惯会把“一十X”简写为“十X”（如 11 -> 十一）。
   if (digits === DIGITS_LOWER && output.startsWith('一十')) {
     output = output.slice(1)
   }
@@ -518,11 +519,11 @@ export function useExcelData() {
       const rowLabel = formatIndex(displayRow, rowNumberScheme)
       if (showRowNumbers) setCell(eRow, 0, `第${rowLabel}排`, styleRowNum)
       for (let g = 0; g < groupCount; g++) {
+        const groupLabel = precomputedGroupLabels[g]
         for (let c = 0; c < columnsPerGroup; c++) {
           const eCol = groupStartCol(g) + c
           const seat = organizedSeats[g]?.[c]?.[srcRow]
-          const groupLabel = precomputedGroupLabels[g]
-          const serial = g * seatsPerGroup + c * seatsPerColumn + displayRow
+          const serial = g * seatsPerGroup + c * seatsPerColumn + (r + 1)
           const serialLabel = formatIndex(serial, serialNumberScheme)
           if (!seat) {
             setCell(eRow, eCol, '', styleSeat)
