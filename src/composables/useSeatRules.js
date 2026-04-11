@@ -401,7 +401,7 @@ export function useSeatRules() {
     return hasOverlap(s1.subjects, s2.subjects)
   }
 
-  const detectConflicts = () => {
+  const detectConflicts = (zoneHelper = null, seatChartHelper = null) => {
     const conflicts = []
     const activeRules = rules.value.filter(r => r.enabled)
 
@@ -498,10 +498,98 @@ export function useSeatRules() {
             })
           }
         }
+
+        if (
+          (r1.predicate === 'MUST_BE_SEATMATES' && r2.predicate === 'DISTANCE_AT_LEAST') ||
+          (r1.predicate === 'DISTANCE_AT_LEAST' && r2.predicate === 'MUST_BE_SEATMATES')
+        ) {
+          if (!hasPairScopeOverlap(r1, r2)) continue
+          const distRule = r1.predicate === 'DISTANCE_AT_LEAST' ? r1 : r2
+          if ((distRule.params?.distance ?? 0) > 1) {
+            conflicts.push({
+              type: 'infeasible',
+              ruleIds: [r1.id, r2.id],
+              message: `不可行冲突：「必须同桌」要求距离≤1，与「${renderRuleText(distRule)}」矛盾`
+            })
+          }
+        }
+
+        if (zoneHelper && seatChartHelper) {
+          checkZoneRangeConflicts(r1, r2, zoneHelper, seatChartHelper, conflicts)
+          checkZoneZoneConflicts(r1, r2, zoneHelper, conflicts)
+        }
       }
     }
 
     return conflicts
+  }
+
+  const checkZoneRangeConflicts = (r1, r2, zoneHelper, seatChartHelper, conflicts) => {
+    const isZoneRule = (r) => r.predicate === 'IN_ZONE' || r.predicate === 'NOT_IN_ZONE'
+    const isRangeRule = (r) => r.predicate === 'IN_ROW_RANGE' || r.predicate === 'IN_GROUP_RANGE'
+
+    if (!((isZoneRule(r1) && isRangeRule(r2)) || (isZoneRule(r2) && isRangeRule(r1)))) {
+      return
+    }
+
+    const zoneRule = isZoneRule(r1) ? r1 : r2
+    const rangeRule = isRangeRule(r1) ? r1 : r2
+
+    if (!hasSingleScopeOverlap(zoneRule, rangeRule)) return
+
+    const zone = zoneHelper.zones.find(z => z.id === zoneRule.params?.zoneId)
+    if (!zone || zone.seatIds.length === 0) return
+
+    const seats = seatChartHelper.seats
+    const zoneSeats = zone.seatIds.map(id => seats.find(s => s.id === id)).filter(Boolean)
+
+    if (rangeRule.predicate === 'IN_ROW_RANGE') {
+      const { minRow, maxRow } = rangeRule.params
+      const seatsInRange = zoneSeats.filter(seat => {
+        const totalRows = seatChartHelper.seatConfig.seatsPerColumn
+        const rowFromPodium = totalRows - seat.rowIndex
+        return rowFromPodium >= minRow && rowFromPodium <= maxRow
+      })
+      if (zoneRule.predicate === 'IN_ZONE' && seatsInRange.length === 0) {
+        conflicts.push({
+          type: 'infeasible',
+          ruleIds: [zoneRule.id, rangeRule.id],
+          message: `不可行冲突：选区与排范围无交集，「${renderRuleText(zoneRule)}」无法满足「${renderRuleText(rangeRule)}」`
+        })
+      }
+    } else if (rangeRule.predicate === 'IN_GROUP_RANGE') {
+      const { minGroup, maxGroup } = rangeRule.params
+      const seatsInRange = zoneSeats.filter(seat => {
+        const group1 = seat.groupIndex + 1
+        return group1 >= minGroup && group1 <= maxGroup
+      })
+      if (zoneRule.predicate === 'IN_ZONE' && seatsInRange.length === 0) {
+        conflicts.push({
+          type: 'infeasible',
+          ruleIds: [zoneRule.id, rangeRule.id],
+          message: `不可行冲突：选区与大组范围无交集，「${renderRuleText(zoneRule)}」无法满足「${renderRuleText(rangeRule)}」`
+        })
+      }
+    }
+  }
+
+  const checkZoneZoneConflicts = (r1, r2, zoneHelper, conflicts) => {
+    if (r1.predicate !== 'IN_ZONE' || r2.predicate !== 'IN_ZONE') return
+    if (!hasSingleScopeOverlap(r1, r2)) return
+
+    const zone1 = zoneHelper.zones.find(z => z.id === r1.params?.zoneId)
+    const zone2 = zoneHelper.zones.find(z => z.id === r2.params?.zoneId)
+    if (!zone1 || !zone2) return
+
+    const set1 = new Set(zone1.seatIds)
+    const hasOverlap = zone2.seatIds.some(id => set1.has(id))
+    if (!hasOverlap) {
+      conflicts.push({
+        type: 'infeasible',
+        ruleIds: [r1.id, r2.id],
+        message: `不可行冲突：两个选区无交集，无法同时满足「${renderRuleText(r1)}」和「${renderRuleText(r2)}」`
+      })
+    }
   }
 
   const toStoredRule = (ruleData) => {

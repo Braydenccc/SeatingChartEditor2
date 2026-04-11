@@ -368,7 +368,7 @@ const validationResult = computed(() => {
   for (const sr of subRules.value) {
     if (!sr.predicate) continue
     const result = validateRule({
-      subjects: sr.subjects,
+      subjects: sharedSubjects.value,
       predicate: sr.predicate,
       params: sr.params
     })
@@ -717,19 +717,17 @@ watch(
 
 /* 添加子规则按钮 */
 .add-sub-rule-btn {
-  border: 1.5px dashed #93c5fd;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid #dbe3ea;
+  background: white;
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: normal;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 .add-sub-rule-btn:hover {
-  background: #dbeafe;
-  border-color: #60a5fa;
+  border-color: #94a3b8;
 }
 
 .chip-group { display: flex; gap: 8px; flex-wrap: wrap; }

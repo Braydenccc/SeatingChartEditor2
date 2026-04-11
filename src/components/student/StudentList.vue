@@ -47,7 +47,7 @@
 
     <!-- 学生列表 / 空状态占位 -->
     <div ref="studentItemsRef" class="student-items" @dragover.prevent="handleDragOver" @drop.prevent="handleDrop" @dragleave="handleDragLeave"
-      :class="{ 'drag-over': isDragOver, 'is-empty': unassignedStudents.length === 0, 'touch-dragging': isTouchDraggingFromSeat }">
+      :class="{ 'drag-over': isDragOver, 'is-empty': unassignedStudents.length === 0, 'has-placeholder': showEmptyPlaceholder, 'touch-dragging': isTouchDraggingFromSeat }">
 
       <!-- 有未分配学生时正常显示 -->
       <CandidateItem
@@ -319,6 +319,10 @@ const studentItemsRef = ref(null)   // .student-items 元素引用
 // 未入座学生计算属性
 const unassignedStudents = computed(() => {
   return students.value.filter(student => !findSeatByStudent(student.id))
+})
+
+const showEmptyPlaceholder = computed(() => {
+  return students.value.length === 0 || (unassignedStudents.value.length === 0 && students.value.length > 0)
 })
 
 // ==================== 触摸移出处理 ====================
@@ -700,7 +704,7 @@ const handleDrop = (e) => {
 }
 
 /* 有空状态占位时仍需显示 */
-.student-items.is-empty:has(.empty-placeholder) {
+.student-items.is-empty.has-placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;

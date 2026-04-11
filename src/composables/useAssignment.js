@@ -450,7 +450,7 @@ export function useAssignment() {
 
           // 分组谓词单独处理
           if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
-            subScore = checkGroupViolation(subRule, subSubjects, assignment)
+            subScore = -checkGroupViolation(subRule, subSubjects, assignment)
           } else {
             for (const subject of subSubjects) {
               const { violated, excess = 0 } = checkViolation(subRule, subject, assignment)
@@ -1096,6 +1096,75 @@ export function useAssignment() {
     const violated = []
 
     for (const rule of activeRules) {
+      if (rule.subRules && rule.subRules.length > 1) {
+        let allSubSatisfied = true
+        const anySubSatisfied = []
+        const subViolationDetails = []
+
+        for (const subRule of rule.subRules) {
+          if (!subRule.predicate) continue
+          const subSubjects = expandSubject(subRule, studentList)
+          let subSatisfied = true
+          const subRuleViolations = []
+
+          if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
+            const penalty = checkGroupViolation(subRule, subSubjects, solution)
+            if (penalty > 0) {
+              subSatisfied = false
+              const focusedStudentIds = getGroupRuleViolatingStudentIds(subRule, subSubjects, solution)
+              const names = focusedStudentIds
+                .map(studentId => studentList.find(st => st.id === studentId)?.name ?? `ID:${studentId}`)
+                .slice(0, 3)
+              subRuleViolations.push(names.length > 0
+                ? `重点定位学生：${names.join('、')}${focusedStudentIds.length > 3 ? `…等${focusedStudentIds.length}人` : ''}`
+                : '分组约束未满足（存在明显分散/不均衡）'
+              )
+            }
+          } else {
+            for (const subj of subSubjects) {
+              const { violated: v } = checkViolation(subRule, subj, solution)
+              if (v) {
+                subSatisfied = false
+                if (subj.type === 'single') {
+                  const s = studentList.find(st => st.id === subj.studentId)
+                  subRuleViolations.push(s?.name ?? `ID:${subj.studentId}`)
+                } else if (subj.type === 'pair') {
+                  const s1 = studentList.find(st => st.id === subj.studentId1)
+                  const s2 = studentList.find(st => st.id === subj.studentId2)
+                  subRuleViolations.push(`${s1?.name ?? subj.studentId1} & ${s2?.name ?? subj.studentId2}`)
+                }
+              }
+            }
+          }
+
+          anySubSatisfied.push(subSatisfied)
+          if (!subSatisfied) {
+            allSubSatisfied = false
+            subViolationDetails.push(...subRuleViolations)
+          }
+        }
+
+        let finalSatisfied = false
+        if (rule.logicOperator === 'OR') {
+          finalSatisfied = anySubSatisfied.some(s => s)
+        } else {
+          finalSatisfied = allSubSatisfied
+        }
+
+        if (finalSatisfied) {
+          satisfied.push(rule)
+        } else {
+          violated.push({
+            rule,
+            violatingSubjects: [...new Set(subViolationDetails)],
+            reason: subViolationDetails.length > 0
+              ? `复合规则未满足：${subViolationDetails.slice(0, 3).join('；')}${subViolationDetails.length > 3 ? `…等${subViolationDetails.length}处` : ''}`
+              : '复合规则未满足'
+          })
+        }
+        continue
+      }
+
       const subjects = expandSubject(rule, studentList)
       if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
         const penalty = checkGroupViolation(rule, subjects, solution)

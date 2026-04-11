@@ -509,6 +509,7 @@ const { requestConfirm, isConfirming } = useConfirmAction()
 const { rules, ruleCount, getActiveRules, getRulesForStudent, detectConflicts, renderRuleText } = useSeatRules()
 const { isLoggedIn, isLoginDialogVisible } = useAuth()
 const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom()
+const { zones } = useZoneData()
 const { recordBatch, createSnapshot } = useUndo()
 const totalSeats = computed(() => seatConfig.value.groupCount * seatConfig.value.columnsPerGroup * seatConfig.value.seatsPerColumn)
 const handleFitZoom = () => fitToViewport()
@@ -1119,11 +1120,170 @@ const detectDeskmateBindingConflicts = () => {
   return { count: details.length, details }
 }
 
+const detectSeatCapacityConflicts = () => {
+  const details = []
+  const activeRules = getActiveRules()
+
+  const tagToStudentIds = new Map()
+  for (const student of students.value) {
+    for (const tagId of (student.tags || [])) {
+      if (!tagToStudentIds.has(tagId)) tagToStudentIds.set(tagId, new Set())
+      tagToStudentIds.get(tagId).add(student.id)
+    }
+  }
+
+  const expandEntriesToStudentIds = (entries = []) => {
+    const ids = new Set()
+    for (const entry of entries) {
+      if (!entry?.id) continue
+      if (entry.type === 'person') {
+        ids.add(entry.id)
+        continue
+      }
+      if (entry.type === 'tag') {
+        const studentIds = tagToStudentIds.get(entry.id)
+        if (!studentIds) continue
+        for (const studentId of studentIds) {
+          ids.add(studentId)
+        }
+      }
+    }
+    return [...ids]
+  }
+
+  const inZoneRules = activeRules.filter(r => r.predicate === 'IN_ZONE')
+  for (const rule of inZoneRules) {
+    const studentIds = expandEntriesToStudentIds(rule.subjects || [])
+    const zone = zones.find(z => z.id === rule.params?.zoneId)
+    if (!zone) continue
+    const zoneSeatCount = zone.seatIds.filter(seatId => {
+      const seat = seats.find(s => s.id === seatId)
+      return seat && !seat.isEmpty
+    }).length
+    if (studentIds.length > zoneSeatCount) {
+      details.push(`选区容量不足：「${renderRuleText(rule)}」需要 ${studentIds.length} 个座位，但选区只有 ${zoneSeatCount} 个可用座位`)
+    }
+  }
+
+  const inRowRangeRules = activeRules.filter(r => r.predicate === 'IN_ROW_RANGE')
+  for (const rule of inRowRangeRules) {
+    const studentIds = expandEntriesToStudentIds(rule.subjects || [])
+    const { minRow, maxRow } = rule.params
+    const eligibleSeats = getAvailableSeats().filter(seat => {
+      const totalRows = seatConfig.seatsPerColumn
+      const rowFromPodium = totalRows - seat.rowIndex
+      return rowFromPodium >= minRow && rowFromPodium <= maxRow
+    })
+    if (studentIds.length > eligibleSeats.length) {
+      details.push(`排范围容量不足：「${renderRuleText(rule)}」需要 ${studentIds.length} 个座位，但指定排范围只有 ${eligibleSeats.length} 个可用座位`)
+    }
+  }
+
+  const inGroupRangeRules = activeRules.filter(r => r.predicate === 'IN_GROUP_RANGE')
+  for (const rule of inGroupRangeRules) {
+    const studentIds = expandEntriesToStudentIds(rule.subjects || [])
+    const { minGroup, maxGroup } = rule.params
+    const eligibleSeats = getAvailableSeats().filter(seat => {
+      const group1 = seat.groupIndex + 1
+      return group1 >= minGroup && group1 <= maxGroup
+    })
+    if (studentIds.length > eligibleSeats.length) {
+      details.push(`大组范围容量不足：「${renderRuleText(rule)}」需要 ${studentIds.length} 个座位，但指定大组范围只有 ${eligibleSeats.length} 个可用座位`)
+    }
+  }
+
+  return { count: details.length, details }
+}
+
+const detectStudentFeasibilityConflicts = () => {
+  const details = []
+
+  const tagToStudentIds = new Map()
+  for (const student of students.value) {
+    for (const tagId of (student.tags || [])) {
+      if (!tagToStudentIds.has(tagId)) tagToStudentIds.set(tagId, new Set())
+      tagToStudentIds.get(tagId).add(student.id)
+    }
+  }
+
+  for (const student of students.value) {
+    const studentRules = getRulesForStudent(student.id).filter(r => r.enabled)
+    let eligibleSeats = new Set(getAvailableSeats().map(s => s.id))
+
+    for (const rule of studentRules) {
+      if (rule.not) continue
+
+      if (rule.predicate === 'IN_ZONE') {
+        const zone = zones.find(z => z.id === rule.params?.zoneId)
+        if (zone) {
+          const zoneSeats = new Set(zone.seatIds)
+          eligibleSeats = new Set([...eligibleSeats].filter(id => zoneSeats.has(id)))
+        }
+      } else if (rule.predicate === 'NOT_IN_ZONE') {
+        const zone = zones.find(z => z.id === rule.params?.zoneId)
+        if (zone) {
+          const zoneSeats = new Set(zone.seatIds)
+          eligibleSeats = new Set([...eligibleSeats].filter(id => !zoneSeats.has(id)))
+        }
+      } else if (rule.predicate === 'IN_ROW_RANGE') {
+        const { minRow, maxRow } = rule.params
+        eligibleSeats = new Set([...eligibleSeats].filter(id => {
+          const seat = seats.find(s => s.id === id)
+          if (!seat) return false
+          const totalRows = seatConfig.seatsPerColumn
+          const rowFromPodium = totalRows - seat.rowIndex
+          return rowFromPodium >= minRow && rowFromPodium <= maxRow
+        }))
+      } else if (rule.predicate === 'IN_GROUP_RANGE') {
+        const { minGroup, maxGroup } = rule.params
+        eligibleSeats = new Set([...eligibleSeats].filter(id => {
+          const seat = seats.find(s => s.id === id)
+          if (!seat) return false
+          const group1 = seat.groupIndex + 1
+          return group1 >= minGroup && group1 <= maxGroup
+        }))
+      } else if (rule.predicate === 'NOT_IN_COLUMN_TYPE') {
+        const columnType = rule.params?.columnType
+        eligibleSeats = new Set([...eligibleSeats].filter(id => {
+          const seat = seats.find(s => s.id === id)
+          if (!seat) return false
+          const { groupIndex, columnIndex } = seat
+          const { groupCount, columnsPerGroup } = seatConfig
+          const isFirstGroup = groupIndex === 0
+          const isLastGroup = groupIndex === groupCount - 1
+          const isFirstCol = columnIndex === 0
+          const isLastCol = columnIndex === columnsPerGroup - 1
+          const isWall = (isFirstGroup && isFirstCol) || (isLastGroup && isLastCol)
+          const isAisle = isFirstCol || isLastCol
+          let type = 'center'
+          if (isWall) type = 'wall'
+          else if (isAisle) type = 'aisle'
+          
+          if (columnType === 'edge') {
+            return type !== 'wall' && type !== 'aisle'
+          }
+          return type !== columnType
+        }))
+      }
+    }
+
+    if (eligibleSeats.size === 0 && studentRules.length > 0) {
+      const studentName = student.name || `学生#${student.id}`
+      details.push(`学生位置不可行：${studentName} 的所有规则结合后没有可用座位`)
+    }
+  }
+
+  return { count: details.length, details }
+}
+
 const runAssignmentPrecheck = ({ silent = false } = {}) => {
   const studentCount = students.value.length
   const availableSeatCount = getAvailableSeats().length
   const activeRuleCount = getActiveRules().length
-  const conflictList = detectConflicts()
+  
+  const zoneHelper = { zones }
+  const seatChartHelper = { seats, seatConfig }
+  const conflictList = detectConflicts(zoneHelper, seatChartHelper)
   const conflictCount = conflictList.length
   const blockingReasons = []
   const warnings = []
@@ -1137,6 +1297,9 @@ const runAssignmentPrecheck = ({ silent = false } = {}) => {
   const hardConflictCount = conflictList.filter(c => c.type === 'infeasible' || c.type === 'contradiction').length
   if (hardConflictCount > 0) {
     blockingReasons.push(`存在 ${hardConflictCount} 条不可满足或逻辑矛盾规则`)
+    conflictList.slice(0, 5).forEach(c => {
+      blockingReasons.push(c.message)
+    })
   }
 
   const deskmateBindingConflict = detectDeskmateBindingConflicts()
@@ -1144,6 +1307,19 @@ const runAssignmentPrecheck = ({ silent = false } = {}) => {
     blockingReasons.push(`存在 ${deskmateBindingConflict.count} 处同桌绑定冲突`)
     blockingReasons.push(...deskmateBindingConflict.details.slice(0, 5))
   }
+
+  const seatCapacityConflict = detectSeatCapacityConflicts()
+  if (seatCapacityConflict.count > 0) {
+    blockingReasons.push(`存在 ${seatCapacityConflict.count} 处座位容量冲突`)
+    blockingReasons.push(...seatCapacityConflict.details.slice(0, 5))
+  }
+
+  const studentFeasibilityConflict = detectStudentFeasibilityConflicts()
+  if (studentFeasibilityConflict.count > 0) {
+    blockingReasons.push(`存在 ${studentFeasibilityConflict.count} 处学生位置不可行问题`)
+    blockingReasons.push(...studentFeasibilityConflict.details.slice(0, 5))
+  }
+
   if (activeRuleCount === 0) {
     warnings.push('当前未启用规则，本次将接近随机排位')
   }
