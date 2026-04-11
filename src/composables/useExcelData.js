@@ -389,9 +389,13 @@ export function useExcelData() {
 
     // ── 纯净无底色排版 (完全贴合普通表格预览，只做对齐和描边) ──
     const borderRgb = normalizeHexColor(borderColor, '000000')
+    const MONO_FILL_COLOR = 'F2F2F2'
+    const COLOR_FILL_COLOR = 'DCEEFF'
+    const MONO_FONT_COLOR = '000000'
+    const COLOR_FONT_COLOR = '1F4E78'
     const isMono = colorMode === 'bw'
-    const accentFill = isMono ? 'F2F2F2' : 'DCEEFF'
-    const accentFont = isMono ? '000000' : '1F4E78'
+    const accentFill = isMono ? MONO_FILL_COLOR : COLOR_FILL_COLOR
+    const accentFont = isMono ? MONO_FONT_COLOR : COLOR_FONT_COLOR
     const accent = {
       fill: { patternType: 'solid', fgColor: { rgb: accentFill } }
     }
@@ -459,7 +463,7 @@ export function useExcelData() {
     // ── 布局计算 ──
     const groupGapCols     = showGroupGap ? 1 : 0
     const seatsPerGroup    = columnsPerGroup * seatsPerColumn
-    const groupLabels      = Array.from({ length: groupCount }, (_, i) => formatIndex(i + 1, groupNumberScheme))
+    const precomputedGroupLabels = Array.from({ length: groupCount }, (_, i) => formatIndex(i + 1, groupNumberScheme))
     const dataColOffset    = showRowNumbers ? 1 : 0
     const groupStartCol    = (g) => dataColOffset + g * (columnsPerGroup + groupGapCols)
     const totalCols        = dataColOffset + groupCount * columnsPerGroup + (groupCount - 1) * groupGapCols
@@ -497,7 +501,7 @@ export function useExcelData() {
       if (showRowNumbers) setCell(hRow, 0, '', styleHeader)
       for (let g = 0; g < groupCount; g++) {
         const sc = groupStartCol(g)
-        const groupLabel = groupLabels[g]
+        const groupLabel = precomputedGroupLabels[g]
         setCell(hRow, sc, `第 ${groupLabel} 组`, styleHeader)
         for (let c = 1; c < columnsPerGroup; c++) setCell(hRow, sc + c, '', styleHeader)
         if (columnsPerGroup > 1) merges.push({ s: { r: hRow, c: sc }, e: { r: hRow, c: sc + columnsPerGroup - 1 } })
@@ -517,7 +521,7 @@ export function useExcelData() {
         for (let c = 0; c < columnsPerGroup; c++) {
           const eCol = groupStartCol(g) + c
           const seat = organizedSeats[g]?.[c]?.[srcRow]
-          const groupLabel = groupLabels[g]
+          const groupLabel = precomputedGroupLabels[g]
           const serial = g * seatsPerGroup + c * seatsPerColumn + displayRow
           const serialLabel = formatIndex(serial, serialNumberScheme)
           if (!seat) {
