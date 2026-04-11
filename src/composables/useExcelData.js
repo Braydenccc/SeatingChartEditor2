@@ -139,12 +139,14 @@ const formatCellContent = (template, context) => {
     if (token === '%') return '%'
     return tokenMap[token] ?? ''
   })
-  return replaced
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter((line, index, arr) => line !== '' || (index > 0 && index < arr.length - 1))
-    .join('\n')
-    .trim()
+  return trimEdgeEmptyLines(replaced)
+}
+
+const trimEdgeEmptyLines = (text) => {
+  const lines = String(text || '').split('\n').map((line) => line.trimEnd())
+  while (lines.length > 0 && lines[0] === '') lines.shift()
+  while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
+  return lines.join('\n').trim()
 }
 
 export function useExcelData() {
@@ -405,7 +407,7 @@ export function useExcelData() {
     const styleTitle = {
       font: { bold: true, sz: nameFontSize + 4, color: { rgb: '000000' } },
       alignment: center,
-       border: thinBorder()
+      border: thinBorder()
     }
     const styleRowNum = {
       font: { bold: true, sz: nameFontSize - 1, color: { rgb: '000000' } },
@@ -503,7 +505,8 @@ export function useExcelData() {
           const eCol = groupStartCol(g) + c
           const seat = organizedSeats[g]?.[c]?.[srcRow]
           const groupLabel = formatIndex(g + 1, groupNumberScheme)
-          const serial = g * columnsPerGroup * seatsPerColumn + c * seatsPerColumn + displayRow
+          const seatsPerGroup = columnsPerGroup * seatsPerColumn
+          const serial = g * seatsPerGroup + c * seatsPerColumn + displayRow
           const serialLabel = formatIndex(serial, serialNumberScheme)
           if (!seat) {
             setCell(eRow, eCol, '', styleSeat)
