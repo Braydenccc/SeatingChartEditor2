@@ -40,6 +40,32 @@
             <h3>名单管理</h3>
           </div>
           <div class="options-group">
+            <div class="roster-controls">
+              <div class="student-count-control">
+                <label>共</label>
+                <input
+                  v-model.number="targetStudentCount"
+                  type="number"
+                  min="0"
+                  class="student-count-input"
+                  :class="{ error: isCountError }"
+                  @blur="handleStudentCountChange"
+                  @keyup.enter="handleStudentCountChange"
+                />
+                <label>人</label>
+              </div>
+              <button class="option-button primary" @click="handleAddStudent">
+                <span>添加学生</span>
+              </button>
+            </div>
+            <TagManager
+              :tags="tags"
+              @add-tag="handleAddTag"
+              @edit-tag="handleEditTag"
+              @delete-tag="handleDeleteTag"
+            />
+          </div>
+          <div class="options-group">
             <button class="option-button" @click="handleDownloadTemplate">
               <span>下载名单模板</span>
             </button>
@@ -448,14 +474,16 @@ import { useZoneRotation } from '@/composables/useZoneRotation'
 import ZoneList from '../zone/ZoneList.vue'
 import AssignmentInlineReport from '../rule/AssignmentInlineReport.vue'
 import { useAuth } from '@/composables/useAuth'
+import TagManager from '../student/TagManager.vue'
 
 const { activeTab, mobileMenuOpen, setActiveTab, closeMobileMenu } = useSidebar()
 const { seatConfig, updateConfig, clearAllSeats, seats, shiftSeats, getAvailableSeats } = useSeatChart()
 const { currentMode, setMode, toggleEmptyEditMode, EditMode } = useEditMode()
 const { isAssigning, assignmentProgress, assignmentIterationInfo, runSmartAssignment } = useAssignment()
-const { tags, addTag, clearAllTags } = useTagData()
-const { students, addStudent, updateStudent, clearAllStudents } = useStudentData()
+const { tags, addTag, editTag, deleteTag, clearAllTags } = useTagData()
+const { students, addStudent, setStudentCount, updateStudent, deleteStudent, removeTagFromStudents, clearAllStudents } = useStudentData()
 const { exportSettings } = useExportSettings()
+const { removeTagFromAllZones } = useZoneData()
 const { exportToImage } = useImageExport()
 const { downloadTemplate, importFromExcel, exportToExcel } = useExcelData()
 const { saveWorkspace, loadWorkspace, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
@@ -540,6 +568,50 @@ const tabs = [
   { id: 3, label: '排位', icon: Shuffle },
   { id: 4, label: '导出', icon: Download }
 ]
+
+// ==================== 名单管理 ====================
+const targetStudentCount = ref(0)
+const isCountError = ref(false)
+
+watch(students, (newStudents) => {
+  if (!isCountError.value) {
+    targetStudentCount.value = newStudents.length
+  }
+}, { immediate: true })
+
+const handleStudentCountChange = () => {
+  if (!targetStudentCount.value || targetStudentCount.value < 0) {
+    targetStudentCount.value = students.value.length
+    isCountError.value = false
+    return
+  }
+  const success_result = setStudentCount(targetStudentCount.value)
+  if (!success_result) {
+    isCountError.value = true
+  } else {
+    isCountError.value = false
+  }
+}
+
+const handleAddStudent = () => {
+  addStudent()
+  isCountError.value = false
+}
+
+const handleAddTag = (tagData) => {
+  addTag(tagData)
+}
+
+const handleEditTag = (tagId, tagData) => {
+  editTag(tagId, tagData)
+}
+
+const handleDeleteTag = (tagId) => {
+  removeTagFromStudents(tagId)
+  removeTagFromAllZones(tagId)
+  delete exportSettings.value.tagSettings[tagId]
+  deleteTag(tagId)
+}
 
 // 座位配置表单
 const configForm = ref({
@@ -1567,6 +1639,57 @@ const formatLogTime = (timestamp) => {
 .input-group input[type="text"]:focus {
   outline: none;
   border-color: var(--color-primary);
+}
+
+.roster-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.roster-controls .student-count-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.roster-controls .student-count-control label {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.roster-controls .student-count-input {
+  width: 70px;
+  padding: 6px 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.roster-controls .student-count-input:focus {
+  outline: none;
+  border-color: #23587b;
+}
+
+.roster-controls .student-count-input.error {
+  border-color: #f44336;
+  background-color: #ffebee;
+  color: #f44336;
+}
+
+.roster-controls .student-count-input::-webkit-inner-spin-button,
+.roster-controls .student-count-input::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+.roster-controls .option-button {
+  flex: none;
+  width: auto;
+  padding: 8px 16px;
 }
 
 .checkbox-label {
