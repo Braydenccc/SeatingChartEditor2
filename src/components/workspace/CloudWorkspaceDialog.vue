@@ -4,7 +4,9 @@
       <div class="cloud-workspace-dialog">
         <div class="dialog-header">
           <h3>{{ isSaveMode ? '保存工作区至云端' : '从云端加载工作区' }}</h3>
-          <button class="close-btn" @click="close">&times;</button>
+          <button class="close-btn" @click="close" aria-label="关闭">
+            <X :size="18" stroke-width="2" />
+          </button>
         </div>
 
         <div class="dialog-body">
@@ -34,11 +36,11 @@
 
             <!-- 单云时显示目标提示条 -->
             <div v-else class="save-target-banner">
-              <Cloud v-if="hasRetiehe" class="ui-icon banner-icon" />
-              <HardDrive v-else class="ui-icon banner-icon" />
+              <Cloud v-if="hasRetiehe" :size="16" stroke-width="1.8" />
+              <HardDrive v-else :size="16" stroke-width="1.8" />
               <span>保存至：<strong>{{ hasRetiehe ? 'SCE 云服务' : 'WebDAV 网盘' }}</strong></span>
               <span v-if="backupMode && hasWebdav !== false" class="backup-hint">
-                <CheckCircle2 class="ui-icon backup-hint-icon" />
+                <CheckCircle2 :size="14" stroke-width="2" />
                 同时备份至 WebDAV
               </span>
             </div>
@@ -96,7 +98,7 @@
             </div>
             
             <div v-if="!currentTabWorkspaces || currentTabWorkspaces.length === 0" class="empty-state mt-2">
-              <Inbox class="ui-icon empty-icon" />
+              <Inbox :size="40" stroke-width="1.5" />
               <p>{{ activeTab === 'webdav' ? 'WebDAV 网盘上' : 'SCE 云端' }}暂无工作区</p>
               <p class="empty-hint">切换到「保存」模式将当前编辑内容上传到云端</p>
             </div>
@@ -107,7 +109,7 @@
                 class="workspace-card"
               >
                 <div class="card-content" @click="handleLoad(ws.fileId, ws.source)">
-                  <Folder class="ui-icon card-icon" />
+                  <Folder :size="28" stroke-width="1.8" />
                   <div class="card-details">
                     <h4 class="ws-name">{{ ws.metadata.name }}</h4>
                     <p class="ws-meta">
@@ -118,7 +120,7 @@
                 </div>
                 <div class="card-actions">
                   <button class="icon-btn delete-btn" title="删除此工作区" @click.stop="confirmDelete(ws)">
-                    <Trash2 class="ui-icon" />
+                    <Trash2 :size="15" stroke-width="2" />
                   </button>
                 </div>
               </div>
@@ -391,9 +393,7 @@ const formatSize = (bytes) => {
   margin-bottom: 16px;
 }
 
-.save-target-banner .banner-icon {
-  font-size: 15px;
-}
+/* .save-target-banner icons use :size prop directly */
 
 .backup-hint {
   display: inline-flex;
@@ -403,9 +403,7 @@ const formatSize = (bytes) => {
   font-weight: 500;
 }
 
-.backup-hint .backup-hint-icon {
-  font-size: 14px;
-}
+/* .backup-hint icons use :size prop directly */
 
 .cloud-tabs {
   display: flex;
@@ -493,11 +491,16 @@ const formatSize = (bytes) => {
 .close-btn {
   background: none;
   border: none;
-  font-size: 24px;
   color: var(--color-text-muted);
   cursor: pointer;
-  line-height: 1;
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+.close-btn:hover {
+  color: var(--color-text-primary);
 }
 
 .dialog-body {
@@ -663,7 +666,6 @@ const formatSize = (bytes) => {
 }
 
 .card-icon {
-  font-size: 24px;
   background: var(--color-bg-soft);
   width: 44px;
   height: 44px;
@@ -671,6 +673,7 @@ const formatSize = (bytes) => {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .ws-meta {
@@ -683,12 +686,14 @@ const formatSize = (bytes) => {
 .icon-btn {
   background: none;
   border: none;
-  font-size: 16px;
   padding: 8px;
   cursor: pointer;
   border-radius: 4px;
   color: var(--color-text-muted);
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .delete-btn:hover {
@@ -706,7 +711,6 @@ const formatSize = (bytes) => {
 }
 
 .empty-state .empty-icon {
-  font-size: 32px;
   margin-bottom: 8px;
 }
 

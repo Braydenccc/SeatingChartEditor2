@@ -8,7 +8,9 @@
         <!-- ── 标题栏 ── -->
         <div class="dialog-header">
           <h3>导出设置</h3>
-          <button class="close-btn" @click="$emit('close')">×</button>
+          <button class="close-btn" @click="$emit('close')" aria-label="关闭">
+            <X :size="18" stroke-width="2" />
+          </button>
         </div>
 
         <!-- ── Tab 栏 ── -->
@@ -228,6 +230,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { X } from 'lucide-vue-next'
 import { useExportSettings } from '@/composables/useExportSettings'
 import { useImageExport } from '@/composables/useImageExport'
 import { useTagData } from '@/composables/useTagData'

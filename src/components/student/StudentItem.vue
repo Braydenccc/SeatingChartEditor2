@@ -51,24 +51,26 @@
           <Plus :size="14" stroke-width="2.5" />
         </button>
         
-        <transition name="dropdown-pop">
-          <div v-if="showTagDropdown" class="tag-dropdown">
-            <div class="dropdown-header">选择标签</div>
-            <div class="tag-options">
-              <template v-for="tag in availableTags" :key="tag.id">
-                <div 
-                  v-if="!localTags.includes(tag.id)"
-                  class="tag-option" 
-                  @click="addTag(tag.id)"
-                >
-                  <div class="tag-color-dot" :style="{ backgroundColor: tag.color }"></div>
-                  {{ tag.name }}
-                </div>
-              </template>
-              <div v-if="unassignedTags.length === 0" class="no-tags">暂无可用标签</div>
+        <teleport to="body">
+          <transition name="dropdown-pop">
+            <div v-if="showTagDropdown" class="tag-dropdown" :style="dropdownStyle">
+              <div class="dropdown-header">选择标签</div>
+              <div class="tag-options">
+                <template v-for="tag in availableTags" :key="tag.id">
+                  <div 
+                    v-if="!localTags.includes(tag.id)"
+                    class="tag-option" 
+                    @click="addTag(tag.id)"
+                  >
+                    <div class="tag-color-dot" :style="{ backgroundColor: tag.color }"></div>
+                    {{ tag.name }}
+                  </div>
+                </template>
+                <div v-if="unassignedTags.length === 0" class="no-tags">暂无可用标签</div>
+              </div>
             </div>
-          </div>
-        </transition>
+          </transition>
+        </teleport>
       </div>
     </div>
 
@@ -127,6 +129,7 @@ const handleDelete = () => {
 // ================= 标签逻辑 =================
 const showTagDropdown = ref(false)
 const wrapperRef = ref(null)
+const dropdownStyle = ref({})
 
 onClickOutside(wrapperRef, () => {
   showTagDropdown.value = false
@@ -136,7 +139,21 @@ const unassignedTags = computed(() => {
   return props.availableTags.filter(t => !localTags.value.includes(t.id))
 })
 
+const updateDropdownPosition = () => {
+  if (!wrapperRef.value) return
+  const rect = wrapperRef.value.getBoundingClientRect()
+  dropdownStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 6}px`,
+    left: `${rect.left}px`,
+    zIndex: 9999
+  }
+}
+
 const toggleTagDropdown = () => {
+  if (!showTagDropdown.value) {
+    updateDropdownPosition()
+  }
   showTagDropdown.value = !showTagDropdown.value
 }
 
@@ -334,75 +351,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   transform: scale(1.05);
 }
 
-/* 标签下拉菜单 */
-.tag-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 8px;
-  width: 160px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e2e8f0;
-  z-index: 50;
-  overflow: hidden;
-}
 
-.dropdown-header {
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #64748b;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.tag-options {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.tag-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: #334155;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.tag-option:hover {
-  background: #f1f5f9;
-}
-
-.tag-color-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.no-tags {
-  padding: 12px;
-  text-align: center;
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-/* 下拉菜单动画 */
-.dropdown-pop-enter-active,
-.dropdown-pop-leave-active {
-  transition: opacity 0.2s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transform-origin: top left;
-}
-
-.dropdown-pop-enter-from,
-.dropdown-pop-leave-to {
-  opacity: 0;
-  transform: scale(0.95) translateY(-5px);
-}
 
 /* ================= 右侧操作区域 ================= */
 
@@ -460,5 +409,73 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   .student-info {
     flex: 1;
   }
+}
+</style>
+
+<!-- Teleport 到 body 的下拉菜单不受 scoped 限制，需独立全局样式 -->
+<style>
+.tag-dropdown {
+  width: 160px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.tag-dropdown .dropdown-header {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tag-dropdown .tag-options {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tag-dropdown .tag-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tag-dropdown .tag-option:hover {
+  background: #f1f5f9;
+}
+
+.tag-dropdown .tag-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tag-dropdown .no-tags {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* 下拉菜单展开动画 */
+.dropdown-pop-enter-active,
+.dropdown-pop-leave-active {
+  transition: opacity 0.2s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: top left;
+}
+
+.dropdown-pop-enter-from,
+.dropdown-pop-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(-5px);
 }
 </style>
