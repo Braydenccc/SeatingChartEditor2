@@ -585,8 +585,8 @@ const handleStudentCountChange = () => {
     isCountError.value = false
     return
   }
-  const success_result = setStudentCount(targetStudentCount.value)
-  if (!success_result) {
+  const countResult = setStudentCount(targetStudentCount.value)
+  if (!countResult) {
     isCountError.value = true
   } else {
     isCountError.value = false
