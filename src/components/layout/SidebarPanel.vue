@@ -40,6 +40,9 @@
             <h3>名单管理</h3>
           </div>
           <div class="options-group">
+            <button class="option-button" @click="showRosterDialog = true">
+              <span class="btn-content"><Users class="ui-icon" />编辑名单</span>
+            </button>
             <button class="option-button" @click="handleDownloadTemplate">
               <span>下载名单模板</span>
             </button>
@@ -419,16 +422,20 @@
     @close="showRuleEditor = false"
   />
 
+  <!-- 编辑名单弹窗 -->
+  <StudentRosterDialog v-model:visible="showRosterDialog" />
+
 
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed, defineAsyncComponent } from 'vue'
-import { CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, Save, Scale, Shuffle, X } from 'lucide-vue-next'
+import { CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, Save, Scale, Shuffle, Users, X } from 'lucide-vue-next'
 
 const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
 const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
 const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
+const StudentRosterDialog = defineAsyncComponent(() => import('../student/StudentRosterDialog.vue'))
 
 import { useSidebar } from '@/composables/useSidebar'
 import { useSeatChart } from '@/composables/useSeatChart'
@@ -578,6 +585,7 @@ const tagSettingsLocal = ref({})
 
 // 导出弹窗状态
 const showExportDialog = ref(false)
+const showRosterDialog = ref(false)
 const lastExportUrl = ref('')
 const isExporting = ref(false)
 let lastExportObjectUrl = ''

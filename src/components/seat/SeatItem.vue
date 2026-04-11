@@ -313,6 +313,11 @@ const handleTouchMove = (e) => {
       const seatEl = findParentSeat(targetEl)
       if (seatEl && seatEl.dataset.seatId !== props.seat.id) {
         seatEl.classList.add('drag-over')
+      } else {
+        const studentListEl = findParentByClass(targetEl, 'student-items')
+        if (studentListEl && props.seat.studentId != null) {
+          studentListEl.classList.add('drag-over')
+        }
       }
     }
   })
@@ -361,7 +366,18 @@ const handleTouchEnd = (e) => {
 
   if (!targetEl) return
   const seatEl = findParentSeat(targetEl)
-  if (!seatEl || seatEl.dataset.seatId === props.seat.id) return
+  if (!seatEl || seatEl.dataset.seatId === props.seat.id) {
+    // 检测是否拖到候选列表区域
+    const studentListEl = findParentByClass(targetEl, 'student-items')
+    if (studentListEl && props.seat.studentId != null) {
+      const event = new CustomEvent('touch-seat-to-list', {
+        bubbles: true,
+        detail: { seatId: props.seat.id, studentId: props.seat.studentId }
+      })
+      studentListEl.dispatchEvent(event)
+    }
+    return
+  }
 
   const targetSeatId = seatEl.dataset.seatId
   // 触摸拖拽总是执行交换/分配
@@ -383,6 +399,15 @@ const findParentSeat = (el) => {
     current = current.parentElement
   }
   return current
+}
+
+const findParentByClass = (el, className) => {
+  let current = el
+  while (current) {
+    if (current.classList?.contains(className)) return current
+    current = current.parentElement
+  }
+  return null
 }
 
 const clearAllTouchHighlights = () => {

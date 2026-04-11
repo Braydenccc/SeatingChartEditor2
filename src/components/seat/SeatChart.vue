@@ -366,12 +366,18 @@ const handleTouchStudentDrop = (e) => {
   handleAssignStudent(targetSeatId, studentId)
 }
 
+const handleTouchSeatToList = (e) => {
+  const { seatId } = e.detail
+  clearSeat(seatId)
+}
+
 // ==================== 初始化 ====================
 onMounted(() => {
   initializeSeats()
 
   if (viewportRef.value) {
     viewportRef.value.addEventListener('touch-seat-drop', handleTouchSeatDrop)
+    viewportRef.value.addEventListener('touch-seat-to-list', handleTouchSeatToList)
   }
   document.addEventListener('touch-student-drop', handleTouchStudentDrop)
 
@@ -384,6 +390,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (viewportRef.value) {
     viewportRef.value.removeEventListener('touch-seat-drop', handleTouchSeatDrop)
+    viewportRef.value.removeEventListener('touch-seat-to-list', handleTouchSeatToList)
   }
   document.removeEventListener('touch-student-drop', handleTouchStudentDrop)
 })

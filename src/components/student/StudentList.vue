@@ -10,27 +10,33 @@
       <div class="header-right">
         <button class="icon-btn" title="随机排位" @click="handleRandomAssign">
           <Shuffle :size="16" stroke-width="2.5" />
+          <span>随机排位</span>
         </button>
         <button class="icon-btn" title="编辑名单" @click="showRosterDialog = true">
           <Users :size="16" stroke-width="2.5" />
+          <span>编辑名单</span>
         </button>
       </div>
     </div>
-    <div class="student-items">
-      <StudentItem
-        v-for="student in unassignedStudents"
-        :key="student.id"
-        :student="student"
-        :available-tags="tags"
-        @update-student="handleUpdateStudent"
-        @delete-student="handleDeleteStudent"
-      />
+    <div class="student-items" @dragover.prevent="handleDragOver" @drop.prevent="handleDrop" @dragleave="handleDragLeave" :class="{ 'drag-over': isDragOver, 'is-empty': unassignedStudents.length === 0 }">
+      <template v-if="unassignedStudents.length > 0">
+        <CandidateItem
+          v-for="student in unassignedStudents"
+          :key="student.id"
+          :student="student"
+        />
+      </template>
       <EmptyState
-        v-if="unassignedStudents.length === 0"
+        v-else
         type="student"
         message="暂无候选学生"
-        hint="所有学生都已入座，或点击右上角管理人员名单"
-      />
+        hint="所有学生都已入座，或点击下方按钮管理人员名单"
+      >
+        <button class="primary-btn" @click="showRosterDialog = true">
+          <Users :size="16" stroke-width="2" />
+          <span>编辑名单</span>
+        </button>
+      </EmptyState>
     </div>
     
     <StudentRosterDialog v-model:visible="showRosterDialog" />
@@ -40,7 +46,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Shuffle, Users } from 'lucide-vue-next'
-import StudentItem from './StudentItem.vue'
+import CandidateItem from './CandidateItem.vue'
 import EmptyState from '../ui/EmptyState.vue'
 import StudentRosterDialog from './StudentRosterDialog.vue'
 import { useTagData } from '@/composables/useTagData'
@@ -52,21 +58,15 @@ const showRosterDialog = ref(false)
 
 const { tags } = useTagData()
 const { students, updateStudent, deleteStudent } = useStudentData()
-const { findSeatByStudent, getEmptySeats, assignStudent } = useSeatChart()
+const { findSeatByStudent, getEmptySeats, assignStudent, clearSeat } = useSeatChart()
 const { success, warning } = useLogger()
+
+const isDragOver = ref(false)
 
 // 未入座学生计算属性
 const unassignedStudents = computed(() => {
   return students.value.filter(student => !findSeatByStudent(student.id))
 })
-
-const handleUpdateStudent = (studentId, studentData) => {
-  updateStudent(studentId, studentData)
-}
-
-const handleDeleteStudent = (studentId) => {
-  deleteStudent(studentId)
-}
 
 // 随机排位功能
 const handleRandomAssign = () => {
@@ -99,6 +99,31 @@ const handleRandomAssign = () => {
   }
 
   success(`已随机入座 ${assignedCount} 名学生！`)
+}
+
+const handleDragOver = (e) => {
+  e.dataTransfer.dropEffect = 'move'
+  isDragOver.value = true
+}
+
+const handleDragLeave = () => {
+  isDragOver.value = false
+}
+
+const handleDrop = (e) => {
+  isDragOver.value = false
+  const raw = e.dataTransfer.getData('application/json')
+  if (!raw) return
+
+  try {
+    const data = JSON.parse(raw)
+    if (data.type === 'seat' && data.studentId != null) {
+      clearSeat(data.seatId)
+      success('已将学生移回候选列表')
+    }
+  } catch {
+    // ignore
+  }
 }
 </script>
 
@@ -151,14 +176,16 @@ const handleRandomAssign = () => {
 .icon-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 8px;
+  gap: 4px;
+  padding: 6px 10px;
   background: #f0f0f0;
   color: #555;
   border: none;
   border-radius: 6px;
   cursor: pointer;
+  font-size: 12px;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .icon-btn:hover {
@@ -169,7 +196,53 @@ const handleRandomAssign = () => {
 .student-items {
   flex: 1;
   overflow-y: auto;
-  padding: 10px;
+  padding: 15px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  min-height: 60px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  grid-auto-rows: min-content;
+  gap: 12px;
+  align-content: start;
+}
+
+.student-items.drag-over {
+  background: rgba(35, 88, 123, 0.06);
+  border-color: var(--color-primary);
+}
+
+.student-items.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.primary-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #23587b 0%, #2d6a94 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12);
+}
+
+.primary-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .student-items::-webkit-scrollbar {
@@ -201,7 +274,8 @@ const handleRandomAssign = () => {
   }
   
   .icon-btn {
-    padding: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
   }
   
   .student-items {
