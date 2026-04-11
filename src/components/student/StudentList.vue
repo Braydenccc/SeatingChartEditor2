@@ -699,6 +699,134 @@ const handleDrop = (e) => {
   display: none;
 }
 
+/* 有空状态占位时仍需显示 */
+.student-items.is-empty:has(.empty-placeholder) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  text-align: left;
+  gap: 16px;
+}
+
+.empty-content-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.empty-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  opacity: 0.85;
+  color: #6b7280;
+}
+
+.empty-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.empty-icon.success {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  color: #52B788;
+}
+
+.empty-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+}
+
+.empty-hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* 空状态操作按钮 */
+.empty-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.empty-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 44px;
+  border: none;
+  width: 100%;
+}
+
+.empty-action-btn.primary {
+  background: linear-gradient(135deg, #23587b, #2d6a94);
+  color: white;
+  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.25);
+}
+
+.empty-action-btn.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(35, 88, 123, 0.3);
+}
+
+.empty-action-btn.primary:active {
+  transform: translateY(0);
+}
+
+.empty-action-btn.outline {
+  background: #f8f9fa;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+}
+
+.empty-action-btn.outline:hover {
+  background: #f0f4f7;
+  border-color: #23587b;
+  color: #23587b;
+}
+
+.empty-action-row {
+  display: flex;
+  gap: 8px;
+}
+
+.empty-action-row .empty-action-btn {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
 /* 触摸拖拽激活时，即使全部入座也要显示移出目标 */
 .student-items.is-empty.touch-dragging {
   display: grid;
@@ -879,114 +1007,9 @@ const handleDrop = (e) => {
     justify-content: center;
   }
 
-  /* 空状态占位样式 - 水平布局 */
   .empty-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
     padding: 16px 16px;
-    text-align: left;
     gap: 12px;
-  }
-
-  .empty-content-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-  }
-
-  .empty-icon {
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
-    opacity: 0.85;
-    color: #6b7280;
-  }
-
-  .empty-icon svg {
-    width: 100%;
-    height: 100%;
-  }
-
-  .empty-icon.success {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    color: #52B788;
-  }
-
-  .empty-text-group {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .empty-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #374151;
-    margin: 0;
-  }
-
-  .empty-hint {
-    font-size: 12px;
-    color: #9ca3af;
-    margin: 0;
-    line-height: 1.3;
-  }
-
-  /* 空状态操作按钮 */
-  .empty-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-    max-width: 280px;
-  }
-
-  .empty-action-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 12px 20px;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    min-height: 44px;
-    border: none;
-    width: 100%;
-  }
-
-  .empty-action-btn.primary {
-    background: linear-gradient(135deg, #23587b, #2d6a94);
-    color: white;
-    box-shadow: 0 2px 8px rgba(35, 88, 123, 0.25);
-  }
-
-  .empty-action-btn.primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(35, 88, 123, 0.3);
-  }
-
-  .empty-action-btn.primary:active {
-    transform: translateY(0);
-  }
-
-  .empty-action-btn.outline {
-    background: #f8f9fa;
-    color: #4b5563;
-    border: 1px solid #e5e7eb;
-  }
-
-  .empty-action-btn.outline:hover {
-    background: #f0f4f7;
-    border-color: #23587b;
-    color: #23587b;
   }
 
   .empty-action-row {
