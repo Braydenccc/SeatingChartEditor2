@@ -1156,10 +1156,7 @@ const detectSeatCapacityConflicts = () => {
     const studentIds = expandEntriesToStudentIds(rule.subjects || [])
     const zone = zones.find(z => z.id === rule.params?.zoneId)
     if (!zone) continue
-    const zoneSeatCount = zone.seatIds.filter(seatId => {
-      const seat = seats.find(s => s.id === seatId)
-      return seat && !seat.isEmpty
-    }).length
+    const zoneSeatCount = zone.seatIds.length
     if (studentIds.length > zoneSeatCount) {
       details.push(`选区容量不足：「${renderRuleText(rule)}」需要 ${studentIds.length} 个座位，但选区只有 ${zoneSeatCount} 个可用座位`)
     }
@@ -1276,6 +1273,133 @@ const detectStudentFeasibilityConflicts = () => {
   return { count: details.length, details }
 }
 
+const calculateIdealMinDistance = (studentCount, seatConfig) => {
+  if (studentCount <= 1) return Infinity
+  if (!seatConfig) return Math.max(1.41, Math.sqrt(studentCount) * 0.8)
+
+  const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig
+  const totalCols = groupCount * columnsPerGroup
+  const totalRows = seatsPerColumn
+  const totalSeats = totalCols * totalRows
+
+  const maxTheoreticalDistance = Math.sqrt((totalCols - 1) * (totalCols - 1) + (totalRows - 1) * (totalRows - 1))
+
+  const density = studentCount / totalSeats
+  const gridSide = Math.ceil(Math.sqrt(studentCount))
+  
+  let idealMinDistance
+  
+  if (studentCount <= 3) {
+    idealMinDistance = 1.5
+  } else if (studentCount <= 8) {
+    const baseDistance = 1.41
+    const linearGrowth = (studentCount - 1) * 0.15
+    idealMinDistance = baseDistance + linearGrowth
+  } else {
+    const baseDistance = 2.5
+    const logGrowth = Math.log10(studentCount - 5) * 0.6
+    idealMinDistance = baseDistance + logGrowth
+  }
+  
+  const classroomScaleFactor = Math.min(1.5, maxTheoreticalDistance / 10)
+  idealMinDistance = idealMinDistance * classroomScaleFactor
+  
+  idealMinDistance = Math.max(1.41, idealMinDistance)
+  idealMinDistance = Math.min(idealMinDistance, maxTheoreticalDistance * 0.7)
+  
+  return idealMinDistance
+}
+
+const calculateTheoreticalMinimumDistance = (studentCount, totalSeats) => {
+  if (studentCount <= 1) return Infinity
+  if (studentCount > totalSeats) return 0
+
+  const gridSide = Math.ceil(Math.sqrt(studentCount))
+  const totalGridCells = gridSide * gridSide
+  
+  if (studentCount <= totalGridCells * 0.5) {
+    return 2.0
+  } else if (studentCount <= totalGridCells * 0.75) {
+    return 1.5
+  } else {
+    return 1.0
+  }
+}
+
+const detectDistributeEvenlyFeasibility = () => {
+  const details = []
+  const activeRules = getActiveRules()
+
+  const tagToStudentIds = new Map()
+  for (const student of students.value) {
+    for (const tagId of (student.tags || [])) {
+      if (!tagToStudentIds.has(tagId)) tagToStudentIds.set(tagId, new Set())
+      tagToStudentIds.get(tagId).add(student.id)
+    }
+  }
+
+  const expandEntriesToStudentIds = (entries = []) => {
+    const ids = new Set()
+    for (const entry of entries) {
+      if (!entry?.id) continue
+      if (entry.type === 'person') {
+        ids.add(entry.id)
+        continue
+      }
+      if (entry.type === 'tag') {
+        const studentIds = tagToStudentIds.get(entry.id)
+        if (!studentIds) continue
+        for (const studentId of studentIds) {
+          ids.add(studentId)
+        }
+      }
+    }
+    return [...ids]
+  }
+
+  const distributeRules = activeRules.filter(r => r.predicate === 'DISTRIBUTE_EVENLY')
+  for (const rule of distributeRules) {
+    const studentIds = expandEntriesToStudentIds(rule.subjects || [])
+    if (studentIds.length <= 1) continue
+
+    const idealMinDistance = calculateIdealMinDistance(studentIds.length, seatConfig)
+
+    const availableSeats = getAvailableSeats()
+    if (availableSeats.length === 0) continue
+
+    const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig
+    const totalCols = groupCount * columnsPerGroup
+    const totalRows = seatsPerColumn
+    const totalSeats = totalCols * totalRows
+
+    const maxTheoreticalDistance = Math.sqrt((totalCols - 1) * (totalCols - 1) + (totalRows - 1) * (totalRows - 1))
+
+    const theoreticalMinDistance = calculateTheoreticalMinimumDistance(studentIds.length, availableSeats.length)
+
+    if (theoreticalMinDistance <= 1.0) {
+      details.push(`均匀分散无法排除相邻：学生数 ${studentIds.length}，可用座位 ${availableSeats.length}，理论上有至少两人相邻`)
+    }
+
+    let feasibleMinDistance = 0
+    if (studentIds.length <= availableSeats.length) {
+      const density = studentIds.length / availableSeats.length
+      const gridSide = Math.ceil(Math.sqrt(studentIds.length))
+      feasibleMinDistance = Math.min(
+        maxTheoreticalDistance / (gridSide - 1 || 1),
+        idealMinDistance * 1.5
+      )
+    }
+
+    if (feasibleMinDistance < idealMinDistance * 0.8) {
+      details.push(`均匀分散可能较难：学生数 ${studentIds.length}，理想距离 ${idealMinDistance.toFixed(2)}，预计可行距离 ${feasibleMinDistance.toFixed(2)}`)
+    } else if (idealMinDistance > maxTheoreticalDistance * 0.6) {
+      details.push(`均匀分散要求较高：学生数 ${studentIds.length}，理想距离 ${idealMinDistance.toFixed(2)}，教室最大距离 ${maxTheoreticalDistance.toFixed(2)}`)
+    }
+  }
+
+  return { count: details.length, details }
+}
+
 const runAssignmentPrecheck = ({ silent = false } = {}) => {
   const studentCount = students.value.length
   const availableSeatCount = getAvailableSeats().length
@@ -1318,6 +1442,11 @@ const runAssignmentPrecheck = ({ silent = false } = {}) => {
   if (studentFeasibilityConflict.count > 0) {
     blockingReasons.push(`存在 ${studentFeasibilityConflict.count} 处学生位置不可行问题`)
     blockingReasons.push(...studentFeasibilityConflict.details.slice(0, 5))
+  }
+
+  const distributeEvenlyWarning = detectDistributeEvenlyFeasibility()
+  if (distributeEvenlyWarning.count > 0) {
+    warnings.push(...distributeEvenlyWarning.details)
   }
 
   if (activeRuleCount === 0) {

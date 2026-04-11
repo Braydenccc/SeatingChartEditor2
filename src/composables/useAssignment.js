@@ -70,6 +70,45 @@ export function useAssignment() {
     return [shuffled[0], shuffled[1]]
   }
 
+  // ==================== 理想距离计算（基于学生数和教室尺寸） ====================
+
+  const calculateIdealMinDistance = (studentCount, seatConfig) => {
+    if (studentCount <= 1) return Infinity
+    if (!seatConfig) return Math.max(1.41, Math.sqrt(studentCount) * 0.8)
+
+    const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig
+    const totalCols = groupCount * columnsPerGroup
+    const totalRows = seatsPerColumn
+    const totalSeats = totalCols * totalRows
+
+    const maxTheoreticalDistance = Math.sqrt((totalCols - 1) * (totalCols - 1) + (totalRows - 1) * (totalRows - 1))
+
+    const density = studentCount / totalSeats
+    const gridSide = Math.ceil(Math.sqrt(studentCount))
+    
+    let idealMinDistance
+    
+    if (studentCount <= 3) {
+      idealMinDistance = 1.5
+    } else if (studentCount <= 8) {
+      const baseDistance = 1.41
+      const linearGrowth = (studentCount - 1) * 0.15
+      idealMinDistance = baseDistance + linearGrowth
+    } else {
+      const baseDistance = 2.5
+      const logGrowth = Math.log10(studentCount - 5) * 0.6
+      idealMinDistance = baseDistance + logGrowth
+    }
+    
+    const classroomScaleFactor = Math.min(1.5, maxTheoreticalDistance / 10)
+    idealMinDistance = idealMinDistance * classroomScaleFactor
+    
+    idealMinDistance = Math.max(1.41, idealMinDistance)
+    idealMinDistance = Math.min(idealMinDistance, maxTheoreticalDistance * 0.7)
+    
+    return idealMinDistance
+  }
+
   // ==================== 新引擎：主体展开 ====================
 
   const normalizeRuleSubjects = (rule) => {
@@ -252,9 +291,10 @@ export function useAssignment() {
    * DISTRIBUTE_EVENLY: 基于直线距离的两两分散（最大化最小距离）
    * CLUSTER_TOGETHER: 基于区域聚集
    */
-  const checkGroupViolation = (rule, expandedSubjects, assignment) => {
+  const checkGroupViolation = (rule, expandedSubjects, assignment, returnDetails = false) => {
     const { predicate, params } = rule
     let penalties = 0
+    let details = null
 
     if (predicate === 'DISTRIBUTE_EVENLY') {
       // 收集已分配学生的座位信息
@@ -274,13 +314,20 @@ export function useAssignment() {
         })
       }
 
-      if (positioned.length <= 1) return 0
+      if (positioned.length <= 1) {
+        if (returnDetails) {
+          return { penalties: 0, minDistance: Infinity, avgDistance: 0 }
+        }
+        return 0
+      }
 
       // 计算所有学生两两之间的欧几里得距离
       let minDistance = Infinity
       let totalDistance = 0
       let pairCount = 0
       const closePairs = [] // 记录距离过近的学生对
+      const adjacentPairs = [] // 记录相邻的学生对（距离 < 1.5）
+      const distanceOnePairs = [] // 记录距离为1的学生对（优先处理）
 
       for (let i = 0; i < positioned.length; i++) {
         for (let j = i + 1; j < positioned.length; j++) {
@@ -298,8 +345,18 @@ export function useAssignment() {
             minDistance = distance
           }
 
-          // 距离小于阈值时记录（阈值=2，约等于"相邻或隔一个座位"）
-          if (distance < 2) {
+          // 记录距离为1的学生对（优先处理）
+          if (distance <= 1.01 && distance >= 0.99) {
+            distanceOnePairs.push({ studentId1: a.studentId, studentId2: b.studentId, distance })
+          }
+          
+          // 记录距离小于1.5的学生对（相邻）
+          if (distance < 1.5) {
+            adjacentPairs.push({ studentId1: a.studentId, studentId2: b.studentId, distance })
+          }
+
+          // 距离小于阈值时记录（阈值=3，提高检测灵敏度）
+          if (distance < 3) {
             closePairs.push({ studentId1: a.studentId, studentId2: b.studentId, distance })
           }
         }
@@ -307,22 +364,48 @@ export function useAssignment() {
 
       const avgDistance = pairCount > 0 ? totalDistance / pairCount : 0
 
-      // 惩罚策略：
-      // 1. 最小距离惩罚：如果最近的一对学生坐得太近（<2），按不足程度惩罚
-      if (minDistance < 2) {
-        penalties += (2 - minDistance) * PENALTY_WEIGHTS[rule.priority] * 0.5
+      // 优化后的惩罚策略：优先分开距离为1的对象
+      // 1. 距离为1的极高优先级惩罚：最优先处理距离正好为1的情况
+      for (const pair of distanceOnePairs) {
+        penalties += PENALTY_WEIGHTS[rule.priority] * 5.0
       }
 
-      // 2. 过近pair惩罚：每对距离<2的学生对都额外惩罚
+      // 2. 最小距离惩罚：核心策略 - 强烈惩罚小的最小距离
+      // 使用基于学生数量和教室尺寸的理想距离算法
+      const idealMinDistance = calculateIdealMinDistance(positioned.length, seatConfig.value)
+      
+      if (minDistance < idealMinDistance) {
+        const diff = idealMinDistance - minDistance
+        penalties += diff * diff * PENALTY_WEIGHTS[rule.priority] * 0.8
+      }
+
+      // 3. 过近pair惩罚：对每对距离过近的学生进行额外惩罚
       for (const pair of closePairs) {
-        penalties += (2 - pair.distance) * PENALTY_WEIGHTS[rule.priority] * 0.3
+        penalties += (3 - pair.distance) * PENALTY_WEIGHTS[rule.priority] * 0.4
       }
 
-      // 3. 平均距离奖励/惩罚：鼓励整体分布均匀
-      // 理想平均距离与座位布局相关，这里用经验值
-      const idealMinAvg = Math.sqrt(positioned.length) * 1.5
-      if (avgDistance < idealMinAvg && positioned.length > 2) {
-        penalties += (idealMinAvg - avgDistance) * PENALTY_WEIGHTS[rule.priority] * 0.1
+      // 4. 平均距离奖励/惩罚：鼓励整体分布均匀，但优先级低于最小距离
+      const idealAvg = Math.sqrt(positioned.length) * 2
+      if (avgDistance < idealAvg && positioned.length > 2) {
+        penalties += (idealAvg - avgDistance) * PENALTY_WEIGHTS[rule.priority] * 0.15
+      }
+
+      // 5. 最小距离的额外奖励：如果最小距离很大，给予负惩罚（即奖励）
+      if (minDistance > idealMinDistance * 1.5) {
+        penalties -= (minDistance - idealMinDistance * 1.5) * PENALTY_WEIGHTS[rule.priority] * 0.3
+      }
+
+      if (returnDetails) {
+        details = { 
+          minDistance, 
+          avgDistance, 
+          positionedCount: positioned.length,
+          idealMinDistance,
+          closePairs,
+          adjacentPairs,
+          distanceOnePairs,
+          isIdeal: minDistance >= idealMinDistance && adjacentPairs.length === 0
+        }
       }
     }
 
@@ -343,6 +426,9 @@ export function useAssignment() {
       }
     }
 
+    if (returnDetails) {
+      return { penalties, details }
+    }
     return penalties
   }
 
@@ -373,9 +459,9 @@ export function useAssignment() {
 
       if (positioned.length <= 1) return []
 
-      // 找出所有距离过近的pair（距离<2）
+      // 找出所有距离过近的pair（距离<3，与优化后的策略保持一致）
       const violatingStudentIds = new Set()
-      const threshold = 2
+      const threshold = 3
 
       for (let i = 0; i < positioned.length; i++) {
         for (let j = i + 1; j < positioned.length; j++) {
@@ -450,7 +536,8 @@ export function useAssignment() {
 
           // 分组谓词单独处理
           if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
-            subScore = -checkGroupViolation(subRule, subSubjects, assignment)
+            const result = checkGroupViolation(subRule, subSubjects, assignment)
+            subScore = typeof result === 'object' ? result.penalties : result
           } else {
             for (const subject of subSubjects) {
               const { violated, excess = 0 } = checkViolation(subRule, subject, assignment)
@@ -481,7 +568,8 @@ export function useAssignment() {
 
       // 分组谓词单独处理
       if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
-        score -= checkGroupViolation(rule, subjects, assignment)
+        const result = checkGroupViolation(rule, subjects, assignment)
+        score -= typeof result === 'object' ? result.penalties : result
         continue
       }
 
@@ -1094,6 +1182,7 @@ export function useAssignment() {
   const generateReport = (solution, activeRules, studentList) => {
     const satisfied = []
     const violated = []
+    const distributeEvenlyDetails = []
 
     for (const rule of activeRules) {
       if (rule.subRules && rule.subRules.length > 1) {
@@ -1108,17 +1197,67 @@ export function useAssignment() {
           const subRuleViolations = []
 
           if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
-            const penalty = checkGroupViolation(subRule, subSubjects, solution)
-            if (penalty > 0) {
+            const result = checkGroupViolation(subRule, subSubjects, solution, true)
+            const penalty = typeof result === 'object' ? result.penalties : result
+            const details = typeof result === 'object' ? result.details : null
+
+            if (subRule.predicate === 'DISTRIBUTE_EVENLY' && details) {
+              distributeEvenlyDetails.push({
+                rule: subRule,
+                minDistance: details.minDistance,
+                avgDistance: details.avgDistance,
+                positionedCount: details.positionedCount,
+                idealMinDistance: details.idealMinDistance,
+                isIdeal: details.isIdeal
+              })
+            }
+
+            // 对于均匀分散规则：当最小距离理想且互不相邻时就返回成功
+            let ruleSatisfied = false
+            if (subRule.predicate === 'DISTRIBUTE_EVENLY' && details?.isIdeal) {
+              ruleSatisfied = true
+            } else if (penalty <= 0) {
+              ruleSatisfied = true
+            }
+
+            if (!ruleSatisfied) {
               subSatisfied = false
-              const focusedStudentIds = getGroupRuleViolatingStudentIds(subRule, subSubjects, solution)
-              const names = focusedStudentIds
-                .map(studentId => studentList.find(st => st.id === studentId)?.name ?? `ID:${studentId}`)
-                .slice(0, 3)
-              subRuleViolations.push(names.length > 0
-                ? `重点定位学生：${names.join('、')}${focusedStudentIds.length > 3 ? `…等${focusedStudentIds.length}人` : ''}`
-                : '分组约束未满足（存在明显分散/不均衡）'
-              )
+              
+              if (subRule.predicate === 'DISTRIBUTE_EVENLY' && details) {
+                // 显示最小距离信息
+                const minDistFormatted = details.minDistance === Infinity ? 'N/A' : details.minDistance.toFixed(2)
+                const idealDistFormatted = details.idealMinDistance.toFixed(2)
+                subRuleViolations.push(`最小距离 ${minDistFormatted}（理想≥${idealDistFormatted}）`)
+                
+                // 显示距离为1的学生对（最高优先级）
+                if (details.distanceOnePairs && details.distanceOnePairs.length > 0) {
+                  const oneNames = details.distanceOnePairs.slice(0, 3).map(pair => {
+                    const s1 = studentList.find(st => st.id === pair.studentId1)?.name ?? `ID:${pair.studentId1}`
+                    const s2 = studentList.find(st => st.id === pair.studentId2)?.name ?? `ID:${pair.studentId2}`
+                    return `${s1} & ${s2}`
+                  })
+                  subRuleViolations.push(`距离为1的学生对：${oneNames.join('、')}${details.distanceOnePairs.length > 3 ? `…等${details.distanceOnePairs.length}对` : ''}`)
+                }
+                
+                // 显示相邻的学生对
+                if (details.adjacentPairs && details.adjacentPairs.length > 0) {
+                  const adjNames = details.adjacentPairs.slice(0, 3).map(pair => {
+                    const s1 = studentList.find(st => st.id === pair.studentId1)?.name ?? `ID:${pair.studentId1}`
+                    const s2 = studentList.find(st => st.id === pair.studentId2)?.name ?? `ID:${pair.studentId2}`
+                    return `${s1} & ${s2}`
+                  })
+                  subRuleViolations.push(`相邻学生对：${adjNames.join('、')}${details.adjacentPairs.length > 3 ? `…等${details.adjacentPairs.length}对` : ''}`)
+                }
+              } else {
+                // 原有逻辑
+                const focusedStudentIds = getGroupRuleViolatingStudentIds(subRule, subSubjects, solution)
+                const names = focusedStudentIds
+                  .map(studentId => studentList.find(st => st.id === studentId)?.name ?? `ID:${studentId}`)
+                  .slice(0, 3)
+                if (names.length > 0) {
+                  subRuleViolations.push(`重点定位学生：${names.join('、')}${focusedStudentIds.length > 3 ? `…等${focusedStudentIds.length}人` : ''}`)
+                }
+              }
             }
           } else {
             for (const subj of subSubjects) {
@@ -1167,19 +1306,81 @@ export function useAssignment() {
 
       const subjects = expandSubject(rule, studentList)
       if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
-        const penalty = checkGroupViolation(rule, subjects, solution)
-        if (penalty <= 0) {
+        const result = checkGroupViolation(rule, subjects, solution, true)
+        const penalty = typeof result === 'object' ? result.penalties : result
+        const details = typeof result === 'object' ? result.details : null
+
+        if (rule.predicate === 'DISTRIBUTE_EVENLY' && details) {
+          distributeEvenlyDetails.push({
+            rule,
+            minDistance: details.minDistance,
+            avgDistance: details.avgDistance,
+            positionedCount: details.positionedCount,
+            idealMinDistance: details.idealMinDistance,
+            isIdeal: details.isIdeal
+          })
+        }
+
+        // 对于均匀分散规则：当最小距离理想且互不相邻时就返回成功
+        if (rule.predicate === 'DISTRIBUTE_EVENLY' && details?.isIdeal) {
+          satisfied.push(rule)
+        } else if (penalty <= 0) {
           satisfied.push(rule)
         } else {
-          const focusedStudentIds = getGroupRuleViolatingStudentIds(rule, subjects, solution)
-          const names = focusedStudentIds
-            .map(studentId => studentList.find(st => st.id === studentId)?.name ?? `ID:${studentId}`)
-            .slice(0, 3)
+          // 失败时给出不满足的具体学生
+          const violationReasons = []
+          
+          if (rule.predicate === 'DISTRIBUTE_EVENLY' && details) {
+            // 显示最小距离信息
+            const minDistFormatted = details.minDistance === Infinity ? 'N/A' : details.minDistance.toFixed(2)
+            const idealDistFormatted = details.idealMinDistance.toFixed(2)
+            violationReasons.push(`最小距离 ${minDistFormatted}（理想≥${idealDistFormatted}）`)
+            
+            // 显示距离为1的学生对（最高优先级）
+            if (details.distanceOnePairs && details.distanceOnePairs.length > 0) {
+              const oneNames = details.distanceOnePairs.slice(0, 3).map(pair => {
+                const s1 = studentList.find(st => st.id === pair.studentId1)?.name ?? `ID:${pair.studentId1}`
+                const s2 = studentList.find(st => st.id === pair.studentId2)?.name ?? `ID:${pair.studentId2}`
+                return `${s1} & ${s2}`
+              })
+              violationReasons.push(`距离为1的学生对：${oneNames.join('、')}${details.distanceOnePairs.length > 3 ? `…等${details.distanceOnePairs.length}对` : ''}`)
+            }
+            
+            // 显示相邻的学生对
+            if (details.adjacentPairs && details.adjacentPairs.length > 0) {
+              const adjNames = details.adjacentPairs.slice(0, 3).map(pair => {
+                const s1 = studentList.find(st => st.id === pair.studentId1)?.name ?? `ID:${pair.studentId1}`
+                const s2 = studentList.find(st => st.id === pair.studentId2)?.name ?? `ID:${pair.studentId2}`
+                return `${s1} & ${s2}`
+              })
+              violationReasons.push(`相邻学生对：${adjNames.join('、')}${details.adjacentPairs.length > 3 ? `…等${details.adjacentPairs.length}对` : ''}`)
+            }
+            
+            // 显示距离过近的学生对
+            if (details.closePairs && details.closePairs.length > 0) {
+              const closeNames = details.closePairs.slice(0, 3).map(pair => {
+                const s1 = studentList.find(st => st.id === pair.studentId1)?.name ?? `ID:${pair.studentId1}`
+                const s2 = studentList.find(st => st.id === pair.studentId2)?.name ?? `ID:${pair.studentId2}`
+                return `${s1} & ${s2}(${pair.distance.toFixed(1)})`
+              })
+              violationReasons.push(`过近学生对：${closeNames.join('、')}${details.closePairs.length > 3 ? `…等${details.closePairs.length}对` : ''}`)
+            }
+          } else {
+            // 原有逻辑
+            const focusedStudentIds = getGroupRuleViolatingStudentIds(rule, subjects, solution)
+            const names = focusedStudentIds
+              .map(studentId => studentList.find(st => st.id === studentId)?.name ?? `ID:${studentId}`)
+              .slice(0, 3)
+            if (names.length > 0) {
+              violationReasons.push(`重点定位学生：${names.join('、')}${focusedStudentIds.length > 3 ? `…等${focusedStudentIds.length}人` : ''}`)
+            }
+          }
+          
           violated.push({
             rule,
-            violatingSubjects: names,
-            reason: names.length > 0
-              ? `重点定位学生：${names.join('、')}${focusedStudentIds.length > 3 ? `…等${focusedStudentIds.length}人` : ''}`
+            violatingSubjects: [],
+            reason: violationReasons.length > 0
+              ? violationReasons.join('；')
               : '分组约束未满足（存在明显分散/不均衡）'
           })
         }
@@ -1218,7 +1419,7 @@ export function useAssignment() {
 
     const satRate = activeRules.length > 0 ? satisfied.length / activeRules.length : 1
 
-    return { satisfied, violated, satRate }
+    return { satisfied, violated, satRate, distributeEvenlyDetails }
   }
 
 
@@ -1307,9 +1508,26 @@ export function useAssignment() {
       const report = generateReport(solution, activeRules, studentList)
       const duration = Date.now() - startTime
 
+      // 构建消息，包含均匀分散规则的最小距离信息
+      let message = `排位完成 · 满足度 ${Math.round(report.satRate * 100)}% · 耗时 ${duration}ms${finalReheatCount > 0 ? ` · 重加热 ${finalReheatCount} 次` : ''}`
+      
+      if (report.distributeEvenlyDetails && report.distributeEvenlyDetails.length > 0) {
+        const distDetails = report.distributeEvenlyDetails
+        if (distDetails.length === 1) {
+          const d = distDetails[0]
+          const minDistFormatted = d.minDistance === Infinity ? 'N/A' : d.minDistance.toFixed(2)
+          message += ` · 最小距离 ${minDistFormatted}`
+        } else {
+          const minDists = distDetails.map(d => d.minDistance === Infinity ? Infinity : d.minDistance)
+          const overallMin = Math.min(...minDists)
+          const overallMinFormatted = overallMin === Infinity ? 'N/A' : overallMin.toFixed(2)
+          message += ` · ${distDetails.length} 个分散规则 · 最小距离 ${overallMinFormatted}`
+        }
+      }
+
       return {
         success: true,
-        message: `排位完成 · 满足度 ${Math.round(report.satRate * 100)}% · 耗时 ${duration}ms${finalReheatCount > 0 ? ` · 重加热 ${finalReheatCount} 次` : ''}`,
+        message,
         solution,
         score,
         satRate: report.satRate,
