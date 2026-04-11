@@ -1,0 +1,181 @@
+---
+trigger: always_on
+---
+
+# 项目规范与开发指南
+
+本文件定义了"座位表编辑器 v2"的架构模式、状态管理、数据结构以及视觉规范，旨在确保助手（Agent）在开发过程中严格遵循项目既定标准。
+
+## 1. 项目概览
+
+这是一个基于 Vue 3 和 Vite 构建的教室座位表编辑器。允许教师管理学生、配置教室布局，并通过多种编辑模式将学生分配到座位上。
+
+## 2. 核心架构
+
+### 2.1 状态管理模式 (State Management)
+
+本项目使用 Vue 3 组合式 API (Composition API) 实现 **共享状态 (Shared State Composables)** 模式。**不使用** Pinia 或 Vuex。
+
+- **核心原则**：Composable 在模块作用域（Module Scope）导出响应式引用 (Refs)，使其成为单例（Singleton）。
+- **示例**：
+  ```javascript
+  const students = ref([])
+  export function useStudentData() {
+    return { students, ... }
+  }
+  ```
+
+### 2.2 核心 Composable 模块
+
+- `useStudentData()`：管理学生列表、选择状态及 CRUD 操作。
+- `useSeatChart()`：管理座位网格数据结构与分配逻辑。
+- `useEditMode()`：管理编辑模式状态机（常规/交换/清除/空格编辑）。
+- `useTagData()`：管理学生标签。
+- `useSidebar()`：管理侧边栏 Tab 状态。
+
+### 2.3 数据流架构
+
+```
+用户交互 → 组件事件处理 → Composable 函数 → 响应式状态更新 → UI 自动重绘
+```
+
+## 3. 座位数据结构
+
+座位在内部以 **扁平数组** 形式存储，但在渲染时通过 `organizedSeats` 计算属性组织为 **三级结构**：
+
+```
+分组 (groupIndex) → 列 (columnIndex) → 行 (rowIndex) 对应的座位
+```
+
+这既保证了查询效率，也保持了渲染逻辑的清晰。
+
+## 4. 编辑模式 (Edit Mode)
+
+应用具有 4 种全局编辑模式，由 `useEditMode()` 管理：
+
+1. **NORMAL (常规)**：点击学生 → 点击座位进行分配。
+2. **SWAP (交换)**：依次点击两个座位交换学生。
+3. **CLEAR (清除)**：点击座位移除其中的学生。
+4. **EMPTY_EDIT (空置)**：点击座位将其标记为"不可用"。
+
+## 5. 组件结构 (Component Structure)
+
+```
+App.vue (主布局 - 限制高度)
+├── AppHeader.vue (标题栏)
+├── EditorPanel.vue (编辑器区域 - 80% 宽度)
+│   ├── SeatChart.vue (座位图 - 上部 60%)
+│   │   └── SeatItem.vue (单个座位)
+│   └── StudentList.vue (学生列表 - 下部 40%)
+│       ├── TagManager.vue
+│       └── StudentItem.vue (单个学生)
+└── SidebarPanel.vue (侧边栏 - 20% 宽度)
+```
+
+## 6. 重要实现细节
+
+### 6.1 学生排序与删除
+
+- **排序逻辑**：`sortedStudents` 属性中，无学号的学生排在最前，之后按学号升序排列。
+- **删除逻辑**：减少学生总数时，仅允许删除同时满足"无姓名、无学号、无标签"条件的学生。若条件不满足则显示错误标识（红色边框）。
+
+### 6.2 交互规范
+
+- **表情使用**：本项目**严禁使用**任何 Emoji 图标。
+- **点击穿透**：`StudentItem` 中处理选择逻辑时，需通过 `event.target.closest` 避开按钮和输入框。
+- **配置覆盖**：应用新的座位表配置会清除所有已分配的座位数据，操作前需弹出确认对话框。
+
+## 7. 视觉规范
+
+- **主品牌色**：`#23587b`
+- **样式模式**：
+  - 阴影：`0 2px 4px rgba(0, 0, 0, 0.08)`
+  - 圆角：6-12px
+  - 渐变（主按钮）：`linear-gradient(135deg, #23587b 0%, #2d6a94 100%)`
+  - 过渡：`all 0.2s ease`
+
+## 8. 开发规范
+
+- **命名规范**：
+  - 组件：PascalCase (如 `SeatChart.vue`)
+  - Composable：camelCase 且以 `use` 开头 (如 `useStudentData.js`)
+  - 常量：camelCase
+- **目录约定**：
+  - 布局组件：`src/components/layout/`
+  - 功能组件：`src/components/student/`, `src/components/seat/`
+
+## 9. 图标库规范
+
+本项目统一使用 **`lucide-vue-next`** 作为唯一图标库。
+
+### 9.1 使用原则
+
+- **必须**：所有需要图形符号的场景均使用 Lucide 图标组件
+- **禁止**：在 Vue 模板中使用手写内联 `<svg>` 代替图标
+- **禁止**：用 Unicode 字符（`×`、`+`、`−`、`编`、`删` 等）充当按钮图标
+
+### 9.2 导入方式
+
+按需具名导入，不允许全量导入：
+
+```javascript
+// ✅ 正确
+import { X, Plus, Trash2, Pencil } from 'lucide-vue-next'
+
+// ❌ 禁止
+import * as icons from 'lucide-vue-next'
+```
+
+### 9.3 使用规范
+
+| 场景 | 推荐图标 | 尺寸 |
+|------|---------|------|
+| 关闭/取消/移除 | `X` | 14–18px |
+| 添加/新增 | `Plus` | 14–16px |
+| 编辑/修改 | `Pencil` | 12–14px |
+| 删除 | `Trash2` | 14px |
+| 缩小 | `Minus` | 16px |
+| 放大 | `Plus` | 16px |
+| 搜索 | `Search` | 15px |
+| 清空 | `X` | 12px |
+| 下载/导出 | `Download` | 14px |
+| 上传/导入 | `Upload` | 14px |
+| 警告 | `AlertTriangle` | 16px |
+| 展开/收起 | `ChevronDown` | 14px |
+| 空状态（规则列表）| `ClipboardList` | 40px |
+
+### 9.4 Prop 规范
+
+- **`:size`**：始终通过 prop 指定，不通过 CSS `width/height` 控制
+- **`stroke-width`**：细节图标用 `2`，强调用 `2.5`，淡色装饰用 `1.5`
+- **`color`**：优先由父元素 `color` CSS 属性继承；若需覆盖则显式传入
+
+```html
+<!-- ✅ 正确示例 -->
+<X :size="14" stroke-width="2" />
+<Trash2 :size="14" color="#ef4444" />
+
+<!-- ❌ 错误：不要用 CSS width/height 控制 SVG 尺寸 -->
+<X style="width: 14px; height: 14px;" />
+```
+
+### 9.5 动态图标（component :is）
+
+当图标组件需要动态切换时，将组件**对象**（非字符串）存入数据，使用 `<component :is>` 渲染：
+
+```javascript
+// ✅ 正确：存储组件对象
+import { List, Users } from 'lucide-vue-next'
+const tabs = [
+  { key: 'rules', icon: List, label: '规则总览' },
+  { key: 'info',  icon: Users, label: '说明' }
+]
+```
+
+```html
+<component :is="tab.icon" :size="15" stroke-width="1.8" />
+```
+
+### 9.6 按钮内图标居中
+
+含图标的小图标按钮必须设置 `padding: 0; display: flex; align-items: center; justify-content: center;`，避免浏览器默认 padding 导致图标偏移。
