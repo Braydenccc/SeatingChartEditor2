@@ -35,6 +35,11 @@ const exportSettings = ref({
   excelReverseOrder: false,      // 翻转行序（讲台置顶）
   excelShowGroupGap: true,       // 保留组间空列
   excelColorMode: 'color',       // 'color' | 'bw'
+  excelBorderColor: '#000000',   // Excel 边框颜色
+  excelCellFormat: '%n\n%i',     // 单元格内容模板：%n姓名 %i学号 %r行号 %g组号 %s序号 %j序号 %%百分号
+  excelRowNumberScheme: 'arabic',    // 行号编号方案
+  excelGroupNumberScheme: 'arabic',  // 组号编号方案
+  excelSerialNumberScheme: 'arabic', // 序号编号方案
   excelNameFontSize: 12,         // 姓名字号 (pt)
   excelIdFontSize: 10,           // 学号字号 (pt)
   excelCellWidth: 10,            // 座位列宽 (wch)
