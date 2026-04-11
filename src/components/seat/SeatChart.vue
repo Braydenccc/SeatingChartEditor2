@@ -1,13 +1,28 @@
 <template>
   <div class="seat-chart-container">
-    <div class="seat-chart-info">
-      <span class="info-item">{{ seatConfig.groupCount }} 大组</span>
-      <span class="info-separator">·</span>
-      <span class="info-item">每组 {{ seatConfig.columnsPerGroup }} 列</span>
-      <span class="info-separator">·</span>
-      <span class="info-item">每列 {{ seatConfig.seatsPerColumn }} 座</span>
-      <span class="info-separator">·</span>
-      <span class="info-item">共 {{ totalSeats }} 个座位</span>
+    <!-- 顶部功能栏 -->
+    <div class="seat-toolbar"
+      @dragover.prevent="handleToolbarDragOver" @dragleave="handleToolbarDragLeave" @drop.prevent="handleToolbarDrop">
+      <div class="toolbar-info">
+        <span class="info-item">{{ seatConfig.groupCount }} 大组</span>
+        <span class="info-separator">·</span>
+        <span class="info-item">每组 {{ seatConfig.columnsPerGroup }} 列</span>
+        <span class="info-separator">·</span>
+        <span class="info-item">每列 {{ seatConfig.seatsPerColumn }} 座</span>
+        <span class="info-separator">·</span>
+        <span class="info-item">共 {{ totalSeats }} 个座位</span>
+      </div>
+      <div class="zoom-controls">
+        <button class="zoom-btn" @click.stop="zoomOut" :disabled="scale <= MIN_SCALE" title="缩小">
+          <Minus :size="16" stroke-width="2.5" />
+        </button>
+        <button class="zoom-label" @click.stop="fitToViewport" title="自适应大小">
+          {{ Math.round(scale * 100) }}%
+        </button>
+        <button class="zoom-btn" @click.stop="zoomIn" :disabled="scale >= MAX_SCALE" title="放大">
+          <Plus :size="16" stroke-width="2.5" />
+        </button>
+      </div>
     </div>
 
     <div ref="viewportRef" class="seat-chart-viewport" :class="{ 'is-panning': isPanning }" @wheel.prevent="handleWheel"
@@ -57,19 +72,6 @@
           </template>
         </svg>
       </div>
-
-      <!-- 缩放控件 -->
-      <div class="zoom-controls">
-        <button class="zoom-btn" @click.stop="zoomOut" :disabled="scale <= MIN_SCALE" title="缩小">
-          <Minus :size="16" stroke-width="2.5" />
-        </button>
-        <button class="zoom-label" @click.stop="handleFitZoom" title="自适应大小">
-          {{ Math.round(scale * 100) }}%
-        </button>
-        <button class="zoom-btn" @click.stop="zoomIn" :disabled="scale >= MAX_SCALE" title="放大">
-          <Plus :size="16" stroke-width="2.5" />
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -83,6 +85,8 @@ import { useEditMode } from '@/composables/useEditMode'
 import { useStudentData } from '@/composables/useStudentData'
 import { useZoom } from '@/composables/useZoom'
 import { useZoneRotation } from '@/composables/useZoneRotation'
+import { useUndo } from '@/composables/useUndo'
+import { useDragState } from '@/composables/useDragState'
 
 const {
   seatConfig,
@@ -92,16 +96,27 @@ const {
   toggleEmpty,
   clearSeat,
   swapSeats,
-  findSeatByStudent
+  findSeatByStudent,
+  getStudentAtSeat
 } = useSeatChart()
 
 const { firstSelectedSeat, setFirstSelectedSeat, clearFirstSelectedSeat } = useEditMode()
-const { clearSelection } = useStudentData()
-const { scale, panX, panY, zoomIn, zoomOut, setScale, setPan, MIN_SCALE, MAX_SCALE } = useZoom()
+const { clearSelection, students } = useStudentData()
+const { scale, panX, panY, zoomIn, zoomOut, setScale, setPan, MIN_SCALE, MAX_SCALE, registerViewport, fitToViewport } = useZoom()
+const { recordAssign, recordClear, recordSwap, recordToggleEmpty } = useUndo()
+const { isDraggingFromSeat: globalIsDraggingFromSeat } = useDragState()
 
 const viewportRef = ref(null)
 const chartRef = ref(null)
 const isPanning = ref(false)
+
+// 候选区是否已隐藏（所有学生均已入座）
+const candidateAreaHidden = computed(() => {
+  return students.value.length > 0 && students.value.every(s => findSeatByStudent(s.id))
+})
+
+// 是否显示功能栏的移出放置区
+const showDropZone = computed(() => globalIsDraggingFromSeat.value && candidateAreaHidden.value)
 
 // ==================== 变换样式 ====================
 const chartTransformStyle = computed(() => ({
@@ -109,45 +124,6 @@ const chartTransformStyle = computed(() => ({
   transformOrigin: 'center center',
   willChange: 'transform' // 提示浏览器优化渲染
 }))
-
-// ==================== 自适应缩放 ====================
-const fitToViewport = () => {
-  if (!viewportRef.value || !chartRef.value) return
-
-  // 暂时重置以获取真实尺寸
-  const prevTransform = chartRef.value.style.transform
-  chartRef.value.style.transform = 'none'
-
-  nextTick(() => {
-    if (!viewportRef.value || !chartRef.value) return
-
-    const vpRect = viewportRef.value.getBoundingClientRect()
-    const chartRect = chartRef.value.getBoundingClientRect()
-
-    // 还原
-    chartRef.value.style.transform = prevTransform
-
-    if (chartRect.width === 0 || chartRect.height === 0) return
-
-    const padH = 40 // 水平留白
-    const padV = 30 // 垂直留白
-    const availW = vpRect.width - padH
-    const availH = vpRect.height - padV
-
-    const fitScale = Math.min(
-      availW / chartRect.width,
-      availH / chartRect.height,
-      1.0 // 不超过 100%
-    )
-
-    setScale(Math.max(MIN_SCALE, fitScale))
-    setPan(0, 0)
-  })
-}
-
-const handleFitZoom = () => {
-  fitToViewport()
-}
 
 // ==================== 鼠标拖拽平移 ====================
 let mouseDown = false
@@ -334,8 +310,35 @@ const handleDrop = (e) => {
       handleAssignStudent(targetSeatId, data.studentId)
     } else if (data.type === 'seat') {
       if (data.seatId !== targetSeatId) {
+        recordSwap(data.seatId, targetSeatId)
         swapSeats(data.seatId, targetSeatId)
       }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// ==================== 功能栏拖放（移出学生） ====================
+const handleToolbarDragOver = (e) => {
+  e.dataTransfer.dropEffect = 'move'
+}
+
+const handleToolbarDragLeave = () => {
+  // 保持 isDraggingFromSeat 不变，仅用于视觉反馈
+}
+
+const handleToolbarDrop = (e) => {
+  const raw = e.dataTransfer.getData('application/json')
+  if (!raw) return
+
+  try {
+    const data = JSON.parse(raw)
+    if (data.type === 'seat' && data.seatId) {
+      const studentId = getStudentAtSeat(data.seatId)
+      recordClear(data.seatId, studentId)
+      clearSeat(data.seatId)
+      clearSelection()
     }
   } catch {
     // ignore
@@ -357,6 +360,7 @@ const findSeatElement = (el) => {
 const handleTouchSeatDrop = (e) => {
   const { sourceSeatId, targetSeatId } = e.detail
   if (sourceSeatId !== targetSeatId) {
+    recordSwap(sourceSeatId, targetSeatId)
     swapSeats(sourceSeatId, targetSeatId)
   }
 }
@@ -368,18 +372,40 @@ const handleTouchStudentDrop = (e) => {
 
 const handleTouchSeatToList = (e) => {
   const { seatId } = e.detail
+  const studentId = getStudentAtSeat(seatId)
+  recordClear(seatId, studentId)
   clearSeat(seatId)
+}
+
+// ==================== 全局拖拽状态追踪 ====================
+const handleGlobalDragStart = (e) => {
+  const el = e.target
+  const seatEl = el.closest?.('[data-seat-id]')
+  if (!seatEl) return
+  const seatId = seatEl.dataset.seatId
+  if (!seatId) return
+  const seat = organizedSeats.value.flat(Infinity).find(s => s.id === seatId)
+  if (seat && seat.studentId !== null && !seat.isEmpty) {
+    isDraggingFromSeat.value = true
+  }
+}
+
+const handleGlobalDragEnd = () => {
+  isDraggingFromSeat.value = false
 }
 
 // ==================== 初始化 ====================
 onMounted(() => {
   initializeSeats()
+  registerViewport(viewportRef.value, chartRef.value)
 
   if (viewportRef.value) {
     viewportRef.value.addEventListener('touch-seat-drop', handleTouchSeatDrop)
-    viewportRef.value.addEventListener('touch-seat-to-list', handleTouchSeatToList)
   }
+  document.addEventListener('touch-seat-to-list', handleTouchSeatToList)
   document.addEventListener('touch-student-drop', handleTouchStudentDrop)
+  document.addEventListener('dragstart', handleGlobalDragStart)
+  document.addEventListener('dragend', handleGlobalDragEnd)
 
   // 首次自适应
   nextTick(() => {
@@ -390,9 +416,11 @@ onMounted(() => {
 onUnmounted(() => {
   if (viewportRef.value) {
     viewportRef.value.removeEventListener('touch-seat-drop', handleTouchSeatDrop)
-    viewportRef.value.removeEventListener('touch-seat-to-list', handleTouchSeatToList)
   }
+  document.removeEventListener('touch-seat-to-list', handleTouchSeatToList)
   document.removeEventListener('touch-student-drop', handleTouchStudentDrop)
+  document.removeEventListener('dragstart', handleGlobalDragStart)
+  document.removeEventListener('dragend', handleGlobalDragEnd)
 })
 
 // 配置变化时重新自适应
@@ -429,20 +457,25 @@ const totalSeats = computed(() => {
 // 处理分配学生
 const handleAssignStudent = (seatId, studentId) => {
   const existingSeat = findSeatByStudent(studentId)
+  const previousSeatId = existingSeat ? existingSeat.id : null
   if (existingSeat) {
     clearSeat(existingSeat.id)
   }
   assignStudent(seatId, studentId)
   clearSelection()
+  recordAssign(seatId, studentId, previousSeatId)
 }
 
 // 处理切换空置状态
 const handleToggleEmpty = (seatId) => {
+  recordToggleEmpty(seatId)
   toggleEmpty(seatId)
 }
 
 // 处理清空座位
 const handleClearSeat = (seatId) => {
+  const studentId = getStudentAtSeat(seatId)
+  recordClear(seatId, studentId)
   clearSeat(seatId)
 }
 
@@ -453,6 +486,7 @@ const handleSwapSeat = (seatId) => {
   } else if (firstSelectedSeat.value === seatId) {
     clearFirstSelectedSeat()
   } else {
+    recordSwap(firstSelectedSeat.value, seatId)
     swapSeats(firstSelectedSeat.value, seatId)
     clearFirstSelectedSeat()
   }
@@ -569,22 +603,31 @@ const showOverlay = computed(() => editingZoneId.value !== null)
   overflow: hidden;
 }
 
-.seat-chart-info {
+/* ==================== 顶部功能栏 ==================== */
+.seat-toolbar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 20px;
-  background: white;
-  border-bottom: 2px solid #23587b;
-  font-size: 14px;
-  color: #666;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #e8eef2;
+  z-index: 10;
+  pointer-events: auto;
   flex-shrink: 0;
+  min-height: 40px;
+}
+
+.toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #666;
 }
 
 .info-item {
   font-weight: 500;
-  color: #23587b;
+  color: #888;
 }
 
 .info-separator {
@@ -600,6 +643,7 @@ const showOverlay = computed(() => editingZoneId.value !== null)
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
+  min-height: 0;
 }
 
 .seat-chart-viewport.is-panning {
@@ -633,15 +677,14 @@ const showOverlay = computed(() => editingZoneId.value !== null)
   font-size: 15px;
   font-weight: 600;
   color: #23587b;
-  padding: 8px 12px;
-  background: white;
-  border-radius: 8px;
-  border: 2px solid #e0e0e0;
+  padding: 0px 0px;
+  order: 1;
 }
 
 .group-content {
   display: flex;
   gap: 16px;
+  order: 0;
 }
 
 .seat-column {
@@ -653,19 +696,9 @@ const showOverlay = computed(() => editingZoneId.value !== null)
 
 /* ==================== 缩放控件 ==================== */
 .zoom-controls {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
   display: flex;
   align-items: center;
   gap: 2px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 10px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-  padding: 4px;
-  z-index: 10;
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .zoom-btn {
@@ -720,10 +753,13 @@ const showOverlay = computed(() => editingZoneId.value !== null)
   color: #23587b;
 }
 
-@media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
-  .seat-chart-info {
-    padding: 10px 14px;
-    font-size: 13px;
+@media (max-width: 1366px) and (min-width: 1025px) {
+  .seat-toolbar {
+    padding: 8px 14px;
+  }
+
+  .toolbar-info {
+    font-size: 12px;
     gap: 6px;
   }
 
@@ -751,24 +787,67 @@ const showOverlay = computed(() => editingZoneId.value !== null)
   }
 }
 
+/* 小高度屏幕优化 */
+@media (max-height: 820px) and (min-width: 1025px) {
+  .seat-toolbar {
+    padding: 6px 12px;
+  }
+
+  .toolbar-info {
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .seat-chart {
+    gap: 24px;
+    padding: 18px 12px;
+  }
+
+  .seat-group {
+    gap: 8px;
+  }
+
+  .group-content {
+    gap: 10px;
+  }
+
+  .seat-column {
+    width: 100px;
+    gap: 8px;
+  }
+}
+
 /* ==================== 响应式 ==================== */
 @media (max-width: 768px) {
   .seat-chart-container {
     width: 100%;
     height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .seat-toolbar {
+    display: flex;
+    padding: 5px 10px;
+    min-height: 36px;
+    flex-shrink: 0;
+  }
+
+  .toolbar-info {
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 10px;
+    gap: 3px;
+  }
+
+  .info-item {
+    color: #23587b;
+    font-weight: 500;
   }
 
   .seat-chart-viewport {
     flex: 1;
     min-height: 0;
-  }
-
-  .seat-chart-info {
-    flex-wrap: wrap;
-    justify-content: center;
-    padding: 10px 15px;
-    font-size: 12px;
-    gap: 4px;
   }
 
   .seat-chart {
@@ -789,17 +868,23 @@ const showOverlay = computed(() => editingZoneId.value !== null)
     width: 100px;
     gap: 8px;
   }
-
-  .zoom-controls {
-    bottom: 12px;
-    right: 10px;
-  }
 }
 
 @media (max-width: 480px) {
-  .seat-chart-info {
-    font-size: 11px;
-    padding: 8px 10px;
+  .seat-toolbar {
+    padding: 4px 8px;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 32px;
+  }
+
+  .toolbar-info {
+    font-size: 9px;
+    justify-content: center;
+  }
+
+  .zoom-controls {
+    padding: 2px;
   }
 
   .seat-chart {
@@ -824,12 +909,6 @@ const showOverlay = computed(() => editingZoneId.value !== null)
   .seat-column {
     width: 90px;
     gap: 6px;
-  }
-
-  .zoom-controls {
-    bottom: 10px;
-    right: 8px;
-    padding: 3px;
   }
 
   .zoom-btn {

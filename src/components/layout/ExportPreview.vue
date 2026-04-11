@@ -133,13 +133,74 @@
                   <label class="radio-item"><input type="radio" value="color" v-model="exportSettings.excelColorMode" /><span>彩色</span></label>
                   <label class="radio-item"><input type="radio" value="bw" v-model="exportSettings.excelColorMode" /><span>单色</span></label>
                 </div>
-                <div class="setting-row" style="margin-top:6px">
-                  <label>边框颜色:</label>
-                  <input v-model="exportSettings.excelBorderColor" type="color" />
+                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowBorders" /><span>显示边框</span></label>
+              </div>
+
+              <div class="settings-section" v-if="exportSettings.excelShowBorders">
+                <h4>边框设置</h4>
+                <div class="font-style-section">
+                  <h5 class="subsection-title">外边框</h5>
+                  <div class="spacing-grid">
+                    <div class="num-input"><label>样式</label><select v-model="exportSettings.excelOuterBorderStyle"><option value="thin">细 (Thin)</option><option value="medium">中 (Medium)</option><option value="thick">粗 (Thick)</option><option value="dashed">虚线 (Dashed)</option><option value="dotted">点线 (Dotted)</option><option value="double">双线条 (Double)</option></select></div>
+                    <div class="color-input"><label>颜色</label><div class="fill-color-picker"><div class="fill-color-swatch has-value" :style="{ backgroundColor: exportSettings.excelOuterBorderColor || '#000000' }"><input v-model="exportSettings.excelOuterBorderColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelOuterBorderColor" maxlength="7" /></div></div>
+                  </div>
                 </div>
-                <div class="spacing-grid" style="margin-top:8px">
-                  <div class="num-input"><label>姓名字号(pt)</label><input type="number" v-model.number="exportSettings.excelNameFontSize" min="8" max="24" /></div>
-                  <div class="num-input"><label>学号字号(pt)</label><input type="number" v-model.number="exportSettings.excelIdFontSize" min="6" max="18" /></div>
+                <div class="font-style-section">
+                  <h5 class="subsection-title">内边框</h5>
+                  <div class="spacing-grid">
+                    <div class="num-input"><label>样式</label><select v-model="exportSettings.excelInnerBorderStyle"><option value="thin">细 (Thin)</option><option value="medium">中 (Medium)</option><option value="thick">粗 (Thick)</option><option value="dashed">虚线 (Dashed)</option><option value="dotted">点线 (Dotted)</option><option value="double">双线条 (Double)</option></select></div>
+                    <div class="color-input"><label>颜色</label><div class="fill-color-picker"><div class="fill-color-swatch has-value" :style="{ backgroundColor: exportSettings.excelInnerBorderColor || '#000000' }"><input v-model="exportSettings.excelInnerBorderColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelInnerBorderColor" maxlength="7" /></div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="settings-section">
+                <h4>样式</h4>
+                <div class="font-style-section">
+                  <h5 class="subsection-title">标题</h5>
+                  <div class="spacing-grid">
+                    <div class="num-input"><label>字号(pt)</label><input type="number" v-model.number="exportSettings.excelTitleFontSize" min="8" max="36" /></div>
+                    <div class="color-input"><label>字体颜色</label><div class="fill-color-picker"><div class="fill-color-swatch has-value" :style="{ backgroundColor: exportSettings.excelTitleFontColor || '#000000' }"><input v-model="exportSettings.excelTitleFontColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelTitleFontColor" maxlength="7" /></div></div>
+                    <div class="color-input fill-color"><label>背景颜色</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelTitleFillColor }" :style="{ backgroundColor: exportSettings.excelTitleFillColor || undefined }"><input v-model="exportSettings.excelTitleFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelTitleFillColor" placeholder="--" maxlength="7" /></div></div>
+                  </div>
+                  <div class="font-style-row">
+                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelTitleFontBold" /><span>粗体</span></label>
+                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelTitleFontItalic" /><span>斜体</span></label>
+                  </div>
+                </div>
+                <div class="font-style-section">
+                  <h5 class="subsection-title">表头（组号/行号/讲台）</h5>
+                  <div class="spacing-grid">
+                    <div class="num-input"><label>字号(pt)</label><input type="number" v-model.number="exportSettings.excelHeaderFontSize" min="6" max="24" /></div>
+                    <div class="color-input"><label>字体颜色</label><div class="fill-color-picker"><div class="fill-color-swatch has-value" :style="{ backgroundColor: exportSettings.excelHeaderFontColor || '#000000' }"><input v-model="exportSettings.excelHeaderFontColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelHeaderFontColor" maxlength="7" /></div></div>
+                  </div>
+                  <div class="font-style-row">
+                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelHeaderFontBold" /><span>粗体</span></label>
+                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelHeaderFontItalic" /><span>斜体</span></label>
+                  </div>
+                  <div class="sub-fill-row">
+                    <div class="color-input fill-color"><label>组号背景</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelHeaderFillColor }" :style="{ backgroundColor: exportSettings.excelHeaderFillColor || undefined }"><input v-model="exportSettings.excelHeaderFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelHeaderFillColor" placeholder="--" maxlength="7" /></div></div>
+                    <div class="color-input fill-color"><label>行号背景</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelRowNumFillColor }" :style="{ backgroundColor: exportSettings.excelRowNumFillColor || undefined }"><input v-model="exportSettings.excelRowNumFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelRowNumFillColor" placeholder="--" maxlength="7" /></div></div>
+                    <div class="color-input fill-color"><label>讲台背景</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelPodiumFillColor }" :style="{ backgroundColor: exportSettings.excelPodiumFillColor || undefined }"><input v-model="exportSettings.excelPodiumFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelPodiumFillColor" placeholder="--" maxlength="7" /></div></div>
+                  </div>
+                </div>
+                <div class="font-style-section">
+                  <h5 class="subsection-title">座位格</h5>
+                  <div class="spacing-grid">
+                    <div class="num-input"><label>姓名字号(pt)</label><input type="number" v-model.number="exportSettings.excelNameFontSize" min="8" max="24" /></div>
+                    <div class="num-input"><label>学号字号(pt)</label><input type="number" v-model.number="exportSettings.excelIdFontSize" min="6" max="18" /></div>
+                    <div class="color-input"><label>字体颜色</label><div class="fill-color-picker"><div class="fill-color-swatch has-value" :style="{ backgroundColor: exportSettings.excelSeatCellFontColor || '#000000' }"><input v-model="exportSettings.excelSeatCellFontColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelSeatCellFontColor" maxlength="7" /></div></div>
+                    <div class="color-input fill-color"><label>背景颜色</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelSeatFillColor }" :style="{ backgroundColor: exportSettings.excelSeatFillColor || undefined }"><input v-model="exportSettings.excelSeatFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelSeatFillColor" placeholder="--" maxlength="7" /></div></div>
+                  </div>
+                  <div class="font-style-row">
+                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelSeatCellFontBold" /><span>粗体</span></label>
+                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelSeatCellFontItalic" /><span>斜体</span></label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-section">
+                <h4>尺寸</h4>
+                <div class="spacing-grid">
                   <div class="num-input"><label>列宽(字符)</label><input type="number" v-model.number="exportSettings.excelCellWidth" min="6" max="30" /></div>
                   <div class="num-input"><label>行高(点)</label><input type="number" v-model.number="exportSettings.excelSeatRowHeight" min="20" max="100" /></div>
                 </div>
@@ -151,11 +212,14 @@
                   <label>单元格内容模板:</label>
                   <textarea
                     v-model="exportSettings.excelCellFormat"
-                    rows="3"
+                    rows="4"
                     class="format-textarea"
-                    placeholder="%n&#10;%i"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="%n[color:#ff0000,bold]&#10;%i[size:10]"
                   ></textarea>
                   <div class="format-hint">支持占位符：%n 姓名，%i 学号，%r 行号，%g 组号，%s/%j 序号，%% 百分号</div>
+                  <div class="format-hint">内联样式语法：%n[color:#ff0000,bold,italic,size:14]</div>
                   <div class="format-hint">说明：关闭“格子内显示学号”后，模板中的 %i 会输出空文本。</div>
                 </div>
                 <div class="spacing-grid">
@@ -188,6 +252,9 @@
                   <span>导出标签统计</span>
                 </label>
                 <div v-if="exportSettings.excelShowTagTable" class="tag-table-options">
+                  <div class="sub-fill-row" style="margin-top:6px">
+                    <div class="color-input fill-color"><label>表头背景</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelTagHeaderFillColor }" :style="{ backgroundColor: exportSettings.excelTagHeaderFillColor || undefined }"><input v-model="exportSettings.excelTagHeaderFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelTagHeaderFillColor" placeholder="--" maxlength="7" /></div></div>
+                  </div>
                   <div class="mode-row" style="margin-top:6px">
                     <span class="mode-label">位置:</span>
                     <label class="radio-item"><input type="radio" :value="false" v-model="exportSettings.excelTagTableNewSheet" /><span>座位下方</span></label>
@@ -381,6 +448,12 @@ const updateExcelWorkbook = async () => {
         showGroupGap:     es.excelShowGroupGap,
         colorMode:        es.excelColorMode,
         borderColor:      es.excelBorderColor,
+        showBorders:      es.excelShowBorders,
+        borderStyle:      es.excelBorderStyle,
+        innerBorderStyle: es.excelInnerBorderStyle,
+        innerBorderColor: es.excelInnerBorderColor,
+        outerBorderStyle: es.excelOuterBorderStyle,
+        outerBorderColor: es.excelOuterBorderColor,
         cellFormat:       es.excelCellFormat,
         rowNumberScheme:   es.excelRowNumberScheme,
         groupNumberScheme: es.excelGroupNumberScheme,
@@ -391,7 +464,23 @@ const updateExcelWorkbook = async () => {
         seatRowHeight:    es.excelSeatRowHeight,
         showTagTable:     es.excelShowTagTable,
         tagTableNewSheet: es.excelTagTableNewSheet,
-        title:            es.title || '班级座位表'
+        title:            es.title || '班级座位表',
+        titleFontBold:    es.excelTitleFontBold,
+        titleFontSize:    es.excelTitleFontSize,
+        titleFontColor:   es.excelTitleFontColor,
+        headerFontBold:   es.excelHeaderFontBold,
+        headerFontSize:   es.excelHeaderFontSize,
+        headerFontColor:  es.excelHeaderFontColor,
+        seatFontBold:     es.excelSeatCellFontBold,
+        seatFontColor:    es.excelSeatCellFontColor,
+        titleFillColor:    es.excelTitleFillColor,
+        headerFillColor:   es.excelHeaderFillColor,
+        rowNumFillColor:   es.excelRowNumFillColor,
+        podiumFillColor:   es.excelPodiumFillColor,
+        seatFillColor:     es.excelSeatFillColor,
+        emptyFillColor:    es.excelEmptyFillColor,
+        vacantFillColor:   es.excelVacantFillColor,
+        tagHeaderFillColor: es.excelTagHeaderFillColor
       }
     )
     excelWorkbook.value = wb
@@ -415,7 +504,24 @@ watch(
     exportSettings.value.excelReverseOrder,
     exportSettings.value.excelShowGroupGap,
     exportSettings.value.excelColorMode,
+    exportSettings.value.excelShowBorders,
+    exportSettings.value.excelBorderStyle,
     exportSettings.value.excelBorderColor,
+    exportSettings.value.excelInnerBorderStyle,
+    exportSettings.value.excelInnerBorderColor,
+    exportSettings.value.excelOuterBorderStyle,
+    exportSettings.value.excelOuterBorderColor,
+    exportSettings.value.excelTitleFontBold,
+    exportSettings.value.excelTitleFontItalic,
+    exportSettings.value.excelTitleFontColor,
+    exportSettings.value.excelTitleFontSize,
+    exportSettings.value.excelHeaderFontBold,
+    exportSettings.value.excelHeaderFontItalic,
+    exportSettings.value.excelHeaderFontColor,
+    exportSettings.value.excelHeaderFontSize,
+    exportSettings.value.excelSeatCellFontBold,
+    exportSettings.value.excelSeatCellFontItalic,
+    exportSettings.value.excelSeatCellFontColor,
     exportSettings.value.excelCellFormat,
     exportSettings.value.excelRowNumberScheme,
     exportSettings.value.excelGroupNumberScheme,
@@ -426,7 +532,15 @@ watch(
     exportSettings.value.excelSeatRowHeight,
     exportSettings.value.excelShowTagTable,
     exportSettings.value.excelTagTableNewSheet,
-    exportSettings.value.title
+    exportSettings.value.title,
+    exportSettings.value.excelTitleFillColor,
+    exportSettings.value.excelHeaderFillColor,
+    exportSettings.value.excelRowNumFillColor,
+    exportSettings.value.excelPodiumFillColor,
+    exportSettings.value.excelSeatFillColor,
+    exportSettings.value.excelEmptyFillColor,
+    exportSettings.value.excelVacantFillColor,
+    exportSettings.value.excelTagHeaderFillColor
   ],
   () => {
     if (activeTab.value === 'excel' && props.visible) {
@@ -473,6 +587,7 @@ const excelPreviewHtml = computed(() => {
     let css = ''
     if (style.font) {
       if (style.font.bold) css += 'font-weight:bold;'
+      if (style.font.italic) css += 'font-style:italic;'
       if (style.font.sz) css += `font-size:${Math.round(style.font.sz * 1.33)}px;`
       css += `color:#${style.font.color?.rgb || '000000'};`
     }
@@ -484,20 +599,58 @@ const excelPreviewHtml = computed(() => {
       }
       if (style.alignment.wrapText) css += 'white-space:pre-wrap;word-break:break-all;'
     } else {
-      css += 'vertical-align:middle;' // 默认
+      css += 'vertical-align:middle;'
     }
     if (style.border) {
       for (const edge of ['top', 'bottom', 'left', 'right']) {
         if (style.border[edge]) {
           const bs = style.border[edge].style
           const bc = style.border[edge].color?.rgb || '000000'
-          const cssStyle = bs === 'dashed' ? 'dashed' : 'solid'
-          const cssWidth = bs === 'medium' ? '2px' : '1px'
-          css += `border-${edge}:${cssWidth} ${cssStyle} #${bc};`
+          
+          let cssStyle = 'solid'
+          if (bs === 'dashed') cssStyle = 'dashed'
+          else if (bs === 'dotted') cssStyle = 'dotted'
+          else if (bs === 'double') cssStyle = 'double'
+          
+          let cssWidth = '1px'
+          if (bs === 'medium') cssWidth = '2px'
+          else if (bs === 'thick') cssWidth = '3px'
+          else if (bs === 'double') cssWidth = '3px'
+          
+          css += `border-${edge}:${cssWidth} ${cssStyle} #${bc} !important;`
         }
       }
     }
+    if (style.fill && style.fill.fgColor && style.fill.fgColor.rgb) {
+      css += `background-color:#${style.fill.fgColor.rgb} !important;`
+    }
     return css
+  }
+
+  // 辅助：渲染富文本
+  const renderRichText = (richParts, baseStyle = {}) => {
+    if (!richParts || !Array.isArray(richParts)) return ''
+    
+    let html = ''
+    richParts.forEach(part => {
+      let partStyle = ''
+      const font = part.s?.font || {}
+      
+      if (font.bold) partStyle += 'font-weight:bold;'
+      if (font.italic) partStyle += 'font-style:italic;'
+      if (font.sz) partStyle += `font-size:${Math.round(font.sz * 1.33)}px;`
+      if (font.color?.rgb) partStyle += `color:#${font.color.rgb};`
+      
+      const text = String(part.t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')
+      
+      if (partStyle) {
+        html += `<span style="${partStyle}">${text}</span>`
+      } else {
+        html += text
+      }
+    })
+    
+    return html
   }
 
   // 辅助：坐标转换
@@ -569,16 +722,22 @@ const excelPreviewHtml = computed(() => {
       const merge = mergeMap.get(`${r},${c}`)
       
       let tdAttr = `style="`
-      // Excel 单元格基础重置样式（默认添加网格线占位）
-      tdAttr += `padding:0 4px;box-sizing:border-box;background:#fff;overflow:hidden;border:1px solid #d4d4d4;`
+      // Excel 单元格基础重置样式
+      tdAttr += `padding:0 4px;box-sizing:border-box;background:#fff;overflow:hidden;`
+      if (!exportSettings.value.excelShowBorders) {
+        tdAttr += `border:1px solid #e0e0e0;`
+      }
       let v = ''
       
       if (cell) {
         if (cell.s) tdAttr += getCssFromStyle(cell.s)
         
-        // 提取值并转义
-        v = cell.v !== undefined && cell.v !== null ? String(cell.v) : ''
-        v = v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')
+        if (cell.t === 'r' && cell.r) {
+          v = renderRichText(cell.r, cell.s)
+        } else {
+          v = cell.v !== undefined && cell.v !== null ? String(cell.v) : ''
+          v = v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')
+        }
       }
       
       tdAttr += `"`
@@ -677,7 +836,6 @@ const handleDownload = async () => {
 
 // ── 下载 Excel ──
 const handleExcelDownload = async () => {
-  // ... existing options format ...
   isExcelDownloading.value = true
   try {
     const es = exportSettings.value
@@ -696,6 +854,12 @@ const handleExcelDownload = async () => {
         showGroupGap:     es.excelShowGroupGap,
         colorMode:        es.excelColorMode,
         borderColor:      es.excelBorderColor,
+        showBorders:      es.excelShowBorders,
+        borderStyle:      es.excelBorderStyle,
+        innerBorderStyle: es.excelInnerBorderStyle,
+        innerBorderColor: es.excelInnerBorderColor,
+        outerBorderStyle: es.excelOuterBorderStyle,
+        outerBorderColor: es.excelOuterBorderColor,
         cellFormat:       es.excelCellFormat,
         rowNumberScheme:   es.excelRowNumberScheme,
         groupNumberScheme: es.excelGroupNumberScheme,
@@ -706,7 +870,23 @@ const handleExcelDownload = async () => {
         seatRowHeight:    es.excelSeatRowHeight,
         showTagTable:     es.excelShowTagTable,
         tagTableNewSheet: es.excelTagTableNewSheet,
-        title:            es.title || '班级座位表'
+        title:            es.title || '班级座位表',
+        titleFontBold:    es.excelTitleFontBold,
+        titleFontSize:    es.excelTitleFontSize,
+        titleFontColor:   es.excelTitleFontColor,
+        headerFontBold:   es.excelHeaderFontBold,
+        headerFontSize:   es.excelHeaderFontSize,
+        headerFontColor:  es.excelHeaderFontColor,
+        seatFontBold:     es.excelSeatCellFontBold,
+        seatFontColor:    es.excelSeatCellFontColor,
+        titleFillColor:    es.excelTitleFillColor,
+        headerFillColor:   es.excelHeaderFillColor,
+        rowNumFillColor:   es.excelRowNumFillColor,
+        podiumFillColor:   es.excelPodiumFillColor,
+        seatFillColor:     es.excelSeatFillColor,
+        emptyFillColor:    es.excelEmptyFillColor,
+        vacantFillColor:   es.excelVacantFillColor,
+        tagHeaderFillColor: es.excelTagHeaderFillColor
       }
     )
   } catch (e) {
@@ -774,6 +954,12 @@ const handleCloudExportExcel = async () => {
         showGroupGap:     es.excelShowGroupGap,
         colorMode:        es.excelColorMode,
         borderColor:      es.excelBorderColor,
+        showBorders:      es.excelShowBorders,
+        borderStyle:      es.excelBorderStyle,
+        innerBorderStyle: es.excelInnerBorderStyle,
+        innerBorderColor: es.excelInnerBorderColor,
+        outerBorderStyle: es.excelOuterBorderStyle,
+        outerBorderColor: es.excelOuterBorderColor,
         cellFormat:       es.excelCellFormat,
         rowNumberScheme:   es.excelRowNumberScheme,
         groupNumberScheme: es.excelGroupNumberScheme,
@@ -784,7 +970,23 @@ const handleCloudExportExcel = async () => {
         seatRowHeight:    es.excelSeatRowHeight,
         showTagTable:     es.excelShowTagTable,
         tagTableNewSheet: es.excelTagTableNewSheet,
-        title:            es.title || '班级座位表'
+        title:            es.title || '班级座位表',
+        titleFontBold:    es.excelTitleFontBold,
+        titleFontSize:    es.excelTitleFontSize,
+        titleFontColor:   es.excelTitleFontColor,
+        headerFontBold:   es.excelHeaderFontBold,
+        headerFontSize:   es.excelHeaderFontSize,
+        headerFontColor:  es.excelHeaderFontColor,
+        seatFontBold:     es.excelSeatCellFontBold,
+        seatFontColor:    es.excelSeatCellFontColor,
+        titleFillColor:    es.excelTitleFillColor,
+        headerFillColor:   es.excelHeaderFillColor,
+        rowNumFillColor:   es.excelRowNumFillColor,
+        podiumFillColor:   es.excelPodiumFillColor,
+        seatFillColor:     es.excelSeatFillColor,
+        emptyFillColor:    es.excelEmptyFillColor,
+        vacantFillColor:   es.excelVacantFillColor,
+        tagHeaderFillColor: es.excelTagHeaderFillColor
       }
     )
     const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
@@ -980,8 +1182,8 @@ onBeforeUnmount(() => {
 .settings-section { padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; }
 .settings-section:last-child { border-bottom: none; }
 .settings-section h4 {
-  margin: 0 0 8px 0; font-size: 12px; font-weight: 700;
-  color: #23587b; text-transform: uppercase; letter-spacing: 0.5px;
+  margin: 0 0 8px 0; font-size: 12px; font-weight: 600;
+  color: #555;
 }
 
 .setting-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
@@ -1000,12 +1202,13 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 .setting-row input[type="color"] {
-  width: 100%;
-  height: 34px;
+  width: 60px;
+  height: 30px;
   padding: 2px;
   border: 1px solid #ddd;
   border-radius: 6px;
   background: #fff;
+  cursor: pointer;
 }
 .setting-row input[type="text"]:focus { outline: none; border-color: #23587b; }
 .setting-row textarea:focus,
@@ -1051,6 +1254,116 @@ onBeforeUnmount(() => {
   padding: 4px 8px; background: #f5f8fb; border-radius: 5px; border: 1px solid #e8eef2;
 }
 .tag-count { margin-left: auto; color: #23587b; font-weight: 600; font-size: 11px; }
+
+/* 字体样式子区域 */
+.subsection-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  margin: 0 0 8px 0;
+}
+
+/* 字体样式区域 */
+.font-style-section,
+.placeholder-style-section {
+  background: #f5f8fb;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.font-style-section:last-child,
+.placeholder-style-section:last-child {
+  margin-bottom: 0;
+}
+
+.font-style-row,
+.placeholder-style-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.placeholder-style-grid,
+.color-input {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.color-input {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.color-input input[type="color"] {
+  width: 100%;
+  height: 26px;
+  padding: 2px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: #fff;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.color-input label {
+  font-size: 11px;
+  color: #888;
+}
+
+.fill-color-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.fill-color-swatch {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  background-image: repeating-linear-gradient(45deg, #ccc 0, #ccc 1px, #f8f8f8 1px, #f8f8f8 5px);
+  background-size: 6px 6px;
+  box-sizing: border-box;
+}
+.fill-color-swatch.has-value {
+  background-image: none;
+}
+.fill-color-swatch input[type="color"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  cursor: pointer;
+}
+.fill-color-hex {
+  width: 56px;
+  height: 22px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+  color: #555;
+  background: #fff;
+  box-sizing: border-box;
+  font-family: Consolas, Monaco, monospace;
+}
+.fill-color-hex::placeholder {
+  color: #bbb;
+}
+
+.sub-fill-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
 
 /* ── 预览面板 ── */
 .preview-panel {

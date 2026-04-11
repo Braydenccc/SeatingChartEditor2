@@ -106,7 +106,7 @@ export const RULE_TYPE_DESCRIPTIONS = {
   MUST_BE_SAME_GROUP: '对象集合内任意两者必须同一大组',
   MUST_NOT_BE_SAME_GROUP: '对象集合内任意两者必须不同大组',
   MUST_BE_ADJACENT_ROW: '对象集合内任意两者在同大组内行数差为 1',
-  DISTRIBUTE_EVENLY: '同标签学生尽量分散到不同大组/排',
+  DISTRIBUTE_EVENLY: '同标签学生两两之间保持足够距离（直线距离最大化）',
   CLUSTER_TOGETHER: '同标签学生尽量聚集在同一区域'
 }
 
@@ -219,18 +219,7 @@ export const PREDICATE_META = {
   DISTRIBUTE_EVENLY: {
     relation: 'single',
     minSubjects: 1,
-    params: [
-      {
-        key: 'scope',
-        label: '分散维度',
-        type: 'select',
-        options: [
-          { value: 'group', label: '分散到不同大组' },
-          { value: 'row', label: '分散到不同排' }
-        ],
-        default: 'group'
-      }
-    ]
+    params: []
   },
   CLUSTER_TOGETHER: {
     relation: 'single',
@@ -264,6 +253,22 @@ export const SCOPE_LABELS = {
   row: '排',
   zone: '区域'
 }
+
+// ==================== 逻辑操作符（多规则组合） ====================
+
+export const LogicOperator = {
+  AND: 'AND',
+  OR: 'OR'
+}
+
+export const LOGIC_OPERATOR_LABELS = {
+  AND: '与（全部满足）',
+  OR: '或（满足任一）'
+}
+
+// ==================== 取反修饰符 ====================
+
+export const NOT_LABEL = '非（取反）'
 
 /**
  * 获取指定谓词适用的主体模式列表（兼容旧调用，内部已切到 relation 语义）

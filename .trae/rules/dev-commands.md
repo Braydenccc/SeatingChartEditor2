@@ -20,3 +20,5 @@ npm run preview  # 预览构建结果
 - 禁止表情：代码/注释/UI 严禁 Emoji
 - 布局限制：App.vue 严格高度限制，勿随意修改
 - 禁止 Base64：项目中任何地方不用 Base64，本地图片用 URL.createObjectURL()
+- 不自动 build：开发完成后不自动运行 npm run build 测试
+- 不自动启动 dev：开发完成后不自动运行 npm run dev 打开开发服务器

@@ -125,21 +125,39 @@
         <transition name="expand">
           <div v-if="expandedId === rule.id" class="rule-detail">
             <div class="rule-detail-grid">
+              <div v-if="rule.description" class="detail-item full-width">
+                <span class="detail-key">使用指南</span>
+                <span class="detail-val guide-text">{{ rule.description }}</span>
+              </div>
               <div class="detail-item full-width">
-                <span class="detail-key">对象集合</span>
+                <span class="detail-key">适用对象</span>
                 <span class="detail-val">{{ formatSubjects(rule.subjects || []) }}</span>
               </div>
-              <div class="detail-item">
-                <span class="detail-key">谓词</span>
+              <!-- NOT 取反标记 -->
+              <div v-if="rule.not" class="detail-item">
+                <span class="detail-key">取反</span>
+                <span class="detail-val not-badge">是（结果取反）</span>
+              </div>
+              <!-- 逻辑操作符（多规则时显示） -->
+              <div v-if="rule.subRules && rule.subRules.length > 1" class="detail-item full-width">
+                <span class="detail-key">组合方式</span>
+                <span class="detail-val logic-op-badge">{{ rule.logicOperator === 'OR' ? '或（OR）- 满足任一即可' : '与（AND）- 全部需满足' }}</span>
+              </div>
+              <!-- 子规则列表（多规则时显示） -->
+              <template v-if="rule.subRules && rule.subRules.length > 1">
+                <div v-for="(sr, idx) in rule.subRules" :key="`sr-${idx}`" class="detail-item full-width sub-rule-detail">
+                  <span class="detail-key">条件 #{{ idx + 1 }}{{ sr.not ? ' [非]' : '' }}</span>
+                  <span class="detail-val">{{ RULE_TYPE_LABELS[sr.predicate] || sr.predicate }} · {{ formatSubjects(sr.subjects || []) }}</span>
+                </div>
+              </template>
+              <!-- 单条规则的类型 -->
+              <div v-if="!rule.subRules || rule.subRules.length <= 1" class="detail-item">
+                <span class="detail-key">规则类型</span>
                 <span class="detail-val">{{ RULE_TYPE_LABELS[rule.predicate] }}</span>
               </div>
               <div class="detail-item">
                 <span class="detail-key">优先级</span>
                 <span class="detail-val priority-chip" :class="rule.priority">{{ PRIORITY_LABELS[rule.priority] }}</span>
-              </div>
-              <div v-if="rule.description" class="detail-item full-width">
-                <span class="detail-key">备注</span>
-                <span class="detail-val">{{ rule.description }}</span>
               </div>
               <div v-for="(val, key) in rule.params" :key="key" class="detail-item">
                 <span class="detail-key">{{ getParamLabel(rule.predicate, key) }}</span>
@@ -172,6 +190,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { Search, X, FileOutput, FileInput, Trash2, AlertTriangle, ClipboardList, ChevronDown } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
+import { useLogger } from '@/composables/useLogger'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
@@ -198,6 +217,7 @@ const { rules, renderRuleText, toggleRule, updateRule, deleteRule, clearAllRules
 const { students } = useStudentData()
 const { tags } = useTagData()
 const { requestConfirm, isConfirming } = useConfirmAction()
+const { info, success } = useLogger()
 
 const searchQuery = ref('')
 const filterPriority = ref('all')
@@ -277,15 +297,19 @@ const clearInvalidSelections = () => {
 }
 
 const handleBatchSetPriority = (priority) => {
+  const count = selectedRuleIds.value.length
   selectedRuleIds.value.forEach(ruleId => {
     updateRule(ruleId, { priority })
   })
+  success(`已将 ${count} 条规则设为${PRIORITY_LABELS[priority]}`)
 }
 
 const handleBatchToggle = (enabled) => {
+  const count = selectedRuleIds.value.length
   selectedRuleIds.value.forEach(ruleId => {
     updateRule(ruleId, { enabled })
   })
+  success(`已${enabled ? '启用' : '停用'} ${count} 条规则`)
 }
 
 const handleBatchDelete = () => {
@@ -297,16 +321,21 @@ const handleBatchDelete = () => {
   if (expandedId.value && !rules.value.find(r => r.id === expandedId.value)) {
     expandedId.value = null
   }
+  success(`已成功删除 ${count} 条规则`)
 }
 
 const getDeletingKey = (id) => `deleteRule-${id}`
 const isDeletingRule = (id) => isConfirming(getDeletingKey(id))
 
 const handleDelete = (rule) => {
+  if (!isDeletingRule(rule.id).value) {
+    info(`请再次点击以确认删除此规则`)
+  }
   requestConfirm(
     getDeletingKey(rule.id),
     () => {
       deleteRule(rule.id)
+      success(`成功删除规则`)
       if (expandedId.value === rule.id) expandedId.value = null
     },
     `确定删除此规则？`
@@ -315,9 +344,11 @@ const handleDelete = (rule) => {
 
 const handleClearAll = () => {
   if (confirm(`确定清空全部 ${rules.value.length} 条规则？此操作不可撤销。`)) {
+    const count = rules.value.length
     clearAllRules()
     expandedId.value = null
     selectedRuleIds.value = []
+    success(`已成功清空 ${count} 条规则`)
   }
 }
 
@@ -823,7 +854,40 @@ defineExpose({ focusRule })
 }
 .priority-chip.required { background: #fee2e2; color: #dc2626; }
 .priority-chip.prefer { background: #fef9c3; color: #b45309; }
-.priority-chip.optional { background: #f1f5f9; color: #475569; } /* Darkened for readability */
+.priority-chip.optional { background: #f1f5f9; color: #475569; }
+
+.guide-text {
+  color: #23587b;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.not-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.logic-op-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.sub-rule-detail {
+  background: #f8fafc;
+  border-left: 3px solid #cbd5e1;
+  border-radius: 0 6px 6px 0;
+  padding-left: 10px;
+} /* Darkened for readability */
 
 .detail-actions { display: flex; justify-content: flex-end; }
 

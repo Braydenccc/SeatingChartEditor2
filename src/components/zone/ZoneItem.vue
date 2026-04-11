@@ -116,7 +116,7 @@ const emit = defineEmits([
 ])
 
 const { requestConfirm, isConfirming } = useConfirmAction()
-const { warning } = useLogger()
+const { warning, info, success } = useLogger()
 
 const isEditingName = ref(false)
 const editedName = ref('')
@@ -220,15 +220,18 @@ const deleteKey = computed(() => `deleteZone-${props.zone.id}`)
 const isDeletingZone = isConfirming(deleteKey.value)
 
 const handleDelete = () => {
-  const confirmed = requestConfirm(
+  if (!isDeletingZone.value) {
+    info(`请再次点击删除按钮以确认删除选区"${props.zone.name}"`)
+  }
+
+  requestConfirm(
     deleteKey.value,
-    () => emit('delete-zone', props.zone.id),
+    () => {
+      emit('delete-zone', props.zone.id)
+      success(`已成功删除选区"${props.zone.name}"`)
+    },
     `确定要删除选区"${props.zone.name}"吗？`
   )
-
-  if (!confirmed) {
-    warning(`请再次点击删除按钮以确认删除选区"${props.zone.name}"`)
-  }
 }
 
 // 点击外部关闭标签选择器

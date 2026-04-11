@@ -42,7 +42,7 @@
       </div>
       
       <div class="dialog-actions">
-        <button class="btn-cancel" @click="close">关闭</button>
+        <button class="btn-cancel" @click="close" @keyup.enter="close">关闭</button>
       </div>
     </div>
     
@@ -63,8 +63,8 @@
           </div>
         </div>
         <div class="dialog-actions">
-          <button class="btn-cancel" @click="closeTagDialog">取消</button>
-          <button class="btn-confirm" @click="saveTag">确定</button>
+          <button class="btn-cancel" @click="closeTagDialog" @keyup.enter="closeTagDialog">取消</button>
+          <button class="btn-confirm" @click="saveTag" @keyup.enter="saveTag">确定</button>
         </div>
       </div>
     </div>
@@ -89,8 +89,8 @@ const props = defineProps({
 const emit = defineEmits(['update:visible'])
 
 const { tags, showTagsInSeatChart, addTag, editTag, deleteTag, setShowTagsInSeatChart } = useTagData()
-const { requestConfirm, isConfirming } = useConfirmAction()
-const { warning } = useLogger()
+const { requestConfirm, isPending } = useConfirmAction()
+const { warning, info, success } = useLogger()
 
 const localShowTagsInSeatChart = ref(true)
 const tagDialogVisible = ref(false)
@@ -167,18 +167,21 @@ const updateTag = (tag) => {
 }
 
 const getDeletingKey = (tagId) => `deleteTag-${tagId}`
-const isDeletingTag = (tagId) => isConfirming(getDeletingKey(tagId))
+const isDeletingTag = (tagId) => isPending(getDeletingKey(tagId))
 
 const deleteTagHandler = (tagId, tagName) => {
-  const confirmed = requestConfirm(
+  if (!isDeletingTag(tagId)) {
+    info(`请再次点击删除按钮以确认删除标签"${tagName}"`)
+  }
+
+  requestConfirm(
     getDeletingKey(tagId),
-    () => deleteTag(tagId),
+    () => {
+      deleteTag(tagId)
+      success(`已成功删除标签"${tagName}"`)
+    },
     `确定要删除标签"${tagName}"吗？将从所有学生中移除`
   )
-
-  if (!confirmed) {
-    warning(`请再次点击删除按钮以确认删除标签"${tagName}"`)
-  }
 }
 </script>
 

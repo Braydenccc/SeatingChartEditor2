@@ -331,7 +331,7 @@ onBeforeUnmount(() => {
   transform: scale(1.1);
 }
 
-@media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
+@media (max-width: 1366px) and (min-width: 1025px) {
   .app-header {
     padding: 0 18px;
   }
@@ -350,6 +350,29 @@ onBeforeUnmount(() => {
 
   .user-info {
     padding: 6px 12px;
+  }
+}
+
+/* 小高度屏幕优化 */
+@media (max-height: 820px) and (min-width: 1025px) {
+  .app-header {
+    padding: 0 16px;
+  }
+
+  .header-left {
+    gap: 12px;
+  }
+
+  .header-text {
+    font-size: 22px;
+  }
+
+  .header-subtitle {
+    font-size: 14px;
+  }
+
+  .user-info {
+    padding: 5px 10px;
   }
 }
 

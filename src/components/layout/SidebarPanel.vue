@@ -7,11 +7,33 @@
   <div class="sidebar-panel" :class="{ 'mobile-menu-open': mobileMenuOpen }">
     <div class="sidebar-main">
       <div class="tabs-bar">
-        <button v-for="tab in tabs" :key="tab.id" class="tab-button" :class="{ active: activeTab === tab.id }"
-          @click="setActiveTab(tab.id)">
-          <component :is="tab.icon" :size="16" stroke-width="2" />
-          <span class="tab-label">{{ tab.label }}</span>
-        </button>
+        <div class="toolbar-info">
+          <span class="info-item">{{ seatConfig.groupCount }}大组</span>
+          <span class="info-separator">·</span>
+          <span class="info-item">{{ seatConfig.columnsPerGroup }}列</span>
+          <span class="info-separator">·</span>
+          <span class="info-item">{{ seatConfig.seatsPerColumn }}座</span>
+          <span class="info-separator">·</span>
+          <span class="info-item">共{{ totalSeats }}座</span>
+          <div class="zoom-controls">
+            <button class="zoom-btn" @click.stop="zoomOut" :disabled="scale <= MIN_SCALE" title="缩小">
+              <Minus :size="14" stroke-width="2.5" />
+            </button>
+            <button class="zoom-label" @click.stop="handleFitZoom" title="自适应大小">
+              {{ Math.round(scale * 100) }}%
+            </button>
+            <button class="zoom-btn" @click.stop="zoomIn" :disabled="scale >= MAX_SCALE" title="放大">
+              <Plus :size="14" stroke-width="2.5" />
+            </button>
+          </div>
+        </div>
+        <div class="tabs-buttons">
+          <button v-for="tab in tabs" :key="tab.id" class="tab-button" :class="{ active: activeTab === tab.id }"
+            @click="setActiveTab(tab.id)">
+            <component :is="tab.icon" :size="16" stroke-width="2" />
+            <span class="tab-label">{{ tab.label }}</span>
+          </button>
+        </div>
       </div>
       <div class="options-bar">
         <!-- 文件管理 -->
@@ -443,7 +465,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed, defineAsyncComponent } from 'vue'
-import { ArrowLeftRight, Check, CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, LayoutGrid, ListFilter, Loader2, Play, RefreshCcw, Save, Scale, Settings2, Shuffle, Sliders, Tag, Trash2, FileInput, FileOutput, Users, X } from 'lucide-vue-next'
+import { ArrowLeftRight, Check, CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, LayoutGrid, ListFilter, Loader2, Minus, Plus, Play, RefreshCcw, Save, Scale, Settings2, Shuffle, Sliders, Tag, Trash2, FileInput, FileOutput, Users, X } from 'lucide-vue-next'
 
 const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
 const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
@@ -466,9 +488,11 @@ import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useZoneData } from '@/composables/useZoneData'
 import { useZoneRotation } from '@/composables/useZoneRotation'
+import { useZoom } from '@/composables/useZoom'
 import ZoneList from '../zone/ZoneList.vue'
-import AssignmentInlineReport from '../rule/AssignmentInlineReport.vue'
+const AssignmentInlineReport = defineAsyncComponent(() => import('../rule/AssignmentInlineReport.vue'))
 import { useAuth } from '@/composables/useAuth'
+import { useUndo } from '@/composables/useUndo'
 
 const { activeTab, mobileMenuOpen, setActiveTab, closeMobileMenu } = useSidebar()
 const { seatConfig, updateConfig, clearAllSeats, seats, shiftSeats, getAvailableSeats } = useSeatChart()
@@ -484,6 +508,10 @@ const { logs, success, warning, error, clearLogs } = useLogger()
 const { requestConfirm, isConfirming } = useConfirmAction()
 const { rules, ruleCount, getActiveRules, getRulesForStudent, detectConflicts, renderRuleText } = useSeatRules()
 const { isLoggedIn, isLoginDialogVisible } = useAuth()
+const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom()
+const { recordBatch, createSnapshot } = useUndo()
+const totalSeats = computed(() => seatConfig.value.groupCount * seatConfig.value.columnsPerGroup * seatConfig.value.seatsPerColumn)
+const handleFitZoom = () => fitToViewport()
 
 // ==================== 选区轮换 ====================
 const {
@@ -545,8 +573,13 @@ const handleApplyZoneRotation = () => {
     warning('请先创建轮换组')
     return
   }
+  const beforeSnapshot = createSnapshot()
   const seatMapArg = new Map(seats.value.map(s => [s.id, s]))
   const { moved, errors } = applyZoneRotation(seatMapArg)
+  const afterSnapshot = createSnapshot()
+  if (moved > 0) {
+    recordBatch(beforeSnapshot, afterSnapshot)
+  }
   errors.forEach(e => warning(e))
   if (moved > 0) {
     success(`选区轮换完成，已移动 ${moved} 个座位的学生`)
@@ -770,7 +803,10 @@ const applySeatShift = () => {
     warning('行偏移和列偏移不能同时为 0')
     return
   }
+  const beforeSnapshot = createSnapshot()
   shiftSeats(shiftDistance, shiftDirection, shiftColShift)
+  const afterSnapshot = createSnapshot()
+  recordBatch(beforeSnapshot, afterSnapshot)
   const parts = []
   if (shiftDistance !== 0) parts.push(`向${shiftDistance > 0 ? '后' : '前'} ${Math.abs(shiftDistance)} 行`)
   if (shiftColShift !== 0) parts.push(`向${shiftColShift > 0 ? '右' : '左'} ${Math.abs(shiftColShift)} 列`)
@@ -942,6 +978,7 @@ const handleRunAssignment = async () => {
 
   lastAssignmentReport.value = null
   const startTime = Date.now()
+  const beforeSnapshot = createSnapshot()
 
   try {
     const result = await runSmartAssignment({
@@ -950,8 +987,9 @@ const handleRunAssignment = async () => {
     })
 
     if (result.success) {
+      const afterSnapshot = createSnapshot()
+      recordBatch(beforeSnapshot, afterSnapshot)
       if (result.message) success(result.message)
-      // 存储审计报告
       lastAssignmentReport.value = result.report ?? null
       lastAssignmentDuration.value = result.duration ?? (Date.now() - startTime)
     } else {
@@ -1208,28 +1246,10 @@ const formatLogTime = (timestamp) => {
   }
 }
 
-/* 响应式设计 - 平板 */
-@media (max-width: 1024px) {
-  .sidebar-panel {
-    width: 100%;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
-  }
-}
-
 .sidebar-main {
   flex: 1;
   display: flex;
   overflow: hidden;
-}
-
-/* 响应式设计 - 平板和移动设备 */
-@media (max-width: 1024px) {
-  .sidebar-main {
-    flex-direction: column;
-    flex: 1;
-    min-height: 300px;
-    overflow-y: auto;
-  }
 }
 
 .tabs-bar {
@@ -1243,15 +1263,12 @@ const formatLogTime = (timestamp) => {
   border-right: 1px solid #d0d7dc;
 }
 
-/* 响应式设计 - 平板和移动设备 */
-@media (max-width: 1024px) {
-  .tabs-bar {
-    width: 100%;
-    height: auto;
-    flex-direction: row;
-    border-right: none;
-    border-bottom: 1px solid #d0d7dc;
-  }
+.toolbar-info {
+  display: none;
+}
+
+.tabs-buttons {
+  display: contents;
 }
 
 .tab-button {
@@ -1869,8 +1886,8 @@ const formatLogTime = (timestamp) => {
   font-size: 13px;
 }
 
-/* 低分辨率桌面优化 */
-@media (max-width: 1366px) and (min-width: 1025px), (max-height: 820px) and (min-width: 1025px) {
+/* 低分辨率桌面优化（仅基于宽度） */
+@media (max-width: 1366px) and (min-width: 1025px) {
   .tabs-bar {
     width: 18%;
   }
@@ -1925,6 +1942,62 @@ const formatLogTime = (timestamp) => {
   }
 }
 
+/* 小高度屏幕优化 */
+@media (max-height: 820px) and (min-width: 1025px) {
+  .tabs-bar {
+    width: 19%;
+  }
+
+  .tab-button {
+    font-size: 12px;
+    gap: 3px;
+  }
+
+  .tab-label {
+    font-size: 12px;
+  }
+
+  .options-bar {
+    width: 81%;
+  }
+
+  .option-content {
+    padding: 12px;
+  }
+
+  .tab-header h3 {
+    font-size: 15px;
+  }
+
+  .options-group {
+    gap: 7px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+
+  .option-button {
+    padding: 8px 11px;
+    font-size: 12px;
+  }
+
+  .input-group label {
+    font-size: 11px;
+  }
+
+  .input-group input[type="number"],
+  .input-group input[type="text"],
+  .checkbox-label {
+    padding: 7px 9px;
+    font-size: 12px;
+  }
+
+  .log-area {
+    height: 140px;
+    min-height: 140px;
+    max-height: 140px;
+  }
+}
+
 /* ==================== tab-icon (desktop 隐藏) ==================== */
 .tab-icon {
   display: none;
@@ -1953,8 +2026,8 @@ const formatLogTime = (timestamp) => {
   display: none;
 }
 
-/* ==================== 移动端布局 ==================== */
-@media (max-width: 768px) {
+/* ==================== 平板和移动端布局（统一固定底部Tab栏） ==================== */
+@media (max-width: 1024px) {
   /* 遮罩层 */
   .mobile-overlay {
     display: block;
@@ -1986,50 +2059,64 @@ const formatLogTime = (timestamp) => {
     width: 100%;
     z-index: 999;
     flex-direction: column-reverse;
-    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.12);
-    background: #fff;
+    background: transparent;
+    pointer-events: none; /* 让点击穿透空白区域 */
+    box-shadow: none;
     height: auto;
-    max-height: 56px;
-    overflow: hidden;
-    transition: max-height 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
-    will-change: max-height;
-    contain: layout style;
+    /* 去除 max-height 以及其过渡，改为子元素 transform */
   }
 
-  .sidebar-panel.mobile-menu-open {
-    max-height: 70vh;
-  }
-
-  /* sidebar-main flex 反转：tab 在下、内容在上 */
   .sidebar-main {
     display: flex;
-    flex-direction: column-reverse;
+    flex-direction: column-reverse; /* tab 在下、内容在上 */
     flex: 1;
-    overflow: hidden;
     min-height: 0;
   }
 
-  /* Tab 栏：底部固定行 */
+  /* Tab 栏：底部固定行（只显示 Tab 按钮，不显示座位信息） */
   .tabs-bar {
+    position: relative;
+    z-index: 10;
+    pointer-events: auto; /* 允许交互 */
+    background: #fff;
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.12);
     flex-direction: row;
+    align-items: center;
+    justify-content: center;
     width: 100%;
     height: 56px;
     min-height: 56px;
     border-right: none;
     border-top: 1px solid #e0e7ec;
-    background: #fff;
-    padding: 0;
+    padding: 0 6px;
     padding-bottom: env(safe-area-inset-bottom, 0);
+    gap: 4px;
+    transition: box-shadow 0.3s ease;
   }
+
+  .sidebar-panel.mobile-menu-open .tabs-bar {
+    box-shadow: 0 -1px 3px rgba(0,0,0,0.05); /* 展开时减弱底部栏阴影 */
+  }
+
+  /* 移动端隐藏座位信息和缩放控件（避免与顶部工具栏重复） */
+  .toolbar-info {
+    display: none !important;
+  }
+
+  .tabs-buttons {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0;
+    width: 100%;  }
 
   .tab-button {
     flex: 1;
     height: 56px;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
     border-bottom: none;
     border-right: none;
-    padding: 6px 4px;
+    padding: 8px 4px;
     font-size: 11px;
     color: #8a9caa;
     background: transparent;
@@ -2040,10 +2127,23 @@ const formatLogTime = (timestamp) => {
     display: none;
   }
 
-  .tab-button.active {
+  /* 仅在菜单展开时才显示为 active 状态 */
+  .sidebar-panel.mobile-menu-open .tab-button.active {
     color: var(--color-primary);
     background: rgba(35, 88, 123, 0.06);
     font-weight: 600;
+  }
+
+  /* 当菜单未展开时，强制处于 active 状态的按钮恢复未选中时的视觉效果 */
+  .sidebar-panel:not(.mobile-menu-open) .tab-button.active {
+    color: #8a9caa;
+    background: transparent;
+    font-weight: 500;
+  }
+
+  /* 去除全局桌面端可能产生的继承装饰伪元素 */
+  .sidebar-panel:not(.mobile-menu-open) .tab-button.active::before {
+    display: none;
   }
 
   .tab-button:hover {
@@ -2052,7 +2152,7 @@ const formatLogTime = (timestamp) => {
 
   .tab-icon {
     display: block;
-    font-size: 18px;
+    font-size: 20px;
     line-height: 1;
   }
 
@@ -2060,14 +2160,31 @@ const formatLogTime = (timestamp) => {
     font-size: 11px !important;
   }
 
-  /* 内容面板：在 tab 上方展开。用 overflow-y: scroll 确保滚动条常驻，避免出现时压缩内容宽度（右位移） */
+  /* 内容面板：在 tab 上方展开。通过 transform 弹入弹出 */
   .options-bar {
+    position: relative;
+    z-index: 5;
+    pointer-events: none; /* 关闭时不响应点击 */
+    background: #fff;
+    border-radius: 16px 16px 0 0;
+    max-height: calc(70vh - 56px); /* 限制最大高度 */
+    transform: translateY(100%);
+    opacity: 0;
+    transition: transform 0.45s cubic-bezier(0.32, 0.72, 0, 1.05), opacity 0.35s ease;
+    will-change: transform, opacity;
+    
     width: 100%;
-    flex: 1;
     overflow-y: scroll;
     scrollbar-gutter: stable;
     -webkit-overflow-scrolling: touch;
     border-bottom: 1px solid #e0e7ec;
+  }
+
+  .sidebar-panel.mobile-menu-open .options-bar {
+    pointer-events: auto; /* 开启交互 */
+    transform: translateY(0);
+    opacity: 1;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08); /* 展开时的顶部阴影 */
   }
 
   .option-content {
@@ -2146,16 +2263,20 @@ const formatLogTime = (timestamp) => {
   }
 
   .sidebar-panel {
-    max-height: 52px;
+    /* 移除 max-height 修改 */
   }
 
   .sidebar-panel.mobile-menu-open {
-    max-height: 75vh;
+    /* 移除 max-height 修改 */
   }
 
   .tabs-bar {
     height: 52px;
     min-height: 52px;
+  }
+  
+  .options-bar {
+    max-height: calc(75vh - 52px);
   }
 }
 

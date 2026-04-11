@@ -5,6 +5,7 @@ import AppHeader from './components/layout/AppHeader.vue'
 import EditorPanel from './components/layout/EditorPanel.vue'
 import SidebarPanel from './components/layout/SidebarPanel.vue'
 import LoadingSpinner from './components/ui/LoadingSpinner.vue'
+import GlobalDropZone from './components/ui/GlobalDropZone.vue'
 import { ref, onMounted, defineAsyncComponent, watch } from 'vue'
 
 const LoginDialog = defineAsyncComponent({
@@ -16,11 +17,13 @@ import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
 import { useWorkspace } from '@/composables/useWorkspace'
 import { useLogger } from '@/composables/useLogger'
+import { useUndo } from '@/composables/useUndo'
 
 const { isLoginDialogVisible, initAuth, isLoggedIn } = useAuth()
 const { loadWorkspaceFromCloud } = useCloudWorkspace()
 const { applyWorkspaceData, getLastWorkspace } = useWorkspace()
 const { success, warning } = useLogger()
+const { undo, redo, canUndo, canRedo } = useUndo()
 
 const loginDialogInitialTab = ref('login')
 const handleOpenLogin = (tab = 'login') => {
@@ -33,7 +36,28 @@ initAuth()
 
 onMounted(async () => {
   const lastWs = getLastWorkspace()
-  
+
+  // 全局键盘快捷键：撤销 (Ctrl+Z) / 重做 (Ctrl+Y)
+  const handleKeyDown = (e) => {
+    const isCtrl = e.ctrlKey || e.metaKey
+
+    if (isCtrl && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault()
+      if (canUndo()) {
+        undo()
+      }
+    }
+
+    if (isCtrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      e.preventDefault()
+      if (canRedo()) {
+        redo()
+      }
+    }
+  }
+
+  document.addEventListener('keydown', handleKeyDown)
+
   if (lastWs && lastWs.type === 'cloud' && lastWs.fileId) {
     // 使用 watch 代替 setTimeout(500)，一旦登录成功且还没恢复过，立即执行
     const unwatch = watch(() => isLoggedIn.value, async (loggedIn) => {
@@ -78,7 +102,9 @@ onMounted(async () => {
       import('./components/relation/SeatRuleEditor.vue')
       import('./components/layout/ExportPreview.vue')
       import('./components/workspace/CloudWorkspaceDialog.vue')
-      // 预乘重型库（xlsx）
+      import('./components/student/StudentRosterDialog.vue')
+      import('./components/student/TagSettingsDialog.vue')
+      // 预下载重型库（xlsx）
       import('xlsx-js-style')
     })
   }
@@ -93,7 +119,9 @@ onMounted(async () => {
     <EditorPanel />
     <SidebarPanel />
   </main>
-  
+
+  <GlobalDropZone />
+
   <LoginDialog v-model:visible="isLoginDialogVisible" :initial-tab="loginDialogInitialTab" />
 </template>
 
@@ -110,13 +138,15 @@ onMounted(async () => {
   background: #f5f5f5;
 }
 
-/* 响应式布局 - 平板 */
+/* 响应式布局 - 平板和移动设备 */
 @media (max-width: 1024px) {
   .main-content {
     flex-direction: column;
     min-height: calc(100vh - 90px);
     max-height: none;
     overflow-y: auto;
+    /* 底部 tab 栏高度由 SidebarPanel 通过 fixed 定位提供 */
+    padding-bottom: 56px;
   }
 }
 

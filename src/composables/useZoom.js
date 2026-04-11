@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 
 const MIN_SCALE = 0.2
 const MAX_SCALE = 3.0
@@ -7,6 +7,9 @@ const STEP = 0.1
 const scale = ref(1.0)
 const panX = ref(0)
 const panY = ref(0)
+
+let viewportEl = null
+let chartEl = null
 
 export function useZoom() {
     const zoomIn = () => {
@@ -32,6 +35,43 @@ export function useZoom() {
         panY.value = y
     }
 
+    const registerViewport = (vp, chart) => {
+        viewportEl = vp
+        chartEl = chart
+    }
+
+    const fitToViewport = () => {
+        if (!viewportEl || !chartEl) return
+
+        const prevTransform = chartEl.style.transform
+        chartEl.style.transform = 'none'
+
+        nextTick(() => {
+            if (!viewportEl || !chartEl) return
+
+            const vpRect = viewportEl.getBoundingClientRect()
+            const chartRect = chartEl.getBoundingClientRect()
+
+            chartEl.style.transform = prevTransform
+
+            if (chartRect.width === 0 || chartRect.height === 0) return
+
+            const padH = 40
+            const padV = 30
+            const availW = vpRect.width - padH
+            const availH = vpRect.height - padV
+
+            const fitScale = Math.min(
+                availW / chartRect.width,
+                availH / chartRect.height,
+                1.0
+            )
+
+            setScale(Math.max(MIN_SCALE, fitScale))
+            setPan(0, 0)
+        })
+    }
+
     return {
         scale,
         panX,
@@ -42,6 +82,8 @@ export function useZoom() {
         setScale,
         setPan,
         MIN_SCALE,
-        MAX_SCALE
+        MAX_SCALE,
+        registerViewport,
+        fitToViewport,
     }
 }

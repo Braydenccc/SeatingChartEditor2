@@ -35,6 +35,8 @@ const exportSettings = ref({
   excelReverseOrder: false,      // 翻转行序（讲台置顶）
   excelShowGroupGap: true,       // 保留组间空列
   excelColorMode: 'color',       // 'color' | 'bw'
+  excelShowBorders: true,        // 显示边框
+  excelBorderStyle: 'thin',      // 边框样式: 'thin' | 'medium' | 'thick' | 'dashed' | 'dotted'
   excelBorderColor: '#000000',   // Excel 边框颜色
   excelCellFormat: '%n\n%i',     // 单元格内容模板：%n姓名 %i学号 %r行号 %g组号 %s序号 %j序号 %%百分号
   excelRowNumberScheme: 'arabic',    // 行号编号方案
@@ -46,6 +48,34 @@ const exportSettings = ref({
   excelSeatRowHeight: 40,        // 座位行高 (hpt)
   excelShowTagTable: false,      // 导出标签统计表
   excelTagTableNewSheet: false,  // 标签表放在独立工作表
+  // 新增：内边框和外边框独立样式
+  excelInnerBorderStyle: 'thin',  // 内边框样式
+  excelInnerBorderColor: '#000000', // 内边框颜色
+  excelOuterBorderStyle: 'medium',  // 外边框样式
+  excelOuterBorderColor: '#000000', // 外边框颜色
+  // 新增：标题字体样式
+  excelTitleFontBold: true,      // 标题粗体
+  excelTitleFontItalic: false,   // 标题斜体
+  excelTitleFontColor: '#000000', // 标题颜色
+  excelTitleFontSize: 16,        // 标题字号 (pt)
+  // 新增：表头字体样式
+  excelHeaderFontBold: true,      // 表头粗体
+  excelHeaderFontItalic: false,   // 表头斜体
+  excelHeaderFontColor: '#000000', // 表头颜色
+  excelHeaderFontSize: 11,        // 表头字号 (pt)
+  // 新增：座位单元格字体样式
+  excelSeatCellFontBold: false,    // 座位单元格粗体
+  excelSeatCellFontItalic: false,   // 座位单元格斜体
+  excelSeatCellFontColor: '#000000', // 座位单元格颜色
+  // 新增：各模块背景颜色（默认无填充）
+  excelTitleFillColor: '',
+  excelHeaderFillColor: '',
+  excelRowNumFillColor: '',
+  excelPodiumFillColor: '',
+  excelSeatFillColor: '',
+  excelEmptyFillColor: '',
+  excelVacantFillColor: '',
+  excelTagHeaderFillColor: '',
   tagSettings: {}, // 格式: { tagId: { enabled: true, displayText: '文本' } }
   webdavExportDir: '' // 云端导出的自定义路径, 为空表示跟目录或系统默认
 })
