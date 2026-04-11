@@ -131,11 +131,49 @@
                   <label class="radio-item"><input type="radio" value="color" v-model="exportSettings.excelColorMode" /><span>彩色</span></label>
                   <label class="radio-item"><input type="radio" value="bw" v-model="exportSettings.excelColorMode" /><span>单色</span></label>
                 </div>
+                <div class="setting-row" style="margin-top:6px">
+                  <label>边框颜色:</label>
+                  <input v-model="exportSettings.excelBorderColor" type="color" />
+                </div>
                 <div class="spacing-grid" style="margin-top:8px">
                   <div class="num-input"><label>姓名字号(pt)</label><input type="number" v-model.number="exportSettings.excelNameFontSize" min="8" max="24" /></div>
                   <div class="num-input"><label>学号字号(pt)</label><input type="number" v-model.number="exportSettings.excelIdFontSize" min="6" max="18" /></div>
                   <div class="num-input"><label>列宽(字符)</label><input type="number" v-model.number="exportSettings.excelCellWidth" min="6" max="30" /></div>
                   <div class="num-input"><label>行高(点)</label><input type="number" v-model.number="exportSettings.excelSeatRowHeight" min="20" max="100" /></div>
+                </div>
+              </div>
+
+              <div class="settings-section">
+                <h4>格式化</h4>
+                <div class="setting-row">
+                  <label>单元格内容模板:</label>
+                  <textarea
+                    v-model="exportSettings.excelCellFormat"
+                    rows="3"
+                    class="format-textarea"
+                    placeholder="%n&#10;%i"
+                  ></textarea>
+                  <div class="format-hint">支持占位符：%n 姓名，%i 学号，%r 行号，%g 组号，%s/%j 序号，%% 百分号</div>
+                </div>
+                <div class="spacing-grid">
+                  <div class="num-input">
+                    <label>行号方案</label>
+                    <select v-model="exportSettings.excelRowNumberScheme">
+                      <option v-for="item in numberSchemeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
+                  </div>
+                  <div class="num-input">
+                    <label>组号方案</label>
+                    <select v-model="exportSettings.excelGroupNumberScheme">
+                      <option v-for="item in numberSchemeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
+                  </div>
+                  <div class="num-input">
+                    <label>序号方案</label>
+                    <select v-model="exportSettings.excelSerialNumberScheme">
+                      <option v-for="item in numberSchemeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -281,6 +319,14 @@ const updateExcelScale = () => {
 
 const excelActiveSheetIndex = ref(0)
 const excelSheetNames = ref([])
+const numberSchemeOptions = [
+  { value: 'arabic', label: '12' },
+  { value: 'alpha', label: 'AB' },
+  { value: 'chineseUpper', label: '壹贰' },
+  { value: 'chineseLower', label: '一二' },
+  { value: 'roman', label: 'I II' },
+  { value: 'circled', label: '①②' }
+]
 
 // overlay 点击关闭保护（防止从弹窗内拖出后关闭）
 const overlayMouseDownSelf = ref(false)
@@ -319,6 +365,11 @@ const updateExcelWorkbook = async () => {
         reverseOrder:     es.excelReverseOrder,
         showGroupGap:     es.excelShowGroupGap,
         colorMode:        es.excelColorMode,
+        borderColor:      es.excelBorderColor,
+        cellFormat:       es.excelCellFormat,
+        rowNumberScheme:  es.excelRowNumberScheme,
+        groupNumberScheme: es.excelGroupNumberScheme,
+        serialNumberScheme: es.excelSerialNumberScheme,
         nameFontSize:     es.excelNameFontSize,
         idFontSize:       es.excelIdFontSize,
         cellWidth:        es.excelCellWidth,
@@ -349,6 +400,11 @@ watch(
     exportSettings.value.excelReverseOrder,
     exportSettings.value.excelShowGroupGap,
     exportSettings.value.excelColorMode,
+    exportSettings.value.excelBorderColor,
+    exportSettings.value.excelCellFormat,
+    exportSettings.value.excelRowNumberScheme,
+    exportSettings.value.excelGroupNumberScheme,
+    exportSettings.value.excelSerialNumberScheme,
     exportSettings.value.excelNameFontSize,
     exportSettings.value.excelIdFontSize,
     exportSettings.value.excelCellWidth,
@@ -624,6 +680,11 @@ const handleExcelDownload = async () => {
         reverseOrder:     es.excelReverseOrder,
         showGroupGap:     es.excelShowGroupGap,
         colorMode:        es.excelColorMode,
+        borderColor:      es.excelBorderColor,
+        cellFormat:       es.excelCellFormat,
+        rowNumberScheme:  es.excelRowNumberScheme,
+        groupNumberScheme: es.excelGroupNumberScheme,
+        serialNumberScheme: es.excelSerialNumberScheme,
         nameFontSize:     es.excelNameFontSize,
         idFontSize:       es.excelIdFontSize,
         cellWidth:        es.excelCellWidth,
@@ -697,6 +758,11 @@ const handleCloudExportExcel = async () => {
         reverseOrder:     es.excelReverseOrder,
         showGroupGap:     es.excelShowGroupGap,
         colorMode:        es.excelColorMode,
+        borderColor:      es.excelBorderColor,
+        cellFormat:       es.excelCellFormat,
+        rowNumberScheme:  es.excelRowNumberScheme,
+        groupNumberScheme: es.excelGroupNumberScheme,
+        serialNumberScheme: es.excelSerialNumberScheme,
         nameFontSize:     es.excelNameFontSize,
         idFontSize:       es.excelIdFontSize,
         cellWidth:        es.excelCellWidth,
@@ -908,7 +974,30 @@ onBeforeUnmount(() => {
 .setting-row input[type="text"] {
   padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; transition: border-color 0.2s;
 }
+.setting-row textarea,
+.num-input select {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+}
+.setting-row input[type="color"] {
+  width: 100%;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+}
 .setting-row input[type="text"]:focus { outline: none; border-color: #23587b; }
+.setting-row textarea:focus,
+.num-input select:focus,
+.setting-row input[type="color"]:focus { outline: none; border-color: #23587b; }
+.format-textarea { resize: vertical; min-height: 64px; }
+.format-hint { color: #888; font-size: 11px; line-height: 1.4; }
 
 .check-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; font-size: 13px; color: #444; }
 .check-item input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
