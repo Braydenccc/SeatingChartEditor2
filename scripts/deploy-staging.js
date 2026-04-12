@@ -85,7 +85,7 @@ function collectFiles(dir) {
 
 /** Extensions / patterns treated as text (uploaded in bulk JSON) */
 function isTextFile(filePath) {
-  return /\.(html?|css|[cm]?js|json|md|txt|vue|webmanifest|xml|rth)$/i.test(filePath);
+  return /\.(html?|css|[cm]?js|json|md|txt|vue|webmanifest|xml|rth|php)$/i.test(filePath);
 }
 
 /** Extensions that should never be uploaded to a web host */
