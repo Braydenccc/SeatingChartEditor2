@@ -83,10 +83,40 @@ function respond($payload, $code = 200) {
     exit($code >= 400 ? 1 : 0);
 }
 
+function getCsrfCookieCandidates() {
+    $candidates = [];
+    $csrfCookie = isset($_COOKIE['sce_csrf']) ? trim((string)$_COOKIE['sce_csrf']) : '';
+    if ($csrfCookie !== '') {
+        $candidates[] = $csrfCookie;
+    }
+    $rawCookie = isset($_SERVER['HTTP_COOKIE']) ? (string)$_SERVER['HTTP_COOKIE'] : '';
+    if ($rawCookie !== '') {
+        foreach (explode(';', $rawCookie) as $part) {
+            $segment = trim($part);
+            if (stripos($segment, 'sce_csrf=') === 0) {
+                $value = trim(substr($segment, strlen('sce_csrf=')));
+                $decoded = urldecode($value);
+                if ($decoded !== '') {
+                    $candidates[] = $decoded;
+                }
+            }
+        }
+    }
+    return array_values(array_unique($candidates));
+}
+
 function ensureCsrfMatched() {
     $csrfHeader = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? trim($_SERVER['HTTP_X_CSRF_TOKEN']) : '';
-    $csrfCookie = isset($_COOKIE['sce_csrf']) ? trim($_COOKIE['sce_csrf']) : '';
-    return $csrfHeader !== '' && $csrfCookie !== '' && hash_equals($csrfCookie, $csrfHeader);
+    if ($csrfHeader === '') {
+        return false;
+    }
+    $candidates = getCsrfCookieCandidates();
+    foreach ($candidates as $candidate) {
+        if ($candidate !== '' && hash_equals($candidate, $csrfHeader)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function isValidUsername($username) {
