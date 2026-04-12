@@ -62,7 +62,7 @@
                 placeholder="请输入字母或数字" 
                 required 
                 maxlength="32"
-                pattern="[A-Za-z0-9_-]{1,32}"
+                pattern="[A-Za-z0-9\_-]{1,32}"
                 title="只能包含字母、数字、下划线和连字符"
                 autocomplete="username"
               />

@@ -10,11 +10,18 @@ export function authMockPlugin() {
                         res.setHeader('Content-Type', 'application/json')
 
                         // CSRF double-submit cookie validation: the header token must match the cookie token
+                        // or the body _csrf field (fallback for serverless environments where cookies may not be forwarded)
                         const csrfHeader = req.headers['x-csrf-token']
                         const cookieHeader = req.headers['cookie'] || ''
                         const csrfCookieMatch = cookieHeader.match(/(?:^|;\s*)sce_csrf=([^;]+)/)
                         const csrfCookie = csrfCookieMatch ? decodeURIComponent(csrfCookieMatch[1]) : null
-                        if (!csrfHeader || !csrfCookie || csrfHeader !== csrfCookie) {
+                        let csrfBodyToken = null
+                        try { csrfBodyToken = JSON.parse(body)._csrf || null } catch(e) {}
+                        const csrfMatched = csrfHeader && (
+                            (csrfCookie && csrfHeader === csrfCookie) ||
+                            (csrfBodyToken && csrfHeader === csrfBodyToken)
+                        )
+                        if (!csrfMatched) {
                             res.statusCode = 403
                             return res.end(JSON.stringify({ success: false, message: 'CSRF验证失败' }))
                         }

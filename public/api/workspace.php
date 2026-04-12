@@ -116,6 +116,13 @@ function ensureCsrfMatched() {
             return true;
         }
     }
+    global $input;
+    if (is_array($input) && isset($input['_csrf']) && is_string($input['_csrf'])) {
+        $bodyCsrf = trim($input['_csrf']);
+        if ($bodyCsrf !== '' && hash_equals($bodyCsrf, $csrfHeader)) {
+            return true;
+        }
+    }
     return false;
 }
 

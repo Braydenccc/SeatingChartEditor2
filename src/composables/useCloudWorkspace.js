@@ -44,16 +44,18 @@ export function useCloudWorkspace() {
 
         try {
             isFetching.value = true
+            const csrfToken = getOrCreateCsrfToken()
             const response = await fetch('/api/workspace.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-Token': getOrCreateCsrfToken()
+                    'X-CSRF-Token': csrfToken
                 },
                 body: JSON.stringify({
                     action,
                     username: currentUser.value.username,
                     token: token.value,
+                    _csrf: csrfToken,
                     ...payload
                 })
             })

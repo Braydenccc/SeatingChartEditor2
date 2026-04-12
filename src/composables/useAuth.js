@@ -110,7 +110,7 @@ const fetchSyncSettings = async () => {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-            body: JSON.stringify({ action: 'get_settings', username: currentUser.value.username, token: token.value })
+            body: JSON.stringify({ action: 'get_settings', username: currentUser.value.username, token: token.value, _csrf: csrfToken })
         })
         const result = await response.json()
         if (result.success && result.data) {
@@ -141,7 +141,7 @@ export function useAuth() {
                     'Content-Type': 'application/json',
                     'X-CSRF-Token': csrfToken
                 },
-                body: JSON.stringify({ action, username, password })
+                body: JSON.stringify({ action, username, password, _csrf: csrfToken })
             })
 
             if (!response.ok) {
@@ -240,7 +240,8 @@ export function useAuth() {
                     action: 'set_settings', 
                     username: currentUser.value.username, 
                     token: token.value, 
-                    settings: { webdav, backupMode: backup } 
+                    settings: { webdav, backupMode: backup },
+                    _csrf: csrfToken
                 })
             })
             const result = await response.json()
