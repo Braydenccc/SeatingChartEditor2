@@ -488,7 +488,7 @@ const handleDrop = (e) => {
 }
 
 .candidate-count {
-  background: linear-gradient(135deg, #23587b, #2d6a94);
+  background: #23587b;
   color: white;
   font-size: 11px;
   font-weight: 600;
@@ -597,14 +597,14 @@ const handleDrop = (e) => {
 }
 
 .icon-btn.btn-primary {
-  background: linear-gradient(135deg, #23587b, #2d6a94);
+  background: #23587b;
   color: #ffffff;
   border-color: transparent;
   box-shadow: 0 1px 3px rgba(35, 88, 123, 0.2);
 }
 
 .icon-btn.btn-primary:hover {
-  background: linear-gradient(135deg, #1e4a66, #265c82);
+  background: #1a4460;
   box-shadow: 0 2px 6px rgba(35, 88, 123, 0.3);
   color: #ffffff;
   border-color: transparent;
@@ -794,7 +794,7 @@ const handleDrop = (e) => {
 }
 
 .empty-action-btn.primary {
-  background: linear-gradient(135deg, #23587b, #2d6a94);
+  background: #23587b;
   color: white;
   box-shadow: 0 2px 8px rgba(35, 88, 123, 0.25);
 }
@@ -844,7 +844,7 @@ const handleDrop = (e) => {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: linear-gradient(135deg, #23587b 0%, #2d6a94 100%);
+  background: #23587b;
   color: white;
   border: none;
   border-radius: 6px;

@@ -357,7 +357,7 @@ const close = () => {
 
 .tab-divider {
   height: 2px;
-  background: linear-gradient(to right, #e2e8f0, transparent);
+  background: #e2e8f0;
   border-radius: 1px;
 }
 
@@ -599,7 +599,7 @@ const close = () => {
 }
 
 .delete-relation-btn.confirming {
-  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  background: #dc2626 !important;
   color: white !important;
   border-color: #dc2626 !important;
   font-size: 11px;

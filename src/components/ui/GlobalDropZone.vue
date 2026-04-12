@@ -76,13 +76,13 @@ const handleDrop = (e) => {
   align-items: center;
   justify-content: center;
   padding: 12px 20px;
-  background: linear-gradient(180deg, rgba(35, 88, 123, 0.95) 0%, rgba(35, 88, 123, 1) 100%);
+  background: #23587b;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
   cursor: pointer;
 }
 
 .global-drop-zone.drag-over {
-  background: linear-gradient(180deg, rgba(35, 88, 123, 1) 0%, #1a4a6b 100%);
+  background: #1a4460;
 }
 
 .drop-zone-content {

@@ -93,14 +93,44 @@
 </head>
 
 <body>
-  <div id="app">
-    <!-- 关键路径占位符：在 Vue 挂载前显示的 HTML 结构 -->
+  <!-- 关键路径占位符：在 Vue 挂载前显示的 HTML 结构 -->
+  <div id="initial-loading">
     <div class="app-header-placeholder"></div>
     <div class="initial-loading-container">
       <div class="initial-spinner"></div>
       <div class="initial-loading-text">正在加载应用...</div>
     </div>
   </div>
+  
+  <div id="app"></div>
+  
+  <script>
+    // 监听 Vue 挂载完成，隐藏 loading 占位符
+    function hideLoading() {
+      const loading = document.getElementById('initial-loading')
+      if (loading) {
+        loading.style.display = 'none'
+      }
+    }
+    
+    // 备份原来的 console.log，用于检测 Vue 挂载
+    // 或者使用 MutationObserver 监听 #app 的变化
+    const observer = new MutationObserver(function(mutations) {
+      const app = document.getElementById('app')
+      if (app && app.children.length > 0) {
+        hideLoading()
+        observer.disconnect()
+      }
+    })
+    
+    const app = document.getElementById('app')
+    if (app) {
+      observer.observe(app, { childList: true, subtree: true })
+    }
+    
+    // 超时保护：5秒后强制隐藏 loading，避免无限等待
+    setTimeout(hideLoading, 5000)
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 

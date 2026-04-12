@@ -131,10 +131,10 @@ const gradeIconComponent = computed(() => {
   border-bottom: 1px solid #e2e8f0;
 }
 
-.in-report-header.grade-a { background: linear-gradient(135deg, #f0fdf4, #dcfce7); }
-.in-report-header.grade-b { background: linear-gradient(135deg, #fffbeb, #fef9c3); }
-.in-report-header.grade-c { background: linear-gradient(135deg, #fff7ed, #ffedd5); }
-.in-report-header.grade-d { background: linear-gradient(135deg, #fef2f2, #fee2e2); }
+.in-report-header.grade-a { background: #dcfce7; }
+.in-report-header.grade-b { background: #fef9c3; }
+.in-report-header.grade-c { background: #ffedd5; }
+.in-report-header.grade-d { background: #fee2e2; }
 
 /* 评分环替换为图标+百分比标签 */
 .in-score-ring {

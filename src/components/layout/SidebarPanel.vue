@@ -1893,7 +1893,7 @@ const formatLogTime = (timestamp) => {
 
 .alignment-btn-simple.active {
   border-color: #23587b;
-  background: linear-gradient(135deg, #23587b, #2d6a94);
+  background: #23587b;
   color: white;
 }
 
@@ -1947,7 +1947,7 @@ const formatLogTime = (timestamp) => {
 }
 
 .option-button.confirming {
-  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  background: #dc2626 !important;
   color: white !important;
   border-color: #dc2626 !important;
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
@@ -2638,14 +2638,6 @@ const formatLogTime = (timestamp) => {
 
   .tab-label {
     font-size: 10px !important;
-  }
-
-  .sidebar-panel {
-    /* 移除 max-height 修改 */
-  }
-
-  .sidebar-panel.mobile-menu-open {
-    /* 移除 max-height 修改 */
   }
 
   .tabs-bar {

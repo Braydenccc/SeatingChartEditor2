@@ -168,7 +168,7 @@
 .step-number {
   width: 24px;
   height: 24px;
-  background: linear-gradient(135deg, #23587b, #2d6a94);
+  background: #23587b;
   color: white;
   border-radius: 50%;
   display: flex;
@@ -235,17 +235,17 @@
 
 .priority-card.required {
   border-color: #fee2e2;
-  background: linear-gradient(135deg, #fff1f2, #fee2e2);
+  background: #fee2e2;
 }
 
 .priority-card.prefer {
   border-color: #fef9c3;
-  background: linear-gradient(135deg, #fffbeb, #fef9c3);
+  background: #fef9c3;
 }
 
 .priority-card.optional {
   border-color: #f1f5f9;
-  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  background: #f1f5f9;
 }
 
 .priority-title {

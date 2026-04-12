@@ -410,7 +410,7 @@ onUnmounted(() => {
 }
 
 .delete-zone-btn.confirming {
-  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  background: #dc2626 !important;
   box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
 }
 

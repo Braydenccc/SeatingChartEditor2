@@ -18,6 +18,12 @@ const seatConfig = ref({
   seatAlignment: 'bottom'      // 座位对齐方式：'top'（对齐顶部/后排）或 'bottom'（对齐底部/前排）
 })
 
+// 座位数据
+const seats = ref([])
+
+// 座位查找索引 (id -> seat object)，O(1) 查找替代 .find()
+let seatMap = new Map()
+
 // 确保 groups 数组存在且长度匹配
 function ensureGroupsArray() {
   const config = seatConfig.value
@@ -52,15 +58,18 @@ function getGroupConfig(groupIndex) {
   }
 }
 
-// 座位数据
-const seats = ref([])
-
-// 座位查找索引 (id -> seat object)，O(1) 查找替代 .find()
-let seatMap = new Map()
-
 // 生成座位ID
 function generateSeatId(groupIndex, columnIndex, rowIndex) {
   return `seat-${groupIndex}-${columnIndex}-${rowIndex}`
+}
+
+// 从 seats.value（响应式代理）重建索引，确保 Map 持有代理对象
+function rebuildSeatMap() {
+  const newMap = new Map()
+  for (const seat of seats.value) {
+    newMap.set(seat.id, seat)
+  }
+  seatMap = newMap
 }
 
 // 初始化座位表
@@ -89,14 +98,8 @@ function initializeSeats() {
   rebuildSeatMap()
 }
 
-// 从 seats.value（响应式代理）重建索引，确保 Map 持有代理对象
-function rebuildSeatMap() {
-  const newMap = new Map()
-  for (const seat of seats.value) {
-    newMap.set(seat.id, seat)
-  }
-  seatMap = newMap
-}
+// 立即初始化座位数据，避免第一次加载时空白
+initializeSeats()
 
 // 按组和列组织座位数据（用于渲染）— 单遍分桶，O(n)
 const organizedSeats = computed(() => {

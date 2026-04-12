@@ -460,7 +460,7 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-action-btn.delete.confirming {
-  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  background: #dc2626 !important;
   color: white !important;
 }
 

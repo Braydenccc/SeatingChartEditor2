@@ -416,12 +416,12 @@ function handleConfirm() {
 .preview-seat {
   width: 28px;
   height: 22px;
-  background: linear-gradient(135deg, #23587b, #2d6a94);
+  background: #23587b;
   border-radius: 4px;
 }
 
 .preview-seat.first-row {
-  background: linear-gradient(135deg, #d97706, #b45309);
+  background: #d97706;
   box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.3);
 }
 
@@ -542,7 +542,7 @@ function handleConfirm() {
 
 .alignment-btn.active {
   border-color: #23587b;
-  background: linear-gradient(135deg, #23587b, #2d6a94);
+  background: #23587b;
   color: white;
 }
 
@@ -643,7 +643,7 @@ function handleConfirm() {
 
 .confirm-btn {
   border: none;
-  background: linear-gradient(135deg, #23587b, #2d6a94);
+  background: #23587b;
   color: white;
 }
 
@@ -657,7 +657,7 @@ function handleConfirm() {
 }
 
 .confirm-btn.confirming {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  background: #dc2626;
 }
 
 .confirm-btn.confirming:hover {

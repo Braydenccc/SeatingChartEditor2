@@ -97,8 +97,9 @@ const initAuth = () => {
     }
 
     // 初始化后如果本身是受信任状态，则拉取后台同步数据
+    // 延迟执行，避免阻塞应用初始加载
     if (currentUser.value && token.value) {
-        fetchSyncSettings()
+        setTimeout(() => fetchSyncSettings(), 100)
     }
 }
 

@@ -919,7 +919,7 @@ defineExpose({ focusRule })
 .btn-delete:hover { background: #fee2e2; }
 
 .btn-delete.confirming {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  background: #dc2626;
   color: white;
   border-color: #dc2626;
 }
