@@ -48,8 +48,8 @@ const getOrCreateCsrfToken = () => {
         csrfToken = Array.from(crypto.getRandomValues(new Uint8Array(24)))
             .map(b => b.toString(16).padStart(2, '0'))
             .join('')
-        setCookie('sce_csrf', csrfToken, 1)
     }
+    setCookie('sce_csrf', csrfToken, 1)
     return csrfToken
 }
 
@@ -108,6 +108,7 @@ const fetchSyncSettings = async () => {
         const csrfToken = getOrCreateCsrfToken()
         const response = await fetch('/api/auth.php', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
             body: JSON.stringify({ action: 'get_settings', username: currentUser.value.username, token: token.value })
         })
@@ -135,6 +136,7 @@ export function useAuth() {
             const csrfToken = getOrCreateCsrfToken()
             const response = await fetch('/api/auth.php', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-Token': csrfToken
@@ -232,6 +234,7 @@ export function useAuth() {
             const csrfToken = getOrCreateCsrfToken()
             const response = await fetch('/api/auth.php', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ 
                     action: 'set_settings', 
