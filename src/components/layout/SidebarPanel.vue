@@ -50,10 +50,10 @@
             <button class="option-button" @click="handleSaveWorkspace">
               <span class="btn-content"><Save :size="14" stroke-width="2" />保存到本地</span>
             </button>
-            <button class="option-button" @click="handleCloudLoad">
+            <button class="option-button" @click="openCloudLoad">
               <span class="btn-content"><CloudDownload :size="14" stroke-width="2" />从云端加载</span>
             </button>
-            <button class="option-button primary" @click="handleCloudSave">
+            <button class="option-button primary" @click="openCloudSave">
               <span class="btn-content"><CloudUpload :size="14" stroke-width="2" />保存至云端</span>
             </button>
           </div>
@@ -439,7 +439,6 @@
 
   <!-- 云端工作区弹窗 -->
   <CloudWorkspaceDialog
-    v-if="showCloudDialog"
     :visible="showCloudDialog"
     :mode="cloudDialogMode"
     @update:visible="showCloudDialog = $event"
@@ -493,6 +492,7 @@ import ZoneList from '../zone/ZoneList.vue'
 const AssignmentInlineReport = defineAsyncComponent(() => import('../rule/AssignmentInlineReport.vue'))
 import { useAuth } from '@/composables/useAuth'
 import { useUndo } from '@/composables/useUndo'
+import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 
 const { activeTab, mobileMenuOpen, setActiveTab, closeMobileMenu } = useSidebar()
 const { seatConfig, updateConfig, clearAllSeats, seats, shiftSeats, getAvailableSeats } = useSeatChart()
@@ -511,6 +511,7 @@ const { isLoggedIn, isLoginDialogVisible } = useAuth()
 const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom()
 const { zones } = useZoneData()
 const { recordBatch, createSnapshot } = useUndo()
+const { showCloudDialog, cloudDialogMode, openCloudLoad, openCloudSave, handleCloudSuccess } = useCloudWorkspaceDialog()
 const totalSeats = computed(() => seatConfig.value.groupCount * seatConfig.value.columnsPerGroup * seatConfig.value.seatsPerColumn)
 const handleFitZoom = () => fitToViewport()
 
@@ -654,32 +655,6 @@ const onExported = (payload) => {
   }
   lastExportObjectUrl = URL.createObjectURL(payload)
   lastExportUrl.value = lastExportObjectUrl
-}
-
-// 工作区管理 (云端)
-const showCloudDialog = ref(false)
-const cloudDialogMode = ref('load')
-
-const handleCloudLoad = () => {
-  if (!isLoggedIn.value) {
-    isLoginDialogVisible.value = true
-    return
-  }
-  cloudDialogMode.value = 'load'
-  showCloudDialog.value = true
-}
-
-const handleCloudSave = () => {
-  if (!isLoggedIn.value) {
-    isLoginDialogVisible.value = true
-    return
-  }
-  cloudDialogMode.value = 'save'
-  showCloudDialog.value = true
-}
-
-const handleCloudSuccess = () => {
-  // 可以根据需要执行刷新动作，当前弹窗内部已经 handled messages
 }
 
 // 工作区管理 (本地)

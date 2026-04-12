@@ -1,6 +1,6 @@
 <template>
   <transition name="dialog-fade">
-    <div v-if="visible" class="cloud-workspace-overlay" @mousedown.self="close">
+    <div v-show="visible" class="cloud-workspace-overlay" @mousedown.self="close">
       <div class="cloud-workspace-dialog">
         <div class="dialog-header">
           <h3>{{ isSaveMode ? '保存工作区至云端' : '从云端加载工作区' }}</h3>
@@ -109,7 +109,7 @@
                 class="workspace-card"
               >
                 <div class="card-content" @click="handleLoad(ws.fileId, ws.source)">
-                  <Folder :size="28" stroke-width="1.8" />
+                  <Folder :size="28" stroke-width="2" class="workspace-icon" />
                   <div class="card-details">
                     <h4 class="ws-name">{{ ws.metadata.name }}</h4>
                     <p class="ws-meta">
@@ -663,6 +663,10 @@ const formatSize = (bytes) => {
   gap: 12px;
   flex: 1;
   cursor: pointer;
+}
+
+.workspace-icon {
+  color: var(--color-primary);
 }
 
 .card-icon {

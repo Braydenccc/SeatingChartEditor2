@@ -45,10 +45,11 @@
       </a>
     </div>
     
-    <CloudWorkspaceDialog 
-      :visible="showWorkspaceManagement" 
-      mode="load" 
-      @update:visible="showWorkspaceManagement = $event" 
+    <CloudWorkspaceDialog
+      :visible="showCloudDialog"
+      :mode="cloudDialogMode"
+      @update:visible="showCloudDialog = $event"
+      @success="handleCloudSuccess"
     />
     <SyncSettingsDialog 
       :visible="showSyncSettings" 
@@ -61,6 +62,7 @@
 import { onMounted, ref, onBeforeUnmount, computed, defineAsyncComponent } from 'vue'
 import { Cloud, FolderOpen, Github, LogIn, RefreshCw, User } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
+import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 
 const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
 const SyncSettingsDialog = defineAsyncComponent(() => import('../auth/SyncSettingsDialog.vue'))
@@ -68,9 +70,9 @@ const SyncSettingsDialog = defineAsyncComponent(() => import('../auth/SyncSettin
 const emit = defineEmits(['open-login'])
 
 const { currentUser, webdavConfig, isLoggedIn, logout, authType, initAuth } = useAuth()
+const { showCloudDialog, cloudDialogMode, openCloudDialog, closeCloudDialog, handleCloudSuccess } = useCloudWorkspaceDialog()
 
 const showDropdown = ref(false)
-const showWorkspaceManagement = ref(false)
 const showSyncSettings = ref(false)
 const menuContainer = ref(null)
 
@@ -82,7 +84,7 @@ const toggleDropdown = () => {
 }
 
 const openWorkspaceManagement = () => {
-  showWorkspaceManagement.value = true
+  openCloudDialog('load')
   showDropdown.value = false
 }
 
