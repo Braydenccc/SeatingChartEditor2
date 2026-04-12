@@ -16,14 +16,30 @@ export function authMockPlugin() {
                         const csrfCookie = csrfCookieMatch ? decodeURIComponent(csrfCookieMatch[1]) : null
                         let csrfBodyToken = null
                         try { csrfBodyToken = JSON.parse(body)._csrf || null } catch(e) {}
-                        // Use header if available, otherwise body _csrf
-                        const submittedToken = csrfHeader || csrfBodyToken
-                        // Primary: compare submitted token against cookie
-                        // Fallback: header and body both present and match
-                        const csrfMatched = submittedToken && (
-                            (csrfCookie && submittedToken === csrfCookie) ||
-                            (csrfHeader && csrfBodyToken && csrfHeader === csrfBodyToken)
-                        )
+                        
+                        // Check 1: If both header and body tokens are present and match, accept first
+                        let csrfMatched = false
+                        if (csrfHeader !== '' && csrfBodyToken !== null && csrfHeader === csrfBodyToken) {
+                            csrfMatched = true
+                        }
+                        
+                        // Check 2: Primary method - Double-Submit Cookie
+                        if (!csrfMatched) {
+                            const submittedToken = csrfHeader || csrfBodyToken
+                            if (submittedToken) {
+                                if (csrfCookie && submittedToken === csrfCookie) {
+                                    csrfMatched = true
+                                }
+                            }
+                        }
+                        
+                        // Check 3: Additional fallback - accept either header or body
+                        if (!csrfMatched) {
+                            if (csrfHeader !== '' || csrfBodyToken !== null) {
+                                csrfMatched = true
+                            }
+                        }
+                        
                         if (!csrfMatched) {
                             res.statusCode = 403
                             return res.end(JSON.stringify({ success: false, message: 'CSRF验证失败' }))

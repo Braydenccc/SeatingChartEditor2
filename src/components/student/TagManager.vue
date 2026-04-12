@@ -5,6 +5,7 @@
       <div v-for="tag in tags" :key="tag.id" class="tag-item" :style="{ '--tag-color': tag.color }">
         <span class="tag-color-bar" :style="{ background: tag.color }"></span>
         <span class="tag-name">{{ tag.name }}</span>
+        <span class="tag-count">{{ getTagStudentCount(tag.id) }}人</span>
         <div class="tag-actions">
           <button class="tag-action-btn edit" @click="editTagHandler(tag)" title="编辑">
             <Pencil :size="11" stroke-width="2" />
@@ -37,6 +38,10 @@
             <span class="color-value">{{ currentTag.color }}</span>
           </div>
         </div>
+        <TagStudentSelector
+          v-model="selectedStudentIds"
+          :students="students"
+        />
         <div class="dialog-actions">
           <button class="btn-cancel" @click="closeDialog">取消</button>
           <button class="btn-confirm" @click="saveTag">确定</button>
@@ -50,9 +55,11 @@
 import { ref, nextTick, computed } from 'vue'
 import { Pencil, X, Plus } from 'lucide-vue-next'
 import EmptyState from '../ui/EmptyState.vue'
+import TagStudentSelector from './TagStudentSelector.vue'
 import { getNextColor } from '@/constants/tagColors'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
+import { useStudentData } from '@/composables/useStudentData'
 
 const props = defineProps({
   tags: {
@@ -61,24 +68,29 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['add-tag', 'edit-tag', 'delete-tag'])
+const emit = defineEmits(['add-tag', 'edit-tag', 'delete-tag', 'assign-tag-students'])
 
 const { requestConfirm, isConfirming } = useConfirmAction()
 const { warning } = useLogger()
+const { students } = useStudentData()
+
+const getTagStudentCount = (tagId) => {
+  return students.value.filter(s => s.tags.includes(tagId)).length
+}
 
 const dialogVisible = ref(false)
 const isEditing = ref(false)
 const currentTag = ref({ id: null, name: '', color: '#23587b' })
 const nameInputRef = ref(null)
+const selectedStudentIds = ref([])
 
 const showAddDialog = () => {
   isEditing.value = false
-  // 为新标签自动选择下一个颜色
   const nextColor = getNextColor(props.tags.length)
   currentTag.value = { id: null, name: '', color: nextColor }
+  selectedStudentIds.value = []
   dialogVisible.value = true
 
-  // 聚焦到输入框
   nextTick(() => {
     nameInputRef.value?.focus()
   })
@@ -87,6 +99,9 @@ const showAddDialog = () => {
 const editTagHandler = (tag) => {
   isEditing.value = true
   currentTag.value = { ...tag }
+  selectedStudentIds.value = students.value
+    .filter(s => s.tags.includes(tag.id))
+    .map(s => s.id)
   dialogVisible.value = true
 
   nextTick(() => {
@@ -97,6 +112,7 @@ const editTagHandler = (tag) => {
 const closeDialog = () => {
   dialogVisible.value = false
   currentTag.value = { id: null, name: '', color: '#23587b' }
+  selectedStudentIds.value = []
 }
 
 const saveTag = () => {
@@ -108,12 +124,14 @@ const saveTag = () => {
   if (isEditing.value) {
     emit('edit-tag', currentTag.value.id, {
       name: currentTag.value.name,
-      color: currentTag.value.color
+      color: currentTag.value.color,
+      studentIds: [...selectedStudentIds.value]
     })
   } else {
     emit('add-tag', {
       name: currentTag.value.name,
-      color: currentTag.value.color
+      color: currentTag.value.color,
+      studentIds: [...selectedStudentIds.value]
     })
   }
   closeDialog()
@@ -249,6 +267,16 @@ const deleteTagHandler = (tagId, tagName) => {
   letter-spacing: 0.3px;
 }
 
+.tag-count {
+  color: color-mix(in srgb, var(--tag-color) 85%, #1a1a1a);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 6px;
+  margin-right: 6px;
+  min-width: 18px;
+  text-align: center;
+}
+
 .tag-actions {
   display: flex;
   align-items: center;
@@ -350,6 +378,8 @@ const deleteTagHandler = (tagId, tagName) => {
   padding: 28px;
   border-radius: 12px;
   min-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.3s ease;
 }

@@ -78,7 +78,7 @@ onMounted(() => {
 
 // 使用composables
 const { tags, addTag, editTag, deleteTag } = useTagData()
-const { students, addStudent, setStudentCount, updateStudent, deleteStudent, removeTagFromStudents } = useStudentData()
+const { students, addStudent, setStudentCount, updateStudent, deleteStudent, removeTagFromStudents, addTagToStudents, removeTagFromStudent } = useStudentData()
 const { removeTagFromAllZones } = useZoneData()
 const { exportSettings } = useExportSettings()
 
@@ -113,11 +113,33 @@ const handleStudentCountChange = () => {
 
 // 标签管理
 const handleAddTag = (tagData) => {
-  addTag(tagData)
+  const studentIds = tagData.studentIds || []
+  const newTagId = addTag({
+    name: tagData.name,
+    color: tagData.color
+  })
+  if (studentIds.length > 0) {
+    addTagToStudents(newTagId, studentIds)
+  }
 }
 
 const handleEditTag = (tagId, tagData) => {
-  editTag(tagId, tagData)
+  editTag(tagId, { name: tagData.name, color: tagData.color })
+
+  const newStudentIds = tagData.studentIds || []
+  const oldStudentIds = students.value
+    .filter(s => s.tags.includes(tagId))
+    .map(s => s.id)
+
+  const addedIds = newStudentIds.filter(id => !oldStudentIds.includes(id))
+  const removedIds = oldStudentIds.filter(id => !newStudentIds.includes(id))
+
+  if (addedIds.length > 0) {
+    addTagToStudents(tagId, addedIds)
+  }
+  removedIds.forEach(studentId => {
+    removeTagFromStudent(tagId, studentId)
+  })
 }
 
 const handleDeleteTag = (tagId) => {

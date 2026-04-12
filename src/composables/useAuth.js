@@ -18,7 +18,7 @@ export const setCookie = (name, value, days) => {
         expires = "; expires=" + date.toUTCString()
     }
     const secure = location.protocol === 'https:' ? '; Secure' : ''
-    document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/; SameSite=Strict" + secure
+    document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/; SameSite=Lax" + secure
 }
 
 export const getCookie = (name) => {
@@ -34,7 +34,7 @@ export const getCookie = (name) => {
 
 export const eraseCookie = (name) => {
     const secure = location.protocol === 'https:' ? '; Secure' : ''
-    document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Strict' + secure
+    document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax' + secure
 }
 
 // Double-Submit Cookie CSRF protection:

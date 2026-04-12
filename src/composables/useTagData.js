@@ -28,12 +28,14 @@ export function useTagData() {
   // 添加标签
   const addTag = (tagData) => {
     const color = tagData.color || getNextColor(colorIndex++)
+    const newId = nextTagId++
     tags.value.push({
-      id: nextTagId++,
+      id: newId,
       name: tagData.name,
       color: color,
       showInSeatChart: tagData.showInSeatChart !== false
     })
+    return newId
   }
 
   // 编辑标签

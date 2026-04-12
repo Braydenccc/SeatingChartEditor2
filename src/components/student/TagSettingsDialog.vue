@@ -23,6 +23,7 @@
           <div v-for="tag in tags" :key="tag.id" class="tag-item" :style="{ '--tag-color': tag.color }">
             <span class="tag-color-bar" :style="{ background: tag.color }"></span>
             <span class="tag-name">{{ tag.name }}</span>
+            <span class="tag-count">{{ getTagStudentCount(tag.id) }}人</span>
             <div class="tag-options">
               <label class="show-option-label">
                 <input type="checkbox" v-model="tag.showInSeatChart" @change="updateTag(tag)" />
@@ -62,6 +63,10 @@
             <span class="color-value">{{ currentTag.color }}</span>
           </div>
         </div>
+        <TagStudentSelector
+          v-model="selectedStudentIds"
+          :students="students"
+        />
         <div class="dialog-actions">
           <button class="btn-cancel" @click="closeTagDialog" @keyup.enter="closeTagDialog">取消</button>
           <button class="btn-confirm" @click="saveTag" @keyup.enter="saveTag">确定</button>
@@ -74,10 +79,12 @@
 <script setup>
 import { ref, watch, nextTick, computed } from 'vue'
 import { Pencil, X, Plus } from 'lucide-vue-next'
+import TagStudentSelector from './TagStudentSelector.vue'
 import { getNextColor } from '@/constants/tagColors'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
 import { useTagData } from '@/composables/useTagData'
+import { useStudentData } from '@/composables/useStudentData'
 
 const props = defineProps({
   visible: {
@@ -89,14 +96,20 @@ const props = defineProps({
 const emit = defineEmits(['update:visible'])
 
 const { tags, showTagsInSeatChart, addTag, editTag, deleteTag, setShowTagsInSeatChart } = useTagData()
+const { students, addTagToStudents, removeTagFromStudent, removeTagFromStudents } = useStudentData()
 const { requestConfirm, isPending } = useConfirmAction()
 const { warning, info, success } = useLogger()
+
+const getTagStudentCount = (tagId) => {
+  return students.value.filter(s => s.tags.includes(tagId)).length
+}
 
 const localShowTagsInSeatChart = ref(true)
 const tagDialogVisible = ref(false)
 const isEditing = ref(false)
 const currentTag = ref({ id: null, name: '', color: '#23587b' })
 const nameInputRef = ref(null)
+const selectedStudentIds = ref([])
 
 watch(() => props.visible, (val) => {
   if (val) {
@@ -116,6 +129,7 @@ const showAddDialog = () => {
   isEditing.value = false
   const nextColor = getNextColor(tags.length)
   currentTag.value = { id: null, name: '', color: nextColor }
+  selectedStudentIds.value = []
   tagDialogVisible.value = true
   nextTick(() => {
     nameInputRef.value?.focus()
@@ -125,6 +139,9 @@ const showAddDialog = () => {
 const editTagHandler = (tag) => {
   isEditing.value = true
   currentTag.value = { ...tag }
+  selectedStudentIds.value = students.value
+    .filter(s => s.tags.includes(tag.id))
+    .map(s => s.id)
   tagDialogVisible.value = true
   nextTick(() => {
     nameInputRef.value?.focus()
@@ -134,6 +151,7 @@ const editTagHandler = (tag) => {
 const closeTagDialog = () => {
   tagDialogVisible.value = false
   currentTag.value = { id: null, name: '', color: '#23587b' }
+  selectedStudentIds.value = []
 }
 
 const saveTag = () => {
@@ -148,12 +166,30 @@ const saveTag = () => {
       color: currentTag.value.color,
       showInSeatChart: currentTag.value.showInSeatChart
     })
+
+    const newStudentIds = [...selectedStudentIds.value]
+    const oldStudentIds = students.value
+      .filter(s => s.tags.includes(currentTag.value.id))
+      .map(s => s.id)
+
+    const addedIds = newStudentIds.filter(id => !oldStudentIds.includes(id))
+    const removedIds = oldStudentIds.filter(id => !newStudentIds.includes(id))
+
+    if (addedIds.length > 0) {
+      addTagToStudents(currentTag.value.id, addedIds)
+    }
+    removedIds.forEach(studentId => {
+      removeTagFromStudent(currentTag.value.id, studentId)
+    })
   } else {
-    addTag({
+    const newTagId = addTag({
       name: currentTag.value.name,
       color: currentTag.value.color,
       showInSeatChart: true
     })
+    if (selectedStudentIds.value.length > 0) {
+      addTagToStudents(newTagId, selectedStudentIds.value)
+    }
   }
   closeTagDialog()
 }
@@ -177,6 +213,7 @@ const deleteTagHandler = (tagId, tagName) => {
   requestConfirm(
     getDeletingKey(tagId),
     () => {
+      removeTagFromStudents(tagId)
       deleteTag(tagId)
       success(`已成功删除标签"${tagName}"`)
     },
@@ -223,7 +260,8 @@ const deleteTagHandler = (tagId, tagName) => {
 
 .small-dialog {
   max-width: 420px;
-  overflow: visible;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 @keyframes slideUp {
@@ -353,6 +391,17 @@ const deleteTagHandler = (tagId, tagName) => {
   white-space: nowrap;
   letter-spacing: 0.3px;
   flex: 1;
+}
+
+.tag-count {
+  color: color-mix(in srgb, var(--tag-color) 85%, #1a1a1a);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 7px;
+  border-radius: 12px;
+  margin-right: 8px;
+  min-width: 20px;
+  text-align: center;
 }
 
 .tag-options {

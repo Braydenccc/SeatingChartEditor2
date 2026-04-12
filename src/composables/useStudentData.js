@@ -96,7 +96,23 @@ export function useStudentData() {
     }
   }
 
-  // 从学生中移除指定标签
+  const addTagToStudents = (tagId, studentIds) => {
+    if (!tagId || !studentIds || studentIds.length === 0) return
+    studentIds.forEach(studentId => {
+      const student = students.value.find(s => s.id === studentId)
+      if (student && !student.tags.includes(tagId)) {
+        student.tags.push(tagId)
+      }
+    })
+  }
+
+  const removeTagFromStudent = (tagId, studentId) => {
+    const student = students.value.find(s => s.id === studentId)
+    if (student) {
+      student.tags = student.tags.filter(tid => tid !== tagId)
+    }
+  }
+
   const removeTagFromStudents = (tagId) => {
     students.value.forEach(student => {
       student.tags = student.tags.filter(tid => tid !== tagId)
@@ -135,6 +151,8 @@ export function useStudentData() {
     setStudentCount,
     updateStudent,
     deleteStudent,
+    addTagToStudents,
+    removeTagFromStudent,
     removeTagFromStudents,
     clearAllStudents
   }
