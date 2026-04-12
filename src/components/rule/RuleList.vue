@@ -919,15 +919,9 @@ defineExpose({ focusRule })
 .btn-delete:hover { background: #fee2e2; }
 
 .btn-delete.confirming {
-  background: #dc2626;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
   color: white;
   border-color: #dc2626;
-  animation: pulse-del 0.5s ease-in-out infinite;
-}
-
-@keyframes pulse-del {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.03); }
 }
 
 /* ==================== 动画 ==================== */

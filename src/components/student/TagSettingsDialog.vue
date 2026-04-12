@@ -460,19 +460,8 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-action-btn.delete.confirming {
-  background: #fff7ed !important;
-  color: #ea580c !important;
-  animation: pulse-icon 0.8s ease-in-out infinite;
-}
-
-@keyframes pulse-icon {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.2);
-  }
+  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  color: white !important;
 }
 
 .form-group {

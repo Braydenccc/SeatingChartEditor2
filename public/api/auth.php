@@ -1,6 +1,20 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
+// Database 类存根（仅用于 IDE 类型检查，实际由 Retinbox 平台提供）
+if (!class_exists('Database')) {
+    class Database {
+        public function __construct($name) {}
+        public function get($key) { return null; }
+        public function set($key, $value) { return true; }
+        public function delete($key, $value = null) { return true; }
+        public function list_keys() { return []; }
+        public function search_value($pattern) { return []; }
+        public function push($key, $value) { return true; }
+        public function get_array($key) { return null; }
+    }
+}
+
 function respond($payload, $code = 200) {
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);

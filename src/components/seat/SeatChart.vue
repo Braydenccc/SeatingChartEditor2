@@ -11,6 +11,8 @@
         <span class="info-item">每列 {{ seatConfig.seatsPerColumn }} 座</span>
         <span class="info-separator">·</span>
         <span class="info-item">共 {{ totalSeats }} 个座位</span>
+        <span class="info-separator">·</span>
+        <span class="info-item">讲台位置: {{ seatConfig.podiumPosition === 'bottom' ? '底部' : '顶部' }}</span>
       </div>
       <div class="zoom-controls">
         <button class="zoom-btn" @click.stop="zoomOut" :disabled="scale <= MIN_SCALE" title="缩小">
@@ -29,7 +31,7 @@
       @mousedown="handleMouseDown" @mousemove="handleMouseMove" @mouseup="handleMouseUp" @mouseleave="handleMouseUp"
       @touchstart="handleTouchStart" @touchmove.prevent="handleTouchMove" @touchend="handleTouchEnd"
       @dragover.prevent="handleDragOver" @drop.prevent="handleDrop">
-      <div ref="chartRef" class="seat-chart" :style="chartTransformStyle">
+      <div ref="chartRef" class="seat-chart" :class="seatConfig.seatAlignment === 'top' ? 'align-top' : 'align-bottom'" :style="chartTransformStyle">
         <div v-for="(group, groupIndex) in organizedSeats" :key="groupIndex" class="seat-group">
           <div class="group-label">第 {{ groupIndex + 1 }} 组</div>
           <div class="group-content">
@@ -653,7 +655,7 @@ const showOverlay = computed(() => editingZoneId.value !== null)
 .seat-chart {
   display: inline-flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   gap: 40px;
   padding: 30px 20px;
   position: absolute;
@@ -663,6 +665,14 @@ const showOverlay = computed(() => editingZoneId.value !== null)
   /* 默认居中，由 JS 控制 transform */
   margin-left: 0;
   margin-top: 0;
+}
+
+.seat-chart.align-top {
+  align-items: flex-start;
+}
+
+.seat-chart.align-bottom {
+  align-items: flex-end;
 }
 
 .seat-group {

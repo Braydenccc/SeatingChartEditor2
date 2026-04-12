@@ -4,10 +4,53 @@ import { useZoneData } from './useZoneData'
 // 座位表配置
 const seatConfig = ref({
   groupCount: 4,        // 大组数量
-  columnsPerGroup: 2,   // 每大组的列数
-  seatsPerColumn: 7,     // 每列的座位数
-  shiftDistance: 4
+  columnsPerGroup: 2,   // 每大组的列数（默认值，向后兼容）
+  seatsPerColumn: 7,     // 每列的座位数（默认值，向后兼容）
+  // 每大组的独立配置
+  groups: [
+    { columns: 2, rows: 7 },
+    { columns: 2, rows: 7 },
+    { columns: 2, rows: 7 },
+    { columns: 2, rows: 7 }
+  ],
+  shiftDistance: 4,
+  podiumPosition: 'bottom',   // 讲台位置：'top'（顶部）或 'bottom'（底部）
+  seatAlignment: 'bottom'      // 座位对齐方式：'top'（对齐顶部/后排）或 'bottom'（对齐底部/前排）
 })
+
+// 确保 groups 数组存在且长度匹配
+function ensureGroupsArray() {
+  const config = seatConfig.value
+  if (!config.groups || !Array.isArray(config.groups)) {
+    config.groups = []
+  }
+  // 补齐或裁剪数组以匹配 groupCount
+  while (config.groups.length < config.groupCount) {
+    config.groups.push({
+      columns: config.columnsPerGroup,
+      rows: config.seatsPerColumn
+    })
+  }
+  while (config.groups.length > config.groupCount) {
+    config.groups.pop()
+  }
+}
+
+// 获取指定大组的配置
+function getGroupConfig(groupIndex) {
+  ensureGroupsArray()
+  const config = seatConfig.value
+  if (config.groups[groupIndex]) {
+    return {
+      columns: config.groups[groupIndex].columns || config.columnsPerGroup,
+      rows: config.groups[groupIndex].rows || config.seatsPerColumn
+    }
+  }
+  return {
+    columns: config.columnsPerGroup,
+    rows: config.seatsPerColumn
+  }
+}
 
 // 座位数据
 const seats = ref([])
@@ -23,11 +66,13 @@ function generateSeatId(groupIndex, columnIndex, rowIndex) {
 // 初始化座位表
 function initializeSeats() {
   const newSeats = []
-  const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig.value
+  const { groupCount } = seatConfig.value
+  ensureGroupsArray()
 
   for (let g = 0; g < groupCount; g++) {
-    for (let c = 0; c < columnsPerGroup; c++) {
-      for (let r = 0; r < seatsPerColumn; r++) {
+    const groupConfig = getGroupConfig(g)
+    for (let c = 0; c < groupConfig.columns; c++) {
+      for (let r = 0; r < groupConfig.rows; r++) {
         newSeats.push({
           id: generateSeatId(g, c, r),
           groupIndex: g,
@@ -55,21 +100,31 @@ function rebuildSeatMap() {
 
 // 按组和列组织座位数据（用于渲染）— 单遍分桶，O(n)
 const organizedSeats = computed(() => {
-  const { groupCount, columnsPerGroup } = seatConfig.value
-  // 预分配结构
-  const groups = Array.from({ length: groupCount }, () =>
-    Array.from({ length: columnsPerGroup }, () => [])
-  )
+  const { groupCount } = seatConfig.value
+  ensureGroupsArray()
+  
+  // 预分配结构，根据每大组的列数
+  const groups = Array.from({ length: groupCount }, (_, g) => {
+    const groupConfig = getGroupConfig(g)
+    return Array.from({ length: groupConfig.columns }, () => [])
+  })
 
   // 单次遍历分桶
   for (const seat of seats.value) {
-    groups[seat.groupIndex][seat.columnIndex].push(seat)
+    if (groups[seat.groupIndex] && groups[seat.groupIndex][seat.columnIndex]) {
+      groups[seat.groupIndex][seat.columnIndex].push(seat)
+    }
   }
 
-  // 每个桶按 rowIndex 排序
+  // 每个桶按 rowIndex 排序，并根据 alignment 决定顺序
   for (const group of groups) {
     for (const col of group) {
       col.sort((a, b) => a.rowIndex - b.rowIndex)
+      
+      // 如果对齐顶部，保持原样（rowIndex 0 在最上面）
+      // 如果对齐底部，保持原样（rowIndex 0 在最上面，rowIndex 大的在下面）
+      // 这里的顺序不需要改变，因为渲染时顺序已经是从上到下
+      // 视觉上的对齐通过 CSS 和 rowIndex 的含义来体现
     }
   }
 
@@ -164,6 +219,7 @@ export function useSeatChart() {
   // 更新配置
   const updateConfig = (newConfig) => {
     seatConfig.value = { ...seatConfig.value, ...newConfig }
+    ensureGroupsArray()
     initializeSeats()  // 重新初始化座位
     // 清理选区中已失效的座位引用
     cleanupInvalidSeats(seats.value.map(s => s.id))
@@ -202,14 +258,18 @@ export function useSeatChart() {
   const areDeskmates = (seatId1, seatId2) => {
     const seat1 = parseSeatId(seatId1)
     const seat2 = parseSeatId(seatId2)
-    const columnsPerGroup = Number(seatConfig.value?.columnsPerGroup || 0)
+    
+    // 必须同大组
+    if (seat1.groupIndex !== seat2.groupIndex) return false
+    
+    const groupConfig = getGroupConfig(seat1.groupIndex)
+    const columnsInGroup = groupConfig.columns
 
     // 列数<=1 时结构上不存在同桌位（0 也按不可同桌处理，避免无效配置误判）
-    if (columnsPerGroup <= 1) return false
+    if (columnsInGroup <= 1) return false
 
     // 同桌 = 同大组 且 同排(rowIndex相同) 且 不是同一列
     return (
-      seat1.groupIndex === seat2.groupIndex &&
       seat1.rowIndex === seat2.rowIndex &&
       seat1.columnIndex !== seat2.columnIndex
     )
@@ -218,8 +278,9 @@ export function useSeatChart() {
   // 查找指定座位的同桌座位
   const findDeskmates = (seatId) => {
     const parsed = parseSeatId(seatId)
-    const columnsPerGroup = Number(seatConfig.value?.columnsPerGroup || 0)
-    if (columnsPerGroup <= 1) return []
+    const groupConfig = getGroupConfig(parsed.groupIndex)
+    const columnsInGroup = groupConfig.columns
+    if (columnsInGroup <= 1) return []
     return seats.value.filter(seat =>
       seat.groupIndex === parsed.groupIndex &&
       seat.rowIndex === parsed.rowIndex &&
@@ -325,16 +386,29 @@ export function useSeatChart() {
 
   /**
    * 判断座位是否在指定行范围内
-   * 讲台在最下方，行数从下往上数（前排为 1=离讲台最近的排，即图形底部的排，rowIndex 最大）
+   * 根据 alignment 配置决定计数方向：
+   * - 'bottom': 讲台在最下方，从下往上数（前排为 1，离讲台最近）
+   * - 'top': 对齐顶部/后排，从上往下数（后排为 1，离讲台最远）
    * @param {string} seatId
    * @param {number} minRow - 最小排数（含），1-indexed
    * @param {number} maxRow - 最大排数（含），1-indexed
    */
   const isInRowRange = (seatId, minRow, maxRow) => {
-    const { rowIndex } = parseSeatId(seatId)
-    const totalRows = seatConfig.value.seatsPerColumn
-    const rowFromPodium = totalRows - rowIndex // 讲台在最下方，rowIndex 最大即第 1 排
-    return rowFromPodium >= minRow && rowFromPodium <= maxRow
+    const { rowIndex, groupIndex } = parseSeatId(seatId)
+    const groupConfig = getGroupConfig(groupIndex)
+    const totalRows = groupConfig.rows
+    const { seatAlignment } = seatConfig.value
+    
+    let normalizedRow
+    if (seatAlignment === 'top') {
+      // 对齐顶部/后排：从上往下数，rowIndex 0 为第 1 排（后排）
+      normalizedRow = rowIndex + 1
+    } else {
+      // 对齐底部/讲台：从下往上数，rowIndex 最大为第 1 排（前排）
+      normalizedRow = totalRows - rowIndex
+    }
+    
+    return normalizedRow >= minRow && normalizedRow <= maxRow
   }
 
   /**
@@ -344,20 +418,22 @@ export function useSeatChart() {
    * - center: 既非 wall 也非 aisle 的中间列
    *
    * 简化规则：
-   *   columnsPerGroup = 2 时：所有列都是 edge（wall+aisle 重合）
-   *   columnsPerGroup > 2 时：
-   *     columnIndex 0 或 columnsPerGroup-1 的是 aisle（紧邻走廊的组外侧）
+   *   该组列数 = 2 时：所有列都是 edge（wall+aisle 重合）
+   *   该组列数 > 2 时：
+   *     columnIndex 0 或 该组列数-1 的是 aisle（紧邻走廊的组外侧）
    *     同时 groupIndex 0 的 columnIndex 0 也是 wall（最左墙）
-   *     groupIndex groupCount-1 的 columnIndex columnsPerGroup-1 也是 wall（最右墙）
+   *     groupIndex groupCount-1 的 columnIndex 该组列数-1 也是 wall（最右墙）
    */
   const getColumnType = (seatId) => {
     const { groupIndex, columnIndex } = parseSeatId(seatId)
-    const { groupCount, columnsPerGroup } = seatConfig.value
+    const { groupCount } = seatConfig.value
+    const groupConfig = getGroupConfig(groupIndex)
+    const columnsInGroup = groupConfig.columns
 
     const isFirstGroup = groupIndex === 0
     const isLastGroup = groupIndex === groupCount - 1
     const isFirstCol = columnIndex === 0
-    const isLastCol = columnIndex === columnsPerGroup - 1
+    const isLastCol = columnIndex === columnsInGroup - 1
 
     // 最边缘的墙边列（整个座位图的最左/最右列）
     const isWall = (isFirstGroup && isFirstCol) || (isLastGroup && isLastCol)
@@ -383,21 +459,32 @@ export function useSeatChart() {
 
   /**
    * 判断 seatId1 是否在 seatId2 的视线前方（即 seatId1 遮挡 seatId2）
-   * 讲台在下方：rowIndex 越大的座位在屏幕上越靠下，离讲台越近。
-   * 若 s1 遮挡 s2，则 s1 必须在 s2 前方（离讲台更近），即 s1.rowIndex 必须更大。
-   * @param {string} seatId1 - 遮挡者（在前方，离讲台更近）
-   * @param {string} seatId2 - 被遮挡者（在后方，离讲台更远）
+   * 根据 alignment 配置决定"前方"的方向：
+   * - 'bottom': 讲台在下方，rowIndex 越大越靠前（离讲台近）
+   * - 'top': 对齐顶部，rowIndex 越小越靠前（离讲台远但在顶部）
+   * @param {string} seatId1 - 遮挡者（在前方）
+   * @param {string} seatId2 - 被遮挡者（在后方）
    * @param {number} tolerance - 0=仅正前方; 1=正前方±1列
    */
   const isDirectlyBehind = (seatId1, seatId2, tolerance = 0) => {
     const s1 = parseSeatId(seatId1)
     const s2 = parseSeatId(seatId2)
-
-    // 遮挡者必须在被遮挡者的前方（离讲台更近，因此 rowIndex 必须更大）
-    if (s1.rowIndex <= s2.rowIndex) return false
+    const { seatAlignment } = seatConfig.value
 
     // 遮挡者必须在同大组
     if (s1.groupIndex !== s2.groupIndex) return false
+
+    // 根据对齐方式判断谁在前方
+    let isInFront
+    if (seatAlignment === 'top') {
+      // 对齐顶部：rowIndex 越小越靠前（顶部）
+      isInFront = s1.rowIndex < s2.rowIndex
+    } else {
+      // 对齐底部/讲台：rowIndex 越大越靠前（离讲台近）
+      isInFront = s1.rowIndex > s2.rowIndex
+    }
+
+    if (!isInFront) return false
 
     const colDiff = Math.abs(s1.columnIndex - s2.columnIndex)
     return colDiff <= tolerance
@@ -464,6 +551,9 @@ export function useSeatChart() {
     isAdjacentRow,
     isInGroupRange,
     getTotalRows,
-    getSeatGroup
+    getSeatGroup,
+    // 新增的布局配置辅助函数
+    getGroupConfig,
+    ensureGroupsArray
   }
 }

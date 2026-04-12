@@ -87,6 +87,9 @@
             <h3>座位表配置</h3>
           </div>
           <div class="options-group">
+            <button class="option-button" @click="showSeatConfigDialog = true">
+              <span class="btn-content"><Settings :size="14" stroke-width="2" />高级配置</span>
+            </button>
             <div class="input-group">
               <label for="groupCount">大组数量:</label>
               <input id="groupCount" v-model.number="configForm.groupCount" type="number" min="1" max="10" />
@@ -99,8 +102,35 @@
               <label for="seatsPerColumn">每列座位数:</label>
               <input id="seatsPerColumn" v-model.number="configForm.seatsPerColumn" type="number" min="1" max="10" />
             </div>
-            <button class="option-button primary" @click="applyConfig">
-              <span class="btn-content"><Check :size="14" stroke-width="2.5" />应用配置</span>
+            <div class="input-group">
+              <label>讲台位置</label>
+              <div class="alignment-buttons-simple">
+                <button 
+                  class="alignment-btn-simple" 
+                  :class="{ active: configForm.podiumPosition === 'bottom' }"
+                  @click="configForm.podiumPosition = 'bottom'"
+                >
+                  底部
+                </button>
+                <button 
+                  class="alignment-btn-simple" 
+                  :class="{ active: configForm.podiumPosition === 'top' }"
+                  @click="configForm.podiumPosition = 'top'"
+                >
+                  顶部
+                </button>
+              </div>
+            </div>
+            <button 
+              class="option-button primary" 
+              :class="{ 'confirming': isConfirming('applyConfig').value }"
+              @click="applyConfig"
+            >
+              <span class="btn-content">
+                <Check :size="14" stroke-width="2.5" />
+                <span v-if="isConfirming('applyConfig').value">再次点击确认清空</span>
+                <span v-else>应用配置</span>
+              </span>
             </button>
           </div>
 
@@ -460,17 +490,26 @@
   <!-- 标签设置弹窗 -->
   <TagSettingsDialog v-model:visible="showTagSettingsDialog" />
 
+  <!-- 座位表配置弹窗 -->
+  <SeatConfigDialog
+    :visible="showSeatConfigDialog"
+    @update:visible="showSeatConfigDialog = $event"
+    :isConfirming="isConfirming('applyConfig').value"
+    @confirm="handleSeatConfigConfirm"
+  />
+
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed, defineAsyncComponent } from 'vue'
-import { ArrowLeftRight, Check, CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, LayoutGrid, ListFilter, Loader2, Minus, Plus, Play, RefreshCcw, Save, Scale, Settings2, Shuffle, Sliders, Tag, Trash2, FileInput, FileOutput, Users, X } from 'lucide-vue-next'
+import { ArrowLeftRight, Check, CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, LayoutGrid, ListFilter, Loader2, Minus, Plus, Play, RefreshCcw, Save, Scale, Settings, Settings2, Shuffle, Sliders, Tag, Trash2, FileInput, FileOutput, Users, X } from 'lucide-vue-next'
 
 const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
 const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
 const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
 const StudentRosterDialog = defineAsyncComponent(() => import('../student/StudentRosterDialog.vue'))
 const TagSettingsDialog = defineAsyncComponent(() => import('../student/TagSettingsDialog.vue'))
+const SeatConfigDialog = defineAsyncComponent(() => import('./SeatConfigDialog.vue'))
 
 import { useSidebar } from '@/composables/useSidebar'
 import { useSeatChart } from '@/composables/useSeatChart'
@@ -512,8 +551,39 @@ const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom(
 const { zones } = useZoneData()
 const { recordBatch, createSnapshot } = useUndo()
 const { showCloudDialog, cloudDialogMode, openCloudLoad, openCloudSave, handleCloudSuccess } = useCloudWorkspaceDialog()
-const totalSeats = computed(() => seatConfig.value.groupCount * seatConfig.value.columnsPerGroup * seatConfig.value.seatsPerColumn)
+const showSeatConfigDialog = ref(false)
+const totalSeats = computed(() => {
+  const config = seatConfig.value
+  let total = 0
+  for (let g = 0; g < config.groupCount; g++) {
+    const groupConfig = config.groups && config.groups[g]
+      ? { columns: config.groups[g].columns || config.columnsPerGroup, rows: config.groups[g].rows || config.seatsPerColumn }
+      : { columns: config.columnsPerGroup, rows: config.seatsPerColumn }
+    total += groupConfig.columns * groupConfig.rows
+  }
+  return total
+})
 const handleFitZoom = () => fitToViewport()
+
+const handleSeatConfigConfirm = (newConfig) => {
+  const confirmed = requestConfirm('applyConfig', () => {
+    updateConfig(newConfig)
+    clearAllSeats()
+    // 同步更新配置表单
+    configForm.value.groupCount = newConfig.groupCount
+    configForm.value.podiumPosition = newConfig.podiumPosition || 'bottom'
+    if (newConfig.groups && newConfig.groups.length > 0) {
+      configForm.value.columnsPerGroup = newConfig.groups[0].columns
+      configForm.value.seatsPerColumn = newConfig.groups[0].rows
+    }
+    showSeatConfigDialog.value = false
+    success('座位配置已更新')
+  }, '再次点击确认清空')
+  
+  if (!confirmed) {
+    warning('再次点击"应用配置"按钮以确认清空所有座位')
+  }
+}
 
 // ==================== 选区轮换 ====================
 const {
@@ -605,6 +675,7 @@ const configForm = ref({
   shiftDistance: 4,
   shiftColShift: 0,
   shiftDirection: -1,
+  podiumPosition: 'bottom'
 })
 
 // 排位配置
@@ -1490,6 +1561,18 @@ watch(
   { deep: true }
 )
 
+// 监听 seatConfig 变化，同步到 configForm
+watch(
+  seatConfig,
+  (newConfig) => {
+    configForm.value.groupCount = newConfig.groupCount
+    configForm.value.columnsPerGroup = newConfig.columnsPerGroup
+    configForm.value.seatsPerColumn = newConfig.seatsPerColumn
+    configForm.value.podiumPosition = newConfig.podiumPosition || 'bottom'
+  },
+  { deep: true, immediate: true }
+)
+
 onMounted(() => {
   runAssignmentPrecheck({ silent: true })
 })
@@ -1784,6 +1867,36 @@ const formatLogTime = (timestamp) => {
   border-bottom: none;
 }
 
+.alignment-buttons-simple {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.alignment-btn-simple {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  background: white;
+  color: #666;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.alignment-btn-simple:hover {
+  border-color: #23587b;
+  color: #23587b;
+}
+
+.alignment-btn-simple.active {
+  border-color: #23587b;
+  background: linear-gradient(135deg, #23587b, #2d6a94);
+  color: white;
+}
+
 .option-button {
   display: flex;
   align-items: center;
@@ -1834,25 +1947,10 @@ const formatLogTime = (timestamp) => {
 }
 
 .option-button.confirming {
-  background: #FF9800 !important;
+  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
   color: white !important;
-  border-color: #FF9800 !important;
-  animation: pulse 0.8s ease-in-out infinite;
-  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
-  }
-
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 6px rgba(255, 152, 0, 0.3);
-  }
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
 }
 
 .input-group {

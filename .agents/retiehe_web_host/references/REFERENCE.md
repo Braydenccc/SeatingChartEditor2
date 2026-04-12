@@ -7,7 +7,7 @@
 ### 超全局变量
 
 | 变量 | 说明 | 示例 |
-|------|------|------|
+| ---- | ---- | ---- |
 | `$_GET` | URL 查询参数 | `$_GET["name"]` |
 | `$_POST` | POST 请求体参数 | `$_POST["message"]` |
 | `$_COOKIE` | Cookie | `$_COOKIE["sessionId"]` |
@@ -17,7 +17,7 @@
 ### 常用 $_SERVER 键
 
 | 键名 | 说明 |
-|------|------|
+| ---- | ---- |
 | `REQUEST_METHOD` | 请求方法（GET、POST 等） |
 | `QUERY_STRING` | 查询字符串 |
 | `HTTP_HOST` | 主机名 |
@@ -31,7 +31,7 @@
 ### 输出函数
 
 | 函数 | 说明 |
-|------|------|
+| ---- | ---- |
 | `echo` | 输出一个或多个字符串 |
 | `print` | 输出一个字符串 |
 | `var_dump` | 打印变量的详细信息 |
@@ -40,7 +40,7 @@
 ### HTTP 响应相关
 
 | 函数 | 说明 | 示例 |
-|------|------|------|
+| ---- | ---- | ---- |
 | `header()` | 设置响应头 | `header("Content-Type: application/json")` |
 | `http_response_code()` | 设置响应状态码 | `http_response_code(404)` |
 | `setcookie()` | 设置 Cookie | `setcookie("name", "value", time() + 3600)` |
@@ -49,7 +49,7 @@
 ### Session 函数
 
 | 函数 | 说明 |
-|------|------|
+| ---- | ---- |
 | `session_start()` | 启动 Session |
 | `session_destroy()` | 销毁 Session |
 | `session_unset()` | 释放所有 Session 变量 |
@@ -58,7 +58,7 @@
 ### 文件操作函数
 
 | 函数 | 说明 |
-|------|------|
+| ---- | ---- |
 | `file_get_contents()` | 读取文件内容 |
 | `file_put_contents()` | 写入文件内容 |
 | `file_exists()` | 检查文件是否存在 |
@@ -73,7 +73,7 @@
 ### 引入文件
 
 | 函数 | 说明 | 行为 |
-|------|------|------|
+| ---- | ---- | ---- |
 | `include` | 引入文件 | 不存在时继续执行 |
 | `include_once` | 引入文件（仅一次） | 不存在时继续执行 |
 | `require` | 引入文件 | 不存在时报错停止 |
@@ -82,9 +82,9 @@
 ### 数据库 API (Database 类)
 
 | 方法 | 说明 | 返回值 |
-|------|------|--------|
+| ---- | ---- | ------ |
 | `__construct(string $name)` | 创建或打开数据库 | Database 实例 |
-| `get(string $key)` | 获取键值 | string|null |
+| `get(string $key)` | 获取键值 | string\|null |
 | `set(string $key, string $value)` | 设置键值 | void |
 | `delete(string $key)` | 删除键值 | void |
 | `list_keys()` | 列出所有键 | array |
@@ -95,7 +95,7 @@
 ### 字符串处理
 
 | 函数 | 说明 |
-|------|------|
+| ---- | ---- |
 | `strlen()` | 字符串长度 |
 | `strpos()` | 查找子串位置 |
 | `str_replace()` | 字符串替换 |
@@ -109,7 +109,7 @@
 ### 数组处理
 
 | 函数 | 说明 |
-|------|------|
+| ---- | ---- |
 | `count()` | 数组元素个数 |
 | `in_array()` | 检查值是否在数组中 |
 | `array_push()` | 向数组末尾添加元素 |
@@ -124,7 +124,7 @@
 ### 日期时间
 
 | 函数 | 说明 |
-|------|------|
+| ---- | ---- |
 | `time()` | 当前时间戳 |
 | `date()` | 格式化日期 |
 | `strtotime()` | 将字符串解析为时间戳 |
@@ -135,7 +135,7 @@
 ### 全局对象
 
 | 对象 | 说明 |
-|------|------|
+| ---- | ---- |
 | `req` | 请求对象（Express 风格） |
 | `res` | 响应对象（Express 风格） |
 | `document` | 文档对象（浏览器风格） |
@@ -153,7 +153,7 @@
 ### req 对象属性
 
 | 属性 | 说明 | 示例 |
-|------|------|------|
+| ---- | ---- | ---- |
 | `req.query` | URL 查询参数 | `req.query.name` |
 | `req.body` | POST 请求体 | `req.body.message` |
 | `req.headers` | 请求头 | `req.headers["user-agent"]` |
@@ -165,7 +165,7 @@
 ### res 对象方法
 
 | 方法 | 说明 | 示例 |
-|------|------|------|
+| ---- | ---- | ---- |
 | `res.write(string)` | 写入响应内容 | `res.write("Hello")` |
 | `res.end(string)` | 结束响应并返回 | `res.end("Done")` |
 | `res.send(string)` | 同 `res.end()` | - |
@@ -179,27 +179,27 @@
 ### document 对象
 
 | 属性/方法 | 说明 |
-|-----------|------|
+| ----------- | ---- |
 | `document.write(string)` | 写入响应内容 |
 | `document.referrer` | 来源网址 |
 
 ### location 对象
 
 | 属性 | 说明 |
-|-------|------|
+| ---- | ---- |
 | `location.href` | 完整 URL |
 | `location.search` | 查询字符串 |
 
 ### navigator 对象
 
 | 属性 | 说明 |
-|-------|------|
+| ---- | ---- |
 | `navigator.userAgent` | 用户代理 |
 
 ### fs 对象方法 (同步)
 
 | 方法 | 说明 |
-|------|------|
+| ---- | ---- |
 | `fs.readFileSync(path)` | 读取文件 |
 | `fs.writeFileSync(path, data)` | 写入文件 |
 | `fs.existsSync(path)` | 检查文件是否存在 |
@@ -211,54 +211,54 @@
 ### localStorage 对象
 
 | 方法 | 说明 |
-|------|------|
+| ---- | ---- |
 | `localStorage.getItem(key)` | 获取值 |
 | `localStorage.setItem(key, value)` | 设置值 |
 | `localStorage.removeItem(key)` | 删除值 |
 
 ### process 对象
 
-| 方法 | 说明 |
-|------|------|
+| 方法/属性 | 说明 |
+| ---- | ---- |
 | `process.exit()` | 退出程序 |
 | `process.env` | 环境变量 |
 
 ### os 对象
 
 | 方法 | 说明 |
-|------|------|
+| ---- | ---- |
 | `os.diskFreeSpace()` | 获取剩余空间 |
 
 ### crypto 对象
 
 | 方法 | 说明 |
-|------|------|
+| ---- | ---- |
 | `crypto.createHash(algorithm)` | 创建哈希对象 |
 | `crypto.createHmac(algorithm, key)` | 创建 HMAC 对象 |
 
-### 数据库 API (Database 类)
+### Node.js 数据库 API (Database 类)
 
 | 方法 | 说明 | 返回值 |
-|------|------|--------|
+| ---- | ---- | ------ |
 | `constructor(string name)` | 创建或打开数据库 | Database 实例 |
-| `get(string key)` | 获取键值（异步） | Promise<string> |
+| `get(string key)` | 获取键值（异步） | Promise&lt;string&gt; |
 | `set(string key, string value)` | 设置键值（同步） | void |
 | `delete(string key)` | 删除键值（同步） | void |
-| `listKeys()` | 列出所有键（异步） | Promise<string[]> |
+| `listKeys()` | 列出所有键（异步） | Promise&lt;string[]&gt; |
 | `push(string key, string value)` | 向数组添加值（同步） | void |
-| `getArray(string key)` | 获取数组（异步） | Promise<string[]> |
+| `getArray(string key)` | 获取数组（异步） | Promise&lt;string[]&gt; |
 
 ### JSON 处理
 
 | 方法 | 说明 |
-|------|------|
+| ---- | ---- |
 | `JSON.stringify(object)` | 对象转 JSON 字符串 |
 | `JSON.parse(string)` | JSON 字符串转对象 |
 
 ### require 函数
 
 | 用途 | 示例 |
-|------|------|
+| ---- | ---- |
 | 引入 Node.js 模块 | `const fs = require("fs")` |
 | 引入本地文件 | `const utils = require("lib/utils.node.js")` |
 | 引入 JSON 文件 | `const config = require("config.json")` |
@@ -396,7 +396,7 @@ class DBHelper {
 ## 常见状态码
 
 | 状态码 | 含义 | 使用场景 |
-|--------|------|----------|
+| ------ | ---- | -------- |
 | 200 | OK | 请求成功 |
 | 201 | Created | 创建成功 |
 | 204 | No Content | 成功但无返回内容 |

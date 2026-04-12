@@ -410,20 +410,8 @@ onUnmounted(() => {
 }
 
 .delete-zone-btn.confirming {
-  background: #FF9800 !important;
-  animation: pulse 0.8s ease-in-out infinite;
-  box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
-}
-
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
-  }
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 4px rgba(255, 152, 0, 0.3);
-  }
+  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
 }
 
 .tag-picker {

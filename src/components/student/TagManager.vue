@@ -317,35 +317,8 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-action-btn.delete.confirming {
-  background: #fff7ed !important;
-  color: #ea580c !important;
-  animation: pulse-icon 0.8s ease-in-out infinite;
-}
-
-@keyframes pulse-icon {
-
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.2);
-  }
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
-  }
-
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 4px rgba(255, 152, 0, 0.3);
-  }
+  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  color: white !important;
 }
 
 /* 对话框样式 */

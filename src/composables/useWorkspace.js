@@ -379,6 +379,32 @@ export function useWorkspace() {
       delete ws.timestamp
     }
 
+    // v2.0 → v2.2：添加 groups 数组支持每大组独立配置
+    if (version.startsWith('2.') && ws.layout?.config && !ws.layout.config.groups) {
+      const config = ws.layout.config
+      const groupCount = config.groupCount || 4
+      config.groups = []
+      for (let i = 0; i < groupCount; i++) {
+        config.groups.push({
+          columns: config.columnsPerGroup || 2,
+          rows: config.seatsPerColumn || 7
+        })
+      }
+    }
+
+    // v2.x → v2.3：将单一的 alignment 配置拆分为 podiumPosition 和 seatAlignment
+    if (ws.layout?.config?.alignment && !ws.layout.config.podiumPosition) {
+      ws.layout.config.podiumPosition = ws.layout.config.alignment
+      ws.layout.config.seatAlignment = ws.layout.config.alignment
+      delete ws.layout.config.alignment
+    }
+
+    // 确保默认值
+    if (ws.layout?.config) {
+      if (!ws.layout.config.podiumPosition) ws.layout.config.podiumPosition = 'bottom'
+      if (!ws.layout.config.seatAlignment) ws.layout.config.seatAlignment = 'bottom'
+    }
+
     // 确保默认值
     ws.zones = ws.zones || []
     ws.exportSettings = ws.exportSettings || {}

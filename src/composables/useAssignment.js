@@ -33,7 +33,8 @@ export function useAssignment() {
     isAdjacentRow,
     isInGroupRange,
     getTotalRows,
-    getSeatGroup
+    getSeatGroup,
+    getGroupConfig
   } = useSeatChart()
   const { zones, getZoneForSeat } = useZoneData()
 
@@ -47,6 +48,29 @@ export function useAssignment() {
     reheatCount: 0,
     algorithm: 'SA'
   })
+
+  // ==================== 布局辅助工具（支持复杂布局） ====================
+
+  // 计算座位的全局列位置（支持每大组不同列数）
+  const getGlobalColumn = (groupIndex, columnIndex) => {
+    let globalCol = 0
+    for (let g = 0; g < groupIndex; g++) {
+      const groupConfig = getGroupConfig ? getGroupConfig(g) : { columns: seatConfig.value.columnsPerGroup }
+      globalCol += groupConfig.columns
+    }
+    globalCol += columnIndex
+    return globalCol
+  }
+
+  // 获取所有大组的总列数
+  const getTotalColumns = () => {
+    return getTotalColumnsFromConfig(seatConfig.value)
+  }
+
+  // 获取所有大组的最大行数
+  const getMaxRows = () => {
+    return getMaxRowsFromConfig(seatConfig.value)
+  }
 
   // ==================== 随机工具 ====================
 
@@ -72,14 +96,50 @@ export function useAssignment() {
 
   // ==================== 理想距离计算（基于学生数和教室尺寸） ====================
 
+  // 辅助函数：基于传入的 seatConfig 计算总列数
+  const getTotalColumnsFromConfig = (config) => {
+    let totalCols = 0
+    for (let g = 0; g < config.groupCount; g++) {
+      const groupConfig = config.groups && config.groups[g]
+        ? { columns: config.groups[g].columns || config.columnsPerGroup }
+        : { columns: config.columnsPerGroup }
+      totalCols += groupConfig.columns
+    }
+    return totalCols
+  }
+
+  // 辅助函数：基于传入的 seatConfig 计算最大行数
+  const getMaxRowsFromConfig = (config) => {
+    let maxRows = 0
+    for (let g = 0; g < config.groupCount; g++) {
+      const groupConfig = config.groups && config.groups[g]
+        ? { rows: config.groups[g].rows || config.seatsPerColumn }
+        : { rows: config.seatsPerColumn }
+      maxRows = Math.max(maxRows, groupConfig.rows)
+    }
+    return maxRows
+  }
+
+  // 辅助函数：基于传入的 seatConfig 计算总座位数
+  const getTotalSeatsFromConfig = (config) => {
+    let totalSeats = 0
+    for (let g = 0; g < config.groupCount; g++) {
+      const groupConfig = config.groups && config.groups[g]
+        ? { columns: config.groups[g].columns || config.columnsPerGroup, rows: config.groups[g].rows || config.seatsPerColumn }
+        : { columns: config.columnsPerGroup, rows: config.seatsPerColumn }
+      totalSeats += groupConfig.columns * groupConfig.rows
+    }
+    return totalSeats
+  }
+
   const calculateIdealMinDistance = (studentCount, seatConfig) => {
     if (studentCount <= 1) return Infinity
     if (!seatConfig) return Math.max(1.41, Math.sqrt(studentCount) * 0.8)
 
-    const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig
-    const totalCols = groupCount * columnsPerGroup
-    const totalRows = seatsPerColumn
-    const totalSeats = totalCols * totalRows
+    // 支持复杂布局的计算（基于传入的 seatConfig 参数）
+    const totalCols = getTotalColumnsFromConfig(seatConfig)
+    const totalRows = getMaxRowsFromConfig(seatConfig)
+    const totalSeats = getTotalSeatsFromConfig(seatConfig)
 
     const maxTheoreticalDistance = Math.sqrt((totalCols - 1) * (totalCols - 1) + (totalRows - 1) * (totalRows - 1))
 
@@ -303,9 +363,8 @@ export function useAssignment() {
         const seatId = assignment.get(subj.studentId)
         if (!seatId) continue
         const parsed = parseSeatId(seatId)
-        // 计算全局列号：跨大组的连续坐标
-        const { columnsPerGroup } = seatConfig.value
-        const globalCol = parsed.groupIndex * columnsPerGroup + parsed.columnIndex
+        // 计算全局列号：跨大组的连续坐标（支持每大组不同列数）
+        const globalCol = getGlobalColumn(parsed.groupIndex, parsed.columnIndex)
         positioned.push({
           studentId: subj.studentId,
           seatId,
@@ -448,8 +507,8 @@ export function useAssignment() {
         const seatId = assignment.get(subj.studentId)
         if (!seatId) continue
         const parsed = parseSeatId(seatId)
-        const { columnsPerGroup } = seatConfig.value
-        const globalCol = parsed.groupIndex * columnsPerGroup + parsed.columnIndex
+        // 计算全局列号：跨大组的连续坐标（支持每大组不同列数）
+        const globalCol = getGlobalColumn(parsed.groupIndex, parsed.columnIndex)
         positioned.push({
           studentId: subj.studentId,
           globalCol,
