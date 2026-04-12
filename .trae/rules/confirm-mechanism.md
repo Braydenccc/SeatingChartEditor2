@@ -81,12 +81,12 @@ const handleApply = () => {
 
 <style scoped>
 .confirm-btn {
-  background: linear-gradient(135deg, #23587b, #2d6a94);
+  background: #23587b;
   color: white;
 }
 
 .confirm-btn.confirming {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  background: #dc2626;
 }
 </style>
 ```
@@ -107,7 +107,7 @@ const handleApply = () => {
 
 确认状态按钮样式：
 
-- 背景：红色渐变 `linear-gradient(135deg, #dc2626, #b91c1c)`
+- 背景：#dc2626
 - 动画：无（禁用脉冲动画）
 - 文字：确认提示文字
 

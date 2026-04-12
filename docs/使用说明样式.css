@@ -1,0 +1,276 @@
+/* 使用说明页面样式 */
+.usage-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.guide-section {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #eef2f6;
+}
+
+.guide-title {
+  margin: 0 0 12px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #23587b;
+}
+
+.guide-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-text {
+  margin: 0;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.step-number {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #23587b, #2d6a94);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-text {
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.rule-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.rule-type-card {
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.rule-type-title {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.rule-type-list {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rule-type-list li {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.priority-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.priority-card {
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  border: 2px solid #e2e8f0;
+  text-align: center;
+}
+
+.priority-card.required {
+  border-color: #fee2e2;
+  background: linear-gradient(135deg, #fff1f2, #fee2e2);
+}
+
+.priority-card.prefer {
+  border-color: #fef9c3;
+  background: linear-gradient(135deg, #fffbeb, #fef9c3);
+}
+
+.priority-card.optional {
+  border-color: #f1f5f9;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+}
+
+.priority-title {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.priority-card.required .priority-title {
+  color: #dc2626;
+}
+
+.priority-card.prefer .priority-title {
+  color: #b45309;
+}
+
+.priority-card.optional .priority-title {
+  color: #475569;
+}
+
+.priority-desc {
+  margin: 0;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.subject-guide {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.subject-item {
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.subject-title {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.subject-desc {
+  margin: 0;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.guide-tip {
+  margin: 0;
+  padding: 10px 12px;
+  background: #eff6ff;
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
+  font-size: 12px;
+  color: #1d4ed8;
+  line-height: 1.5;
+}
+
+.tips-list {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tips-list li {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.tip-actions {
+  margin-top: 12px;
+}
+
+.tip-actions.center {
+  display: flex;
+  justify-content: center;
+}
+
+.tip-action-btn {
+  border: 1px solid #23587b;
+  background: #23587b;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tip-action-btn:hover {
+  background: #2d6a94;
+  border-color: #2d6a94;
+}
+
+/* Markdown 内容样式 */
+.markdown-content h3 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.markdown-content h4 {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.markdown-content blockquote {
+  margin: 0;
+  padding: 10px 12px;
+  background: #eff6ff;
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
+  font-size: 12px;
+  color: #1d4ed8;
+  line-height: 1.5;
+}
+
+.markdown-content hr {
+  border: none;
+  height: 1px;
+  background: #e2e8f0;
+  margin: 16px 0;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .rule-type-grid,
+  .priority-grid,
+  .subject-guide {
+    grid-template-columns: 1fr;
+  }
+}

@@ -26,7 +26,7 @@ trigger: always_on
 ## 视觉
 
 - 品牌色：#23587b
+- 危险色：#dc2626
 - 阴影：0 2px 4px rgba(0,0,0,0.08)
 - 圆角：6-12px
-- 渐变：linear-gradient(135deg, #23587b, #2d6a94)
 - 过渡：all 0.2s ease

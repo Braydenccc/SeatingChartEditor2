@@ -66,69 +66,11 @@
 
         <!-- Tab 2: 使用说明 -->
         <div v-show="activeTab === 'personal'" class="tab-content">
-          <div class="usage-guide">
-            <div v-for="(section, index) in guide.sections" :key="index" class="guide-section">
-              <h4 class="guide-title">{{ section.title }}</h4>
-              <div class="guide-content">
-                <!-- 快速入门 -->
-                <template v-if="section.content && section.steps">
-                  <p class="guide-text">{{ section.content }}</p>
-                  <div class="guide-steps">
-                    <div v-for="(step, stepIndex) in section.steps" :key="stepIndex" class="guide-step">
-                      <span class="step-number">{{ stepIndex + 1 }}</span>
-                      <span class="step-text">{{ step }}</span>
-                    </div>
-                  </div>
-                </template>
-
-                <!-- 规则类型详解 -->
-                <template v-else-if="section.categories">
-                  <div class="rule-type-grid">
-                    <div v-for="(category, catIndex) in section.categories" :key="catIndex" class="rule-type-card">
-                      <h5 class="rule-type-title">{{ category.title }}</h5>
-                      <ul class="rule-type-list">
-                        <li v-for="(rule, ruleIndex) in category.rules" :key="ruleIndex">
-                          <strong>{{ rule.name }}</strong>：{{ rule.desc }}
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </template>
-
-                <!-- 优先级说明 -->
-                <template v-else-if="section.priorities">
-                  <div class="priority-grid">
-                    <div v-for="(priority, pIndex) in section.priorities" :key="pIndex" class="priority-card" :class="priority.color">
-                      <h5 class="priority-title">{{ priority.level }}</h5>
-                      <p class="priority-desc">{{ priority.desc }}</p>
-                    </div>
-                  </div>
-                </template>
-
-                <!-- 对象选择 -->
-                <template v-else-if="section.subjects">
-                  <div class="subject-guide">
-                    <div v-for="(subject, sIndex) in section.subjects" :key="sIndex" class="subject-item">
-                      <h5 class="subject-title">{{ subject.type }}</h5>
-                      <p class="subject-desc">{{ subject.desc }}</p>
-                    </div>
-                  </div>
-                  <p v-if="section.tip" class="guide-tip">{{ section.tip }}</p>
-                </template>
-
-                <!-- 高级技巧 -->
-                <template v-else-if="section.tips">
-                  <ul class="tips-list">
-                    <li v-for="(tip, tIndex) in section.tips" :key="tIndex">{{ tip }}</li>
-                  </ul>
-                </template>
-              </div>
-            </div>
-
-            <div class="tip-actions center">
+          <RuleUsageGuide>
+            <template #action-button>
               <button class="tip-action-btn" @click="activeTab = 'rules'">去规则总览创建规则</button>
-            </div>
-          </div>
+            </template>
+          </RuleUsageGuide>
         </div>
 
       </div>
@@ -150,7 +92,7 @@ import { useSeatRules } from '@/composables/useSeatRules'
 import { useLogger } from '@/composables/useLogger'
 import RuleBuilder from '@/components/rule/RuleBuilder.vue'
 import RuleList from '@/components/rule/RuleList.vue'
-import { RULE_USAGE_GUIDE } from '@/constants/docs.js'
+import RuleUsageGuide from '@/components/docs/RuleUsageGuide.vue'
 
 const props = defineProps({
   visible: {
@@ -172,7 +114,6 @@ const emit = defineEmits(['close'])
 const { rules, ruleCount, exportRules, importRules } = useSeatRules()
 const { success, warning, error } = useLogger()
 const ruleListRef = ref(null)
-const guide = RULE_USAGE_GUIDE
 
 // ==================== Tab 状态 ====================
 const activeTab = ref('rules')
@@ -460,233 +401,20 @@ const close = () => {
   cursor: pointer;
 }
 
+.tip-action-btn {
+  border: 1px solid #23587b;
+  background: #23587b;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .tip-action-btn:hover {
   background: #2d6a94;
   border-color: #2d6a94;
-}
-
-/* 使用说明样式 */
-.usage-guide {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.guide-section {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 16px;
-  border: 1px solid #eef2f6;
-}
-
-.guide-title {
-  margin: 0 0 12px 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: #23587b;
-}
-
-.guide-content {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.guide-text {
-  margin: 0;
-  font-size: 13px;
-  color: #475569;
-  line-height: 1.6;
-}
-
-.guide-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.guide-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 12px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-}
-
-.step-number {
-  width: 24px;
-  height: 24px;
-  background: linear-gradient(135deg, #23587b, #2d6a94);
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.step-text {
-  font-size: 13px;
-  color: #334155;
-  line-height: 1.6;
-}
-
-.rule-type-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-.rule-type-card {
-  background: white;
-  border-radius: 8px;
-  padding: 12px;
-  border: 1px solid #e2e8f0;
-}
-
-.rule-type-title {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.rule-type-list {
-  margin: 0;
-  padding-left: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.rule-type-list li {
-  font-size: 12px;
-  color: #475569;
-  line-height: 1.5;
-}
-
-.priority-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.priority-card {
-  background: white;
-  border-radius: 8px;
-  padding: 12px;
-  border: 2px solid #e2e8f0;
-  text-align: center;
-}
-
-.priority-card.required {
-  border-color: #fee2e2;
-  background: linear-gradient(135deg, #fff1f2, #fee2e2);
-}
-
-.priority-card.prefer {
-  border-color: #fef9c3;
-  background: linear-gradient(135deg, #fffbeb, #fef9c3);
-}
-
-.priority-card.optional {
-  border-color: #f1f5f9;
-  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-}
-
-.priority-title {
-  margin: 0 0 6px 0;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.priority-card.required .priority-title {
-  color: #dc2626;
-}
-
-.priority-card.prefer .priority-title {
-  color: #b45309;
-}
-
-.priority-card.optional .priority-title {
-  color: #475569;
-}
-
-.priority-desc {
-  margin: 0;
-  font-size: 12px;
-  color: #475569;
-  line-height: 1.5;
-}
-
-.subject-guide {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-.subject-item {
-  background: white;
-  border-radius: 8px;
-  padding: 12px;
-  border: 1px solid #e2e8f0;
-}
-
-.subject-title {
-  margin: 0 0 6px 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.subject-desc {
-  margin: 0;
-  font-size: 12px;
-  color: #475569;
-  line-height: 1.5;
-}
-
-.guide-tip {
-  margin: 0;
-  padding: 10px 12px;
-  background: #eff6ff;
-  border-radius: 8px;
-  border: 1px solid #bfdbfe;
-  font-size: 12px;
-  color: #1d4ed8;
-  line-height: 1.5;
-}
-
-.tips-list {
-  margin: 0;
-  padding-left: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.tips-list li {
-  font-size: 13px;
-  color: #475569;
-  line-height: 1.6;
-}
-
-.tip-actions.center {
-  display: flex;
-  justify-content: center;
-}
-
-/* 响应式样式 */
-@media (max-width: 768px) {
-  .rule-type-grid,
-  .priority-grid,
-  .subject-guide {
-    grid-template-columns: 1fr;
-  }
 }
 
 
