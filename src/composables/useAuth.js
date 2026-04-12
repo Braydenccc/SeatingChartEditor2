@@ -145,13 +145,17 @@ export function useAuth() {
             })
 
             if (!response.ok) {
-                throw new Error(`HTTP Error: ${response.status}`)
+                // Read actual server error message instead of throwing generic error
+                const errorData = await response.json().catch(() => null)
+                const message = errorData?.message || `服务器错误 (${response.status})`
+                console.error('Auth API Error:', response.status, message)
+                return { success: false, message }
             }
 
             const result = await response.json()
             return result
         } catch (err) {
-            console.error('Auth API Error:', err)
+            console.error('Auth API Network Error:', err)
             return { success: false, message: '网络请求失败，请检查连接' }
         }
     }

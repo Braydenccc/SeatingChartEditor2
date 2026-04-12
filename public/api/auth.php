@@ -105,23 +105,36 @@ function getCsrfCookieCandidates() {
 }
 
 function ensureCsrfMatched() {
+    // Collect submitted CSRF token from header (preferred) and body (fallback)
     $csrfHeader = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? trim($_SERVER['HTTP_X_CSRF_TOKEN']) : '';
-    if ($csrfHeader === '') {
-        return false;
-    }
-    $candidates = getCsrfCookieCandidates();
-    foreach ($candidates as $candidate) {
-        if ($candidate !== '' && hash_equals($candidate, $csrfHeader)) {
-            return true;
-        }
-    }
+
     global $input;
+    $bodyCsrf = '';
     if (is_array($input) && isset($input['_csrf']) && is_string($input['_csrf'])) {
         $bodyCsrf = trim($input['_csrf']);
-        if ($bodyCsrf !== '' && hash_equals($bodyCsrf, $csrfHeader)) {
+    }
+
+    // Use header if available, otherwise body _csrf
+    $submittedToken = $csrfHeader !== '' ? $csrfHeader : $bodyCsrf;
+    if ($submittedToken === '') {
+        return false;
+    }
+
+    // Primary: Double-Submit Cookie — compare submitted token against cookie
+    $candidates = getCsrfCookieCandidates();
+    foreach ($candidates as $candidate) {
+        if ($candidate !== '' && hash_equals($candidate, $submittedToken)) {
             return true;
         }
     }
+
+    // Fallback: if cookie unavailable but header and body both present and match,
+    // accept for hosting environments where cookies may not be forwarded to PHP.
+    // Security still ensured by SameSite cookie + JSON Content-Type + CORS checks.
+    if ($csrfHeader !== '' && $bodyCsrf !== '' && hash_equals($csrfHeader, $bodyCsrf)) {
+        return true;
+    }
+
     return false;
 }
 

@@ -9,17 +9,20 @@ export function authMockPlugin() {
                     req.on('end', async () => {
                         res.setHeader('Content-Type', 'application/json')
 
-                        // CSRF double-submit cookie validation: the header token must match the cookie token
-                        // or the body _csrf field (fallback for serverless environments where cookies may not be forwarded)
-                        const csrfHeader = req.headers['x-csrf-token']
+                        // CSRF double-submit cookie validation (mirrors auth.php logic)
+                        const csrfHeader = req.headers['x-csrf-token'] || ''
                         const cookieHeader = req.headers['cookie'] || ''
                         const csrfCookieMatch = cookieHeader.match(/(?:^|;\s*)sce_csrf=([^;]+)/)
                         const csrfCookie = csrfCookieMatch ? decodeURIComponent(csrfCookieMatch[1]) : null
                         let csrfBodyToken = null
                         try { csrfBodyToken = JSON.parse(body)._csrf || null } catch(e) {}
-                        const csrfMatched = csrfHeader && (
-                            (csrfCookie && csrfHeader === csrfCookie) ||
-                            (csrfBodyToken && csrfHeader === csrfBodyToken)
+                        // Use header if available, otherwise body _csrf
+                        const submittedToken = csrfHeader || csrfBodyToken
+                        // Primary: compare submitted token against cookie
+                        // Fallback: header and body both present and match
+                        const csrfMatched = submittedToken && (
+                            (csrfCookie && submittedToken === csrfCookie) ||
+                            (csrfHeader && csrfBodyToken && csrfHeader === csrfBodyToken)
                         )
                         if (!csrfMatched) {
                             res.statusCode = 403
