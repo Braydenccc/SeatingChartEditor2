@@ -136,7 +136,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { CheckCircle2, Cloud, Folder, HardDrive, Inbox, Trash2 } from 'lucide-vue-next'
+import { CheckCircle2, Cloud, Folder, HardDrive, Inbox, Trash2, X } from 'lucide-vue-next'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
 import { useWorkspace } from '@/composables/useWorkspace'
 import { useLogger } from '@/composables/useLogger'
