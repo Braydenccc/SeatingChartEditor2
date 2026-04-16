@@ -24,17 +24,17 @@
     "@vueuse/core": "^14.2.1",
     "bcryptjs": "^3.0.3",
     "lucide-vue-next": "^1.0.0",
-    "pkg": "^5.8.1",
     "vue": "^3.5.22",
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.1",
     "@vitejs/plugin-vue": "^6.0.1",
+    "@yao-pkg/pkg": "^6.15.0",
     "cross-env": "^10.1.0",
     "electron": "^40.8.0",
     "electron-builder": "^26.8.1",
-    "vite": "^7.1.11",
+    "vite": "^7.3.2",
     "vite-plugin-compression": "^0.5.1",
     "vite-plugin-vue-devtools": "^8.0.3"
   },
