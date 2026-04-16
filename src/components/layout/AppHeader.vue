@@ -46,12 +46,14 @@
     </div>
     
     <CloudWorkspaceDialog
+      v-if="showCloudDialog"
       :visible="showCloudDialog"
       :mode="cloudDialogMode"
       @update:visible="showCloudDialog = $event"
       @success="handleCloudSuccess"
     />
     <SyncSettingsDialog 
+      v-if="showSyncSettings"
       :visible="showSyncSettings" 
       @update:visible="showSyncSettings = $event" 
     />

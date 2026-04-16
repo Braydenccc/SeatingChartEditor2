@@ -122,7 +122,11 @@ onMounted(async () => {
 
   <GlobalDropZone />
 
-  <LoginDialog v-model:visible="isLoginDialogVisible" :initial-tab="loginDialogInitialTab" />
+  <LoginDialog
+    v-if="isLoginDialogVisible"
+    v-model:visible="isLoginDialogVisible"
+    :initial-tab="loginDialogInitialTab"
+  />
 </template>
 
 <style scoped>
