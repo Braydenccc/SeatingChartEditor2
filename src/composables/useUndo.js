@@ -139,18 +139,18 @@ export function useUndo() {
     switch (command.type) {
       case 'assign':
         if (command.previousSeatId) {
-          assignStudent(command.previousSeatId, command.studentId)
+          assignStudent(command.previousSeatId, command.studentId, false)
         }
-        clearSeat(command.seatId)
+        clearSeat(command.seatId, false)
         break
       case 'clear':
-        assignStudent(command.seatId, command.studentId)
+        assignStudent(command.seatId, command.studentId, false)
         break
       case 'swap':
-        swapSeats(command.seatId1, command.seatId2)
+        swapSeats(command.seatId1, command.seatId2, false)
         break
       case 'toggleEmpty':
-        toggleEmpty(command.seatId)
+        toggleEmpty(command.seatId, false)
         break
       case 'batch':
         restoreSnapshot(command.beforeSnapshot)
@@ -165,18 +165,18 @@ export function useUndo() {
     switch (command.type) {
       case 'assign':
         if (command.previousSeatId) {
-          clearSeat(command.previousSeatId)
+          clearSeat(command.previousSeatId, false)
         }
-        assignStudent(command.seatId, command.studentId)
+        assignStudent(command.seatId, command.studentId, false)
         break
       case 'clear':
-        clearSeat(command.seatId)
+        clearSeat(command.seatId, false)
         break
       case 'swap':
-        swapSeats(command.seatId1, command.seatId2)
+        swapSeats(command.seatId1, command.seatId2, false)
         break
       case 'toggleEmpty':
-        toggleEmpty(command.seatId)
+        toggleEmpty(command.seatId, false)
         break
       case 'batch':
         restoreSnapshot(command.afterSnapshot)
