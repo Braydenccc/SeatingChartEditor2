@@ -2,9 +2,9 @@
 module_name: Cloud Sync & Authentication
 description: 官方账号认证机制及泛底层的 WebDAV 私有同步双轨方案。
 related_files:
-  - d:\00file\项目\座位表编辑器v2\scev2\src\composables\useAuth.js
-  - d:\00file\项目\座位表编辑器v2\scev2\src\composables\useWebDav.js
-  - d:\00file\项目\座位表编辑器v2\scev2\src\composables\useCloudWorkspace.js
+  - src/composables/useAuth.js
+  - src/composables/useWebDav.js
+  - src/composables/useCloudWorkspace.js
 ---
 
 # 07-云端同步与认证 (Cloud Sync & Authentication)
@@ -13,9 +13,9 @@ related_files:
 由于本软件定位“开箱即用”且部署在 Retinbox 上，因此提供了非常轻量的 `api/auth.php` 和 `api/workspace.php` 用于储存 `.sce` 存档。同时考虑到部分敏感学校不用公有云，所以内嵌了纯前端的纯原生 WebDAV 协议引擎。
 
 ## 2. 源代码入口 (Source Files)
-- 登录认证态: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useAuth.js`
-- WebDAV 底层驱动: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useWebDav.js`
-- 聚合存储操作平台: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useCloudWorkspace.js`
+- 登录认证态: `src/composables/useAuth.js`
+- WebDAV 底层驱动: `src/composables/useWebDav.js`
+- 聚合存储操作平台: `src/composables/useCloudWorkspace.js`
 
 ## 3. 数据模型 / 核心API (Data Models & Core API)
 

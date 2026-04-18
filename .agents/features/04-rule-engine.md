@@ -2,8 +2,8 @@
 module_name: Rule Engine
 description: 将用户对“座位安排”的自然语言需求转化为结构化的拓扑冲突约束，支持排位前自检。
 related_files:
-  - d:\00file\项目\座位表编辑器v2\scev2\src\composables\useSeatRules.js
-  - d:\00file\项目\座位表编辑器v2\scev2\src\constants\ruleTypes.js
+  - src/composables/useSeatRules.js
+  - src/constants/ruleTypes.js
 ---
 
 # 04-规则引擎方案 (Rule Engine Strategy)
@@ -12,8 +12,8 @@ related_files:
 定义、校验以及人类语言化渲染所有排位规则。规则引擎不直接执行排座位操作，它是给【05-自动排位算法】和【人工排位时 UI 报错机制】提供一个通用的“合规性检测器” (Compliance Checker)。
 
 ## 2. 源代码入口 (Source Files)
-- 规则配置字典: `d:\00file\项目\座位表编辑器v2\scev2\src\constants\ruleTypes.js` (存放枚举、默认参数、谓词元数据)
-- 规则中枢逻辑: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useSeatRules.js`
+- 规则配置字典: `src/constants/ruleTypes.js` (存放枚举、默认参数、谓词元数据)
+- 规则中枢逻辑: `src/composables/useSeatRules.js`
 
 ## 3. 数据模型 / 核心API (Data Models & Core API)
 

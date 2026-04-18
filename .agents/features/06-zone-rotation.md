@@ -2,8 +2,8 @@
 module_name: Zones & Rotation System
 description: 选区机制与周期性的座位大轮换。
 related_files:
-  - d:\00file\项目\座位表编辑器v2\scev2\src\composables\useZoneData.js
-  - d:\00file\项目\座位表编辑器v2\scev2\src\composables\useZoneRotation.js
+  - src/composables/useZoneData.js
+  - src/composables/useZoneRotation.js
 ---
 
 # 06-区域与轮换系统 (Zones & Rotation System)
@@ -12,8 +12,8 @@ related_files:
 将物理上杂散的座位集合归纳成逻辑“区域 (Zone)”，用于高亮显示或条件绑定。并在 Zone 的基础上，构建“大组轮换”引擎，使学生能在多个 Zone 之间周期性转移。
 
 ## 2. 源代码入口 (Source Files)
-- 选区元数据: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useZoneData.js`
-- 轮换执行逻辑: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useZoneRotation.js`
+- 选区元数据: `src/composables/useZoneData.js`
+- 轮换执行逻辑: `src/composables/useZoneRotation.js`
 
 ## 3. 数据模型 / 核心API (Data Models & Core API)
 

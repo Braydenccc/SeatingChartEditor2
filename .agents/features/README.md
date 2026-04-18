@@ -6,10 +6,14 @@
 
 ```mermaid
 graph TD
-  UI[UI 视图层<br/>SeatGrid.vue] --> |拖拽分发| Zoom(缩放平移引擎<br/>useZoom)
+  UI[UI 视图层<br/>SeatChart.vue] --> |拖拽分发| Zoom(缩放平移引擎<br/>useZoom)
   UI --> EditMode(工作模式状态<br/>useEditMode)
+  UI --> Selection(多选管理<br/>useSelection)
+  UI --> DragPreview(拖拽预览<br/>useDragPreview)
   
   EditMode -->|写入数据| CoreState
+  Selection -->|批量操作| CoreState
+  DragPreview -->|选区拖拽| CoreState
 
   subgraph 核心数据层 Composables (无框架无UI，纯响应式单例)
     direction TB
@@ -51,5 +55,6 @@ graph TD
   - [08-导出系统 (08-export-system.md)](./08-export-system.md)
 
 ## Vibe Coding 注意事项
+
 1. **优先保持结构完整**: 不要破坏已有的 `useXXX.js` 单例导出。如果是加功能，在原文件里暴露新的变量。
 2. **遵守 TypeScript 模型约束**: 上述文档已将项目里隐式的对象类型严格定义了，在修改业务之前，必须了解其底层是 `Map` 还是 `Array`，以及坐标维度。

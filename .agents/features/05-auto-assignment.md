@@ -2,7 +2,7 @@
 module_name: Auto-Assignment Algorithm
 description: 座位表的核心大脑。利用“模拟退火”实现满足多维约束（同桌、分区、排数、隔离距离、正前方防遮挡）的最优座次计算。
 related_files:
-  - d:\00file\项目\座位表编辑器v2\scev2\src\composables\useAssignment.js
+  - src/composables/useAssignment.js
 ---
 
 # 05-自动排位算法 (Auto-Assignment Algorithm)
@@ -11,9 +11,9 @@ related_files:
 将所有被放到右侧工作区的学生，根据《04-规则引擎》里定义的上百条冲突和偏好，找出一个最优（总体扣分最少）的坐法。它不再是 $O(n^2)$ 的贪婪分配，而是一种启发式暴力搜索过程。
 
 ## 2. 源代码入口 (Source Files)
-- 退火算法核心: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useAssignment.js`
-- 规则惩罚依赖: `d:\00file\项目\座位表编辑器v2\scev2\src\constants\ruleTypes.js`
-- 座位拓扑判定库: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useSeatChart.js` (依赖里面的 `validateRepulsion` 等方法)
+- 退火算法核心: `src/composables/useAssignment.js`
+- 规则惩罚依赖: `src/constants/ruleTypes.js`
+- 座位拓扑判定库: `src/composables/useSeatChart.js` (依赖里面的 `validateRepulsion` 等方法)
 
 ## 3. 算法核心概念 (The Heuristic Approach Context)
 

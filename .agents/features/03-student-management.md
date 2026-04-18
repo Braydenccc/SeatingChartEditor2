@@ -2,8 +2,8 @@
 module_name: Student & Data Management
 description: 提供学生数据的增删改查、以及与 Excel 双向互通的完整实现。
 related_files:
-  - d:\00file\项目\座位表编辑器v2\scev2\src\composables\useStudentData.js
-  - d:\00file\项目\座位表编辑器v2\scev2\src\composables\useExcelData.js
+  - src/composables/useStudentData.js
+  - src/composables/useExcelData.js
 ---
 
 # 03-学生与数据处理 (Student & Data Management)
@@ -12,9 +12,9 @@ related_files:
 解耦学生数据与座位。提供对学生列表的排序、标签绑定以及利用 `xlsx-js-style` 来解析用户上传的表格并转换成内化数据模型。
 
 ## 2. 源代码入口 (Source Files)
-- 学生数据 Store: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useStudentData.js`
-- 标签数据 Store: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useTagData.js`
-- Excel数据处理: `d:\00file\项目\座位表编辑器v2\scev2\src\composables\useExcelData.js`
+- 学生数据 Store: `src/composables/useStudentData.js`
+- 标签数据 Store: `src/composables/useTagData.js`
+- Excel数据处理: `src/composables/useExcelData.js`
 
 ## 3. 核心 API 暴露 (Core Internal Logic)
 
@@ -52,3 +52,5 @@ export const loadXlsx = async () => {
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **Lazy Load 依赖**: `useExcelData.js` 由于引入了 `xlsx-js-style` 这个非常巨大的包，绝不能使用顶层 `import`，必须通过封装好的 `loadXlsx()` 来异步获取它。如果你在这个文件里写了顶层导入，会导致首屏构建体积爆炸。
 - **选中态悬空**: 如果您编写了一个批量删除学生的组件，务必调用 `clearSelection()` 防止 `selectedStudentId` 仍保留着被删除实体的 ID 造成组件崩溃。
+- **标签显示模式**: 学生列表支持多种标签显示模式（完整显示、仅图标、隐藏等），通过 `useStudentData` 中的配置控制。修改标签渲染逻辑时需要考虑不同显示模式下的兼容性。
+- **学号唯一性**: 系统通过"抢夺式"机制保证学号唯一性。当为学生A设置已被学生B占用的学号时，学生B的学号会被自动清空。这是设计行为，不是bug。
