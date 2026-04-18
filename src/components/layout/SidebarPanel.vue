@@ -559,7 +559,7 @@ const handleFitZoom = () => fitToViewport()
 const handleSeatConfigConfirm = (newConfig) => {
   const confirmed = requestConfirm('applyConfig', () => {
     updateConfig(newConfig)
-    clearAllSeats()
+    clearAllSeats(false)
     // 同步更新配置表单
     configForm.value.groupCount = newConfig.groupCount
     configForm.value.podiumPosition = newConfig.podiumPosition || 'bottom'
@@ -977,7 +977,7 @@ const handleQuickExport = async () => {
 const applyConfig = () => {
   const confirmed = requestConfirm('applyConfig', () => {
     updateConfig(configForm.value)
-    clearAllSeats()
+    clearAllSeats(false)
     success('座位配置已更新')
   })
 
