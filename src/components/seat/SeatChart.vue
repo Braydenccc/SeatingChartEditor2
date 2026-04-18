@@ -14,15 +14,70 @@
         <span class="info-separator">·</span>
         <span class="info-item">讲台位置: {{ seatConfig.podiumPosition === 'bottom' ? '底部' : '顶部' }}</span>
       </div>
-      <div class="zoom-controls">
-        <button class="zoom-btn" @click.stop="zoomOut" :disabled="scale <= MIN_SCALE" title="缩小">
-          <Minus :size="16" stroke-width="2.5" />
+      <div class="toolbar-right">
+        <button
+          v-if="isMobile"
+          @click="undo"
+          :disabled="!canUndo()"
+          class="mobile-undo-btn"
+          title="撤销"
+        >
+          <Undo2 :size="16" stroke-width="2" />
         </button>
-        <button class="zoom-label" @click.stop="fitToViewport" title="自适应大小">
-          {{ Math.round(scale * 100) }}%
+        <button
+          v-if="isMobile"
+          @click="redo"
+          :disabled="!canRedo()"
+          class="mobile-redo-btn"
+          title="重做"
+        >
+          <Redo2 :size="16" stroke-width="2" />
         </button>
-        <button class="zoom-btn" @click.stop="zoomIn" :disabled="scale >= MAX_SCALE" title="放大">
-          <Plus :size="16" stroke-width="2.5" />
+        <button
+          v-if="isMobile"
+          @click="toggleSelectionMode"
+          :class="['mobile-select-btn', { active: isSelectionMode }]"
+        >
+          {{ isSelectionMode ? '关闭' : '选择' }}
+        </button>
+        <div class="zoom-controls">
+          <button class="zoom-btn" @click.stop="zoomOut" :disabled="scale <= MIN_SCALE" title="缩小">
+            <Minus :size="16" stroke-width="2.5" />
+          </button>
+          <button class="zoom-label" @click.stop="fitToViewport" title="自适应大小">
+            {{ Math.round(scale * 100) }}%
+          </button>
+          <button class="zoom-btn" @click.stop="zoomIn" :disabled="scale >= MAX_SCALE" title="放大">
+            <Plus :size="16" stroke-width="2.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 手机端固定选区工具栏 -->
+    <div v-if="isMobile && isSelectionMode" class="mobile-selection-toolbar-fixed">
+      <div class="selection-info">
+        <template v-if="selectedCount > 0">已选 {{ selectedCount }} 个座位</template>
+        <template v-else>请点击或滑动选择座位</template>
+      </div>
+      <div class="selection-actions">
+        <button @click="handleSelEdit" title="编辑" :disabled="selectedCount === 0">
+          <Edit2 :size="16" />
+        </button>
+        <button @click="handleSelClear" title="移出" :disabled="selectedCount === 0">
+          <UserMinus :size="16" />
+        </button>
+        <button v-if="selectedCount === 2" @click="handleSelShuffle" title="交换" :disabled="selectedCount < 2">
+          <ArrowLeftRight :size="16" />
+        </button>
+        <button v-else @click="handleSelShuffle" title="打乱" :disabled="selectedCount < 2">
+          <Shuffle :size="16" />
+        </button>
+        <button @click="handleSelAssign" title="排入" :disabled="selectedCount === 0">
+          <UserPlus :size="16" />
+        </button>
+        <button @click="clearSeatSelection" title="取消" class="cancel-btn">
+          <X :size="16" />
         </button>
       </div>
     </div>
@@ -36,8 +91,13 @@
           <div class="group-label">第 {{ groupIndex + 1 }} 组</div>
           <div class="group-content">
             <div v-for="(column, columnIndex) in group" :key="columnIndex" class="seat-column">
-              <SeatItem v-for="seat in column" :key="seat.id" :seat="seat" @assign-student="handleAssignStudent"
-                @toggle-empty="handleToggleEmpty" @clear-seat="handleClearSeat" @swap-seat="handleSwapSeat" />
+              <SeatItem v-for="seat in column" :key="seat.id" :seat="seat"
+                :is-drop-target="dropTargetSeatIds.has(seat.id)"
+                @assign-student="handleAssignStudent"
+                @toggle-empty="handleToggleEmpty" @clear-seat="handleClearSeat" @swap-seat="handleSwapSeat"
+                @drag-start-seat="handleDragStartSeat"
+                @drag-enter-seat="handleDragEnterSeat"
+                @drag-end-seat="handleDragEndSeat" />
             </div>
           </div>
         </div>
@@ -80,12 +140,14 @@
 
       <!-- 选区操作工具栏 -->
       <SelectionToolbar
+        v-if="!isMobile"
         :visible="showSelToolbar"
         :anchorX="selToolbarAnchor.x"
         :anchorY="selToolbarAnchor.y"
         :isFull="isSelectionFull"
         :hasStudent="isSelectionHasStudent"
         :canShuffle="selectedCount >= 2"
+        :isExactlyTwo="selectedCount === 2"
         @edit="handleSelEdit"
         @clear="handleSelClear"
         @shuffle="handleSelShuffle"
@@ -114,7 +176,8 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
-import { Minus, Plus } from 'lucide-vue-next'
+import { useMediaQuery } from '@vueuse/core'
+import { Minus, Plus, Edit2, UserMinus, Shuffle, UserPlus, X, ArrowLeftRight, Undo2, Redo2 } from 'lucide-vue-next'
 import SeatItem from './SeatItem.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
 import BatchEditDialog from '@/components/student/BatchEditDialog.vue'
@@ -162,7 +225,7 @@ const {
 const { firstSelectedSeat, setFirstSelectedSeat, clearFirstSelectedSeat } = useEditMode()
 const { clearSelection: clearStudentSelection, students } = useStudentData()
 const { scale, panX, panY, zoomIn, zoomOut, setScale, setPan, MIN_SCALE, MAX_SCALE, registerViewport, fitToViewport } = useZoom()
-const { recordAssign, recordClear, recordSwap, recordToggleEmpty } = useUndo()
+const { recordAssign, recordClear, recordSwap, recordToggleEmpty, recordBatch, createSnapshot, canUndo, canRedo, undo, redo } = useUndo()
 const { isDraggingFromSeat: globalIsDraggingFromSeat } = useDragState()
 const {
   clearSelection: clearSeatSelection,
@@ -172,7 +235,9 @@ const {
   startSelection,
   updateSelection,
   endSelection,
-  toggleSeatInSelection
+  toggleSeatInSelection,
+  isSelectionMode,
+  toggleSelectionMode
 } = useSelection()
 const {
   dragPreviewState,
@@ -188,6 +253,41 @@ const dragPreviewRef = ref(null)
 const viewportRef = ref(null)
 const chartRef = ref(null)
 const isPanning = ref(false)
+
+// 多选拖拽落点高亮
+const currentDragAnchorSeatId = ref(null)
+const currentDragTargetSeatId = ref(null)
+const dropTargetSeatIds = computed(() => {
+  if (!currentDragTargetSeatId.value || !currentDragAnchorSeatId.value || selectedCount.value <= 1) return new Set()
+
+  const anchor = parseSeatId(currentDragAnchorSeatId.value)
+  const target = parseSeatId(currentDragTargetSeatId.value)
+
+  const offsetCol = toGlobalCol(target) - toGlobalCol(anchor)
+  const offsetRow = target.rowIndex - anchor.rowIndex
+
+  const targets = new Set()
+  const gc = seatConfig.value.groupCount
+  const cpg = seatConfig.value.columnsPerGroup
+  const spc = seatConfig.value.seatsPerColumn
+
+  for (const sid of selectedSeatsArray.value) {
+    const src = parseSeatId(sid)
+    const destGC = toGlobalCol(src) + offsetCol
+    const destR = src.rowIndex + offsetRow
+    const { groupIndex: destG, columnIndex: destC } = fromGlobalCol(destGC)
+
+    // 检查是否在边界内
+    if (destG >= 0 && destG < gc && destC >= 0 && destC < cpg && destR >= 0 && destR < spc) {
+      targets.add(generateSeatId(destG, destC, destR))
+    }
+  }
+
+  return targets
+})
+
+// 响应式断点检测
+const isMobile = useMediaQuery('(max-width: 768px)')
 
 // 候选区是否已隐藏（所有学生均已入座）
 const candidateAreaHidden = computed(() => {
@@ -438,6 +538,23 @@ const handleWheel = (e) => {
 }
 
 // ==================== 拖放处理 ====================
+const handleDragStartSeat = (seatId, isSelection) => {
+  if (isSelection) {
+    currentDragAnchorSeatId.value = seatId
+  } else {
+    currentDragAnchorSeatId.value = null
+  }
+}
+
+const handleDragEnterSeat = (seatId) => {
+  currentDragTargetSeatId.value = seatId
+}
+
+const handleDragEndSeat = () => {
+  currentDragAnchorSeatId.value = null
+  currentDragTargetSeatId.value = null
+}
+
 const handleDragOver = (e) => {
   e.dataTransfer.dropEffect = 'move'
   if (dragPreviewState.isActive) {
@@ -446,6 +563,8 @@ const handleDragOver = (e) => {
 }
 
 const handleDrop = (e) => {
+  currentDragAnchorSeatId.value = null
+  currentDragTargetSeatId.value = null
   const raw = e.dataTransfer.getData('application/json')
   if (!raw) {
     endDragPreview()
@@ -470,25 +589,33 @@ const handleDrop = (e) => {
       endDragPreview([targetSeatId])
     } else if (data.type === 'seat') {
       if (data.selectedSeatIds && data.selectedSeatIds.length > 1) {
-        const moved = moveSelection(data.selectedSeatIds, data.seatId, targetSeatId)
-        if (moved) {
-          const anchor = parseSeatId(data.seatId)
-          const target = parseSeatId(targetSeatId)
-          const offsetCol = toGlobalCol(target) - toGlobalCol(anchor)
-          const offsetRow = target.rowIndex - anchor.rowIndex
+        // 选区拖拽
+        if (data.seatId !== targetSeatId) {
+          const beforeSnapshot = createSnapshot()
+          const moved = moveSelection(data.selectedSeatIds, data.seatId, targetSeatId)
+          if (moved) {
+            const afterSnapshot = createSnapshot()
+            recordBatch(beforeSnapshot, afterSnapshot)
+            const anchor = parseSeatId(data.seatId)
+            const target = parseSeatId(targetSeatId)
+            const offsetCol = toGlobalCol(target) - toGlobalCol(anchor)
+            const offsetRow = target.rowIndex - anchor.rowIndex
 
-          const destIds = data.selectedSeatIds.map(sid => {
-            const src = parseSeatId(sid)
-            const destGC = toGlobalCol(src) + offsetCol
-            const destR = src.rowIndex + offsetRow
-            const { groupIndex: destG, columnIndex: destC } = fromGlobalCol(destGC)
-            return generateSeatId(destG, destC, destR)
-          })
-          endDragPreview(destIds)
-          clearSeatSelection()
+            const destIds = data.selectedSeatIds.map(sid => {
+              const src = parseSeatId(sid)
+              const destGC = toGlobalCol(src) + offsetCol
+              const destR = src.rowIndex + offsetRow
+              const { groupIndex: destG, columnIndex: destC } = fromGlobalCol(destGC)
+              return generateSeatId(destG, destC, destR)
+            })
+            endDragPreview(destIds)
+          } else {
+            endDragPreview()
+          }
         } else {
           endDragPreview()
         }
+        clearSeatSelection()
       } else if (data.seatId !== targetSeatId) {
         recordSwap(data.seatId, targetSeatId)
         swapSeats(data.seatId, targetSeatId)
@@ -576,8 +703,21 @@ const selectSeatsInRect = () => {
 
 // ==================== 触摸自定义事件 ====================
 const handleTouchSeatDrop = (e) => {
-  const { sourceSeatId, targetSeatId } = e.detail
-  if (sourceSeatId !== targetSeatId) {
+  const { sourceSeatId, targetSeatId, isSelection, selectedSeatIds } = e.detail
+
+  if (isSelection && selectedSeatIds && selectedSeatIds.length > 1) {
+    // 选区拖拽：移动整个选区
+    if (sourceSeatId !== targetSeatId) {
+      const beforeSnapshot = createSnapshot()
+      const moved = moveSelection(selectedSeatIds, sourceSeatId, targetSeatId)
+      if (moved) {
+        const afterSnapshot = createSnapshot()
+        recordBatch(beforeSnapshot, afterSnapshot)
+      }
+    }
+    clearSeatSelection()
+  } else if (sourceSeatId !== targetSeatId) {
+    // 单个座位交换
     recordSwap(sourceSeatId, targetSeatId)
     swapSeats(sourceSeatId, targetSeatId)
   }
@@ -589,10 +729,24 @@ const handleTouchStudentDrop = (e) => {
 }
 
 const handleTouchSeatToList = (e) => {
-  const { seatId } = e.detail
-  const studentId = getStudentAtSeat(seatId)
-  recordClear(seatId, studentId)
-  clearSeat(seatId)
+  const { seatId, isSelection, selectedSeatIds } = e.detail
+
+  if (isSelection && selectedSeatIds && selectedSeatIds.length > 1) {
+    // 选区整体移出
+    selectedSeatIds.forEach(sid => {
+      const studentId = getStudentAtSeat(sid)
+      if (studentId !== null) {
+        recordClear(sid, studentId)
+        clearSeat(sid)
+      }
+    })
+    clearSeatSelection()
+  } else {
+    // 单个座位移出
+    const studentId = getStudentAtSeat(seatId)
+    recordClear(seatId, studentId)
+    clearSeat(seatId)
+  }
 }
 
 // ==================== 全局拖拽状态追踪 ====================
@@ -621,7 +775,11 @@ const handleGlobalDragOver = (e) => {
 // ==================== 键盘快捷键 ====================
 const handleKeyDown = (e) => {
   if (e.key === 'Escape') {
-    clearSeatSelection()
+    if (isMobile.value && isSelectionMode.value) {
+      toggleSelectionMode()
+    } else {
+      clearSeatSelection()
+    }
   }
 }
 
@@ -685,6 +843,24 @@ const handleSelShuffle = () => {
   const ids = selectedSeatsArray.value
   const studentIds = ids.map(id => getStudentAtSeat(id)).filter(Boolean)
   if (studentIds.length < 2) return
+
+  if (ids.length === 2) {
+    const [seatA, seatB] = ids
+    const studentA = getStudentAtSeat(seatA)
+    const studentB = getStudentAtSeat(seatB)
+    if (studentA && studentB) {
+      recordSwap(seatA, seatB)
+      swapSeats(seatA, seatB)
+    } else if (studentA || studentB) {
+      const fromSeat = studentA ? seatA : seatB
+      const toSeat = studentA ? seatB : seatA
+      const studentId = studentA || studentB
+      clearSeat(fromSeat)
+      assignStudent(toSeat, studentId)
+    }
+    return
+  }
+
   for (let i = studentIds.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [studentIds[i], studentIds[j]] = [studentIds[j], studentIds[i]]
@@ -949,7 +1125,7 @@ const rectSelectStyle = computed(() => {
 
 .drag-preview-seat {
   position: absolute;
-  border: 2.5px solid var(--color-primary, #23587b);
+  border: 2px solid var(--color-primary, #23587b);
   border-radius: 12px;
   background: var(--color-bg-selected, #e8f4f8);
   color: #333;
@@ -1224,9 +1400,114 @@ const rectSelectStyle = computed(() => {
 
   .seat-toolbar {
     display: flex;
+    justify-content: space-between;
     padding: 5px 10px;
     min-height: 36px;
     flex-shrink: 0;
+  }
+
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-select-btn {
+    height: 28px;
+    padding: 0 12px;
+    font-size: 12px;
+    border-radius: 4px;
+    background: white;
+    color: #23587b;
+    border: 1px solid #23587b;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .mobile-select-btn.active {
+    background: #23587b;
+    color: white;
+  }
+
+  .mobile-undo-btn,
+  .mobile-redo-btn {
+    height: 28px;
+    width: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background: white;
+    color: #23587b;
+    border: 1px solid #d0d7dc;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .mobile-undo-btn:disabled,
+  .mobile-redo-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .mobile-undo-btn:not(:disabled):active,
+  .mobile-redo-btn:not(:disabled):active {
+    background: #f0f4f7;
+  }
+
+  .mobile-selection-toolbar-fixed {
+    position: sticky;
+    top: 36px;
+    z-index: 10;
+    background: #f5f5f5;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
+  }
+
+  .selection-info {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+  }
+
+  .selection-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .selection-actions button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 4px;
+    background: white;
+    border: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .selection-actions button:active {
+    transform: scale(0.95);
+  }
+
+  .selection-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .selection-actions button.cancel-btn {
+    background: #ff4444;
+    color: white;
+    border-color: #ff4444;
   }
 
   .toolbar-info {
@@ -1263,6 +1544,10 @@ const rectSelectStyle = computed(() => {
   .seat-column {
     width: 100px;
     gap: 8px;
+  }
+
+  .drag-preview-seat {
+    font-size: 12px;
   }
 }
 
@@ -1305,6 +1590,11 @@ const rectSelectStyle = computed(() => {
   .seat-column {
     width: 90px;
     gap: 6px;
+  }
+
+  .drag-preview-seat {
+    font-size: 11px;
+    border-radius: 8px;
   }
 
   .zoom-btn {

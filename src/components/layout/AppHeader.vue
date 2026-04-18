@@ -419,7 +419,7 @@ onBeforeUnmount(() => {
     left: 0;
     top: 0;
     height: 100%; /* Fuse with header bar */
-    z-index: 10;
+    z-index: 100;
   }
 
   .user-info {
@@ -456,6 +456,7 @@ onBeforeUnmount(() => {
     top: 100%; /* attach directly below header */
     left: 0;
     border-radius: 0 0 12px 12px;
+    z-index: 1000;
   }
 
   .user-avatar {

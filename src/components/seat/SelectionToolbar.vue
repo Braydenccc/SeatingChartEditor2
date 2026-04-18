@@ -9,7 +9,11 @@
         <UserMinus :size="15" stroke-width="2" />
         <span class="sel-btn-label">移出</span>
       </button>
-      <button class="sel-btn sel-btn--shuffle" title="打乱顺序" :disabled="!canShuffle" @click="handleShuffle">
+      <button v-if="isExactlyTwo" class="sel-btn sel-btn--swap" title="交换座位" :disabled="!canShuffle" @click="handleShuffle">
+        <ArrowLeftRight :size="15" stroke-width="2" />
+        <span class="sel-btn-label">交换</span>
+      </button>
+      <button v-else class="sel-btn sel-btn--shuffle" title="打乱顺序" :disabled="!canShuffle" @click="handleShuffle">
         <Shuffle :size="15" stroke-width="2" />
         <span class="sel-btn-label">打乱</span>
       </button>
@@ -27,7 +31,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Edit3, Shuffle, Sparkles, UserMinus, X } from 'lucide-vue-next'
+import { Edit3, Shuffle, Sparkles, UserMinus, X, ArrowLeftRight } from 'lucide-vue-next'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -35,7 +39,8 @@ const props = defineProps({
   anchorY: { type: Number, default: 0 },
   isFull: { type: Boolean, default: false },
   hasStudent: { type: Boolean, default: false },
-  canShuffle: { type: Boolean, default: true }
+  canShuffle: { type: Boolean, default: true },
+  isExactlyTwo: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['edit', 'clear', 'shuffle', 'assign', 'cancel'])
@@ -117,6 +122,18 @@ const handleCancel = () => emit('cancel')
 }
 
 .sel-btn--shuffle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: transparent;
+  color: #999;
+}
+
+.sel-btn--swap:hover {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.sel-btn--swap:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   background: transparent;

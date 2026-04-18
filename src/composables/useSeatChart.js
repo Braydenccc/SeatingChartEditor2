@@ -190,22 +190,29 @@ export function useSeatChart() {
     const offsetCol = toGlobalCol(targetSeat) - toGlobalCol(anchorSeat)
     const offsetRow = targetSeat.rowIndex - anchorSeat.rowIndex
 
-    // 收集源->目标映射
+    // 收集源->目标映射，以及超出边界的座位
     const moves = []
+    const outOfBoundsSeats = []
+
     for (const sid of selectedSeatIds) {
       const src = seatMap.get(sid)
       if (!src || src.isEmpty || src.studentId === null) continue
+
       const newGC = toGlobalCol(src) + offsetCol
       const newR = src.rowIndex + offsetRow
       const { groupIndex: newG, columnIndex: newC } = fromGlobalCol(newGC)
       const destId = generateSeatId(newG, newC, newR)
       const dest = seatMap.get(destId)
+
       if (dest && !dest.isEmpty) {
         moves.push({ srcId: sid, destId, studentId: src.studentId })
+      } else {
+        // 目标座位不存在或为空置，记录为超出边界
+        outOfBoundsSeats.push({ srcId: sid, studentId: src.studentId })
       }
     }
 
-    if (moves.length === 0) return false
+    if (moves.length === 0 && outOfBoundsSeats.length === 0) return false
 
     // 快照所有涉及座位的当前学生（原子读取）
     const snapshot = new Map()
@@ -248,12 +255,17 @@ export function useSeatChart() {
       }
     }
 
-    // 4. 将被挤掉的学生依次放入空闲源位置
+    // 4. 清空超出边界的源座位
+    for (const { srcId } of outOfBoundsSeats) {
+      finalState.set(srcId, null)
+    }
+
+    // 5. 将被挤掉的学生依次放入空闲源位置
     for (let i = 0; i < displacedStudents.length && i < availableSources.length; i++) {
       finalState.set(availableSources[i], displacedStudents[i])
     }
 
-    // 5. 剩余的空闲源位置清空
+    // 6. 剩余的空闲源位置清空
     for (let i = displacedStudents.length; i < availableSources.length; i++) {
       finalState.set(availableSources[i], null)
     }

@@ -3,19 +3,18 @@ import { ref, computed, triggerRef } from 'vue'
 const selectedSeatIds = ref(new Set())
 const isSelecting = ref(false)
 const isDraggingSelection = ref(false)
+const isSelectionMode = ref(false)
 const visitedSeatIds = new Set()
-
-const notify = () => triggerRef(selectedSeatIds)
 
 export function useSelection() {
   const addSeatToSelection = (seatId) => {
     selectedSeatIds.value.add(seatId)
-    notify()
+    triggerRef(selectedSeatIds)
   }
 
   const removeSeatFromSelection = (seatId) => {
     selectedSeatIds.value.delete(seatId)
-    notify()
+    triggerRef(selectedSeatIds)
   }
 
   const toggleSeatInSelection = (seatId) => {
@@ -25,12 +24,19 @@ export function useSelection() {
     } else {
       set.add(seatId)
     }
-    notify()
+    triggerRef(selectedSeatIds)
   }
 
   const clearSelection = () => {
     selectedSeatIds.value.clear()
-    notify()
+    triggerRef(selectedSeatIds)
+  }
+
+  const toggleSelectionMode = () => {
+    isSelectionMode.value = !isSelectionMode.value
+    if (!isSelectionMode.value) {
+      clearSelection()
+    }
   }
 
   const setSelection = (seatIds) => {
@@ -78,10 +84,12 @@ export function useSelection() {
     selectedSeatIds,
     isSelecting,
     isDraggingSelection,
+    isSelectionMode,
     addSeatToSelection,
     removeSeatFromSelection,
     toggleSeatInSelection,
     clearSelection,
+    toggleSelectionMode,
     setSelection,
     isSeatSelected,
     selectedCount,

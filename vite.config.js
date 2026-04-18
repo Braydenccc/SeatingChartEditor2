@@ -10,9 +10,6 @@ import { authMockPlugin } from './vite.mock.plugin.js'
 // https://vite.dev/config/
 export default defineConfig({
   base: './', // Allow relative paths for electron/tauri builds
-  server: {
-    host: '0.0.0.0',
-  },
   plugins: [
     vue(),
     vueDevTools(),
@@ -25,6 +22,10 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
+  },
+  server: {
+    port: 5173,
+    host: "0.0.0.0"
   },
   build: {
     rollupOptions: {

@@ -84,7 +84,8 @@ export function useDragPreview() {
     if (previewEl) {
       previewEl.style.left = `${clientX}px`
       previewEl.style.top = `${clientY}px`
-      previewEl.style.transform = 'translate(-50%, -50%) scale(1)'
+      // 不缩放，使用原始大小
+      previewEl.style.transform = 'translate(-50%, -50%)'
       previewEl.style.transition = 'none'
     }
   }
@@ -135,15 +136,56 @@ export function useDragPreview() {
 
     const anchor = parseSeatId(state.anchorSeatId)
     const cpg = seatConfig.value.columnsPerGroup
-    const groupW = cpg * L.SEAT_W + (cpg - 1) * L.COL_GAP
+
+    // 获取实际座位尺寸和间距
+    let seatW = L.SEAT_W
+    let seatH = L.SEAT_H
+    let colGap = L.COL_GAP
+    let rowGap = L.ROW_GAP
+    let groupGap = L.GROUP_GAP
+
+    if (chartEl) {
+      // 尝试获取实际座位元素的尺寸
+      const seatEl = chartEl.querySelector('.seat-item')
+      if (seatEl) {
+        const rect = seatEl.getBoundingClientRect()
+        seatW = rect.width
+        seatH = rect.height
+      }
+
+      // 尝试获取实际间距
+      const columnEl = chartEl.querySelector('.seat-column')
+      if (columnEl) {
+        const style = window.getComputedStyle(columnEl)
+        const gap = parseFloat(style.gap)
+        if (!isNaN(gap)) rowGap = gap
+      }
+
+      const groupContentEl = chartEl.querySelector('.group-content')
+      if (groupContentEl) {
+        const style = window.getComputedStyle(groupContentEl)
+        const gap = parseFloat(style.gap)
+        if (!isNaN(gap)) colGap = gap
+      }
+
+      const seatChartEl = chartEl
+      if (seatChartEl) {
+        const style = window.getComputedStyle(seatChartEl)
+        const gap = parseFloat(style.gap)
+        if (!isNaN(gap)) groupGap = gap
+      }
+    }
+
+    // 使用实际尺寸计算组宽度
+    const groupW = cpg * seatW + (cpg - 1) * colGap
 
     return state.selectedSeatIds.map(sid => {
       const parsed = parseSeatId(sid)
 
-      // 计算相对于锚点的偏移
-      const dx = (parsed.groupIndex * (groupW + L.GROUP_GAP) + parsed.columnIndex * (L.SEAT_W + L.COL_GAP)) -
-                 (anchor.groupIndex * (groupW + L.GROUP_GAP) + anchor.columnIndex * (L.SEAT_W + L.COL_GAP))
-      const dy = (parsed.rowIndex * (L.SEAT_H + L.ROW_GAP)) - (anchor.rowIndex * (L.SEAT_H + L.ROW_GAP))
+      // 计算相对于锚点的偏移（使用实际尺寸和间距）
+      const dx = (parsed.groupIndex * (groupW + groupGap) + parsed.columnIndex * (seatW + colGap)) -
+                 (anchor.groupIndex * (groupW + groupGap) + anchor.columnIndex * (seatW + colGap))
+      const dy = (parsed.rowIndex * (seatH + rowGap)) - (anchor.rowIndex * (seatH + rowGap))
 
       const seat = getSeat(sid)
       const isAnchor = sid === state.anchorSeatId
@@ -159,8 +201,8 @@ export function useDragPreview() {
           left: `calc(50% + ${dx}px)`,
           top: `calc(50% + ${dy}px)`,
           transform: 'translate(-50%, -50%)',
-          width: `${L.SEAT_W}px`,
-          height: `${L.SEAT_H}px`
+          width: `${seatW}px`,
+          height: `${seatH}px`
         }
       }
     })

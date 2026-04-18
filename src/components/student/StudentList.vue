@@ -719,20 +719,20 @@ const handleDrop = (e) => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: rgba(35, 88, 123, 0.07);
-  border: 2px dashed rgba(35, 88, 123, 0.4);
+  background: rgba(35, 88, 123, 0.18);
+  border: 2px dashed rgba(35, 88, 123, 0.6);
   border-radius: 8px;
   color: #23587b;
   font-size: 13px;
   font-weight: 600;
-  pointer-events: none;  /* 不拦截触摸事件 */
+  pointer-events: none;
   z-index: 10;
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   animation: touch-overlay-in 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .touch-drop-out-overlay.touch-drop-over {
-  background: rgba(35, 88, 123, 0.16);
+  background: rgba(35, 88, 123, 0.28);
   border-color: #23587b;
   border-style: solid;
   color: #1a4460;
@@ -883,10 +883,15 @@ const handleDrop = (e) => {
 
 /* 触摸拖拽激活时，即使全部入座也要显示移出目标 */
 .student-items.is-empty.touch-dragging {
-  display: grid;
-  min-height: 80px;
-  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+  min-height: 120px;
+  padding: 15px;
   position: relative;
+  border: 2px solid transparent;
+  border-radius: 8px;
 }
 
 .primary-btn {
