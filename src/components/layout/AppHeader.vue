@@ -44,14 +44,7 @@
         <Github :size="26" stroke-width="1.8" />
       </a>
     </div>
-    
-    <CloudWorkspaceDialog
-      v-if="showCloudDialog"
-      :visible="showCloudDialog"
-      :mode="cloudDialogMode"
-      @update:visible="showCloudDialog = $event"
-      @success="handleCloudSuccess"
-    />
+
     <SyncSettingsDialog 
       v-if="showSyncSettings"
       :visible="showSyncSettings" 
@@ -66,13 +59,12 @@ import { Cloud, FolderOpen, Github, LogIn, RefreshCw, User } from 'lucide-vue-ne
 import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 
-const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
 const SyncSettingsDialog = defineAsyncComponent(() => import('../auth/SyncSettingsDialog.vue'))
 
 const emit = defineEmits(['open-login'])
 
 const { currentUser, webdavConfig, isLoggedIn, logout, authType, initAuth } = useAuth()
-const { showCloudDialog, cloudDialogMode, openCloudDialog, closeCloudDialog, handleCloudSuccess } = useCloudWorkspaceDialog()
+const { openCloudDialog } = useCloudWorkspaceDialog()
 
 const showDropdown = ref(false)
 const showSyncSettings = ref(false)

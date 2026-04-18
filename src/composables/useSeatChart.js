@@ -177,6 +177,103 @@ export function useSeatChart() {
     }
   }
 
+  // 批量移动选区学生（以拖拽起始座位为锚点，整体平移）
+  const moveSelection = (selectedSeatIds, anchorId, targetSeatId) => {
+    if (!selectedSeatIds || selectedSeatIds.length === 0) return false
+
+    const targetSeat = seatMap.get(targetSeatId)
+    if (!targetSeat) return false
+
+    const anchorSeat = seatMap.get(anchorId)
+    if (!anchorSeat) return false
+
+    const offsetCol = toGlobalCol(targetSeat) - toGlobalCol(anchorSeat)
+    const offsetRow = targetSeat.rowIndex - anchorSeat.rowIndex
+
+    // 收集源->目标映射
+    const moves = []
+    for (const sid of selectedSeatIds) {
+      const src = seatMap.get(sid)
+      if (!src || src.isEmpty || src.studentId === null) continue
+      const newGC = toGlobalCol(src) + offsetCol
+      const newR = src.rowIndex + offsetRow
+      const { groupIndex: newG, columnIndex: newC } = fromGlobalCol(newGC)
+      const destId = generateSeatId(newG, newC, newR)
+      const dest = seatMap.get(destId)
+      if (dest && !dest.isEmpty) {
+        moves.push({ srcId: sid, destId, studentId: src.studentId })
+      }
+    }
+
+    if (moves.length === 0) return false
+
+    // 快照所有涉及座位的当前学生（原子读取）
+    const snapshot = new Map()
+    for (const m of moves) {
+      const srcSeat = seatMap.get(m.srcId)
+      const destSeat = seatMap.get(m.destId)
+      if (!srcSeat || !destSeat) return false
+      if (!snapshot.has(m.srcId)) snapshot.set(m.srcId, srcSeat.studentId)
+      if (!snapshot.has(m.destId)) snapshot.set(m.destId, destSeat.studentId)
+    }
+
+    // 目标座位集合
+    const destIdSet = new Set(moves.map(m => m.destId))
+
+    // 计算每个座位的最终学生
+    const finalState = new Map()
+
+    // 1. 目标位置填入选区学生
+    for (const m of moves) {
+      finalState.set(m.destId, m.studentId)
+    }
+
+    // 2. 收集所有被挤掉的学生（目标位置原有的非选区学生）
+    const displacedStudents = []
+    for (const m of moves) {
+      const origDestStudent = snapshot.get(m.destId)
+      if (origDestStudent !== null && origDestStudent !== undefined) {
+        const isMovingStudent = moves.some(mv => mv.studentId === origDestStudent)
+        if (!isMovingStudent) {
+          displacedStudents.push(origDestStudent)
+        }
+      }
+    }
+
+    // 3. 找出所有空闲的源位置（不是其他 move 的目标）
+    const availableSources = []
+    for (const m of moves) {
+      if (!destIdSet.has(m.srcId)) {
+        availableSources.push(m.srcId)
+      }
+    }
+
+    // 4. 将被挤掉的学生依次放入空闲源位置
+    for (let i = 0; i < displacedStudents.length && i < availableSources.length; i++) {
+      finalState.set(availableSources[i], displacedStudents[i])
+    }
+
+    // 5. 剩余的空闲源位置清空
+    for (let i = displacedStudents.length; i < availableSources.length; i++) {
+      finalState.set(availableSources[i], null)
+    }
+
+    // 原子性批量写入（预先验证所有座位存在）
+    const updates = []
+    for (const [seatId, studentId] of finalState) {
+      const seat = seatMap.get(seatId)
+      if (!seat) return false
+      updates.push({ seat, studentId })
+    }
+
+    // 执行批量更新
+    for (const { seat, studentId } of updates) {
+      seat.studentId = studentId
+    }
+
+    return true
+  }
+
   /**
    * 将所有非空置座位上的学生进行循环换座（支持二维位移）
    *
@@ -522,6 +619,16 @@ export function useSeatChart() {
    */
   const getSeatGroup = (seatId) => parseSeatId(seatId).groupIndex + 1
 
+  const hasSeat = (seatId) => seatMap.has(seatId)
+  const getSeat = (seatId) => seatMap.get(seatId) ?? null
+
+  // 全局列坐标转换工具
+  const toGlobalCol = (seat) => seat.groupIndex * seatConfig.value.columnsPerGroup + seat.columnIndex
+  const fromGlobalCol = (gc) => ({
+    groupIndex: Math.floor(gc / seatConfig.value.columnsPerGroup),
+    columnIndex: gc % seatConfig.value.columnsPerGroup
+  })
+
   return {
     seatConfig,
     seats,
@@ -531,6 +638,7 @@ export function useSeatChart() {
     toggleEmpty,
     clearSeat,
     swapSeats,
+    moveSelection,
     shiftSeats,
     updateConfig,
     getStudentAtSeat,
@@ -557,6 +665,11 @@ export function useSeatChart() {
     getSeatGroup,
     // 新增的布局配置辅助函数
     getGroupConfig,
-    ensureGroupsArray
+    ensureGroupsArray,
+    hasSeat,
+    getSeat,
+    generateSeatId,
+    toGlobalCol,
+    fromGlobalCol
   }
 }

@@ -88,21 +88,33 @@
           <div v-else class="load-section">
             <!-- 双云时显示 Tab 切换 -->
             <div class="cloud-tabs" v-if="hasWebdav && hasRetiehe">
-              <button :class="{ active: activeTab === 'retiehe' }" @click="activeTab = 'retiehe'">SCE 云服务</button>
-              <button :class="{ active: activeTab === 'webdav' }" @click="activeTab = 'webdav'">WebDAV 网盘</button>
+              <button :class="{ active: activeTab === 'retiehe' }" @click="activeTab = 'retiehe'">
+                <Cloud :size="16" stroke-width="1.8" />
+                <span>SCE 云服务</span>
+              </button>
+              <button :class="{ active: activeTab === 'webdav' }" @click="activeTab = 'webdav'">
+                <HardDrive :size="16" stroke-width="1.8" />
+                <span>WebDAV 网盘</span>
+              </button>
             </div>
-            <!-- 单云时显示来源说明 -->
-            <div v-else class="cloud-source-label">
-              <span>{{ hasRetiehe ? 'SCE 云服务' : 'WebDAV 网盘' }}</span>
-              <span v-if="backupMode" class="backup-tag">备份模式</span>
+
+            <!-- 单云时显示来源提示条 -->
+            <div v-else class="load-source-banner">
+              <Cloud v-if="hasRetiehe" :size="16" stroke-width="1.8" />
+              <HardDrive v-else :size="16" stroke-width="1.8" />
+              <span>加载自：<strong>{{ hasRetiehe ? 'SCE 云服务' : 'WebDAV 网盘' }}</strong></span>
+              <span v-if="backupMode && hasWebdav !== false" class="backup-hint">
+                <CheckCircle2 :size="14" stroke-width="2" />
+                备份模式
+              </span>
             </div>
             
-            <div v-if="!currentTabWorkspaces || currentTabWorkspaces.length === 0" class="empty-state mt-2">
+            <div v-if="!currentTabWorkspaces || currentTabWorkspaces.length === 0" class="empty-state">
               <Inbox :size="40" stroke-width="1.5" />
-              <p>{{ activeTab === 'webdav' ? 'WebDAV 网盘上' : 'SCE 云端' }}暂无工作区</p>
+              <p>{{ activeTab === 'webdav' ? 'WebDAV 网盘' : 'SCE 云服务' }}暂无工作区</p>
               <p class="empty-hint">切换到「保存」模式将当前编辑内容上传到云端</p>
             </div>
-            <div v-else class="workspace-grid mt-2">
+            <div v-else class="workspace-grid">
               <div 
                 v-for="ws in currentTabWorkspaces" 
                 :key="ws.fileId"
@@ -125,8 +137,8 @@
                 </div>
               </div>
             </div>
-            
-            <div v-if="errorMessage" class="error-message mt-16">{{ errorMessage }}</div>
+
+            <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
           </div>
         </div>
       </div>
@@ -135,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { CheckCircle2, Cloud, Folder, HardDrive, Inbox, Trash2, X } from 'lucide-vue-next'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
 import { useWorkspace } from '@/composables/useWorkspace'
@@ -176,27 +188,31 @@ const retieheWorkspaces = computed(() => workspaces.value.filter(ws => ws.source
 const currentTabWorkspaces = computed(() => activeTab.value === 'webdav' ? webdavWorkspaces.value : retieheWorkspaces.value)
 const targetWorkspaces = computed(() => targetService.value === 'webdav' ? webdavWorkspaces.value : retieheWorkspaces.value)
 
-watch(() => props.visible, async (newVal) => {
-  if (newVal) {
-    isSaveMode.value = props.mode === 'save'
-    workspaceName.value = ''
-    selectedOverwriteId.value = null
-    errorMessage.value = ''
-    
-    // Auto-select tab and target based on active authType setting
-    if (authType.value === 'webdav' && hasWebdav.value) {
-      activeTab.value = 'webdav'
-      targetService.value = 'webdav'
-    } else if (hasRetiehe.value) {
-      activeTab.value = 'retiehe'
-      targetService.value = 'retiehe'
-    } else if (hasWebdav.value) {
-      activeTab.value = 'webdav'
-      targetService.value = 'webdav'
-    }
+// 组件挂载时初始化
+onMounted(async () => {
+  isSaveMode.value = props.mode === 'save'
+  workspaceName.value = ''
+  selectedOverwriteId.value = null
+  errorMessage.value = ''
 
-    await fetchWorkspaces()
+  // Auto-select tab and target based on active authType setting
+  if (authType.value === 'webdav' && hasWebdav.value) {
+    activeTab.value = 'webdav'
+    targetService.value = 'webdav'
+  } else if (hasRetiehe.value) {
+    activeTab.value = 'retiehe'
+    targetService.value = 'retiehe'
+  } else if (hasWebdav.value) {
+    activeTab.value = 'webdav'
+    targetService.value = 'webdav'
   }
+
+  await fetchWorkspaces()
+})
+
+// 监听 mode 变化（用于弹窗已打开时切换模式）
+watch(() => props.mode, (newMode) => {
+  isSaveMode.value = newMode === 'save'
 })
 
 const fetchWorkspaces = async () => {
@@ -410,12 +426,12 @@ const formatSize = (bytes) => {
   background: var(--color-bg-soft);
   padding: 4px;
   border-radius: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 16px;
 }
 
 .cloud-tabs button {
   flex: 1;
-  padding: 8px 0;
+  padding: 8px 12px;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
@@ -423,6 +439,10 @@ const formatSize = (bytes) => {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .cloud-tabs button.active {
@@ -431,24 +451,17 @@ const formatSize = (bytes) => {
   box-shadow: var(--shadow-sm);
 }
 
-.cloud-source-label {
+.load-source-banner {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-border);
+  padding: 8px 12px;
+  border-radius: 6px;
   font-size: 13px;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  padding: 6px 0;
-  margin-bottom: 4px;
-}
-
-.backup-tag {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  font-weight: 600;
+  color: var(--color-info);
+  margin-bottom: 16px;
 }
 
 .mt-2 {

@@ -467,14 +467,6 @@
   <!-- 导出设置弹窗 -->
   <ExportDialog v-if="showExportDialog" :visible="showExportDialog" @close="showExportDialog = false" @exported="onExported" />
 
-  <!-- 云端工作区弹窗 -->
-  <CloudWorkspaceDialog
-    :visible="showCloudDialog"
-    :mode="cloudDialogMode"
-    @update:visible="showCloudDialog = $event"
-    @success="handleCloudSuccess"
-  />
-
   <!-- 座位规则编辑器模态框 -->
   <SeatRuleEditor
     v-if="showRuleEditor"
@@ -506,7 +498,6 @@ import { ArrowLeftRight, Check, CircleX, CloudDownload, CloudUpload, Download, E
 
 const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
 const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
-const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
 const StudentRosterDialog = defineAsyncComponent(() => import('../student/StudentRosterDialog.vue'))
 const TagSettingsDialog = defineAsyncComponent(() => import('../student/TagSettingsDialog.vue'))
 const SeatConfigDialog = defineAsyncComponent(() => import('./SeatConfigDialog.vue'))
@@ -550,7 +541,7 @@ const { isLoggedIn, isLoginDialogVisible } = useAuth()
 const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom()
 const { zones } = useZoneData()
 const { recordBatch, createSnapshot } = useUndo()
-const { showCloudDialog, cloudDialogMode, openCloudLoad, openCloudSave, handleCloudSuccess } = useCloudWorkspaceDialog()
+const { openCloudLoad, openCloudSave } = useCloudWorkspaceDialog()
 const showSeatConfigDialog = ref(false)
 const totalSeats = computed(() => {
   const config = seatConfig.value

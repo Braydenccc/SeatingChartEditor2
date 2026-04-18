@@ -8,6 +8,26 @@
           <input type="checkbox" v-model="localShowTagsInSeatChart" />
           <span class="checkbox-text">在座位表中显示标签</span>
         </label>
+        <div class="display-mode-section" :class="{ disabled: !localShowTagsInSeatChart }">
+          <label class="mode-label">显示模式:</label>
+          <div class="mode-options">
+            <label class="mode-option" :class="{ active: localTagDisplayMode === 'dot' }">
+              <input type="radio" v-model="localTagDisplayMode" value="dot" :disabled="!localShowTagsInSeatChart" />
+              <span class="mode-icon dot-icon"></span>
+              <span class="mode-text">颜色点</span>
+            </label>
+            <label class="mode-option" :class="{ active: localTagDisplayMode === 'corner' }">
+              <input type="radio" v-model="localTagDisplayMode" value="corner" :disabled="!localShowTagsInSeatChart" />
+              <span class="mode-icon corner-icon"></span>
+              <span class="mode-text">右上角文字</span>
+            </label>
+            <label class="mode-option" :class="{ active: localTagDisplayMode === 'bottom' }">
+              <input type="radio" v-model="localTagDisplayMode" value="bottom" :disabled="!localShowTagsInSeatChart" />
+              <span class="mode-icon bottom-icon"></span>
+              <span class="mode-text">座位下部文字</span>
+            </label>
+          </div>
+        </div>
       </div>
       
       <div class="tags-section">
@@ -95,7 +115,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible'])
 
-const { tags, showTagsInSeatChart, addTag, editTag, deleteTag, setShowTagsInSeatChart } = useTagData()
+const { tags, showTagsInSeatChart, tagDisplayMode, addTag, editTag, deleteTag, setShowTagsInSeatChart, setTagDisplayMode } = useTagData()
 const { students, addTagToStudents, removeTagFromStudent, removeTagFromStudents } = useStudentData()
 const { requestConfirm, isPending } = useConfirmAction()
 const { warning, info, success } = useLogger()
@@ -105,6 +125,7 @@ const getTagStudentCount = (tagId) => {
 }
 
 const localShowTagsInSeatChart = ref(true)
+const localTagDisplayMode = ref('dot')
 const tagDialogVisible = ref(false)
 const isEditing = ref(false)
 const currentTag = ref({ id: null, name: '', color: '#23587b' })
@@ -114,11 +135,16 @@ const selectedStudentIds = ref([])
 watch(() => props.visible, (val) => {
   if (val) {
     localShowTagsInSeatChart.value = showTagsInSeatChart.value
+    localTagDisplayMode.value = tagDisplayMode.value
   }
 })
 
 watch(localShowTagsInSeatChart, (val) => {
   setShowTagsInSeatChart(val)
+})
+
+watch(localTagDisplayMode, (val) => {
+  setTagDisplayMode(val)
 })
 
 const close = () => {
@@ -286,6 +312,140 @@ const deleteTagHandler = (tagId, tagName) => {
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid #e8eef2;
+}
+
+.display-mode-section {
+  margin-top: 16px;
+  padding-left: 26px;
+}
+
+.display-mode-section.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.mode-label {
+  display: block;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mode-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-option:hover {
+  background: #f0f4f8;
+  border-color: #c0d0e0;
+}
+
+.mode-option.active {
+  background: #e8f4f8;
+  border-color: #23587b;
+}
+
+.mode-option input[type="radio"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.mode-icon {
+  width: 48px;
+  height: 36px;
+  border-radius: 4px;
+  position: relative;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-icon::before {
+  content: '张三';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  color: #666;
+  font-weight: 500;
+}
+
+.bottom-icon::before {
+  top: 40%;
+}
+
+.dot-icon::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 4px;
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+}
+
+.dot-icon::after {
+  background:
+    radial-gradient(circle, #e74c3c 1.5px, transparent 1.5px) 0 0,
+    radial-gradient(circle, #3498db 1.5px, transparent 1.5px) 6px 0,
+    radial-gradient(circle, #f39c12 1.5px, transparent 1.5px) 12px 0;
+  background-size: 4px 4px, 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+
+.corner-icon::after {
+  content: 'A';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  background: #e74c3c;
+  padding: 1px 4px;
+  border-radius: 2px;
+  line-height: 1.2;
+}
+
+.bottom-icon::after {
+  content: 'A';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: 700;
+  color: #fff;
+  background: #e74c3c;
+  padding: 1px 5px;
+  border-radius: 2px;
+  line-height: 1.2;
+}
+
+.mode-text {
+  font-size: 13px;
+  color: #333;
 }
 
 .checkbox-label {

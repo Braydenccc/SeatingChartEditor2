@@ -81,7 +81,7 @@
               <FolderOpen :size="14" stroke-width="2" />
               <span>本地工作区</span>
             </button>
-            <button class="empty-action-btn outline" @click="handleCloudLoad">
+            <button class="empty-action-btn outline" @click="openCloudLoad">
               <CloudDownload :size="14" stroke-width="2" />
               <span>云端工作区</span>
             </button>
@@ -115,23 +115,33 @@
 
     <StudentRosterDialog v-model:visible="showRosterDialog" />
     <TagSettingsDialog v-model:visible="showTagSettingsDialog" />
-    
-    <!-- 云端工作区弹窗 -->
-    <CloudWorkspaceDialog
-      v-if="showCloudDialog"
-      :visible="showCloudDialog"
-      :mode="cloudDialogMode"
-      @update:visible="showCloudDialog = $event"
-      @success="handleCloudSuccess"
-    />
-    
+
     <!-- 导出设置弹窗 -->
     <ExportDialog v-if="showExportDialog" :visible="showExportDialog" @close="showExportDialog = false" @exported="onExported" />
+
+    <!-- 桌面端快捷键提示栏 -->
+    <div v-if="!isMobile" class="shortcuts-hint-bar">
+      <div class="hint-group">
+        <span class="hint-label">快捷键:</span>
+        <span class="hint-item"><kbd>Ctrl+Z</kbd> 撤销</span>
+        <span class="hint-item"><kbd>Ctrl+Y</kbd> 重做</span>
+        <span class="hint-item"><kbd>Esc</kbd> 清除选择</span>
+      </div>
+      <div class="hint-divider"></div>
+      <div class="hint-group">
+        <span class="hint-label">鼠标:</span>
+        <span class="hint-item">左键 分配/操作座位</span>
+        <span class="hint-item">右键拖拽 多选座位</span>
+        <span class="hint-item">滚轮 平移</span>
+        <span class="hint-item"><kbd>Ctrl</kbd>+滚轮 缩放</span>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, defineAsyncComponent, onBeforeUnmount, onMounted, onUnmounted } from 'vue'
+import { useWindowSize } from '@vueuse/core'
 import { Shuffle, Users, Tag, X, FileInput, FolderOpen, CloudDownload, FileOutput, Settings2, Loader2, CheckCircle, LogOut } from 'lucide-vue-next'
 import CandidateItem from './CandidateItem.vue'
 // 修改为动态导入，避免阻塞主 chunk 进行加载
@@ -149,16 +159,14 @@ import { useExportSettings } from '@/composables/useExportSettings'
 import { useImageExport } from '@/composables/useImageExport'
 import { useDragState } from '@/composables/useDragState'
 import { useUndo } from '@/composables/useUndo'
+import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 
-const CloudWorkspaceDialog = defineAsyncComponent(() => import('../workspace/CloudWorkspaceDialog.vue'))
 const ExportDialog = defineAsyncComponent(() => import('../layout/ExportPreview.vue'))
 const StudentRosterDialog = defineAsyncComponent(() => import('./StudentRosterDialog.vue'))
 const TagSettingsDialog = defineAsyncComponent(() => import('./TagSettingsDialog.vue'))
 
 const showRosterDialog = ref(false)
 const showTagSettingsDialog = ref(false)
-const showCloudDialog = ref(false)
-const cloudDialogMode = ref('load')
 const showExportDialog = ref(false)
 const lastExportUrl = ref('')
 const isExporting = ref(false)
@@ -176,6 +184,10 @@ const { exportSettings } = useExportSettings()
 const { exportToImage } = useImageExport()
 const { isTouchDraggingFromSeat } = useDragState()
 const { recordClear } = useUndo()
+const { width: windowWidth } = useWindowSize()
+const { openCloudLoad } = useCloudWorkspaceDialog()
+
+const isMobile = computed(() => windowWidth.value < 1024)
 
 const excelInput = ref(null)
 const workspaceInput = ref(null)
@@ -274,19 +286,6 @@ const handleLoadWorkspace = async (event) => {
   } finally {
     event.target.value = ''
   }
-}
-
-const handleCloudLoad = () => {
-  if (!isLoggedIn.value) {
-    isLoginDialogVisible.value = true
-    return
-  }
-  cloudDialogMode.value = 'load'
-  showCloudDialog.value = true
-}
-
-const handleCloudSuccess = () => {
-  success('云端工作区加载成功')
 }
 
 const onExported = (payload) => {
@@ -422,6 +421,57 @@ const handleDrop = (e) => {
   flex-direction: column;
   height: 100%;
   background: #f5f5f5;
+}
+
+.shortcuts-hint-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 16px;
+  background: #ffffff;
+  border-top: 1px solid #e8eef2;
+  font-size: 11px;
+  color: #6b7280;
+  flex-shrink: 0;
+  min-height: 28px;
+}
+
+.hint-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hint-label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.hint-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.hint-item kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  box-shadow: inset 0 -1px 0 #d1d5db;
+}
+
+.hint-divider {
+  width: 1px;
+  height: 14px;
+  background: #e5e7eb;
 }
 
 .student-list-container.all-assigned {
@@ -911,6 +961,21 @@ const handleDrop = (e) => {
   .student-items {
     padding: 8px;
   }
+
+  .shortcuts-hint-bar {
+    padding: 5px 12px;
+    gap: 12px;
+    font-size: 10px;
+  }
+
+  .hint-group {
+    gap: 8px;
+  }
+
+  .hint-item kbd {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
 }
 
 /* 小高度屏幕优化 */
@@ -940,6 +1005,22 @@ const handleDrop = (e) => {
 
   .student-items {
     padding: 6px;
+  }
+
+  .shortcuts-hint-bar {
+    padding: 4px 10px;
+    gap: 10px;
+    font-size: 10px;
+    min-height: 24px;
+  }
+
+  .hint-group {
+    gap: 6px;
+  }
+
+  .hint-item kbd {
+    font-size: 9px;
+    padding: 1px 3px;
   }
 }
 

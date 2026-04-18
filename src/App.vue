@@ -13,17 +13,21 @@ const LoginDialog = defineAsyncComponent({
   loadingComponent: LoadingSpinner,
   delay: 200 // 仅在加载超过 200ms 时显示 Loading，避免快速网速下的闪烁
 })
+const CloudWorkspaceDialog = defineAsyncComponent(() => import('./components/workspace/CloudWorkspaceDialog.vue'))
+
 import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
 import { useWorkspace } from '@/composables/useWorkspace'
 import { useLogger } from '@/composables/useLogger'
 import { useUndo } from '@/composables/useUndo'
+import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 
 const { isLoginDialogVisible, initAuth, isLoggedIn } = useAuth()
 const { loadWorkspaceFromCloud } = useCloudWorkspace()
 const { applyWorkspaceData, getLastWorkspace } = useWorkspace()
 const { success, warning } = useLogger()
 const { undo, redo, canUndo, canRedo } = useUndo()
+const { showCloudDialog, cloudDialogMode, handleCloudSuccess } = useCloudWorkspaceDialog()
 
 const loginDialogInitialTab = ref('login')
 const handleOpenLogin = (tab = 'login') => {
@@ -126,6 +130,15 @@ onMounted(async () => {
     v-if="isLoginDialogVisible"
     v-model:visible="isLoginDialogVisible"
     :initial-tab="loginDialogInitialTab"
+  />
+
+  <!-- 全局云端工作区弹窗 -->
+  <CloudWorkspaceDialog
+    v-if="showCloudDialog"
+    :visible="showCloudDialog"
+    :mode="cloudDialogMode"
+    @update:visible="showCloudDialog = $event"
+    @success="handleCloudSuccess"
   />
 </template>
 

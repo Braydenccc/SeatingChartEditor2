@@ -343,6 +343,7 @@ export function useImageExport() {
         const setting = exportSettings.value.tagSettings[tagId]
         if (tag && setting && setting.enabled && setting.displayText) {
           return {
+            id: tag.id,
             text: setting.displayText,
             color: tag.color
           }
@@ -350,6 +351,7 @@ export function useImageExport() {
         return null
       })
       .filter(t => t !== null)
+      .sort((a, b) => a.id - b.id)
 
     if (enabledTags.length === 0) return
 

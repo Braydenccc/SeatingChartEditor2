@@ -7,26 +7,55 @@
     'zone-highlight': zoneHighlight,
     'drag-over': isDragOver,
     dragging: isDragging,
-    'undo-highlighted': undoHighlighted
+    'is-anchor': isDragAnchor,
+    'selection-dragging': isSelectionDragging,
+    'undo-highlighted': undoHighlighted,
+    'selection-selected': isInSelection,
+    'drag-ghost': isGhost
   }" :style="zoneHighlightStyle" :data-seat-id="seat.id" :draggable="isDraggable" @click="handleClick"
     @dragstart="handleDragStart" @dragend="handleDragEnd" @dragover.prevent="handleDragOverSeat"
-    @dragenter.prevent="handleDragEnter" @dragleave="handleDragLeave" @drop.prevent.stop="handleDrop"
+    @dragenter.prevent="handleDragEnter" @dragleave="handleDragLeave" @drop.prevent="handleDrop"
     @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd"
     @touchcancel="handleTouchCancel" @contextmenu.prevent @pointerdown="handlePointerDown">
     <div v-if="seat.isEmpty" class="empty-indicator">
       <span class="empty-text">空置</span>
     </div>
-    <div v-else-if="hasStudent" class="student-display">
-      <div class="student-name">{{ studentInfo.name || '未命名' }}</div>
-      <div class="student-number">{{ studentInfo.studentNumber || '-' }}</div>
-      <div v-if="hasTags" class="student-tags">
-        <span v-for="tag in studentTags" :key="tag.id" 
-          :class="['tag-dot', { 'tag-dot-hollow': !hasTag(tag.id) }]"
-          :style="{ backgroundColor: hasTag(tag.id) ? tag.color : 'transparent', borderColor: tag.color }"
+    <template v-else-if="hasStudent">
+      <div class="student-display" :class="{ 'bottom-tag-mode': tagDisplayMode === 'bottom' }">
+        <div class="student-name">{{ studentInfo.name || '未命名' }}</div>
+        <!-- 颜色点模式：显示所有标签，用实心/空心区分 -->
+        <div v-if="hasTags && tagDisplayMode === 'dot'" class="student-tags">
+          <span v-for="tag in allVisibleTags" :key="tag.id"
+            :class="['tag-dot', { 'tag-dot-hollow': !hasTag(tag.id) }]"
+            :style="{ backgroundColor: hasTag(tag.id) ? tag.color : 'transparent', borderColor: tag.color }"
+            :title="tag.name">
+          </span>
+        </div>
+        <!-- 座位下部文字模式：学号绝对定位到右上角 -->
+        <div v-if="tagDisplayMode === 'bottom'" class="student-number-corner">
+          {{ studentInfo.studentNumber || '-' }}
+        </div>
+        <div v-else class="student-number">{{ studentInfo.studentNumber || '-' }}</div>
+        <!-- 座位下部文字模式：只显示学生拥有的标签 -->
+        <div v-if="hasTags && tagDisplayMode === 'bottom'" class="student-tags-text">
+          <span v-for="tag in studentTags" :key="tag.id"
+            class="tag-text-item"
+            :style="{ backgroundColor: tag.color }"
+            :title="tag.name">
+            {{ tag.name.substring(0, 2) }}
+          </span>
+        </div>
+      </div>
+      <!-- 右上角文字模式：只显示学生拥有的标签 -->
+      <div v-if="hasTags && tagDisplayMode === 'corner'" class="corner-tags">
+        <span v-for="tag in studentTags" :key="tag.id"
+          class="corner-tag-item"
+          :style="{ backgroundColor: tag.color }"
           :title="tag.name">
+          {{ tag.name.substring(0, 2) }}
         </span>
       </div>
-    </div>
+    </template>
     <div v-else class="empty-seat">
       <span class="seat-placeholder">空位</span>
     </div>
@@ -42,6 +71,8 @@ import { useZoneRotation } from '@/composables/useZoneRotation'
 import { useTagData } from '@/composables/useTagData'
 import { useUndo } from '@/composables/useUndo'
 import { useDragState } from '@/composables/useDragState'
+import { useSelection } from '@/composables/useSelection'
+import { useDragPreview } from '@/composables/useDragPreview'
 
 const props = defineProps({
   seat: {
@@ -56,9 +87,11 @@ const { students, selectedStudentId } = useStudentData()
 const { currentMode, firstSelectedSeat, EditMode } = useEditMode()
 const { visibleZoneSeats, selectedZoneId, toggleSeatInZone } = useZoneData()
 const { editingZoneId, getRotZoneHighlights, toggleSeatInEditingZone } = useZoneRotation()
-const { tags, showTagsInSeatChart } = useTagData()
+const { tags, showTagsInSeatChart, tagDisplayMode } = useTagData()
 const { isHighlighted } = useUndo()
 const { startDragFromSeat, endDragFromSeat, startTouchDragFromSeat, endTouchDragFromSeat } = useDragState()
+const { isSeatSelected, selectedSeatsArray, isDraggingSelection, startDraggingSelection, endDraggingSelection } = useSelection()
+const { startDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
 
 const isDragOver = ref(false)
 const isDragging = ref(false)
@@ -88,7 +121,7 @@ const studentInfo = computed(() => {
   return students.value.find(s => s.id === props.seat.studentId) || { name: '未知', studentNumber: null, tags: [] }
 })
 
-const studentTags = computed(() => {
+const allVisibleTags = computed(() => {
   if (!showTagsInSeatChart.value || !studentInfo.value) return []
   return tags.value.filter(tag => tag.showInSeatChart !== false)
 })
@@ -98,7 +131,16 @@ const hasTag = (tagId) => {
   return studentInfo.value.tags.includes(tagId)
 }
 
-const hasTags = computed(() => studentTags.value.length > 0)
+const studentTags = computed(() => {
+  return allVisibleTags.value.filter(tag => hasTag(tag.id))
+})
+
+const hasTags = computed(() => {
+  if (tagDisplayMode.value === 'dot') {
+    return allVisibleTags.value.length > 0
+  }
+  return studentTags.value.length > 0
+})
 
 const isFirstSelected = computed(() => {
   return currentMode.value === EditMode.SWAP && firstSelectedSeat.value === props.seat.id
@@ -131,6 +173,24 @@ const isClickable = computed(() => {
 
 const undoHighlighted = computed(() => isHighlighted(props.seat.id))
 
+// 选区选中状态
+const isInSelection = computed(() => isSeatSelected(props.seat.id))
+
+// 选区整体拖拽中（非发起者的其他选中座位）
+const isSelectionDragging = computed(() => {
+  return isInSelection.value && isDraggingSelection.value && !isDragging.value
+})
+
+// 拖拽吸附幽灵
+const isGhost = computed(() => isGhostSeat(props.seat.id))
+
+// 多选拖拽发起者
+const isDragAnchor = computed(() => {
+  return isDragging.value &&
+         isInSelection.value &&
+         selectedSeatsArray.value.length > 1
+})
+
 // 触摸拖拽激活条件
 const canTouchDrag = computed(() => {
   return hasStudent.value &&
@@ -141,6 +201,7 @@ const canTouchDrag = computed(() => {
 // 使用动态 lastPointerWasTouch 而非静态 maxTouchPoints，避免触摸屏笔记本问题
 const isDraggable = computed(() => {
   if (lastPointerWasTouch.value) return false
+  if (isInSelection.value && hasStudent.value) return true
   return canTouchDrag.value
 })
 
@@ -191,16 +252,33 @@ const handleDragStart = (e) => {
   isDragging.value = true
   startDragFromSeat()
   e.dataTransfer.effectAllowed = 'move'
+
+  const isSelection = isInSelection.value && selectedSeatsArray.value.length > 1
+  const selectionData = isSelection ? selectedSeatsArray.value : [props.seat.id]
+
+  if (isSelection) {
+    startDraggingSelection()
+  }
+
   e.dataTransfer.setData('application/json', JSON.stringify({
     type: 'seat',
     seatId: props.seat.id,
-    studentId: props.seat.studentId
+    studentId: props.seat.studentId,
+    selectedSeatIds: selectionData
   }))
+
+  const emptyImg = new Image()
+  emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+  e.dataTransfer.setDragImage(emptyImg, 0, 0)
+
+  startDragPreview(props.seat.id, selectionData, e.clientX, e.clientY)
 }
 
 const handleDragEnd = () => {
   isDragging.value = false
   endDragFromSeat()
+  endDraggingSelection()
+  endDragPreview()
   dragEnterCount = 0
 }
 
@@ -210,7 +288,7 @@ const handleDragOverSeat = (e) => {
 
 const handleDragEnter = () => {
   dragEnterCount++
-  if (!props.seat.isEmpty) {
+  if (!props.seat.isEmpty && !isDraggingSelection.value) {
     isDragOver.value = true
   }
 }
@@ -223,30 +301,9 @@ const handleDragLeave = () => {
   }
 }
 
-const handleDrop = (e) => {
+const handleDrop = () => {
   isDragOver.value = false
   dragEnterCount = 0
-  const raw = e.dataTransfer.getData('application/json')
-  if (!raw) return
-
-  try {
-    const data = JSON.parse(raw)
-    if (data.type === 'student' && !props.seat.isEmpty) {
-      emit('assign-student', props.seat.id, data.studentId)
-    } else if (data.type === 'seat' && data.seatId !== props.seat.id) {
-      // 通过冒泡的自定义事件通知 SeatChart 做交换
-      const event = new CustomEvent('touch-seat-drop', {
-        bubbles: true,
-        detail: {
-          sourceSeatId: data.seatId,
-          targetSeatId: props.seat.id
-        }
-      })
-      e.target.dispatchEvent(event)
-    }
-  } catch {
-    // ignore
-  }
 }
 
 // ==================== 触摸拖拽模拟 ====================
@@ -502,33 +559,26 @@ onUnmounted(() => {
 }
 
 .seat-item.dragging {
-  opacity: 0.35;
-  transform: scale(0.92);
-  border-style: dashed;
-  border-color: #90a4ae;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  background: transparent !important;
+  border-color: #d0d7dc !important;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.seat-item.dragging.is-anchor {
+  background: transparent !important;
+  border-color: #d0d7dc !important;
+}
+
+.seat-item.selection-dragging {
+  background: transparent !important;
+  border-color: #d0d7dc !important;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .seat-item.drag-over {
   border-color: var(--color-primary);
   border-width: 2.5px;
   background: rgba(35, 88, 123, 0.08);
-  outline: 3px solid rgba(35, 88, 123, 0.18);
-  outline-offset: 1px;
-  transform: scale(1.04);
-  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-  animation: drag-over-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes drag-over-pulse {
-  0%, 100% {
-    outline-width: 3px;
-    outline-color: rgba(35, 88, 123, 0.18);
-  }
-  50% {
-    outline-width: 5px;
-    outline-color: rgba(35, 88, 123, 0.28);
-  }
 }
 
 /* 空置座位样式 */
@@ -588,6 +638,48 @@ onUnmounted(() => {
   box-shadow: none;
 }
 
+.student-tags-text {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}
+
+.tag-text-item {
+  font-size: 9px;
+  font-weight: 600;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  line-height: 1.2;
+}
+
+.corner-tags {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  max-width: 80%;
+  justify-content: flex-end;
+  z-index: 1;
+}
+
+.corner-tag-item {
+  font-size: 8px;
+  font-weight: 600;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .student-number {
   font-size: 12px;
   font-weight: 700;
@@ -597,6 +689,20 @@ onUnmounted(() => {
   border-radius: 6px;
   min-width: 40px;
   text-align: center;
+}
+
+.student-number-corner {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.95);
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1.2;
+  z-index: 2;
 }
 
 .student-name {
@@ -671,6 +777,34 @@ onUnmounted(() => {
   box-shadow: 0 0 8px color-mix(in srgb, var(--zone-color, #E0E0E0) 50%, transparent);
 }
 
+/* 选区选中 */
+.seat-item.selection-selected {
+  border-color: #0ea5e9;
+  border-width: 2.5px;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+  background: rgba(14, 165, 233, 0.06);
+}
+
+.seat-item.selection-selected.occupied {
+  background: color-mix(in srgb, rgba(14, 165, 233, 0.12) 50%, var(--color-bg-selected));
+}
+
+/* 拖拽吸附幽灵 */
+.seat-item.drag-ghost {
+  box-shadow: inset 0 0 0 2px rgba(14, 165, 233, 0.3);
+  background: rgba(14, 165, 233, 0.08);
+  position: relative;
+}
+
+.seat-item.drag-ghost::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 2px dashed #0ea5e9;
+  border-radius: 10px;
+  pointer-events: none;
+}
+
 .seat-item.zone-highlight.occupied {
   background: color-mix(in srgb, var(--zone-color, #E0E0E0) 40%, var(--color-bg-selected));
 }
@@ -697,6 +831,11 @@ onUnmounted(() => {
     padding: 1px 8px;
   }
 
+  .student-number-corner {
+    font-size: 8px;
+    padding: 1px 4px;
+  }
+
   .tag-dot {
     width: 5px;
     height: 5px;
@@ -704,6 +843,16 @@ onUnmounted(() => {
 
   .tag-dot-hollow {
     border-width: 1.2px;
+  }
+
+  .tag-text-item {
+    font-size: 8px;
+    padding: 1px 3px;
+  }
+
+  .corner-tag-item {
+    font-size: 7px;
+    padding: 1px 3px;
   }
 
   .empty-text,
@@ -735,6 +884,11 @@ onUnmounted(() => {
     padding: 1px 7px;
   }
 
+  .student-number-corner {
+    font-size: 7px;
+    padding: 1px 3px;
+  }
+
   .tag-dot {
     width: 4px;
     height: 4px;
@@ -742,6 +896,16 @@ onUnmounted(() => {
 
   .tag-dot-hollow {
     border-width: 1px;
+  }
+
+  .tag-text-item {
+    font-size: 7px;
+    padding: 1px 2px;
+  }
+
+  .corner-tag-item {
+    font-size: 6px;
+    padding: 1px 2px;
   }
 
   .empty-text,
@@ -755,6 +919,10 @@ onUnmounted(() => {
   .student-number {
     font-size: 14px;
     padding: 3px 8px;
+  }
+
+  .student-number-corner {
+    font-size: 8px;
   }
 
   .student-name {
@@ -776,6 +944,11 @@ onUnmounted(() => {
     padding: 2px 6px;
   }
 
+  .student-number-corner {
+    font-size: 8px;
+    padding: 1px 4px;
+  }
+
   .tag-dot {
     width: 4px;
     height: 4px;
@@ -783,6 +956,16 @@ onUnmounted(() => {
 
   .tag-dot-hollow {
     border-width: 1px;
+  }
+
+  .tag-text-item {
+    font-size: 7px;
+    padding: 1px 3px;
+  }
+
+  .corner-tag-item {
+    font-size: 6px;
+    padding: 1px 3px;
   }
 
   .empty-text,
@@ -812,6 +995,11 @@ onUnmounted(() => {
     min-width: 30px;
   }
 
+  .student-number-corner {
+    font-size: 7px;
+    padding: 1px 3px;
+  }
+
   .tag-dot {
     width: 3px;
     height: 3px;
@@ -819,6 +1007,16 @@ onUnmounted(() => {
 
   .tag-dot-hollow {
     border-width: 0.8px;
+  }
+
+  .tag-text-item {
+    font-size: 6px;
+    padding: 0 2px;
+  }
+
+  .corner-tag-item {
+    font-size: 5px;
+    padding: 0 2px;
   }
 
   .empty-text,

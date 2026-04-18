@@ -6,7 +6,7 @@ export const EditMode = {
   EMPTY_EDIT: 'empty_edit',   // 空置编辑模式
   SWAP: 'swap',               // 交换座位模式
   CLEAR: 'clear',             // 清空座位模式
-  ZONE_EDIT: 'zone_edit'      // 选区编辑模式
+  ZONE_EDIT: 'zone_edit'     // 选区编辑模式
 }
 
 // 当前编辑模式

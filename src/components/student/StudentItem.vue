@@ -28,27 +28,29 @@
     </div>
 
     <!-- 中间：标签区域 -->
-    <div class="student-tags">
-      <div 
-        v-for="tagId in localTags" 
-        :key="tagId"
-        class="tag-pill"
-        :style="{ 
-          background: `color-mix(in srgb, ${getTagColor(tagId)} 15%, transparent)`,
-          color: getTagColor(tagId),
-          borderColor: `color-mix(in srgb, ${getTagColor(tagId)} 40%, transparent)`
-        }"
-      >
-        <span class="tag-name">{{ getTagName(tagId) }}</span>
-        <button class="remove-tag" @click="removeTag(tagId)" :style="{ color: getTagColor(tagId) }">
-          <X :size="12" stroke-width="2.5" />
-        </button>
+    <div class="student-tags-wrapper">
+      <!-- 颜色点模式 -->
+      <div v-if="displayMode === 'dot'" class="student-tags">
+        <span v-for="tagId in localTags" :key="tagId" 
+          class="tag-dot"
+          :style="{ backgroundColor: getTagColor(tagId) }"
+          :title="getTagName(tagId)">
+        </span>
+      </div>
+      <!-- 文字模式（右上角/座位下部） -->
+      <div v-else class="student-tags-text">
+        <span v-for="tagId in localTags" :key="tagId" 
+          class="tag-text-item"
+          :style="{ backgroundColor: getTagColor(tagId) }"
+          :title="getTagName(tagId)">
+          {{ getTagName(tagId).substring(0, 2) }}
+        </span>
       </div>
 
       <!-- 添加标签组件 -->
       <div class="add-tag-wrapper" ref="wrapperRef">
         <button class="add-tag-btn" @click="toggleTagDropdown" title="添加标签" :class="{ active: showTagDropdown }">
-          <Plus :size="14" stroke-width="2.5" />
+          <Plus :size="12" stroke-width="2.5" />
         </button>
         
         <teleport to="body">
@@ -87,6 +89,7 @@
 import { ref, watch, computed } from 'vue'
 import { Plus, X, Trash2 } from 'lucide-vue-next'
 import { onClickOutside } from '@vueuse/core'
+import { useTagData } from '@/composables/useTagData'
 
 const props = defineProps({
   student: {
@@ -101,6 +104,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update-student', 'delete-student'])
+
+const { tagDisplayMode } = useTagData()
+
+const displayMode = computed(() => tagDisplayMode.value)
 
 const localName = ref(props.student.name || '')
 const localNumber = ref(props.student.studentNumber || '')
@@ -281,7 +288,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
 
 /* ================= 标签区域 ================= */
 
-.student-tags {
+.student-tags-wrapper {
   flex: 1;
   display: flex;
   align-items: center;
@@ -289,41 +296,38 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   gap: 8px;
 }
 
-.tag-pill {
+.student-tags {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  border: 1px solid transparent;
-  animation: scaleIn 0.2s ease-out;
-}
-
-.tag-name {
-  max-width: 80px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.remove-tag {
-  background: none;
-  border: none;
-  padding: 2px;
-  display: flex;
+  gap: 3px;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  border-radius: 50%;
-  transition: background 0.2s;
-  opacity: 0.7;
+  flex-wrap: wrap;
 }
 
-.remove-tag:hover {
-  background: rgba(0, 0, 0, 0.08);
-  opacity: 1;
+.tag-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.student-tags-text {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tag-text-item {
+  font-size: 9px;
+  font-weight: 600;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  line-height: 1.2;
 }
 
 .add-tag-wrapper {
@@ -334,8 +338,8 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #f0f4f8;
   border: 1px dashed #cbd5e1;
@@ -349,7 +353,6 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   background: #e2e8f0;
   color: #23587b;
   border-color: #94a3b8;
-  transform: scale(1.05);
 }
 
 
@@ -381,17 +384,6 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   color: #ef4444;
 }
 
-@keyframes scaleIn {
-  from {
-    transform: scale(0.9);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 /* ================= 响应式 ================= */
 
 @media (max-width: 600px) {
@@ -400,7 +392,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
     gap: 12px;
   }
   
-  .student-tags {
+  .student-tags-wrapper {
     width: 100%;
     order: 3;
     padding-top: 8px;

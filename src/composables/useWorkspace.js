@@ -14,7 +14,7 @@ const CURRENT_VERSION = '2.1'
 
 export function useWorkspace() {
   const { students, addStudent, updateStudent, clearAllStudents } = useStudentData()
-  const { tags, addTag, clearAllTags } = useTagData()
+  const { tags, addTag, clearAllTags, showTagsInSeatChart, tagDisplayMode, setShowTagsInSeatChart, setTagDisplayMode } = useTagData()
   const { seatConfig, seats, updateConfig, clearAllSeats } = useSeatChart()
   const { exportSettings } = useExportSettings()
   const { zones, clearAllZones, addZone, updateZone } = useZoneData()
@@ -39,8 +39,13 @@ export function useWorkspace() {
         tags: tags.value.map(t => ({
           id: t.id,
           name: t.name,
-          color: t.color
+          color: t.color,
+          showInSeatChart: t.showInSeatChart
         })),
+        tagSettings: {
+          showTagsInSeatChart: showTagsInSeatChart.value,
+          tagDisplayMode: tagDisplayMode.value
+        },
         layout: {
           config: { ...seatConfig.value },
           seats: seats.value.map(s => ({
@@ -167,10 +172,24 @@ export function useWorkspace() {
         // 恢复标签并记录旧ID->新ID映射
         const oldTagIdToNewId = {}
         workspace.tags.forEach(tag => {
-          addTag({ name: tag.name, color: tag.color })
+          addTag({ 
+            name: tag.name, 
+            color: tag.color, 
+            showInSeatChart: tag.showInSeatChart !== false 
+          })
           const added = tags.value.find(t => t.name === tag.name && t.color === tag.color)
           if (added) oldTagIdToNewId[tag.id] = added.id
         })
+
+        // 恢复标签显示设置
+        if (workspace.tagSettings) {
+          if (workspace.tagSettings.showTagsInSeatChart !== undefined) {
+            setShowTagsInSeatChart(workspace.tagSettings.showTagsInSeatChart)
+          }
+          if (workspace.tagSettings.tagDisplayMode) {
+            setTagDisplayMode(workspace.tagSettings.tagDisplayMode)
+          }
+        }
 
         // 恢复学生并记录旧ID->新ID映射
         const oldStudentIdToNewId = {}

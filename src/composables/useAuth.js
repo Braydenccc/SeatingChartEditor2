@@ -90,6 +90,16 @@ const initAuth = () => {
         }
     }
 
+    // 初始化备份模式设置
+    const savedBackupMode = getCookie('sce_backup_mode')
+    if (savedBackupMode) {
+        try {
+            backupMode.value = savedBackupMode === 'true'
+        } catch(e) {
+            eraseCookie('sce_backup_mode')
+        }
+    }
+
     // 恢复用户上次手动设置的首选同步类型（仅在未被上面的 WebDAV 逻辑覆盖的情况下才读取）
     const savedAuthType = localStorage.getItem('sce_auth_type')
     if (savedAuthType && authType.value !== 'webdav') {
@@ -119,6 +129,8 @@ const fetchSyncSettings = async () => {
                 webdavConfig.value = result.data.webdav
             }
             backupMode.value = !!result.data.backupMode
+            // 持久化备份模式到 Cookie
+            setCookie('sce_backup_mode', backupMode.value ? 'true' : 'false', 30)
         }
     } catch (e) {
         console.error('Failed to fetch settings:', e)
@@ -200,11 +212,12 @@ export function useAuth() {
                 authType.value = webdavConfig.value ? 'webdav' : 'retiehe'
             }
         }
-        
+
         if (target === 'all' || target === 'webdav') {
             webdavConfig.value = null
             backupMode.value = false
             eraseCookie('sce_webdav_config')
+            eraseCookie('sce_backup_mode')
             // 断开 WebDAV 后若还有 SCE 账号，切换到 retiehe
             if (authType.value === 'webdav') {
                 authType.value = currentUser.value ? 'retiehe' : 'retiehe'
@@ -253,6 +266,8 @@ export function useAuth() {
             if (result.success) {
                 webdavConfig.value = webdav
                 backupMode.value = backup
+                // 持久化备份模式到 Cookie
+                setCookie('sce_backup_mode', backup ? 'true' : 'false', 30)
             }
             return result
         } catch (e) {

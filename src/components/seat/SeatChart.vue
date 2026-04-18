@@ -30,7 +30,7 @@
     <div ref="viewportRef" class="seat-chart-viewport" :class="{ 'is-panning': isPanning }" @wheel.prevent="handleWheel"
       @mousedown="handleMouseDown" @mousemove="handleMouseMove" @mouseup="handleMouseUp" @mouseleave="handleMouseUp"
       @touchstart="handleTouchStart" @touchmove.prevent="handleTouchMove" @touchend="handleTouchEnd"
-      @dragover.prevent="handleDragOver" @drop.prevent="handleDrop">
+      @dragover.prevent="handleDragOver" @drop.prevent="handleDrop" @contextmenu.prevent>
       <div ref="chartRef" class="seat-chart" :class="seatConfig.seatAlignment === 'top' ? 'align-top' : 'align-bottom'" :style="chartTransformStyle">
         <div v-for="(group, groupIndex) in organizedSeats" :key="groupIndex" class="seat-group">
           <div class="group-label">第 {{ groupIndex + 1 }} 组</div>
@@ -74,7 +74,41 @@
           </template>
         </svg>
       </div>
+
+      <!-- 矩形框选叠加层 -->
+      <div v-if="isRectSelecting" class="rect-select-overlay" :style="rectSelectStyle"></div>
+
+      <!-- 选区操作工具栏 -->
+      <SelectionToolbar
+        :visible="showSelToolbar"
+        :anchorX="selToolbarAnchor.x"
+        :anchorY="selToolbarAnchor.y"
+        :isFull="isSelectionFull"
+        :hasStudent="isSelectionHasStudent"
+        :canShuffle="selectedCount >= 2"
+        @edit="handleSelEdit"
+        @clear="handleSelClear"
+        @shuffle="handleSelShuffle"
+        @assign="handleSelAssign"
+        @cancel="clearSeatSelection"
+      />
     </div>
+
+    <!-- 批量编辑弹窗 -->
+    <BatchEditDialog
+      v-model:visible="showBatchEditDialog"
+      :studentIds="batchEditStudentIds"
+    />
+
+    <!-- 浮动拖拽预览 -->
+    <Teleport to="body">
+      <div v-show="dragPreviewState.isActive" ref="dragPreviewRef" class="drag-preview-overlay">
+        <div v-for="item in previewItems" :key="item.seatId"
+          class="drag-preview-seat" :class="{ 'is-anchor': item.isAnchor }" :style="item.style">
+          {{ item.studentName }}
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -82,6 +116,8 @@
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 import { Minus, Plus } from 'lucide-vue-next'
 import SeatItem from './SeatItem.vue'
+import SelectionToolbar from './SelectionToolbar.vue'
+import BatchEditDialog from '@/components/student/BatchEditDialog.vue'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useEditMode } from '@/composables/useEditMode'
 import { useStudentData } from '@/composables/useStudentData'
@@ -89,6 +125,22 @@ import { useZoom } from '@/composables/useZoom'
 import { useZoneRotation } from '@/composables/useZoneRotation'
 import { useUndo } from '@/composables/useUndo'
 import { useDragState } from '@/composables/useDragState'
+import { useSelection } from '@/composables/useSelection'
+import { useDragPreview } from '@/composables/useDragPreview'
+import { useLayoutConstants } from '@/composables/useLayoutConstants'
+
+// 透明拖拽图片常量
+const TRANSPARENT_DRAG_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+
+// Fisher-Yates 洗牌算法
+const shuffleArray = (array) => {
+  const result = [...array]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
+}
 
 const {
   seatConfig,
@@ -98,16 +150,41 @@ const {
   toggleEmpty,
   clearSeat,
   swapSeats,
+  moveSelection,
   findSeatByStudent,
-  getStudentAtSeat
+  getStudentAtSeat,
+  parseSeatId,
+  generateSeatId,
+  toGlobalCol,
+  fromGlobalCol
 } = useSeatChart()
 
 const { firstSelectedSeat, setFirstSelectedSeat, clearFirstSelectedSeat } = useEditMode()
-const { clearSelection, students } = useStudentData()
+const { clearSelection: clearStudentSelection, students } = useStudentData()
 const { scale, panX, panY, zoomIn, zoomOut, setScale, setPan, MIN_SCALE, MAX_SCALE, registerViewport, fitToViewport } = useZoom()
 const { recordAssign, recordClear, recordSwap, recordToggleEmpty } = useUndo()
 const { isDraggingFromSeat: globalIsDraggingFromSeat } = useDragState()
+const {
+  clearSelection: clearSeatSelection,
+  selectedSeatsArray,
+  selectedCount,
+  setSelection,
+  startSelection,
+  updateSelection,
+  endSelection,
+  toggleSeatInSelection
+} = useSelection()
+const {
+  dragPreviewState,
+  isGhostSeat,
+  previewItems,
+  registerChartElement,
+  registerPreviewElement,
+  updateDragPreview,
+  endDragPreview
+} = useDragPreview()
 
+const dragPreviewRef = ref(null)
 const viewportRef = ref(null)
 const chartRef = ref(null)
 const isPanning = ref(false)
@@ -156,7 +233,39 @@ const flushPan = (x, y) => {
 let pendingPanX = 0
 let pendingPanY = 0
 
+let rightMouseDown = false
+let rightStartX = 0
+let rightStartY = 0
+let rightStartSeatId = null
+
+// 矩形框选状态
+const isRectSelecting = ref(false)
+const rectSelectStart = ref({ x: 0, y: 0 })
+const rectSelectEnd = ref({ x: 0, y: 0 })
+
 const handleMouseDown = (e) => {
+  if (e.button === 2) {
+    // Shift+右键：矩形框选模式
+    if (e.shiftKey) {
+      isRectSelecting.value = true
+      rectSelectStart.value = { x: e.clientX, y: e.clientY }
+      rectSelectEnd.value = { x: e.clientX, y: e.clientY }
+      e.preventDefault()
+      return
+    }
+    
+    // 普通右键：涂抹选择模式
+    rightMouseDown = true
+    mouseMoved = false
+    rightStartX = e.clientX
+    rightStartY = e.clientY
+    const seatEl = findSeatElement(e.target)
+    rightStartSeatId = seatEl?.dataset.seatId || null
+    startSelection(null)
+    e.preventDefault()
+    return
+  }
+
   // 不拦截对座位等可交互元素的点击
   // 只在空白区域或按住中键时启动拖拽
   if (e.button === 1 || (e.button === 0 && !isInteractiveTarget(e.target))) {
@@ -171,6 +280,25 @@ const handleMouseDown = (e) => {
 }
 
 const handleMouseMove = (e) => {
+  // 矩形框选模式：更新结束位置
+  if (isRectSelecting.value) {
+    rectSelectEnd.value = { x: e.clientX, y: e.clientY }
+    return
+  }
+
+  if (rightMouseDown) {
+    const dx = e.clientX - rightStartX
+    const dy = e.clientY - rightStartY
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      mouseMoved = true
+    }
+    const seatEl = findSeatElement(e.target)
+    if (seatEl && seatEl.dataset.seatId) {
+      updateSelection(seatEl.dataset.seatId)
+    }
+    return
+  }
+
   if (!mouseDown) return
   const dx = e.clientX - startMouseX
   const dy = e.clientY - startMouseY
@@ -184,6 +312,23 @@ const handleMouseMove = (e) => {
 }
 
 const handleMouseUp = () => {
+  // 完成矩形框选
+  if (isRectSelecting.value) {
+    selectSeatsInRect()
+    isRectSelecting.value = false
+    return
+  }
+
+  if (rightMouseDown) {
+    if (!mouseMoved && rightStartSeatId) {
+      toggleSeatInSelection(rightStartSeatId)
+    }
+    endSelection()
+    rightMouseDown = false
+    rightStartSeatId = null
+    return
+  }
+
   if (mouseDown && mouseMoved) {
     flushPan(pendingPanX, pendingPanY)
   }
@@ -295,29 +440,68 @@ const handleWheel = (e) => {
 // ==================== 拖放处理 ====================
 const handleDragOver = (e) => {
   e.dataTransfer.dropEffect = 'move'
+  if (dragPreviewState.isActive) {
+    updateDragPreview(e.clientX, e.clientY)
+  }
 }
 
 const handleDrop = (e) => {
   const raw = e.dataTransfer.getData('application/json')
-  if (!raw) return
+  if (!raw) {
+    endDragPreview()
+    return
+  }
 
   try {
     const data = JSON.parse(raw)
     const targetEl = findSeatElement(e.target)
-    if (!targetEl) return
+    if (!targetEl) {
+      endDragPreview()
+      return
+    }
     const targetSeatId = targetEl.dataset.seatId
-    if (!targetSeatId) return
+    if (!targetSeatId) {
+      endDragPreview()
+      return
+    }
 
     if (data.type === 'student') {
       handleAssignStudent(targetSeatId, data.studentId)
+      endDragPreview([targetSeatId])
     } else if (data.type === 'seat') {
-      if (data.seatId !== targetSeatId) {
+      if (data.selectedSeatIds && data.selectedSeatIds.length > 1) {
+        const moved = moveSelection(data.selectedSeatIds, data.seatId, targetSeatId)
+        if (moved) {
+          const anchor = parseSeatId(data.seatId)
+          const target = parseSeatId(targetSeatId)
+          const offsetCol = toGlobalCol(target) - toGlobalCol(anchor)
+          const offsetRow = target.rowIndex - anchor.rowIndex
+
+          const destIds = data.selectedSeatIds.map(sid => {
+            const src = parseSeatId(sid)
+            const destGC = toGlobalCol(src) + offsetCol
+            const destR = src.rowIndex + offsetRow
+            const { groupIndex: destG, columnIndex: destC } = fromGlobalCol(destGC)
+            return generateSeatId(destG, destC, destR)
+          })
+          endDragPreview(destIds)
+          clearSeatSelection()
+        } else {
+          endDragPreview()
+        }
+      } else if (data.seatId !== targetSeatId) {
         recordSwap(data.seatId, targetSeatId)
         swapSeats(data.seatId, targetSeatId)
+        endDragPreview([targetSeatId])
+        clearSeatSelection()
+      } else {
+        endDragPreview()
       }
+    } else {
+      endDragPreview()
     }
   } catch {
-    // ignore
+    endDragPreview()
   }
 }
 
@@ -340,7 +524,7 @@ const handleToolbarDrop = (e) => {
       const studentId = getStudentAtSeat(data.seatId)
       recordClear(data.seatId, studentId)
       clearSeat(data.seatId)
-      clearSelection()
+      clearSeatSelection()
     }
   } catch {
     // ignore
@@ -356,6 +540,38 @@ const findSeatElement = (el) => {
     current = current.parentElement
   }
   return null
+}
+
+// 矩形框选：选中矩形区域内的所有座位
+const selectSeatsInRect = () => {
+  if (!viewportRef.value) return
+
+  const x1 = Math.min(rectSelectStart.value.x, rectSelectEnd.value.x)
+  const y1 = Math.min(rectSelectStart.value.y, rectSelectEnd.value.y)
+  const x2 = Math.max(rectSelectStart.value.x, rectSelectEnd.value.x)
+  const y2 = Math.max(rectSelectStart.value.y, rectSelectEnd.value.y)
+
+  // 如果矩形太小（小于5px），不执行选择
+  if (x2 - x1 < 5 && y2 - y1 < 5) return
+
+  const viewportRect = viewportRef.value.getBoundingClientRect()
+  const seatElements = viewportRef.value.querySelectorAll('[data-seat-id]')
+  const seatIdsToSelect = []
+
+  seatElements.forEach(el => {
+    const rect = el.getBoundingClientRect()
+    const seatCenterX = rect.left + rect.width / 2
+    const seatCenterY = rect.top + rect.height / 2
+
+    // 判断座位中心点是否在矩形框内
+    if (seatCenterX >= x1 && seatCenterX <= x2 && seatCenterY >= y1 && seatCenterY <= y2) {
+      seatIdsToSelect.push(el.dataset.seatId)
+    }
+  })
+
+  if (seatIdsToSelect.length > 0) {
+    setSelection(seatIdsToSelect)
+  }
 }
 
 // ==================== 触摸自定义事件 ====================
@@ -388,18 +604,128 @@ const handleGlobalDragStart = (e) => {
   if (!seatId) return
   const seat = organizedSeats.value.flat(Infinity).find(s => s.id === seatId)
   if (seat && seat.studentId !== null && !seat.isEmpty) {
-    isDraggingFromSeat.value = true
+    globalIsDraggingFromSeat.value = true
   }
 }
 
 const handleGlobalDragEnd = () => {
-  isDraggingFromSeat.value = false
+  globalIsDraggingFromSeat.value = false
+}
+
+const handleGlobalDragOver = (e) => {
+  if (dragPreviewState.isActive) {
+    updateDragPreview(e.clientX, e.clientY)
+  }
+}
+
+// ==================== 键盘快捷键 ====================
+const handleKeyDown = (e) => {
+  if (e.key === 'Escape') {
+    clearSeatSelection()
+  }
+}
+
+// ==================== 选区工具栏 ====================
+const selToolbarAnchor = ref({ x: 0, y: 0 })
+const showSelToolbar = computed(() => selectedCount.value >= 1 && !dragPreviewState.isActive)
+
+// 批量编辑弹窗
+const showBatchEditDialog = ref(false)
+const batchEditStudentIds = ref([])
+
+// 判断选区是否已满（所有选中的座位都有学生）
+const isSelectionFull = computed(() => {
+  if (selectedCount.value === 0) return false
+  return selectedSeatsArray.value.every(seatId => getStudentAtSeat(seatId))
+})
+
+// 判断选区是否有学生（至少有一个座位有学生）
+const isSelectionHasStudent = computed(() => {
+  if (selectedCount.value === 0) return false
+  return selectedSeatsArray.value.some(seatId => getStudentAtSeat(seatId))
+})
+
+const updateSelToolbarPosition = () => {
+  if (!viewportRef.value || selectedCount.value < 1) return
+  const vpRect = viewportRef.value.getBoundingClientRect()
+  const ids = selectedSeatsArray.value
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const id of ids) {
+    const el = viewportRef.value.querySelector(`[data-seat-id="${id}"]`)
+    if (!el) continue
+    const r = el.getBoundingClientRect()
+    if (r.left < minX) minX = r.left
+    if (r.top < minY) minY = r.top
+    if (r.right > maxX) maxX = r.right
+    if (r.bottom > maxY) maxY = r.bottom
+  }
+  if (minX === Infinity) return
+  selToolbarAnchor.value = {
+    x: (minX + maxX) / 2 - vpRect.left,
+    y: maxY - vpRect.top + 10
+  }
+}
+
+watch([selectedSeatsArray, scale, panX, panY], () => {
+  nextTick(updateSelToolbarPosition)
+}, { deep: true })
+
+const handleSelClear = () => {
+  for (const seatId of selectedSeatsArray.value) {
+    const studentId = getStudentAtSeat(seatId)
+    if (studentId) {
+      recordClear(seatId, studentId)
+      clearSeat(seatId)
+    }
+  }
+  clearSeatSelection()
+}
+
+const handleSelShuffle = () => {
+  const ids = selectedSeatsArray.value
+  const studentIds = ids.map(id => getStudentAtSeat(id)).filter(Boolean)
+  if (studentIds.length < 2) return
+  for (let i = studentIds.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [studentIds[i], studentIds[j]] = [studentIds[j], studentIds[i]]
+  }
+  const occupiedIds = ids.filter(id => getStudentAtSeat(id))
+  for (const seatId of occupiedIds) {
+    clearSeat(seatId)
+  }
+  for (let i = 0; i < occupiedIds.length; i++) {
+    assignStudent(occupiedIds[i], studentIds[i])
+  }
+}
+
+const handleSelAssign = () => {
+  const ids = selectedSeatsArray.value
+  const emptyIds = ids.filter(id => !getStudentAtSeat(id))
+  const unassigned = students.value.filter(s => !findSeatByStudent(s.id))
+  if (emptyIds.length === 0 || unassigned.length === 0) return
+  const shuffled = [...unassigned].sort(() => Math.random() - 0.5)
+  const count = Math.min(emptyIds.length, shuffled.length)
+  for (let i = 0; i < count; i++) {
+    assignStudent(emptyIds[i], shuffled[i].id)
+    recordAssign(emptyIds[i], shuffled[i].id, null)
+  }
+  clearSeatSelection()
+}
+
+const handleSelEdit = () => {
+  const ids = selectedSeatsArray.value
+  const studentIds = ids.map(id => getStudentAtSeat(id)).filter(Boolean)
+  if (studentIds.length === 0) return
+  batchEditStudentIds.value = studentIds
+  showBatchEditDialog.value = true
 }
 
 // ==================== 初始化 ====================
 onMounted(() => {
   initializeSeats()
   registerViewport(viewportRef.value, chartRef.value)
+  registerChartElement(chartRef.value)
+  registerPreviewElement(dragPreviewRef.value)
 
   if (viewportRef.value) {
     viewportRef.value.addEventListener('touch-seat-drop', handleTouchSeatDrop)
@@ -408,6 +734,8 @@ onMounted(() => {
   document.addEventListener('touch-student-drop', handleTouchStudentDrop)
   document.addEventListener('dragstart', handleGlobalDragStart)
   document.addEventListener('dragend', handleGlobalDragEnd)
+  document.addEventListener('dragover', handleGlobalDragOver)
+  document.addEventListener('keydown', handleKeyDown)
 
   // 首次自适应
   nextTick(() => {
@@ -423,6 +751,8 @@ onUnmounted(() => {
   document.removeEventListener('touch-student-drop', handleTouchStudentDrop)
   document.removeEventListener('dragstart', handleGlobalDragStart)
   document.removeEventListener('dragend', handleGlobalDragEnd)
+  document.removeEventListener('dragover', handleGlobalDragOver)
+  document.removeEventListener('keydown', handleKeyDown)
 })
 
 // 配置变化时重新自适应
@@ -464,7 +794,7 @@ const handleAssignStudent = (seatId, studentId) => {
     clearSeat(existingSeat.id)
   }
   assignStudent(seatId, studentId)
-  clearSelection()
+  clearStudentSelection()
   recordAssign(seatId, studentId, previousSeatId)
 }
 
@@ -482,30 +812,28 @@ const handleClearSeat = (seatId) => {
 }
 
 // 处理交换座位
-const handleSwapSeat = (seatId) => {
-  if (!firstSelectedSeat.value) {
-    setFirstSelectedSeat(seatId)
-  } else if (firstSelectedSeat.value === seatId) {
-    clearFirstSelectedSeat()
+const handleSwapSeat = (seatId, sourceSeatId = null) => {
+  if (sourceSeatId) {
+    // 拖拽交换模式：直接交换两个座位
+    recordSwap(sourceSeatId, seatId)
+    swapSeats(sourceSeatId, seatId)
   } else {
-    recordSwap(firstSelectedSeat.value, seatId)
-    swapSeats(firstSelectedSeat.value, seatId)
-    clearFirstSelectedSeat()
+    // 点击交换模式：依次选择两个座位
+    if (!firstSelectedSeat.value) {
+      setFirstSelectedSeat(seatId)
+    } else if (firstSelectedSeat.value === seatId) {
+      clearFirstSelectedSeat()
+    } else {
+      recordSwap(firstSelectedSeat.value, seatId)
+      swapSeats(firstSelectedSeat.value, seatId)
+      clearFirstSelectedSeat()
+    }
   }
 }
 
 // ==================== 选区轮换 SVG 箭头 ====================
 const { rotGroups, editingZoneId, getZoneColor, parseSeatPos, PALETTE } = useZoneRotation()
-
-// 布局常量（与 CSS 对应）
-const L = {
-  SEAT_W: 120, SEAT_H: 80,
-  COL_GAP: 16,  // .group-content gap
-  ROW_GAP: 12,  // .seat-column gap
-  GROUP_GAP: 40, // .seat-chart gap between groups
-  LABEL_H: 47,  // group label (~35px) + .seat-group gap (12px)
-  PAD_L: 20, PAD_T: 30
-}
+const { LAYOUT: L } = useLayoutConstants()
 
 const getSeatCenter = (seatId) => {
   const { g, c, r } = parseSeatPos(seatId)
@@ -583,6 +911,23 @@ const zoneArrowData = computed(() => {
 })
 
 const showOverlay = computed(() => editingZoneId.value !== null)
+
+// 矩形框选样式
+const rectSelectStyle = computed(() => {
+  if (!isRectSelecting.value) return {}
+  
+  const x1 = Math.min(rectSelectStart.value.x, rectSelectEnd.value.x)
+  const y1 = Math.min(rectSelectStart.value.y, rectSelectEnd.value.y)
+  const x2 = Math.max(rectSelectStart.value.x, rectSelectEnd.value.x)
+  const y2 = Math.max(rectSelectStart.value.y, rectSelectEnd.value.y)
+  
+  return {
+    left: `${x1}px`,
+    top: `${y1}px`,
+    width: `${x2 - x1}px`,
+    height: `${y2 - y1}px`
+  }
+})
 </script>
 
 <style scoped>
@@ -594,6 +939,47 @@ const showOverlay = computed(() => editingZoneId.value !== null)
   overflow: visible;
   pointer-events: none;
   z-index: 5;
+}
+
+.drag-preview-overlay {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.drag-preview-seat {
+  position: absolute;
+  border: 2.5px solid var(--color-primary, #23587b);
+  border-radius: 12px;
+  background: var(--color-bg-selected, #e8f4f8);
+  color: #333;
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 8px;
+  box-shadow: 0 8px 24px rgba(35, 88, 123, 0.35);
+  opacity: 0.95;
+}
+
+.drag-preview-seat.is-anchor {
+  border-width: 3px;
+  box-shadow: 0 12px 32px rgba(35, 88, 123, 0.45);
+  z-index: 10;
+}
+
+.rect-select-overlay {
+  position: fixed;
+  background: rgba(14, 165, 233, 0.15);
+  border: 2px solid #0ea5e9;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1000;
 }
 
 .seat-chart-container {

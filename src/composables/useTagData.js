@@ -9,6 +9,9 @@ let colorIndex = 0
 // 全局设置：是否在座位表中显示标签
 const showTagsInSeatChart = ref(true)
 
+// 标签显示模式: 'dot' | 'corner' | 'bottom'
+const tagDisplayMode = ref('dot')
+
 // 初始化默认标签
 export function initializeTags() {
   if (tags.value.length === 0) {
@@ -67,13 +70,20 @@ export function useTagData() {
     showTagsInSeatChart.value = show
   }
 
+  // 设置标签显示模式
+  const setTagDisplayMode = (mode) => {
+    tagDisplayMode.value = mode
+  }
+
   return {
     tags,
     showTagsInSeatChart,
+    tagDisplayMode,
     addTag,
     editTag,
     deleteTag,
     clearAllTags,
-    setShowTagsInSeatChart
+    setShowTagsInSeatChart,
+    setTagDisplayMode
   }
 }
