@@ -1016,7 +1016,6 @@ const handleRunAssignment = async () => {
 
   lastAssignmentReport.value = null
   const startTime = Date.now()
-  const beforeSnapshot = createSnapshot()
 
   try {
     const result = await runSmartAssignment({
@@ -1025,8 +1024,6 @@ const handleRunAssignment = async () => {
     })
 
     if (result.success) {
-      const afterSnapshot = createSnapshot()
-      recordBatch(beforeSnapshot, afterSnapshot)
       if (result.message) success(result.message)
       lastAssignmentReport.value = result.report ?? null
       lastAssignmentDuration.value = result.duration ?? (Date.now() - startTime)

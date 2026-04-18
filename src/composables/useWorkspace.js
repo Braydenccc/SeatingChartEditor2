@@ -15,7 +15,7 @@ const CURRENT_VERSION = '2.1'
 export function useWorkspace() {
   const { students, addStudent, updateStudent, clearAllStudents } = useStudentData()
   const { tags, addTag, clearAllTags, showTagsInSeatChart, tagDisplayMode, setShowTagsInSeatChart, setTagDisplayMode } = useTagData()
-  const { seatConfig, seats, updateConfig, clearAllSeats } = useSeatChart()
+  const { seatConfig, seats, updateConfig, clearAllSeats, batchUpdateSeats } = useSeatChart()
   const { exportSettings } = useExportSettings()
   const { zones, clearAllZones, addZone, updateZone } = useZoneData()
   const { rules, clearAllRules, addRule } = useSeatRules()
@@ -213,15 +213,21 @@ export function useWorkspace() {
         clearAllSeats()
 
         if (workspace.layout && Array.isArray(workspace.layout.seats)) {
-          workspace.layout.seats.forEach(sw => {
+          const updates = workspace.layout.seats.map(sw => {
             const match = seats.value.find(st =>
               st.groupIndex === sw.group && st.columnIndex === sw.col && st.rowIndex === sw.row
             )
-            if (match) {
-              match.isEmpty = !!sw.empty
-              match.studentId = sw.studentId != null ? (oldStudentIdToNewId[sw.studentId] || null) : null
+            if (!match) return null
+            return {
+              seatId: match.id,
+              isEmpty: !!sw.empty,
+              studentId: sw.studentId != null ? (oldStudentIdToNewId[sw.studentId] || null) : null
             }
-          })
+          }).filter(Boolean)
+
+          if (updates.length > 0) {
+            batchUpdateSeats(updates, false)  // recordUndo=false，历史数据恢复不记录
+          }
         }
 
         // 恢复导出设置

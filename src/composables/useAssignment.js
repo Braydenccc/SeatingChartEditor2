@@ -11,6 +11,7 @@ import { useStudentData } from './useStudentData'
 import { useSeatChart } from './useSeatChart'
 import { useZoneData } from './useZoneData'
 import { useSeatRules } from './useSeatRules'
+import { useUndo } from './useUndo'
 import { PENALTY_WEIGHTS, RulePriority, PREDICATE_META } from '../constants/ruleTypes.js'
 
 export function useAssignment() {
@@ -1556,10 +1557,16 @@ export function useAssignment() {
       }
 
       // 写入结果
+      const { recordBatch, createSnapshot } = useUndo()
+      const beforeSnapshot = createSnapshot()
+
       clearAllSeats()
       for (const [studentId, seatId] of solution.entries()) {
-        assignStudent(seatId, studentId)
+        assignStudent(seatId, studentId, false)  // recordUndo=false
       }
+
+      const afterSnapshot = createSnapshot()
+      recordBatch(beforeSnapshot, afterSnapshot)
 
       assignmentProgress.value = 100
 

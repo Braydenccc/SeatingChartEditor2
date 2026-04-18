@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { useZoneData } from './useZoneData'
+import { useUndo } from './useUndo'
 
 // 座位表配置
 const seatConfig = ref({
@@ -72,6 +73,63 @@ function rebuildSeatMap() {
   seatMap = newMap
 }
 
+// 单座位状态更新（带撤销记录）
+const updateSeatState = (seatId, updates, recordUndo = true) => {
+  const seat = seatMap.get(seatId)
+  if (!seat) return false
+
+  const before = { studentId: seat.studentId, isEmpty: seat.isEmpty }
+
+  // 如果要分配新学生，先找到该学生之前所在的座位
+  let previousSeatId = null
+  if (updates.studentId !== undefined && updates.studentId !== null && updates.studentId !== before.studentId) {
+    const previousSeat = seats.value.find(s => s.studentId === updates.studentId && s.id !== seatId)
+    previousSeatId = previousSeat?.id || null
+  }
+
+  Object.assign(seat, updates)
+  const after = { studentId: seat.studentId, isEmpty: seat.isEmpty }
+
+  if (recordUndo) {
+    const { recordAssign, recordClear, recordToggleEmpty } = useUndo()
+
+    // 根据变更类型调用对应的 record 函数
+    if (before.isEmpty !== after.isEmpty) {
+      recordToggleEmpty(seatId)
+    } else if (before.studentId !== after.studentId) {
+      if (after.studentId === null) {
+        recordClear(seatId, before.studentId)
+      } else {
+        recordAssign(seatId, after.studentId, previousSeatId)
+      }
+    }
+  }
+
+  return true
+}
+
+// 批量状态更新（带快照机制）
+const batchUpdateSeats = (updates, recordUndo = true) => {
+  const { recordBatch, createSnapshot } = useUndo()
+
+  if (recordUndo) {
+    const beforeSnapshot = createSnapshot()
+
+    for (const { seatId, ...changes } of updates) {
+      const seat = seatMap.get(seatId)
+      if (seat) Object.assign(seat, changes)
+    }
+
+    const afterSnapshot = createSnapshot()
+    recordBatch(beforeSnapshot, afterSnapshot)
+  } else {
+    for (const { seatId, ...changes } of updates) {
+      const seat = seatMap.get(seatId)
+      if (seat) Object.assign(seat, changes)
+    }
+  }
+}
+
 // 初始化座位表
 function initializeSeats() {
   const newSeats = []
@@ -138,39 +196,58 @@ export function useSeatChart() {
   const { cleanupInvalidSeats } = useZoneData()
 
   // 分配学生到座位
-  const assignStudent = (seatId, studentId) => {
+  const assignStudent = (seatId, studentId, recordUndo = true) => {
     const seat = seatMap.get(seatId)
     if (seat && !seat.isEmpty) {
-      seat.studentId = studentId
+      if (recordUndo) {
+        const { recordAssign } = useUndo()
+        const previousSeat = seats.value.find(s => s.studentId === studentId && s.id !== seatId)
+        seat.studentId = studentId
+        recordAssign(seatId, studentId, previousSeat?.id || null)
+      } else {
+        seat.studentId = studentId
+      }
       return true
     }
     return false
   }
 
   // 切换空置状态
-  const toggleEmpty = (seatId) => {
+  const toggleEmpty = (seatId, recordUndo = true) => {
     const seat = seatMap.get(seatId)
     if (seat) {
+      if (recordUndo) {
+        const { recordToggleEmpty } = useUndo()
+        recordToggleEmpty(seatId)
+      }
       seat.isEmpty = !seat.isEmpty
       if (seat.isEmpty) {
-        seat.studentId = null  // 空置座位清除学生
+        seat.studentId = null
       }
     }
   }
 
   // 清空座位
-  const clearSeat = (seatId) => {
+  const clearSeat = (seatId, recordUndo = true) => {
     const seat = seatMap.get(seatId)
     if (seat) {
+      if (recordUndo) {
+        const { recordClear } = useUndo()
+        recordClear(seatId, seat.studentId)
+      }
       seat.studentId = null
     }
   }
 
   // 交换两个座位的学生
-  const swapSeats = (seatId1, seatId2) => {
+  const swapSeats = (seatId1, seatId2, recordUndo = true) => {
     const seat1 = seatMap.get(seatId1)
     const seat2 = seatMap.get(seatId2)
     if (seat1 && seat2) {
+      if (recordUndo) {
+        const { recordSwap } = useUndo()
+        recordSwap(seatId1, seatId2)
+      }
       const temp = seat1.studentId
       seat1.studentId = seat2.studentId
       seat2.studentId = temp
@@ -661,6 +738,9 @@ export function useSeatChart() {
     findDeskmates,
     getAvailableSeats,
     getEmptySeats,
+    // 统一状态修改接口
+    updateSeatState,
+    batchUpdateSeats,
     // 距离与相邻性
     getSeatDistance,
     getAdjacentSeats,

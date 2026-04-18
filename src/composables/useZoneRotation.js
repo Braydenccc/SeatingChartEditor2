@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { useSeatChart } from './useSeatChart'
 
 /**
  * 选区轮换（重构 v2）
@@ -60,6 +61,7 @@ const buildZoneColorMap = () => {
 }
 
 export function useZoneRotation() {
+  const { batchUpdateSeats } = useSeatChart()
 
   // ==================== 轮换组 ====================
 
@@ -163,6 +165,7 @@ export function useZoneRotation() {
   const applyZoneRotation = (seatMap) => {
     const errors = []
     let moved = 0
+    const updates = []
 
     for (const group of rotGroups.value) {
       const { valid, error } = validateGroup(group)
@@ -179,7 +182,7 @@ export function useZoneRotation() {
           const seat = seatMap.get(sid)
           if (seat && !seat.isEmpty) {
             if (seat.studentId !== snapB[i]) {
-              seat.studentId = snapB[i]
+              updates.push({ seatId: sid, studentId: snapB[i] })
               moved++
             }
           }
@@ -188,7 +191,7 @@ export function useZoneRotation() {
           const seat = seatMap.get(sid)
           if (seat && !seat.isEmpty) {
             if (seat.studentId !== snapA[i]) {
-              seat.studentId = snapA[i]
+              updates.push({ seatId: sid, studentId: snapA[i] })
               moved++
             }
           }
@@ -205,13 +208,18 @@ export function useZoneRotation() {
             const seat = seatMap.get(sid)
             if (seat && !seat.isEmpty) {
               if (seat.studentId !== src[i]) {
-                seat.studentId = src[i]
+                updates.push({ seatId: sid, studentId: src[i] })
                 moved++
               }
             }
           })
         })
       }
+    }
+
+    // 使用统一接口批量更新座位，recordUndo=false 因为外层已使用 recordBatch
+    if (updates.length > 0) {
+      batchUpdateSeats(updates, false)
     }
 
     return { moved, errors }
