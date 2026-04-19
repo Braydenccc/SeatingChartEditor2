@@ -119,31 +119,40 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppHeader @open-login="handleOpenLogin" />
-  <main class="main-content">
-    <EditorPanel />
-    <SidebarPanel />
-  </main>
+  <div class="app-shell">
+    <AppHeader @open-login="handleOpenLogin" />
+    <main class="main-content">
+      <EditorPanel />
+      <SidebarPanel />
+    </main>
 
-  <GlobalDropZone />
+    <GlobalDropZone />
 
-  <LoginDialog
-    v-if="isLoginDialogVisible"
-    v-model:visible="isLoginDialogVisible"
-    :initial-tab="loginDialogInitialTab"
-  />
+    <LoginDialog
+      v-if="isLoginDialogVisible"
+      v-model:visible="isLoginDialogVisible"
+      :initial-tab="loginDialogInitialTab"
+    />
 
-  <!-- 全局云端工作区弹窗 -->
-  <CloudWorkspaceDialog
-    v-if="showCloudDialog"
-    :visible="showCloudDialog"
-    :mode="cloudDialogMode"
-    @update:visible="showCloudDialog = $event"
-    @success="handleCloudSuccess"
-  />
+    <!-- 全局云端工作区弹窗 -->
+    <CloudWorkspaceDialog
+      v-if="showCloudDialog"
+      :visible="showCloudDialog"
+      :mode="cloudDialogMode"
+      @update:visible="showCloudDialog = $event"
+      @success="handleCloudSuccess"
+    />
+  </div>
 </template>
 
 <style scoped>
+.app-shell {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #f5f5f5;
+}
+
 .main-content {
   display: flex;
   width: 100%;
