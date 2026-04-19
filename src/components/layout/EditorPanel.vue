@@ -106,12 +106,12 @@ import SeatChart from '../seat/SeatChart.vue'
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    height: 100%;
   }
 
   .editor {
-    flex: none;
-    height: calc((100vh - 104px) * 0.55);
-    min-height: unset;
+    flex: 1;
+    min-height: 0;
     background: #ffffff;
     overflow: hidden;
     border-bottom: 1px solid #e0e0e0;
@@ -121,10 +121,9 @@ import SeatChart from '../seat/SeatChart.vue'
   }
 
   .student-list-area {
-    flex: none;
-    max-height: none;
-    height: calc((100vh - 104px) * 0.45);
-    min-height: unset;
+    flex: 0 0 auto;
+    max-height: 40%;
+    min-height: 0;
     overflow: hidden;
     order: 2;
   }
