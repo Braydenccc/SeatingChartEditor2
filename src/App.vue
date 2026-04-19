@@ -171,6 +171,7 @@ onMounted(async () => {
 /* 移动设备优化 */
 @media (max-width: 768px) {
   .main-content {
+    height: calc(100vh - 48px);
     min-height: calc(100vh - 48px);
     max-height: none;
     overflow-y: auto;
