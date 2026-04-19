@@ -1,0 +1,221 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { useSeatChart } from '../useSeatChart'
+
+vi.mock('../useZoneData', () => ({
+  useZoneData: () => ({
+    cleanupInvalidSeats: vi.fn()
+  })
+}))
+
+vi.mock('../useUndo', () => ({
+  useUndo: () => ({
+    recordAssign: vi.fn(),
+    recordClear: vi.fn(),
+    recordSwap: vi.fn(),
+    recordToggleEmpty: vi.fn(),
+    recordBatch: vi.fn(),
+    createSnapshot: vi.fn(() => [])
+  })
+}))
+
+describe('useSeatChart', () => {
+  let seatChart
+
+  beforeEach(() => {
+    seatChart = useSeatChart()
+    seatChart.seats.value.forEach(seat => {
+      seat.studentId = null
+      seat.isEmpty = false
+    })
+  })
+
+  describe('initialization', () => {
+    it('should initialize with default configuration', () => {
+      expect(seatChart.seatConfig.value.groupCount).toBe(4)
+      expect(seatChart.seatConfig.value.columnsPerGroup).toBe(2)
+      expect(seatChart.seatConfig.value.seatsPerColumn).toBe(7)
+    })
+
+    it('should create correct number of seats', () => {
+      const expectedSeats = 4 * 2 * 7
+      expect(seatChart.seats.value).toHaveLength(expectedSeats)
+    })
+
+    it('should generate unique seat IDs', () => {
+      const ids = seatChart.seats.value.map(s => s.id)
+      const uniqueIds = new Set(ids)
+      expect(uniqueIds.size).toBe(ids.length)
+    })
+  })
+
+  describe('assignStudent', () => {
+    it('should assign student to seat', () => {
+      const seatId = 'seat-0-0-0'
+      const studentId = 1
+
+      const result = seatChart.assignStudent(seatId, studentId, false)
+
+      expect(result).toBe(true)
+      expect(seatChart.getStudentAtSeat(seatId)).toBe(studentId)
+    })
+
+    it('should not assign to empty seat', () => {
+      const seatId = 'seat-0-0-0'
+      seatChart.toggleEmpty(seatId, false)
+
+      const result = seatChart.assignStudent(seatId, 1, false)
+
+      expect(result).toBe(false)
+      expect(seatChart.getStudentAtSeat(seatId)).toBe(null)
+    })
+
+    it('should assign same student to different seat without clearing previous', () => {
+      const seat1 = 'seat-0-0-0'
+      const seat2 = 'seat-0-0-1'
+
+      seatChart.assignStudent(seat1, 1, false)
+      seatChart.assignStudent(seat2, 1, false)
+
+      expect(seatChart.getStudentAtSeat(seat1)).toBe(1)
+      expect(seatChart.getStudentAtSeat(seat2)).toBe(1)
+    })
+  })
+
+  describe('clearSeat', () => {
+    it('should remove student from seat', () => {
+      const seatId = 'seat-0-0-0'
+      seatChart.assignStudent(seatId, 1, false)
+
+      seatChart.clearSeat(seatId, false)
+
+      expect(seatChart.getStudentAtSeat(seatId)).toBe(null)
+    })
+  })
+
+  describe('swapSeats', () => {
+    it('should swap students between two seats', () => {
+      const seat1 = 'seat-0-0-0'
+      const seat2 = 'seat-0-0-1'
+
+      seatChart.assignStudent(seat1, 1, false)
+      seatChart.assignStudent(seat2, 2, false)
+
+      seatChart.swapSeats(seat1, seat2, false)
+
+      expect(seatChart.getStudentAtSeat(seat1)).toBe(2)
+      expect(seatChart.getStudentAtSeat(seat2)).toBe(1)
+    })
+
+    it('should handle swapping with empty seat', () => {
+      const seat1 = 'seat-0-0-0'
+      const seat2 = 'seat-0-0-1'
+
+      seatChart.assignStudent(seat1, 1, false)
+
+      seatChart.swapSeats(seat1, seat2, false)
+
+      expect(seatChart.getStudentAtSeat(seat1)).toBe(null)
+      expect(seatChart.getStudentAtSeat(seat2)).toBe(1)
+    })
+  })
+
+  describe('toggleEmpty', () => {
+    it('should toggle seat empty state', () => {
+      const seatId = 'seat-0-0-0'
+      const seat = seatChart.seats.value.find(s => s.id === seatId)
+
+      expect(seat.isEmpty).toBe(false)
+      seatChart.toggleEmpty(seatId, false)
+      expect(seat.isEmpty).toBe(true)
+      seatChart.toggleEmpty(seatId, false)
+      expect(seat.isEmpty).toBe(false)
+    })
+
+    it('should clear student when toggling to empty', () => {
+      const seatId = 'seat-0-0-0'
+      seatChart.assignStudent(seatId, 1, false)
+
+      seatChart.toggleEmpty(seatId, false)
+
+      const seat = seatChart.seats.value.find(s => s.id === seatId)
+      expect(seat.isEmpty).toBe(true)
+      expect(seat.studentId).toBe(null)
+    })
+  })
+
+  describe('areDeskmates', () => {
+    it('should return true for same row, different column in same group', () => {
+      const seat1 = 'seat-0-0-0'
+      const seat2 = 'seat-0-1-0'
+
+      expect(seatChart.areDeskmates(seat1, seat2)).toBe(true)
+    })
+
+    it('should return false for different rows', () => {
+      const seat1 = 'seat-0-0-0'
+      const seat2 = 'seat-0-0-1'
+
+      expect(seatChart.areDeskmates(seat1, seat2)).toBe(false)
+    })
+
+    it('should return false for different groups', () => {
+      const seat1 = 'seat-0-0-0'
+      const seat2 = 'seat-1-0-0'
+
+      expect(seatChart.areDeskmates(seat1, seat2)).toBe(false)
+    })
+
+    it('should return false for same seat', () => {
+      const seat1 = 'seat-0-0-0'
+
+      expect(seatChart.areDeskmates(seat1, seat1)).toBe(false)
+    })
+  })
+
+  describe('getSeatDistance', () => {
+    it('should return 0 for same seat', () => {
+      const distance = seatChart.getSeatDistance('seat-0-0-0', 'seat-0-0-0')
+      expect(distance).toBe(0)
+    })
+
+    it('should calculate Manhattan distance within same group', () => {
+      const distance1 = seatChart.getSeatDistance('seat-0-0-0', 'seat-0-0-2')
+      expect(distance1).toBe(2)
+
+      const distance2 = seatChart.getSeatDistance('seat-0-0-0', 'seat-0-1-0')
+      expect(distance2).toBe(1)
+
+      const distance3 = seatChart.getSeatDistance('seat-0-0-0', 'seat-0-1-2')
+      expect(distance3).toBe(3)
+    })
+
+    it('should return Infinity for different groups', () => {
+      const distance = seatChart.getSeatDistance('seat-0-0-0', 'seat-1-0-0')
+      expect(distance).toBe(Infinity)
+    })
+  })
+
+  describe('isInRowRange', () => {
+    it('should correctly identify seats in row range with bottom alignment', () => {
+      const result = seatChart.isInRowRange('seat-0-0-6', 1, 2)
+      expect(result).toBe(true)
+    })
+
+    it('should return false for seats outside range', () => {
+      const result = seatChart.isInRowRange('seat-0-0-0', 1, 2)
+      expect(result).toBe(false)
+    })
+  })
+
+  describe('getColumnType', () => {
+    it('should identify wall columns', () => {
+      expect(seatChart.getColumnType('seat-0-0-0')).toBe('wall')
+      expect(seatChart.getColumnType('seat-3-1-0')).toBe('wall')
+    })
+
+    it('should identify aisle columns', () => {
+      expect(seatChart.getColumnType('seat-0-1-0')).toBe('aisle')
+      expect(seatChart.getColumnType('seat-1-0-0')).toBe('aisle')
+    })
+  })
+})

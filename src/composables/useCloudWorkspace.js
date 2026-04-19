@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { useAuth } from './useAuth'
 import { useWebDav } from './useWebDav'
 import { getOrCreateCsrfToken } from './useAuth'
+import { fetchWithRetry } from '@/utils/fetchHelpers'
 
 export function useCloudWorkspace() {
     const { currentUser, token, authType, webdavConfig, backupMode } = useAuth()
@@ -45,7 +46,7 @@ export function useCloudWorkspace() {
         try {
             isFetching.value = true
             const csrfToken = getOrCreateCsrfToken()
-            const response = await fetch('/api/workspace.php', {
+            const response = await fetchWithRetry('/api/workspace.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -58,7 +59,7 @@ export function useCloudWorkspace() {
                     _csrf: csrfToken,
                     ...payload
                 })
-            })
+            }, 3)
 
             if (!response.ok) {
                 let errorMsg = `HTTP Error: ${response.status}`

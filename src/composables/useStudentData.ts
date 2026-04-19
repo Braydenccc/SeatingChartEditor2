@@ -1,15 +1,17 @@
 import { ref, computed } from 'vue'
+import type { Ref, ComputedRef } from 'vue'
+import type { Student, UseStudentDataReturn } from '@/types'
 
 // 学生数据管理
-const students = ref([])
-let nextStudentId = 1
+const students = ref<Student[]>([])
+let nextStudentId: number = 1
 
 // 当前选中的学生ID
-const selectedStudentId = ref(null)
+const selectedStudentId = ref<number | null>(null)
 
-export function useStudentData() {
+export function useStudentData(): UseStudentDataReturn {
   // 排序后的学生列表：空白学号在前，有学号的按学号排序
-  const sortedStudents = computed(() => {
+  const sortedStudents: ComputedRef<Student[]> = computed(() => {
     return [...students.value].sort((a, b) => {
       // 空白学号排在前面
       if (!a.studentNumber && !b.studentNumber) return 0
@@ -21,8 +23,8 @@ export function useStudentData() {
   })
 
   // 添加单个学生
-  const addStudent = () => {
-    const newStudent = {
+  const addStudent = (): number => {
+    const newStudent: Student = {
       id: nextStudentId++,
       name: '',
       studentNumber: null,
@@ -33,7 +35,7 @@ export function useStudentData() {
   }
 
   // 批量设置学生人数
-  const setStudentCount = (targetCount) => {
+  const setStudentCount = (targetCount: number): boolean => {
     const currentCount = students.value.length
 
     if (targetCount > currentCount) {
@@ -69,7 +71,10 @@ export function useStudentData() {
   }
 
   // 更新学生
-  const updateStudent = (studentId, studentData) => {
+  const updateStudent = (
+    studentId: number,
+    studentData: Partial<Omit<Student, 'tags'>> & { tags?: (number | null | undefined)[] }
+  ): void => {
     const student = students.value.find(s => s.id === studentId)
     if (!student) return
 
@@ -82,13 +87,13 @@ export function useStudentData() {
     }
 
     student.name = studentData.name?.trim() || ''
-    student.studentNumber = studentData.studentNumber
+    student.studentNumber = studentData.studentNumber ?? student.studentNumber
     // 过滤掉无效(null/undefined)的标签，并进行去重防腐
-    student.tags = [...new Set((studentData.tags || []).filter(Boolean))]
+    student.tags = [...new Set((studentData.tags || []).filter((tag): tag is number => tag !== null && tag !== undefined))]
   }
 
   // 删除学生
-  const deleteStudent = (studentId) => {
+  const deleteStudent = (studentId: number): void => {
     students.value = students.value.filter(s => s.id !== studentId)
     // 健壮性：如果被删除的学生正处于选中状态，则清空焦点
     if (selectedStudentId.value === studentId) {
@@ -96,7 +101,7 @@ export function useStudentData() {
     }
   }
 
-  const addTagToStudents = (tagId, studentIds) => {
+  const addTagToStudents = (tagId: number, studentIds: number[]): void => {
     if (!tagId || !studentIds || studentIds.length === 0) return
     studentIds.forEach(studentId => {
       const student = students.value.find(s => s.id === studentId)
@@ -106,38 +111,48 @@ export function useStudentData() {
     })
   }
 
-  const removeTagFromStudent = (tagId, studentId) => {
+  const removeTagFromStudent = (tagId: number, studentId: number): void => {
     const student = students.value.find(s => s.id === studentId)
     if (student) {
       student.tags = student.tags.filter(tid => tid !== tagId)
     }
   }
 
-  const removeTagFromStudents = (tagId) => {
+  const removeTagFromStudents = (tagId: number): void => {
     students.value.forEach(student => {
       student.tags = student.tags.filter(tid => tid !== tagId)
     })
   }
 
   // 选择学生
-  const selectStudent = (studentId) => {
+  const selectStudent = (studentId: number): void => {
     selectedStudentId.value = studentId
   }
 
   // 清除选择
-  const clearSelection = () => {
+  const clearSelection = (): void => {
     selectedStudentId.value = null
   }
 
   // 清除所有学生
-  const clearAllStudents = () => {
+  const clearAllStudents = (): void => {
     students.value = []
     selectedStudentId.value = null
     nextStudentId = 1
   }
 
+  // 同步学生 ID 计数器（工作区加载后调用）
+  const syncStudentIdCounter = (): void => {
+    if (students.value.length === 0) {
+      nextStudentId = 1
+      return
+    }
+    const maxId = Math.max(...students.value.map(s => s.id))
+    nextStudentId = maxId + 1
+  }
+
   // 获取当前选中的学生
-  const getSelectedStudent = computed(() => {
+  const getSelectedStudent: ComputedRef<Student | null> = computed(() => {
     return students.value.find(s => s.id === selectedStudentId.value) || null
   })
 
@@ -154,6 +169,7 @@ export function useStudentData() {
     addTagToStudents,
     removeTagFromStudent,
     removeTagFromStudents,
-    clearAllStudents
+    clearAllStudents,
+    syncStudentIdCounter
   }
 }

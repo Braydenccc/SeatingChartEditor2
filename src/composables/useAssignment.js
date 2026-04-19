@@ -13,6 +13,7 @@ import { useZoneData } from './useZoneData'
 import { useSeatRules } from './useSeatRules'
 import { useUndo } from './useUndo'
 import { PENALTY_WEIGHTS, RulePriority, PREDICATE_META } from '../constants/ruleTypes.js'
+import { parseSeatId } from '@/utils/seatHelpers'
 
 export function useAssignment() {
   const { students } = useStudentData()
@@ -27,7 +28,6 @@ export function useAssignment() {
     getSeatDistance,
     getAdjacentSeats,
     validateRepulsion,
-    parseSeatId,
     isInRowRange,
     isColumnType,
     isDirectlyBehind,
@@ -216,6 +216,9 @@ export function useAssignment() {
     return [...ids]
   }
 
+  const warnedRules = new Set()
+  const MAX_WARNED_RULES = 50
+
   /**
    * 将规则主体展开为具体的 { studentId } 或 { studentId1, studentId2 } 数组
    */
@@ -225,8 +228,12 @@ export function useAssignment() {
     const relation = PREDICATE_META[rule.predicate]?.relation || 'single'
     const maxSuggestedSubjects = 20
 
-    if (expanded.length > maxSuggestedSubjects) {
+    const warnKey = `${rule.predicate}-${expanded.length}`
+    if (expanded.length > maxSuggestedSubjects && !warnedRules.has(warnKey)) {
       console.warn(`Rule "${rule.predicate}" has ${expanded.length} subjects; pair expansion may be expensive.`)
+      if (warnedRules.size < MAX_WARNED_RULES) {
+        warnedRules.add(warnKey)
+      }
     }
 
     if (relation === 'single') {

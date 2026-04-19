@@ -78,6 +78,7 @@ onMounted(async () => {
           }
         } catch (e) {
           console.error('Auto restore failed:', e)
+          warning(`自动恢复云端任务失败：${e.message || '网络错误，请检查连接后手动重试'}`)
         } finally {
           unwatch() // 执行一次后停止监听
         }

@@ -572,7 +572,6 @@ onUnmounted(() => {
 .seat-item {
   width: 100%;
   height: 80px;
-  aspect-ratio: 3 / 4;
   border: 2px solid #d0d7dc;
   contain: layout style;
   border-radius: 12px;
@@ -991,6 +990,7 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .seat-item {
     height: 70px;
+    border-radius: 10px;
   }
 
   .student-name {

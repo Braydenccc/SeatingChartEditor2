@@ -6,6 +6,10 @@ import { useZoneData } from './useZoneData'
 import { useSeatRules } from './useSeatRules'
 import { useLogger } from './useLogger'
 import { setCookie, getCookie } from './useAuth'
+import { useUndo } from './useUndo'
+import { useSelection } from './useSelection'
+import { useEditMode } from './useEditMode'
+import { useZoneRotation } from './useZoneRotation'
 
 const LAST_WORKSPACE_COOKIE = 'sce_last_workspace'
 
@@ -13,13 +17,17 @@ const FILE_EXT = '.sce'
 const CURRENT_VERSION = '2.1'
 
 export function useWorkspace() {
-  const { students, addStudent, updateStudent, clearAllStudents } = useStudentData()
+  const { students, addStudent, updateStudent, clearAllStudents, syncStudentIdCounter } = useStudentData()
   const { tags, addTag, clearAllTags, showTagsInSeatChart, tagDisplayMode, setShowTagsInSeatChart, setTagDisplayMode } = useTagData()
   const { seatConfig, seats, updateConfig, clearAllSeats, batchUpdateSeats } = useSeatChart()
-  const { exportSettings } = useExportSettings()
-  const { zones, clearAllZones, addZone, updateZone } = useZoneData()
+  const { exportSettings, resetExportSettings } = useExportSettings()
+  const { zones, clearAllZones, addZone, updateZone, syncZoneIdCounter } = useZoneData()
   const { rules, clearAllRules, addRule } = useSeatRules()
   const { success, warning, error } = useLogger()
+  const { clearHistory } = useUndo()
+  const { clearSelection } = useSelection()
+  const { resetEditMode } = useEditMode()
+  const { syncZoneRotationIdCounter } = useZoneRotation()
 
   // 生成工作区 JSON 数据 (用于云端或本地保存)
   const getWorkspaceJson = () => {
@@ -162,10 +170,13 @@ export function useWorkspace() {
         // 版本迁移
         const workspace = migrateWorkspace(workspaceRaw)
 
-        // 下发具体的写入将在外部处理 (现有的加载逻辑是在 SidebarPanel 里实现并注入组件的)
-        // 这里我们进行集中恢复。
+        // 1. 清理所有 UI 状态
+        clearHistory()
+        clearSelection()
+        resetEditMode()
+        resetExportSettings()
 
-        // 清空现有数据
+        // 2. 清空现有数据
         clearAllStudents()
         clearAllTags()
 
@@ -350,6 +361,11 @@ export function useWorkspace() {
             )
           }
         }
+
+        // 3. 同步所有 ID 计数器（必须在数据恢复完成后执行）
+        syncStudentIdCounter()
+        syncZoneIdCounter()
+        syncZoneRotationIdCounter()
 
         resolve(true)
       } catch (err) {

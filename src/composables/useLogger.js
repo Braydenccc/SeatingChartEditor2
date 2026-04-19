@@ -17,12 +17,13 @@ const MAX_LOGS = 100
 
 export function useLogger() {
   // 添加日志
-  const addLog = (message, type = LogType.INFO) => {
+  const addLog = (message, type = LogType.INFO, context = {}) => {
     const log = {
       id: nextLogId++,
       message,
       type,
-      timestamp: new Date()
+      timestamp: new Date(),
+      context: context || {}
     }
 
     logs.value.unshift(log)
@@ -39,7 +40,17 @@ export function useLogger() {
   const info = (message) => addLog(message, LogType.INFO)
   const success = (message) => addLog(message, LogType.SUCCESS)
   const warning = (message) => addLog(message, LogType.WARNING)
-  const error = (message) => addLog(message, LogType.ERROR)
+  const error = (message, context = {}) => {
+    // 支持传入 Error 对象
+    if (message instanceof Error) {
+      return addLog(message.message, LogType.ERROR, {
+        ...context,
+        stack: message.stack,
+        name: message.name
+      })
+    }
+    return addLog(message, LogType.ERROR, context)
+  }
 
   // 清空日志
   const clearLogs = () => {

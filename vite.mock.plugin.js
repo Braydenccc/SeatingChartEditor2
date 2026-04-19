@@ -171,9 +171,9 @@ async function handleAuthRequest(req, res, body) {
             return res.end(JSON.stringify({ success: false, message: 'Unknown action' }))
         }
     } catch (err) {
-        console.error(err)
+        console.error('[Auth Mock Error]', err.message, err.stack)
         res.statusCode = 500
-        return res.end(JSON.stringify({ success: false, message: 'Internal Server Error' }))
+        return res.end(JSON.stringify({ success: false, message: 'Internal Server Error: ' + err.message }))
     }
 }
 
@@ -319,9 +319,9 @@ async function handleWorkspaceRequest(req, res, body) {
         }
 
     } catch (err) {
-        console.error(err)
+        console.error('[Auth Mock Error]', err.message, err.stack)
         res.statusCode = 500
-        return res.end(JSON.stringify({ success: false, message: 'Internal Server Error' }))
+        return res.end(JSON.stringify({ success: false, message: 'Internal Server Error: ' + err.message }))
     }
 }
 

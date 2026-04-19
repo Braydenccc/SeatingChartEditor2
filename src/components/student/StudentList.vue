@@ -174,7 +174,7 @@ let lastExportObjectUrl = ''
 
 const { tags, addTag, clearAllTags } = useTagData()
 const { students, updateStudent, deleteStudent, clearAllStudents, addStudent } = useStudentData()
-const { findSeatByStudent, getEmptySeats, assignStudent, clearSeat } = useSeatChart()
+const { findSeatByStudent, getEmptySeats, assignStudent, clearSeat, getStudentAtSeat } = useSeatChart()
 const { success, warning, error } = useLogger()
 const { currentMode, setMode, EditMode, clearFirstSelectedSeat } = useEditMode()
 const { loadWorkspace, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
@@ -406,8 +406,23 @@ const handleDrop = (e) => {
   try {
     const data = JSON.parse(raw)
     if (data.type === 'seat' && data.studentId != null) {
-      clearSeat(data.seatId)
-      success('已将学生移回候选列表')
+      // 检查是否是选区批量移出
+      if (data.selectedSeatIds && data.selectedSeatIds.length > 1) {
+        // 批量移出选中的座位
+        data.selectedSeatIds.forEach(seatId => {
+          const studentId = getStudentAtSeat(seatId)
+          if (studentId !== null) {
+            recordClear(seatId, studentId)
+            clearSeat(seatId)
+          }
+        })
+        success(`已将 ${data.selectedSeatIds.length} 名学生移回候选列表`)
+      } else {
+        // 单个座位移出
+        recordClear(data.seatId, data.studentId)
+        clearSeat(data.seatId)
+        success('已将学生移回候选列表')
+      }
     }
   } catch {
     // ignore
@@ -699,10 +714,11 @@ const handleDrop = (e) => {
   min-height: 60px;
   display: grid;
   position: relative;  /* 覆盖层定位参照 */
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  grid-auto-rows: min-content;
+  grid-template-columns: repeat(auto-fill, 120px);
+  grid-auto-rows: 80px;
   gap: 12px;
   align-content: start;
+  justify-content: start;
 }
 
 .student-items.drag-over {
@@ -965,6 +981,8 @@ const handleDrop = (e) => {
 
   .student-items {
     padding: 8px;
+    grid-template-columns: repeat(auto-fill, 102px);
+    grid-auto-rows: 68px;
   }
 
   .shortcuts-hint-bar {
@@ -1010,6 +1028,8 @@ const handleDrop = (e) => {
 
   .student-items {
     padding: 6px;
+    grid-template-columns: repeat(auto-fill, 96px);
+    grid-auto-rows: 64px;
   }
 
   .shortcuts-hint-bar {
@@ -1087,6 +1107,8 @@ const handleDrop = (e) => {
   .student-items {
     padding: 6px 8px;
     -webkit-overflow-scrolling: touch;
+    grid-template-columns: repeat(auto-fill, 105px);
+    grid-auto-rows: 70px;
   }
 
   /* 移动端空状态：显示占位符 */
@@ -1111,6 +1133,13 @@ const handleDrop = (e) => {
     flex: 1;
     padding: 10px 12px;
     font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .student-items {
+    grid-template-columns: repeat(auto-fill, 82.5px);
+    grid-auto-rows: 55px;
   }
 }
 </style>

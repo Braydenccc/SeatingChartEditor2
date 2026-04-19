@@ -1,5 +1,7 @@
+import type { TagColorDefinition } from '@/types'
+
 // 标签配色方案 - 12种不同颜色
-export const TAG_COLORS = [
+export const TAG_COLORS: string[] = [
   '#4CAF50', // 绿色
   '#2196F3', // 蓝色
   '#FF9800', // 橙色
@@ -15,12 +17,12 @@ export const TAG_COLORS = [
 ]
 
 // 获取下一个可用颜色
-export function getNextColor(currentIndex) {
+export function getNextColor(currentIndex: number): string {
   return TAG_COLORS[currentIndex % TAG_COLORS.length]
 }
 
 // 默认标签配置
-export const DEFAULT_TAGS = [
+export const DEFAULT_TAGS: TagColorDefinition[] = [
   { name: '住宿', color: TAG_COLORS[0] },
   { name: '午休', color: TAG_COLORS[1] },
   { name: '晚修', color: TAG_COLORS[2] }

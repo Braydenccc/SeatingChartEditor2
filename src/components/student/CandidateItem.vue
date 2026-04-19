@@ -87,8 +87,7 @@ const {
 
 <style scoped>
 .candidate-item {
-  width: 100%;
-  aspect-ratio: 3 / 4;
+  width: 120px;
   height: 80px;
   border: 2px solid var(--color-primary, #23587b);
   contain: layout style;
@@ -172,14 +171,14 @@ const {
   position: absolute;
   top: 4px;
   right: 4px;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 9px;
+  font-weight: 600;
   color: var(--color-primary, #23587b);
-  background: white;
-  padding: 2px 6px;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 1px 5px;
+  border-radius: 3px;
   line-height: 1.2;
-  z-index: 1;
+  z-index: 2;
 }
 
 .student-name {
@@ -198,17 +197,17 @@ const {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .tag-text-item {
   font-size: 9px;
-  font-weight: 700;
+  font-weight: 600;
   color: white;
-  padding: 2px 5px;
+  padding: 1px 4px;
   border-radius: 3px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
   line-height: 1.2;
-  white-space: nowrap;
 }
 
 .corner-tags {
@@ -218,23 +217,24 @@ const {
   display: flex;
   gap: 2px;
   flex-wrap: wrap;
-  max-width: 50%;
+  max-width: 80%;
   justify-content: flex-end;
   z-index: 1;
 }
 
 .corner-tag-item {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 8px;
+  font-weight: 600;
   color: white;
-  padding: 2px 4px;
+  padding: 1px 4px;
   border-radius: 3px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
   line-height: 1.2;
   white-space: nowrap;
 }
 
 @media (max-width: 1366px) and (min-width: 1025px) {
-  .candidate-item { height: 68px; border-radius: 10px; }
+  .candidate-item { width: 102px; height: 68px; border-radius: 10px; }
   .student-display { gap: 3px; padding: 5px; }
   .student-name { font-size: 14px; line-height: 1.2; }
   .student-number { font-size: 11px; min-width: 34px; padding: 1px 8px; }
@@ -247,7 +247,7 @@ const {
 }
 
 @media (max-height: 820px) and (min-width: 1025px) {
-  .candidate-item { height: 64px; border-radius: 9px; }
+  .candidate-item { width: 96px; height: 64px; border-radius: 9px; }
   .student-display { gap: 2px; padding: 4px; }
   .student-name { font-size: 13px; line-height: 1.2; }
   .student-number { font-size: 10px; min-width: 32px; padding: 1px 7px; }
@@ -265,7 +265,7 @@ const {
 }
 
 @media (max-width: 768px) {
-  .candidate-item { height: 70px; }
+  .candidate-item { width: 105px; height: 70px; }
   .student-name { font-size: 12px; }
   .student-number { font-size: 11px; padding: 2px 6px; }
   .student-number-corner { font-size: 9px; padding: 1px 5px; }
@@ -276,7 +276,7 @@ const {
 }
 
 @media (max-width: 480px) {
-  .candidate-item { height: 55px; border-radius: 8px; }
+  .candidate-item { width: 82.5px; height: 55px; border-radius: 8px; }
   .student-display { gap: 3px; padding: 4px; }
   .student-name { font-size: 11px; }
   .student-number { font-size: 10px; padding: 1px 6px; min-width: 30px; }

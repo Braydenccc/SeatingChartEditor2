@@ -67,3 +67,5 @@ pnpm-lock.yaml
 
 # Vitest
 __screenshots__/
+test-results/
+.vitest/

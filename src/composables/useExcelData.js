@@ -1,13 +1,9 @@
 import { shallowRef } from 'vue'
 
-// 移除了顶层 eager 导入：import * as XLSX from 'xlsx-js-style'
-// 该重型组件通过 loadXlsx() 函数按需动态加载，显著减小初始包大小。
-
 export const xlsxInstance = shallowRef(null)
 export const loadXlsx = async () => {
     if (xlsxInstance.value) return xlsxInstance.value
     const mod = await import('xlsx-js-style')
-    // 处理 CJS/ESM 混合情况下的 .default 导出
     xlsxInstance.value = mod.default || mod
     return xlsxInstance.value
 }
@@ -261,10 +257,37 @@ export function useExcelData() {
             return
           }
 
-          // 解析标题行
           const headers = jsonData[0]
           if (!headers || headers.length < 2) {
             reject(new Error('Excel文件格式不正确，至少需要学号和姓名列'))
+            return
+          }
+
+          const firstColName = String(headers[0] || '').trim()
+          const secondColName = String(headers[1] || '').trim()
+
+          const hasStudentId = firstColName.includes('学号') || secondColName.includes('学号')
+          const hasName = firstColName.includes('姓名') || secondColName.includes('姓名')
+
+          if (!hasStudentId || !hasName) {
+            reject(new Error('缺少必要字段：学号、姓名。请确保 Excel 第一行包含这些列名。'))
+            return
+          }
+
+          // 校验姓名不能为空
+          const invalidRows = []
+          for (let i = 1; i < jsonData.length; i++) {
+            const row = jsonData[i]
+            const nameValue = row[1]
+            if (!nameValue || String(nameValue).trim() === '') {
+              invalidRows.push(i + 1)
+            }
+          }
+
+          if (invalidRows.length > 0) {
+            const rowList = invalidRows.slice(0, 5).join('、')
+            const more = invalidRows.length > 5 ? ` 等 ${invalidRows.length} 行` : ''
+            reject(new Error(`第 ${rowList}${more} 的姓名为空，请检查数据`))
             return
           }
 
@@ -288,9 +311,10 @@ export function useExcelData() {
             return
           }
 
-          // 分析哪些标签列包含有效数据
+          // 验证标签列并收集所有标签名称（单次遍历）
           const validTagIndices = []
           const tagMap = {}
+          const allTagNames = new Set()
 
           tagHeaders.forEach((tagName, index) => {
             const colIndex = index + 2
@@ -300,11 +324,11 @@ export function useExcelData() {
               const cellValue = jsonData[i][colIndex]
               if (cellValue === 1 || cellValue === '1') {
                 hasValidData = true
-                break
+                allTagNames.add(tagName)
               } else if (cellValue != null && cellValue !== '' && cellValue !== '0' && cellValue !== 0) {
-                // 支持任何非空值（包括纯数字）
                 hasValidData = true
-                break
+                allTagNames.add(tagName)
+                allTagNames.add(String(cellValue).trim())
               }
             }
 
@@ -316,30 +340,12 @@ export function useExcelData() {
 
           // 检查标签数量
           if (validTagIndices.length > 20) {
-            // 返回警告信息，由调用者处理
             resolve({
               students: [],
               tagNames: [],
               warning: `检测到 ${validTagIndices.length} 个标签，数量较多可能影响性能`
             })
             return
-          }
-
-          // 收集所有需要创建的标签名称
-          const allTagNames = new Set()
-          validTagIndices.forEach(colIndex => {
-            allTagNames.add(tagMap[colIndex])
-          })
-
-          // 收集特殊标签
-          for (let i = 1; i < jsonData.length; i++) {
-            validTagIndices.forEach(colIndex => {
-              const cellValue = jsonData[i][colIndex]
-              if (cellValue != null && cellValue !== '' && cellValue !== '0' && cellValue !== 0 && cellValue !== 1 && cellValue !== '1') {
-                // 将值转换为字符串作为标签名
-                allTagNames.add(String(cellValue).trim())
-              }
-            })
           }
 
           // 准备学生数据

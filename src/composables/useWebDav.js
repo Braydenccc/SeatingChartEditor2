@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { fetchWithRetry } from '@/utils/fetchHelpers'
 
 const WEBDAV_CONFIG_KEY = 'sce_webdav_config'
 
@@ -35,12 +36,29 @@ export function useWebDav() {
       headers['Authorization'] = getAuthHeader(username, password)
     }
 
-    const response = await fetch('/api/dav-proxy', {
-      ...options,
-      headers
-    })
+    try {
+      const response = await fetchWithRetry('/api/dav-proxy', {
+        ...options,
+        headers
+      }, 2)
 
-    return response
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('WebDAV 认证失败，请检查用户名和密码')
+        }
+        if (response.status === 403) {
+          throw new Error('WebDAV 权限不足，请检查账户权限')
+        }
+        throw new Error(`WebDAV 请求失败 (${response.status})`)
+      }
+
+      return response
+    } catch (error) {
+      if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+        throw new Error('WebDAV 服务器连接失败，请检查网络或 CORS 配置')
+      }
+      throw error
+    }
   }
 
   // 创建文件夹 (MKCOL)

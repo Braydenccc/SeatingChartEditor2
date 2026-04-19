@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { useSeatChart } from './useSeatChart'
+import { parseSeatId } from '@/utils/seatHelpers'
 
 /**
  * 选区轮换（重构 v2）
@@ -22,18 +23,15 @@ const PALETTE = [
   '#F97316', '#14B8A6'
 ]
 
-// ——— 座位坐标解析与排序 ———
-const parseSeatPos = (seatId) => {
-  const p = seatId.split('-').map(Number)
-  return { g: p[1], c: p[2], r: p[3] }
-}
-
 /** 按座位在表中的物理位置（组→列→行）排序 */
-const sortedBySeatPos = (seatIds) =>
-  [...seatIds].sort((a, b) => {
-    const pa = parseSeatPos(a), pb = parseSeatPos(b)
-    return pa.g - pb.g || pa.c - pb.c || pa.r - pb.r
+const sortedBySeatPos = (seatIds) => {
+  const parsed = seatIds.map(id => ({ id, pos: parseSeatId(id) }))
+  parsed.sort((a, b) => {
+    const pa = a.pos, pb = b.pos
+    return pa.groupIndex - pb.groupIndex || pa.columnIndex - pb.columnIndex || pa.rowIndex - pb.rowIndex
   })
+  return parsed.map(item => item.id)
+}
 
 // ——— 颜色辅助 ———
 /** 获取某个 zone 的颜色（按跨组全局索引） */
@@ -241,6 +239,17 @@ export function useZoneRotation() {
     nextZoneId = 1
   }
 
+  // 同步轮换选区 ID 计数器（工作区加载后调用）
+  const syncZoneRotationIdCounter = () => {
+    let maxZoneId = 0
+    for (const g of rotGroups.value) {
+      for (const z of g.zones) {
+        if (z.id > maxZoneId) maxZoneId = z.id
+      }
+    }
+    nextZoneId = maxZoneId > 0 ? maxZoneId + 1 : 1
+  }
+
   return {
     rotGroups,
     editingZoneId,
@@ -259,7 +268,8 @@ export function useZoneRotation() {
     applyZoneRotation,
     cleanupInvalidRotSeats,
     clearAllRotData,
-    parseSeatPos,
+    syncZoneRotationIdCounter,
+    sortedBySeatPos,
     PALETTE,
   }
 }

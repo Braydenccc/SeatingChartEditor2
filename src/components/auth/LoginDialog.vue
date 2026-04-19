@@ -70,14 +70,28 @@
 
             <div class="form-group">
               <label>密码</label>
-              <input 
-                type="password" 
-                v-model="password" 
-                placeholder="请输入密码" 
-                required 
-                minlength="6"
+              <input
+                type="password"
+                v-model="password"
+                placeholder="请输入密码"
+                required
+                :minlength="tabMode === 'register' ? 8 : 6"
                 autocomplete="current-password"
               />
+              <div v-if="tabMode === 'register' && passwordValidation" class="password-requirements">
+                <div :class="['requirement', { met: passwordValidation.length }]">
+                  至少 8 个字符
+                </div>
+                <div :class="['requirement', { met: passwordValidation.uppercase }]">
+                  包含大写字母
+                </div>
+                <div :class="['requirement', { met: passwordValidation.lowercase }]">
+                  包含小写字母
+                </div>
+                <div :class="['requirement', { met: passwordValidation.number }]">
+                  包含数字
+                </div>
+              </div>
             </div>
           </template>
 
@@ -103,6 +117,7 @@
 import { ref, watch, computed } from 'vue'
 import { useAuth } from '@/composables/useAuth'
 import { useWebDav } from '@/composables/useWebDav'
+import { validatePasswordStrength, PASSWORD_MIN_LENGTH } from '@/utils/passwordValidator'
 
 const props = defineProps({
   visible: Boolean,
@@ -128,6 +143,11 @@ const errorMessage = ref('')
 const successMessage = ref('')
 
 const isLoginMode = computed(() => tabMode.value === 'login')
+
+const passwordValidation = computed(() => {
+  if (tabMode.value !== 'register' || !password.value) return null
+  return validatePasswordStrength(password.value)
+})
 
 watch(() => props.visible, (newVal) => {
   if (newVal) {
@@ -181,6 +201,14 @@ const handleSubmit = async () => {
   if (!username.value.trim() || !password.value.trim()) {
     errorMessage.value = '用户名和密码不能为空'
     return
+  }
+
+  if (tabMode.value === 'register') {
+    const validation = validatePasswordStrength(password.value)
+    if (!validation.isValid) {
+      errorMessage.value = '密码必须至少 8 个字符，且包含大小写字母和数字'
+      return
+    }
   }
 
   loading.value = true
@@ -373,5 +401,24 @@ const handleSubmit = async () => {
 .btn-primary:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.password-requirements {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.requirement {
+  color: #94a3b8;
+  padding: 2px 0;
+}
+
+.requirement.met {
+  color: #10b981;
+}
+
+.requirement.met::before {
+  content: '✓ ';
+  font-weight: bold;
 }
 </style>

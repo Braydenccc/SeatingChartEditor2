@@ -191,6 +191,7 @@ import { useDragState } from '@/composables/useDragState'
 import { useSelection } from '@/composables/useSelection'
 import { useDragPreview } from '@/composables/useDragPreview'
 import { useLayoutConstants } from '@/composables/useLayoutConstants'
+import { parseSeatId, generateSeatId } from '@/utils/seatHelpers'
 
 // 透明拖拽图片常量
 const TRANSPARENT_DRAG_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
@@ -216,8 +217,6 @@ const {
   moveSelection,
   findSeatByStudent,
   getStudentAtSeat,
-  parseSeatId,
-  generateSeatId,
   toGlobalCol,
   fromGlobalCol
 } = useSeatChart()

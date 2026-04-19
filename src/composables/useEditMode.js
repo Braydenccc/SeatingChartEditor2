@@ -59,6 +59,22 @@ export function useEditMode() {
     firstSelectedSeat.value = null
   }
 
+  // 重置编辑模式（工作区切换时调用）
+  const resetEditMode = () => {
+    currentMode.value = EditMode.NORMAL
+    firstSelectedSeat.value = null
+  }
+
+  // 检查是否为指定模式
+  const isMode = (mode) => {
+    return currentMode.value === mode
+  }
+
+  // 重置为普通模式
+  const resetMode = () => {
+    setMode(EditMode.NORMAL)
+  }
+
   return {
     currentMode,
     firstSelectedSeat,
@@ -67,8 +83,11 @@ export function useEditMode() {
     isEmptyEditMode,
     isSwapMode,
     isZoneEditMode,
+    isMode,
+    resetMode,
     setFirstSelectedSeat,
     clearFirstSelectedSeat,
+    resetEditMode,
     EditMode
   }
 }

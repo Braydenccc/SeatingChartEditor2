@@ -14,12 +14,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `npm run preview` | 预览构建结果 |
 | `npm run deploy:test` | 部署到测试环境 |
 | `npm run deploy:main` | 合并到 main 并推送 |
+| `npm run test` | 运行测试（watch 模式） |
+| `npm run test:run` | 运行测试（单次） |
+| `npm run test:coverage` | 生成覆盖率报告 |
+| `npm run test:ui` | 启动 Vitest UI |
+| `npm run test:student` | 运行学生数据测试 |
+| `npm run test:seat` | 运行座位图测试 |
+| `npm run test:assignment` | 运行分配算法测试 |
+| `npm run type-check` | TypeScript 类型检查 |
 
-Node.js >= 20.0.0。无 linter、formatter 或测试框架。
+Node.js >= 20.0.0。无 linter、formatter。测试框架使用 Vitest + happy-dom。
 
 ## 架构概览
 
-基于 Vue 3 + Vite 的教室座位表编辑器，支持 Web、Tauri 桌面端、Electron 备选三种平台。单页应用，无路由。
+基于 Vue 3 + Vite 的教室座位表编辑器，支持 Web、Tauri 桌面端、Electron 备选三种平台。单页应用，无路由。项目正在从 JavaScript 迁移到 TypeScript（`.ts` 文件优先于 `.js`）。
 
 ### 状态管理
 
@@ -119,6 +127,16 @@ App.vue (主布局 - 高度严格限制)
 - **Ctrl+Z** — 撤销
 - **Ctrl+Y** — 重做
 
+## 测试
+
+测试文件位于 `src/composables/__tests__/`，使用 Vitest + happy-dom。测试工具函数在 `src/test-utils/`：
+
+- `mocks.js` — Mock 对象创建
+- `factories.js` — 测试数据工厂
+- `assertions.js` — 自定义断言
+
+覆盖率目标：Lines 70%、Functions 70%、Branches 60%、Statements 70%。详见 [docs/TESTING.md](docs/TESTING.md)。
+
 ## 核心准则
 
 - **禁止表情**：严禁在代码、注释或 UI 中使用 Emoji
@@ -128,6 +146,8 @@ App.vue (主布局 - 高度严格限制)
 - **中文文档**：所有项目规则和文档使用中文编写
 - **托管平台**：项目使用 Retinbox Web Hosting 部署，不建议其他平台
 - **禁止 base64**：不在任何地方使用 base64 编码，显示本地图片用 `URL.createObjectURL()`
+- **TypeScript 迁移**：新文件使用 `.ts` 扩展名，类型定义在 `src/types/`。`tsconfig.json` 配置为宽松模式（`strict: false`）。优先使用 `.ts` 文件而非 `.js` 文件
+- **命名规范**：组件使用 PascalCase，Composable 使用 camelCase + `use` 前缀，常量使用 camelCase
 
 ## 详细规范
 

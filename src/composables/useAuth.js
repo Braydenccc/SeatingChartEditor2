@@ -9,8 +9,9 @@ const authType = ref('retiehe')
 const webdavConfig = ref(null)
 const backupMode = ref(false)
 
+const COOKIE_EXPIRY_DAYS = 7
 
-export const setCookie = (name, value, days) => {
+export const setCookie = (name, value, days = COOKIE_EXPIRY_DAYS) => {
     let expires = ""
     if (days) {
         const date = new Date()
@@ -129,8 +130,10 @@ const fetchSyncSettings = async () => {
                 webdavConfig.value = result.data.webdav
             }
             backupMode.value = !!result.data.backupMode
-            // 持久化备份模式到 Cookie
-            setCookie('sce_backup_mode', backupMode.value ? 'true' : 'false', 30)
+            const newBackupMode = backupMode.value ? 'true' : 'false'
+            if (getCookie('sce_backup_mode') !== newBackupMode) {
+                setCookie('sce_backup_mode', newBackupMode)
+            }
         }
     } catch (e) {
         console.error('Failed to fetch settings:', e)
@@ -179,8 +182,13 @@ export function useAuth() {
             currentUser.value = { username: result.data.username }
             token.value = result.data.token
             authType.value = 'retiehe'
-            setCookie('sce_user', JSON.stringify(currentUser.value), 30) // 30 days
-            setCookie('sce_token', token.value, 30)
+            const userJson = JSON.stringify(currentUser.value)
+            if (getCookie('sce_user') !== userJson) {
+                setCookie('sce_user', userJson)
+            }
+            if (getCookie('sce_token') !== token.value) {
+                setCookie('sce_token', token.value)
+            }
             localStorage.setItem('sce_auth_type', 'retiehe')
             await fetchSyncSettings()
         }
@@ -193,16 +201,41 @@ export function useAuth() {
             currentUser.value = { username: result.data.username }
             token.value = result.data.token
             authType.value = 'retiehe'
-            setCookie('sce_user', JSON.stringify(currentUser.value), 30) // 30 days
-            setCookie('sce_token', token.value, 30)
+            const userJson = JSON.stringify(currentUser.value)
+            if (getCookie('sce_user') !== userJson) {
+                setCookie('sce_user', userJson)
+            }
+            if (getCookie('sce_token') !== token.value) {
+                setCookie('sce_token', token.value)
+            }
             localStorage.setItem('sce_auth_type', 'retiehe')
             await fetchSyncSettings()
         }
         return result
     }
 
-    const logout = (target = 'all') => {
+    const logout = async (target = 'all') => {
         if (target === 'all' || target === 'retiehe') {
+            // 调用后端 API 失效 token
+            if (currentUser.value && token.value) {
+                try {
+                    const csrfToken = getOrCreateCsrfToken()
+                    await fetch('/api/auth.php', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                        body: JSON.stringify({
+                            action: 'logout',
+                            username: currentUser.value.username,
+                            token: token.value,
+                            _csrf: csrfToken
+                        })
+                    })
+                } catch (e) {
+                    console.error('Logout API error:', e)
+                }
+            }
+
             currentUser.value = null
             token.value = null
             eraseCookie('sce_user')
@@ -223,7 +256,7 @@ export function useAuth() {
                 authType.value = currentUser.value ? 'retiehe' : 'retiehe'
             }
         }
-        
+
         if (target === 'all') {
             authType.value = 'retiehe'
             localStorage.removeItem('sce_auth_type')
@@ -239,7 +272,10 @@ export function useAuth() {
         if (!currentUser.value) {
             currentUser.value = { username: config.username }
         }
-        setCookie('sce_webdav_config', JSON.stringify(config), 30)
+        const configJson = JSON.stringify(config)
+        if (getCookie('sce_webdav_config') !== configJson) {
+            setCookie('sce_webdav_config', configJson)
+        }
         localStorage.setItem('sce_auth_type', 'webdav')
         
         // Remove old local item if any

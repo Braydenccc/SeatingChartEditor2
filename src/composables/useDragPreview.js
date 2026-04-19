@@ -3,6 +3,7 @@ import { useSeatChart } from './useSeatChart'
 import { useZoom } from './useZoom'
 import { useStudentData } from './useStudentData'
 import { useLayoutConstants } from './useLayoutConstants'
+import { parseSeatId, generateSeatId } from '@/utils/seatHelpers'
 
 const { LAYOUT: L } = useLayoutConstants()
 
@@ -22,7 +23,7 @@ let cachedChartRect = null
 let previewEl = null
 
 export function useDragPreview() {
-  const { seatConfig, parseSeatId, generateSeatId, getSeat } = useSeatChart()
+  const { seatConfig, getSeat } = useSeatChart()
   const { scale } = useZoom()
   const { students } = useStudentData()
 

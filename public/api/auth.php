@@ -1,20 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
-// Database 类存根（仅用于 IDE 类型检查，实际由 Retinbox 平台提供）
-if (!class_exists('Database')) {
-    class Database {
-        public function __construct($name) {}
-        public function get($key) { return null; }
-        public function set($key, $value) { return true; }
-        public function delete($key, $value = null) { return true; }
-        public function list_keys() { return []; }
-        public function search_value($pattern) { return []; }
-        public function push($key, $value) { return true; }
-        public function get_array($key) { return null; }
-    }
-}
-
 function respond($payload, $code = 200) {
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
@@ -22,14 +8,63 @@ function respond($payload, $code = 200) {
 }
 
 if (!class_exists('Database')) {
-    respond(['success' => false, 'message' => 'Environment error: Database not supported.']);
+    respond(['success' => false, 'message' => 'Environment error: Database not supported.'], 503);
 }
 
 const MIN_TOKEN_LENGTH = 32;
 const MIN_PASSWORD_LENGTH = 6;
+const RATE_LIMIT_WINDOW = 300;
+const MAX_ATTEMPTS = 5;
 
 function isValidUsername($username) {
     return is_string($username) && preg_match('/^[A-Za-z0-9_-]{1,32}$/', $username);
+}
+
+function checkRateLimit($username) {
+    $rateLimitDb = new Database('users_rate_limit');
+    $key = 'login_' . $username;
+    $data = $rateLimitDb->get($key);
+
+    if ($data) {
+        $attempts = json_decode($data, true);
+        if (!is_array($attempts)) {
+            $attempts = [];
+        }
+        $now = time();
+
+        $attempts = array_filter($attempts, function($timestamp) use ($now) {
+            return ($now - $timestamp) < RATE_LIMIT_WINDOW;
+        });
+
+        if (count($attempts) >= MAX_ATTEMPTS) {
+            $oldestAttempt = min($attempts);
+            $waitTime = RATE_LIMIT_WINDOW - ($now - $oldestAttempt);
+            respond(['success' => false, 'message' => "尝试次数过多，请在 {$waitTime} 秒后重试"], 429);
+        }
+
+        $attempts[] = $now;
+        $rateLimitDb->set($key, json_encode(array_values($attempts)));
+    } else {
+        $rateLimitDb->set($key, json_encode([time()]));
+    }
+}
+
+function validatePassword($password) {
+    if (strlen($password) < 8) {
+        respond(['success' => false, 'message' => '密码至少需要 8 个字符']);
+    }
+
+    if (!preg_match('/[A-Z]/', $password)) {
+        respond(['success' => false, 'message' => '密码必须包含至少一个大写字母']);
+    }
+
+    if (!preg_match('/[a-z]/', $password)) {
+        respond(['success' => false, 'message' => '密码必须包含至少一个小写字母']);
+    }
+
+    if (!preg_match('/[0-9]/', $password)) {
+        respond(['success' => false, 'message' => '密码必须包含至少一个数字']);
+    }
 }
 
 function ensureCsrfMatched() {
@@ -86,7 +121,7 @@ $username = isset($input['username']) ? trim($input['username']) : '';
 $password = isset($input['password']) && is_string($input['password']) ? $input['password'] : '';
 $token = isset($input['token']) ? trim($input['token']) : '';
 
-$allowedActions = ['register', 'login', 'set_settings', 'get_settings'];
+$allowedActions = ['register', 'login', 'logout', 'set_settings', 'get_settings'];
 if (!in_array($action, $allowedActions, true)) {
     respond(['success' => false, 'message' => 'Unknown action'], 400);
 }
@@ -103,9 +138,9 @@ try {
         if (!isValidUsername($username)) {
             respond(['success' => false, 'message' => '用户名格式无效']);
         }
-        if (strlen($password) < MIN_PASSWORD_LENGTH) {
-            respond(['success' => false, 'message' => '密码至少 ' . MIN_PASSWORD_LENGTH . ' 位']);
-        }
+
+        validatePassword($password);
+        checkRateLimit($username);
 
         $existingHash = $db->get($username);
         if ($existingHash !== null) {
@@ -130,6 +165,8 @@ try {
             respond(['success' => false, 'message' => '用户名或密码不正确']);
         }
 
+        checkRateLimit($username);
+
         $existingHash = $db->get($username);
         if ($existingHash === null) {
             respond(['success' => false, 'message' => '用户名或密码不正确']);
@@ -148,6 +185,12 @@ try {
         } else {
             respond(['success' => false, 'message' => '用户名或密码不正确']);
         }
+    } elseif ($action === 'logout') {
+        if (!isValidUsername($username) || !isAuthorized($sessionDb, $username, $token)) {
+            respond(['success' => false, 'message' => 'Token过期或无效'], 401);
+        }
+        $sessionDb->delete($username);
+        respond(['success' => true, 'message' => '登出成功']);
     } elseif ($action === 'set_settings') {
         if (!isValidUsername($username) || !isAuthorized($sessionDb, $username, $token)) {
             respond(['success' => false, 'message' => 'Token过期或无效'], 401);

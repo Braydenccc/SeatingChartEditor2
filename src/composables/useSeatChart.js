@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { useZoneData } from './useZoneData'
 import { useUndo } from './useUndo'
+import { parseSeatId, generateSeatId } from '@/utils/seatHelpers'
 
 // 座位表配置
 const seatConfig = ref({
@@ -59,11 +60,6 @@ function getGroupConfig(groupIndex) {
   }
 }
 
-// 生成座位ID
-function generateSeatId(groupIndex, columnIndex, rowIndex) {
-  return `seat-${groupIndex}-${columnIndex}-${rowIndex}`
-}
-
 // 从 seats.value（响应式代理）重建索引，确保 Map 持有代理对象
 function rebuildSeatMap() {
   const newMap = new Map()
@@ -76,7 +72,10 @@ function rebuildSeatMap() {
 // 单座位状态更新（带撤销记录）
 const updateSeatState = (seatId, updates, recordUndo = true) => {
   const seat = seatMap.get(seatId)
-  if (!seat) return false
+  if (!seat) {
+    console.warn(`[useSeatChart] Seat not found: ${seatId}`, { updates })
+    return false
+  }
 
   const before = { studentId: seat.studentId, isEmpty: seat.isEmpty }
 
@@ -430,17 +429,6 @@ export function useSeatChart() {
     seats.value.forEach(seat => {
       seat.studentId = null
     })
-  }
-
-  // 解析座位ID获取索引信息
-  const parseSeatId = (seatId) => {
-    // 格式: "seat-{groupIndex}-{columnIndex}-{rowIndex}"
-    const parts = seatId.split('-')
-    return {
-      groupIndex: parseInt(parts[1]),
-      columnIndex: parseInt(parts[2]),
-      rowIndex: parseInt(parts[3])
-    }
   }
 
   // 判断两个座位是否为同桌

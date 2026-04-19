@@ -663,6 +663,7 @@ export function useSeatRules() {
 
   const clearAllRules = () => {
     rules.value = []
+    _idCounter = 1
   }
 
   const getAllRules = () => rules.value

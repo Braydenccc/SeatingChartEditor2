@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useSeatChart } from './useSeatChart'
 import { useLogger } from './useLogger'
 
@@ -38,8 +38,8 @@ export function useUndo() {
     redoStack.value = []
   }
 
-  const canUndo = () => undoStack.value.length > 0
-  const canRedo = () => redoStack.value.length > 0
+  const canUndo = computed(() => undoStack.value.length > 0)
+  const canRedo = computed(() => redoStack.value.length > 0)
 
   const highlightSeats = (seatIds) => {
     highlightedSeats.value = new Set(seatIds)
@@ -102,7 +102,7 @@ export function useUndo() {
   }
 
   const undo = () => {
-    if (!canUndo()) return false
+    if (!canUndo.value) return false
     const command = undoStack.value.pop()
     const beforeSnapshot = createSnapshot()
     executeUndo(command)
@@ -119,7 +119,7 @@ export function useUndo() {
   }
 
   const redo = () => {
-    if (!canRedo()) return false
+    if (!canRedo.value) return false
     const command = redoStack.value.pop()
     const beforeSnapshot = createSnapshot()
     executeRedo(command)
@@ -235,6 +235,11 @@ export function useUndo() {
     highlightedSeats.value = new Set()
   }
 
+  // 别名方法
+  const clear = () => {
+    clearHistory()
+  }
+
   return {
     undoStack,
     redoStack,
@@ -248,6 +253,7 @@ export function useUndo() {
     recordToggleEmpty,
     recordBatch,
     clearHistory,
+    clear,
     createSnapshot,
     highlightedSeats,
     isHighlighted
