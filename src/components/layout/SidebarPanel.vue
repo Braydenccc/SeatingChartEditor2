@@ -477,13 +477,14 @@
   />
 
   <!-- 编辑名单弹窗 -->
-  <StudentRosterDialog v-model:visible="showRosterDialog" />
+  <StudentRosterDialog v-if="showRosterDialog" v-model:visible="showRosterDialog" />
 
   <!-- 标签设置弹窗 -->
-  <TagSettingsDialog v-model:visible="showTagSettingsDialog" />
+  <TagSettingsDialog v-if="showTagSettingsDialog" v-model:visible="showTagSettingsDialog" />
 
   <!-- 座位表配置弹窗 -->
   <SeatConfigDialog
+    v-if="showSeatConfigDialog"
     :visible="showSeatConfigDialog"
     @update:visible="showSeatConfigDialog = $event"
     :isConfirming="isConfirming('applyConfig').value"

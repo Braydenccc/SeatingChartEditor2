@@ -113,8 +113,8 @@
       </div>
     </div>
 
-    <StudentRosterDialog v-model:visible="showRosterDialog" />
-    <TagSettingsDialog v-model:visible="showTagSettingsDialog" />
+    <StudentRosterDialog v-if="showRosterDialog" v-model:visible="showRosterDialog" />
+    <TagSettingsDialog v-if="showTagSettingsDialog" v-model:visible="showTagSettingsDialog" />
 
     <!-- 导出设置弹窗 -->
     <ExportDialog v-if="showExportDialog" :visible="showExportDialog" @close="showExportDialog = false" @exported="onExported" />
