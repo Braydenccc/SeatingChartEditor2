@@ -11,6 +11,41 @@ const backupMode = ref(false)
 
 const COOKIE_EXPIRY_DAYS = 7
 
+const safeStorageGet = (key) => {
+    try {
+        return localStorage.getItem(key)
+    } catch (error) {
+        console.warn(`Failed to read localStorage key "${key}":`, error)
+        return null
+    }
+}
+
+const safeStorageSet = (key, value) => {
+    try {
+        localStorage.setItem(key, value)
+        return true
+    } catch (error) {
+        console.warn(`Failed to write localStorage key "${key}":`, error)
+        return false
+    }
+}
+
+const safeStorageRemove = (key) => {
+    try {
+        localStorage.removeItem(key)
+        return true
+    } catch (error) {
+        console.warn(`Failed to remove localStorage key "${key}":`, error)
+        return false
+    }
+}
+
+const generateFallbackToken = (byteLength = 24) => {
+    return Array.from({ length: byteLength }, () => Math.floor(Math.random() * 256))
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('')
+}
+
 export const setCookie = (name, value, days = COOKIE_EXPIRY_DAYS) => {
     let expires = ""
     if (days) {
@@ -46,9 +81,14 @@ export const eraseCookie = (name) => {
 const getOrCreateCsrfToken = () => {
     let csrfToken = getCookie('sce_csrf')
     if (!csrfToken) {
-        csrfToken = Array.from(crypto.getRandomValues(new Uint8Array(24)))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('')
+        const cryptoApi = globalThis.crypto
+        if (cryptoApi?.getRandomValues) {
+            csrfToken = Array.from(cryptoApi.getRandomValues(new Uint8Array(24)))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('')
+        } else {
+            csrfToken = generateFallbackToken()
+        }
     }
     setCookie('sce_csrf', csrfToken, 1)
     return csrfToken
@@ -102,7 +142,7 @@ const initAuth = () => {
     }
 
     // 恢复用户上次手动设置的首选同步类型（仅在未被上面的 WebDAV 逻辑覆盖的情况下才读取）
-    const savedAuthType = localStorage.getItem('sce_auth_type')
+    const savedAuthType = safeStorageGet('sce_auth_type')
     if (savedAuthType && authType.value !== 'webdav') {
         authType.value = savedAuthType
     }
@@ -189,7 +229,7 @@ export function useAuth() {
             if (getCookie('sce_token') !== token.value) {
                 setCookie('sce_token', token.value)
             }
-            localStorage.setItem('sce_auth_type', 'retiehe')
+            safeStorageSet('sce_auth_type', 'retiehe')
             await fetchSyncSettings()
         }
         return result
@@ -208,7 +248,7 @@ export function useAuth() {
             if (getCookie('sce_token') !== token.value) {
                 setCookie('sce_token', token.value)
             }
-            localStorage.setItem('sce_auth_type', 'retiehe')
+            safeStorageSet('sce_auth_type', 'retiehe')
             await fetchSyncSettings()
         }
         return result
@@ -259,9 +299,9 @@ export function useAuth() {
 
         if (target === 'all') {
             authType.value = 'retiehe'
-            localStorage.removeItem('sce_auth_type')
+            safeStorageRemove('sce_auth_type')
         } else {
-            localStorage.setItem('sce_auth_type', authType.value)
+            safeStorageSet('sce_auth_type', authType.value)
         }
     }
 
@@ -276,10 +316,10 @@ export function useAuth() {
         if (getCookie('sce_webdav_config') !== configJson) {
             setCookie('sce_webdav_config', configJson)
         }
-        localStorage.setItem('sce_auth_type', 'webdav')
+        safeStorageSet('sce_auth_type', 'webdav')
         
         // Remove old local item if any
-        localStorage.removeItem('sce_webdav_config')
+        safeStorageRemove('sce_webdav_config')
     }
 
     const updateSyncSettings = async (webdav, backup) => {
@@ -313,7 +353,7 @@ export function useAuth() {
 
     const setAuthType = (type) => {
         authType.value = type
-        localStorage.setItem('sce_auth_type', type)
+        safeStorageSet('sce_auth_type', type)
     }
 
     return {

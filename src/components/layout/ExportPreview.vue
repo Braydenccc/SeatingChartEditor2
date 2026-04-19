@@ -384,6 +384,7 @@ const excelScrollRef = ref(null)
 const excelContentRef = ref(null)
 const excelScale = ref(1)
 let excelResizeObserver = null
+let removeExcelResizeListener = null
 let lastPreviewObjectUrl = ''
 
 const updateExcelScale = () => {
@@ -1071,14 +1072,23 @@ onMounted(() => {
   initializeTagSettings(tags.value)
   initTagLocal()
   if (excelScrollRef.value) {
-    excelResizeObserver = new ResizeObserver(() => updateExcelScale())
-    excelResizeObserver.observe(excelScrollRef.value)
+    if (typeof window.ResizeObserver === 'function') {
+      excelResizeObserver = new ResizeObserver(() => updateExcelScale())
+      excelResizeObserver.observe(excelScrollRef.value)
+    } else {
+      const handleWindowResize = () => updateExcelScale()
+      window.addEventListener('resize', handleWindowResize)
+      removeExcelResizeListener = () => {
+        window.removeEventListener('resize', handleWindowResize)
+      }
+    }
   }
 })
 
 onBeforeUnmount(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
   if (excelResizeObserver) excelResizeObserver.disconnect()
+  removeExcelResizeListener?.()
   if (lastPreviewObjectUrl) {
     URL.revokeObjectURL(lastPreviewObjectUrl)
     lastPreviewObjectUrl = ''
