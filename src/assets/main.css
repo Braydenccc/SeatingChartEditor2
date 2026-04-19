@@ -38,8 +38,19 @@
   flex-shrink: 0;
 }
 
+html,
+body,
+#app {
+  width: 100%;
+  min-height: 100%;
+}
+
 #app {
   font-weight: normal;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 .fatal-error-screen {
