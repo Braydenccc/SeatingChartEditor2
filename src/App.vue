@@ -162,6 +162,8 @@ onMounted(async () => {
     flex-direction: column;
     min-height: calc(100vh - 90px);
     max-height: calc(100vh - 90px);
+    min-height: calc(100dvh - 90px);
+    max-height: calc(100dvh - 90px);
     overflow: hidden;
     /* 底部 tab 栏高度由 SidebarPanel 通过 fixed 定位提供，不需要 padding */
     padding-bottom: 0;
@@ -173,6 +175,8 @@ onMounted(async () => {
   .main-content {
     min-height: calc(100vh - 48px);
     max-height: calc(100vh - 48px);
+    min-height: calc(100dvh - 48px);
+    max-height: calc(100dvh - 48px);
     overflow: hidden;
     padding-bottom: 0;
   }
