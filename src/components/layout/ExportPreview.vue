@@ -364,7 +364,7 @@ const emit = defineEmits(['close', 'exported'])
 const { exportSettings, initializeTagSettings, updateTagSetting } = useExportSettings()
 const { exportToImage } = useImageExport()
 const { tags } = useTagData()
-const { exportSeatChartToExcel, exportSeatChartToExcelBuffer, generateSeatChartWorkbook, loadXlsx, xlsxInstance } = useExcelData()
+const { exportSeatChartToExcel, exportSeatChartToExcelBuffer, generateSeatChartWorkbook, loadXlsx, xlsxInstance, buildExcelOptionsFromSettings } = useExcelData()
 const { organizedSeats, seatConfig } = useSeatChart()
 const { students } = useStudentData()
 const { authType, webdavConfig } = useAuth()
@@ -433,56 +433,12 @@ const updateExcelWorkbook = async () => {
   
   isExcelGenerating.value = true
   try {
-    const es = exportSettings.value
     const { wb } = await generateSeatChartWorkbook(
       organizedSeats.value,
       students.value,
       tags.value,
       seatConfig.value,
-      {
-        showStudentId:    es.excelShowStudentId,
-        showRowNumbers:   es.excelShowRowNumbers,
-        showGroupLabels:  es.excelShowGroupLabels,
-        showTitle:        es.excelShowTitle,
-        showPodium:       es.excelShowPodium,
-        reverseOrder:     es.excelReverseOrder,
-        showGroupGap:     es.excelShowGroupGap,
-        colorMode:        es.excelColorMode,
-        borderColor:      es.excelBorderColor,
-        showBorders:      es.excelShowBorders,
-        borderStyle:      es.excelBorderStyle,
-        innerBorderStyle: es.excelInnerBorderStyle,
-        innerBorderColor: es.excelInnerBorderColor,
-        outerBorderStyle: es.excelOuterBorderStyle,
-        outerBorderColor: es.excelOuterBorderColor,
-        cellFormat:       es.excelCellFormat,
-        rowNumberScheme:   es.excelRowNumberScheme,
-        groupNumberScheme: es.excelGroupNumberScheme,
-        serialNumberScheme: es.excelSerialNumberScheme,
-        nameFontSize:     es.excelNameFontSize,
-        idFontSize:       es.excelIdFontSize,
-        cellWidth:        es.excelCellWidth,
-        seatRowHeight:    es.excelSeatRowHeight,
-        showTagTable:     es.excelShowTagTable,
-        tagTableNewSheet: es.excelTagTableNewSheet,
-        title:            es.title || '班级座位表',
-        titleFontBold:    es.excelTitleFontBold,
-        titleFontSize:    es.excelTitleFontSize,
-        titleFontColor:   es.excelTitleFontColor,
-        headerFontBold:   es.excelHeaderFontBold,
-        headerFontSize:   es.excelHeaderFontSize,
-        headerFontColor:  es.excelHeaderFontColor,
-        seatFontBold:     es.excelSeatCellFontBold,
-        seatFontColor:    es.excelSeatCellFontColor,
-        titleFillColor:    es.excelTitleFillColor,
-        headerFillColor:   es.excelHeaderFillColor,
-        rowNumFillColor:   es.excelRowNumFillColor,
-        podiumFillColor:   es.excelPodiumFillColor,
-        seatFillColor:     es.excelSeatFillColor,
-        emptyFillColor:    es.excelEmptyFillColor,
-        vacantFillColor:   es.excelVacantFillColor,
-        tagHeaderFillColor: es.excelTagHeaderFillColor
-      }
+      buildExcelOptionsFromSettings(exportSettings.value)
     )
     excelWorkbook.value = wb
   } catch (e) {
@@ -839,56 +795,12 @@ const handleDownload = async () => {
 const handleExcelDownload = async () => {
   isExcelDownloading.value = true
   try {
-    const es = exportSettings.value
     await exportSeatChartToExcel(
       organizedSeats.value,
       students.value,
       tags.value,
       seatConfig.value,
-      {
-        showStudentId:    es.excelShowStudentId,
-        showRowNumbers:   es.excelShowRowNumbers,
-        showGroupLabels:  es.excelShowGroupLabels,
-        showTitle:        es.excelShowTitle,
-        showPodium:       es.excelShowPodium,
-        reverseOrder:     es.excelReverseOrder,
-        showGroupGap:     es.excelShowGroupGap,
-        colorMode:        es.excelColorMode,
-        borderColor:      es.excelBorderColor,
-        showBorders:      es.excelShowBorders,
-        borderStyle:      es.excelBorderStyle,
-        innerBorderStyle: es.excelInnerBorderStyle,
-        innerBorderColor: es.excelInnerBorderColor,
-        outerBorderStyle: es.excelOuterBorderStyle,
-        outerBorderColor: es.excelOuterBorderColor,
-        cellFormat:       es.excelCellFormat,
-        rowNumberScheme:   es.excelRowNumberScheme,
-        groupNumberScheme: es.excelGroupNumberScheme,
-        serialNumberScheme: es.excelSerialNumberScheme,
-        nameFontSize:     es.excelNameFontSize,
-        idFontSize:       es.excelIdFontSize,
-        cellWidth:        es.excelCellWidth,
-        seatRowHeight:    es.excelSeatRowHeight,
-        showTagTable:     es.excelShowTagTable,
-        tagTableNewSheet: es.excelTagTableNewSheet,
-        title:            es.title || '班级座位表',
-        titleFontBold:    es.excelTitleFontBold,
-        titleFontSize:    es.excelTitleFontSize,
-        titleFontColor:   es.excelTitleFontColor,
-        headerFontBold:   es.excelHeaderFontBold,
-        headerFontSize:   es.excelHeaderFontSize,
-        headerFontColor:  es.excelHeaderFontColor,
-        seatFontBold:     es.excelSeatCellFontBold,
-        seatFontColor:    es.excelSeatCellFontColor,
-        titleFillColor:    es.excelTitleFillColor,
-        headerFillColor:   es.excelHeaderFillColor,
-        rowNumFillColor:   es.excelRowNumFillColor,
-        podiumFillColor:   es.excelPodiumFillColor,
-        seatFillColor:     es.excelSeatFillColor,
-        emptyFillColor:    es.excelEmptyFillColor,
-        vacantFillColor:   es.excelVacantFillColor,
-        tagHeaderFillColor: es.excelTagHeaderFillColor
-      }
+      buildExcelOptionsFromSettings(exportSettings.value)
     )
   } catch (e) {
     console.error('Excel 导出失败', e)
@@ -939,56 +851,12 @@ const handleCloudExportImage = async () => {
 const handleCloudExportExcel = async () => {
   isUploading.value = true
   try {
-    const es = exportSettings.value
     const buffer = await exportSeatChartToExcelBuffer(
       organizedSeats.value,
       students.value,
       tags.value,
       seatConfig.value,
-      {
-        showStudentId:    es.excelShowStudentId,
-        showRowNumbers:   es.excelShowRowNumbers,
-        showGroupLabels:  es.excelShowGroupLabels,
-        showTitle:        es.excelShowTitle,
-        showPodium:       es.excelShowPodium,
-        reverseOrder:     es.excelReverseOrder,
-        showGroupGap:     es.excelShowGroupGap,
-        colorMode:        es.excelColorMode,
-        borderColor:      es.excelBorderColor,
-        showBorders:      es.excelShowBorders,
-        borderStyle:      es.excelBorderStyle,
-        innerBorderStyle: es.excelInnerBorderStyle,
-        innerBorderColor: es.excelInnerBorderColor,
-        outerBorderStyle: es.excelOuterBorderStyle,
-        outerBorderColor: es.excelOuterBorderColor,
-        cellFormat:       es.excelCellFormat,
-        rowNumberScheme:   es.excelRowNumberScheme,
-        groupNumberScheme: es.excelGroupNumberScheme,
-        serialNumberScheme: es.excelSerialNumberScheme,
-        nameFontSize:     es.excelNameFontSize,
-        idFontSize:       es.excelIdFontSize,
-        cellWidth:        es.excelCellWidth,
-        seatRowHeight:    es.excelSeatRowHeight,
-        showTagTable:     es.excelShowTagTable,
-        tagTableNewSheet: es.excelTagTableNewSheet,
-        title:            es.title || '班级座位表',
-        titleFontBold:    es.excelTitleFontBold,
-        titleFontSize:    es.excelTitleFontSize,
-        titleFontColor:   es.excelTitleFontColor,
-        headerFontBold:   es.excelHeaderFontBold,
-        headerFontSize:   es.excelHeaderFontSize,
-        headerFontColor:  es.excelHeaderFontColor,
-        seatFontBold:     es.excelSeatCellFontBold,
-        seatFontColor:    es.excelSeatCellFontColor,
-        titleFillColor:    es.excelTitleFillColor,
-        headerFillColor:   es.excelHeaderFillColor,
-        rowNumFillColor:   es.excelRowNumFillColor,
-        podiumFillColor:   es.excelPodiumFillColor,
-        seatFillColor:     es.excelSeatFillColor,
-        emptyFillColor:    es.excelEmptyFillColor,
-        vacantFillColor:   es.excelVacantFillColor,
-        tagHeaderFillColor: es.excelTagHeaderFillColor
-      }
+      buildExcelOptionsFromSettings(exportSettings.value)
     )
     const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     const filename = `座位表_${ts}.xlsx`

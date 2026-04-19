@@ -2427,15 +2427,20 @@ const formatLogTime = (timestamp) => {
     z-index: 999;
     flex-direction: column-reverse;
     background: transparent;
-    pointer-events: none; /* 让点击穿透空白区域 */
+    pointer-events: none;
     box-shadow: none;
+    height: 56px;
+    transition: height 0.45s cubic-bezier(0.32, 0.72, 0, 1.05);
+  }
+
+  .sidebar-panel.mobile-menu-open {
     height: auto;
-    /* 去除 max-height 以及其过渡，改为子元素 transform */
+    max-height: 100vh;
   }
 
   .sidebar-main {
     display: flex;
-    flex-direction: column-reverse; /* tab 在下、内容在上 */
+    flex-direction: column-reverse;
     flex: 1;
     min-height: 0;
   }
