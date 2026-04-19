@@ -87,7 +87,6 @@ const toChineseNumber = (num, digits, smallUnits) => {
     needZeroBetween = false
   }
 
-  // 中文小写读数习惯会把“一十X”简写为“十X”（如 11 -> 十一）。
   if (digits === DIGITS_LOWER && output.startsWith('一十')) {
     output = output.slice(1)
   }
@@ -220,11 +219,385 @@ const trimEdgeEmptyLines = (text) => {
   return lines.join('\n').trim()
 }
 
+// ── Excel 导出配置管理 ──
+
+const defaultExcelConfig = {
+  layout: {
+    showStudentId: true,
+    showRowNumbers: true,
+    showGroupLabels: true,
+    showTitle: true,
+    showPodium: true,
+    reverseOrder: false,
+    showGroupGap: true,
+    showTagTable: false,
+    tagTableNewSheet: false
+  },
+  sizing: {
+    cellWidth: 10,
+    seatRowHeight: 40,
+    nameFontSize: 12,
+    idFontSize: 10,
+    seatFontSize: 12
+  },
+  content: {
+    title: '班级座位表',
+    cellFormat: '%n\n%i'
+  },
+  numbering: {
+    rowNumberScheme: 'arabic',
+    groupNumberScheme: 'arabic',
+    serialNumberScheme: 'arabic'
+  },
+  border: {
+    showBorders: true,
+    borderStyle: 'thin',
+    innerBorderStyle: 'thin',
+    innerBorderColor: '#000000',
+    outerBorderStyle: 'thin',
+    outerBorderColor: '#000000',
+    borderColor: '#000000'
+  },
+  fonts: {
+    titleFontBold: true,
+    titleFontSize: 16,
+    titleFontColor: '#1F4E78',
+    headerFontBold: true,
+    headerFontSize: 12,
+    headerFontColor: '#1F4E78',
+    seatFontBold: false,
+    seatFontColor: '#000000'
+  },
+  fills: {
+    titleFillColor: '',
+    headerFillColor: '',
+    rowNumFillColor: '',
+    podiumFillColor: '',
+    seatFillColor: '',
+    emptyFillColor: '',
+    vacantFillColor: '',
+    tagHeaderFillColor: ''
+  }
+}
+
+const mergeExcelConfig = (base, override) => {
+  const result = {}
+  for (const key of Object.keys(base)) {
+    result[key] = { ...base[key], ...(override[key] || {}) }
+  }
+  return result
+}
+
+const convertLegacyExcelOptions = (legacy) => {
+  if (!legacy || typeof legacy !== 'object') return {}
+  if (legacy.layout || legacy.sizing || legacy.content) return legacy
+  return {
+    layout: {
+      showStudentId: legacy.showStudentId,
+      showRowNumbers: legacy.showRowNumbers,
+      showGroupLabels: legacy.showGroupLabels,
+      showTitle: legacy.showTitle,
+      showPodium: legacy.showPodium,
+      reverseOrder: legacy.reverseOrder,
+      showGroupGap: legacy.showGroupGap,
+      showTagTable: legacy.showTagTable,
+      tagTableNewSheet: legacy.tagTableNewSheet
+    },
+    sizing: {
+      nameFontSize: legacy.nameFontSize,
+      idFontSize: legacy.idFontSize,
+      cellWidth: legacy.cellWidth,
+      seatRowHeight: legacy.seatRowHeight,
+      seatFontSize: legacy.seatFontSize
+    },
+    content: {
+      title: legacy.title,
+      cellFormat: legacy.cellFormat
+    },
+    numbering: {
+      rowNumberScheme: legacy.rowNumberScheme,
+      groupNumberScheme: legacy.groupNumberScheme,
+      serialNumberScheme: legacy.serialNumberScheme
+    },
+    border: {
+      showBorders: legacy.showBorders,
+      borderStyle: legacy.borderStyle,
+      innerBorderStyle: legacy.innerBorderStyle,
+      innerBorderColor: legacy.innerBorderColor,
+      outerBorderStyle: legacy.outerBorderStyle,
+      outerBorderColor: legacy.outerBorderColor,
+      borderColor: legacy.borderColor
+    },
+    fonts: {
+      titleFontBold: legacy.titleFontBold,
+      titleFontSize: legacy.titleFontSize,
+      titleFontColor: legacy.titleFontColor,
+      headerFontBold: legacy.headerFontBold,
+      headerFontSize: legacy.headerFontSize,
+      headerFontColor: legacy.headerFontColor,
+      seatFontBold: legacy.seatFontBold,
+      seatFontColor: legacy.seatFontColor
+    },
+    fills: {
+      titleFillColor: legacy.titleFillColor,
+      headerFillColor: legacy.headerFillColor,
+      rowNumFillColor: legacy.rowNumFillColor,
+      podiumFillColor: legacy.podiumFillColor,
+      seatFillColor: legacy.seatFillColor,
+      emptyFillColor: legacy.emptyFillColor,
+      vacantFillColor: legacy.vacantFillColor,
+      tagHeaderFillColor: legacy.tagHeaderFillColor
+    }
+  }
+}
+
+const buildExcelOptionsFromSettings = (es) => ({
+  layout: {
+    showStudentId: es.excelShowStudentId,
+    showRowNumbers: es.excelShowRowNumbers,
+    showGroupLabels: es.excelShowGroupLabels,
+    showTitle: es.excelShowTitle,
+    showPodium: es.excelShowPodium,
+    reverseOrder: es.excelReverseOrder,
+    showGroupGap: es.excelShowGroupGap,
+    showTagTable: es.excelShowTagTable,
+    tagTableNewSheet: es.excelTagTableNewSheet
+  },
+  sizing: {
+    nameFontSize: es.excelNameFontSize,
+    idFontSize: es.excelIdFontSize,
+    cellWidth: es.excelCellWidth,
+    seatRowHeight: es.excelSeatRowHeight
+  },
+  content: {
+    title: es.title || '班级座位表',
+    cellFormat: es.excelCellFormat
+  },
+  numbering: {
+    rowNumberScheme: es.excelRowNumberScheme,
+    groupNumberScheme: es.excelGroupNumberScheme,
+    serialNumberScheme: es.excelSerialNumberScheme
+  },
+  border: {
+    showBorders: es.excelShowBorders,
+    borderStyle: es.excelBorderStyle,
+    innerBorderStyle: es.excelInnerBorderStyle,
+    innerBorderColor: es.excelInnerBorderColor,
+    outerBorderStyle: es.excelOuterBorderStyle,
+    outerBorderColor: es.excelOuterBorderColor,
+    borderColor: es.excelBorderColor
+  },
+  fonts: {
+    titleFontBold: es.excelTitleFontBold,
+    titleFontSize: es.excelTitleFontSize,
+    titleFontColor: es.excelTitleFontColor,
+    headerFontBold: es.excelHeaderFontBold,
+    headerFontSize: es.excelHeaderFontSize,
+    headerFontColor: es.excelHeaderFontColor,
+    seatFontBold: es.excelSeatCellFontBold,
+    seatFontColor: es.excelSeatCellFontColor
+  },
+  fills: {
+    titleFillColor: es.excelTitleFillColor,
+    headerFillColor: es.excelHeaderFillColor,
+    rowNumFillColor: es.excelRowNumFillColor,
+    podiumFillColor: es.excelPodiumFillColor,
+    seatFillColor: es.excelSeatFillColor,
+    emptyFillColor: es.excelEmptyFillColor,
+    vacantFillColor: es.excelVacantFillColor,
+    tagHeaderFillColor: es.excelTagHeaderFillColor
+  }
+})
+
+// ── Excel 样式构建器 ──
+
+const createExcelStyleBuilder = (config) => {
+  const { border: bc, fonts, fills, sizing } = config
+
+  const borderRgb = normalizeHexColor(bc.borderColor, '000000')
+  const innerBorderRgb = normalizeHexColor(bc.innerBorderColor, '000000')
+  const outerBorderRgb = normalizeHexColor(bc.outerBorderColor, '000000')
+  const titleFontRgb = normalizeHexColor(fonts.titleFontColor, '1F4E78')
+  const headerFontRgb = normalizeHexColor(fonts.headerFontColor, '1F4E78')
+  const seatFontRgb = normalizeHexColor(fonts.seatFontColor, '000000')
+
+  const titleFillRgb = normalizeHexColor(fills.titleFillColor, '') || null
+  const headerFillRgb = normalizeHexColor(fills.headerFillColor, '') || null
+  const rowNumFillRgb = normalizeHexColor(fills.rowNumFillColor, '') || null
+  const podiumFillRgb = normalizeHexColor(fills.podiumFillColor, '') || null
+  const seatFillRgb = normalizeHexColor(fills.seatFillColor, '') || null
+  const emptyFillRgb = normalizeHexColor(fills.emptyFillColor, '') || null
+  const vacantFillRgb = normalizeHexColor(fills.vacantFillColor, '') || null
+  const tagHeaderFillRgb = normalizeHexColor(fills.tagHeaderFillColor, '') || null
+
+  const buildFill = (colorRgb) => {
+    if (!colorRgb) return {}
+    return { fill: { patternType: 'solid', fgColor: { rgb: colorRgb } } }
+  }
+
+  const createBorder = (style, color) => {
+    if (!bc.showBorders) return {}
+    return {
+      top: { style, color: { rgb: color } },
+      bottom: { style, color: { rgb: color } },
+      left: { style, color: { rgb: color } },
+      right: { style, color: { rgb: color } }
+    }
+  }
+
+  const createBorderSide = (style, color) => {
+    if (!bc.showBorders) return {}
+    return { style, color: { rgb: color } }
+  }
+
+  const thinBorder = (clr = borderRgb) => createBorder(bc.borderStyle, clr)
+  const innerBorder = () => createBorder(bc.innerBorderStyle, innerBorderRgb)
+
+  const cellEdgeBorder = (isTop, isBottom, isLeft, isRight) => ({
+    top: isTop ? createBorderSide(bc.outerBorderStyle, outerBorderRgb) : createBorderSide(bc.innerBorderStyle, innerBorderRgb),
+    bottom: isBottom ? createBorderSide(bc.outerBorderStyle, outerBorderRgb) : createBorderSide(bc.innerBorderStyle, innerBorderRgb),
+    left: isLeft ? createBorderSide(bc.outerBorderStyle, outerBorderRgb) : createBorderSide(bc.innerBorderStyle, innerBorderRgb),
+    right: isRight ? createBorderSide(bc.outerBorderStyle, outerBorderRgb) : createBorderSide(bc.innerBorderStyle, innerBorderRgb)
+  })
+
+  const buildRichText = (parts, baseFont = {}) => {
+    const rich = []
+    parts.forEach(part => {
+      if (part.type === 'text') {
+        rich.push({ t: part.content, s: { font: baseFont } })
+      } else if (part.type === 'placeholder') {
+        const font = { ...baseFont }
+        if (part.style) {
+          if (part.style.bold !== undefined) font.bold = part.style.bold
+          if (part.style.size !== undefined) font.sz = part.style.size
+          if (part.style.color !== undefined) {
+            font.color = { rgb: normalizeHexColor(part.style.color, '000000') }
+          }
+        }
+        rich.push({ t: part.content, s: { font } })
+      }
+    })
+    return rich
+  }
+
+  const center = { horizontal: 'center', vertical: 'center', wrapText: true }
+
+  const styles = {
+    header: {
+      font: { bold: fonts.headerFontBold, sz: fonts.headerFontSize, color: { rgb: headerFontRgb } },
+      alignment: center,
+      border: thinBorder(),
+      ...buildFill(headerFillRgb)
+    },
+    title: {
+      font: { bold: fonts.titleFontBold, sz: fonts.titleFontSize, color: { rgb: titleFontRgb } },
+      alignment: center,
+      border: thinBorder(),
+      ...buildFill(titleFillRgb)
+    },
+    rowNum: {
+      font: { bold: fonts.headerFontBold, sz: fonts.headerFontSize, color: { rgb: headerFontRgb } },
+      alignment: center,
+      border: thinBorder(),
+      ...buildFill(rowNumFillRgb)
+    },
+    seatName: {
+      font: { bold: true, sz: sizing.seatFontSize, color: { rgb: seatFontRgb } },
+      alignment: center,
+      border: innerBorder(),
+      ...buildFill(seatFillRgb)
+    },
+    seat: {
+      font: { bold: fonts.seatFontBold, sz: sizing.seatFontSize, color: { rgb: seatFontRgb } },
+      alignment: center,
+      border: innerBorder(),
+      ...buildFill(seatFillRgb)
+    },
+    empty: {
+      font: { bold: fonts.seatFontBold, sz: sizing.seatFontSize, color: { rgb: seatFontRgb } },
+      alignment: center,
+      border: innerBorder(),
+      ...buildFill(emptyFillRgb)
+    },
+    vacant: {
+      font: { bold: fonts.seatFontBold, sz: sizing.seatFontSize, color: { rgb: seatFontRgb } },
+      alignment: center,
+      border: innerBorder(),
+      ...buildFill(vacantFillRgb)
+    },
+    podium: {
+      font: { bold: fonts.headerFontBold, sz: fonts.headerFontSize, color: { rgb: headerFontRgb } },
+      alignment: center,
+      border: thinBorder(),
+      ...buildFill(podiumFillRgb)
+    },
+    tagHeader: {
+      font: { bold: fonts.headerFontBold, sz: fonts.headerFontSize, color: { rgb: headerFontRgb } },
+      alignment: center,
+      border: thinBorder(),
+      ...buildFill(tagHeaderFillRgb)
+    }
+  }
+
+  return {
+    styles,
+    cellEdgeBorder,
+    buildRichText,
+    seatFontRgb,
+    center
+  }
+}
+
+// ── Excel 布局计算器 ──
+
+const createExcelLayoutCalculator = (seatConfig, config) => {
+  const { layout, numbering } = config
+  const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig
+
+  const groupGapCols = layout.showGroupGap ? 1 : 0
+  const seatsPerGroup = columnsPerGroup * seatsPerColumn
+  const precomputedGroupLabels = Array.from({ length: groupCount }, (_, i) => formatIndex(i + 1, numbering.groupNumberScheme))
+  const dataColOffset = layout.showRowNumbers ? 1 : 0
+  const groupStartCol = (g) => dataColOffset + g * (columnsPerGroup + groupGapCols)
+  const totalCols = dataColOffset + groupCount * columnsPerGroup + (groupCount - 1) * groupGapCols
+  const titleRowOffset = layout.showTitle ? 1 : 0
+  const podiumTopOffset = layout.reverseOrder && layout.showPodium ? 1 : 0
+  const groupLabelOffset = layout.showGroupLabels ? 1 : 0
+  const headerRowOffset = titleRowOffset + podiumTopOffset + groupLabelOffset
+  const podiumRows = layout.showPodium ? 1 : 0
+  const totalSeatRows = headerRowOffset + seatsPerColumn + (layout.reverseOrder ? 0 : podiumRows)
+
+  const isTopEdge = (r) => r === 0
+  const isBottomEdge = (r) => r === totalSeatRows - 1
+  const isLeftEdge = (c) => c === 0
+  const isRightEdge = (c) => c === totalCols - 1
+
+  return {
+    groupCount,
+    columnsPerGroup,
+    seatsPerColumn,
+    seatsPerGroup,
+    precomputedGroupLabels,
+    dataColOffset,
+    groupStartCol,
+    totalCols,
+    titleRowOffset,
+    podiumTopOffset,
+    groupLabelOffset,
+    headerRowOffset,
+    podiumRows,
+    totalSeatRows,
+    groupGapCols,
+    isTopEdge,
+    isBottomEdge,
+    isLeftEdge,
+    isRightEdge
+  }
+}
+
 export function useExcelData() {
-  // 下载空白模板
   const downloadTemplate = async () => {
     const XLSX = await loadXlsx()
-    // 创建示例数据
     const templateData = [
       ['学号', '姓名', '性别', '不修', '830', '住宿生', '午休', '周五走'],
       ['1', '示例学生1', '男', '1', '', '', '1', ''],
@@ -239,7 +612,6 @@ export function useExcelData() {
     XLSX.writeFile(wb, '学生名单模板.xlsx')
   }
 
-  // 从Excel导入 - 返回原始数据供调用者处理
   const importFromExcel = async (file) => {
     const XLSX = await loadXlsx()
     return new Promise((resolve, reject) => {
@@ -274,7 +646,6 @@ export function useExcelData() {
             return
           }
 
-          // 校验姓名不能为空
           const invalidRows = []
           for (let i = 1; i < jsonData.length; i++) {
             const row = jsonData[i]
@@ -291,18 +662,14 @@ export function useExcelData() {
             return
           }
 
-          // 从第三列开始是标签列
           const tagHeaders = headers.slice(2).filter(h => {
             if (h == null) return false
-            // 转换为字符串并去除空白
             const str = String(h).trim()
             return str.length > 0
           }).map(h => String(h).trim())
 
-          // 检查学生数量
           const studentCount = jsonData.length - 1
           if (studentCount > 100) {
-            // 返回警告信息，由调用者处理
             resolve({
               students: [],
               tagNames: [],
@@ -311,7 +678,6 @@ export function useExcelData() {
             return
           }
 
-          // 验证标签列并收集所有标签名称（单次遍历）
           const validTagIndices = []
           const tagMap = {}
           const allTagNames = new Set()
@@ -338,7 +704,6 @@ export function useExcelData() {
             }
           })
 
-          // 检查标签数量
           if (validTagIndices.length > 20) {
             resolve({
               students: [],
@@ -348,7 +713,6 @@ export function useExcelData() {
             return
           }
 
-          // 准备学生数据
           const studentsData = []
           for (let i = 1; i < jsonData.length; i++) {
             const row = jsonData[i]
@@ -359,7 +723,6 @@ export function useExcelData() {
 
             if (!name || !name.toString().trim()) continue
 
-            // 收集学生的标签名称
             const studentTagNames = []
 
             validTagIndices.forEach(colIndex => {
@@ -368,7 +731,6 @@ export function useExcelData() {
               if (cellValue === 1 || cellValue === '1') {
                 studentTagNames.push(tagMap[colIndex])
               } else if (cellValue != null && cellValue !== '' && cellValue !== '0' && cellValue !== 0) {
-                // 将值转换为字符串作为标签名
                 studentTagNames.push(String(cellValue).trim())
               }
             })
@@ -397,7 +759,6 @@ export function useExcelData() {
     })
   }
 
-  // 导出到Excel
   const exportToExcel = async (students, tags) => {
     const XLSX = await loadXlsx()
     if (!students || students.length === 0) {
@@ -405,13 +766,11 @@ export function useExcelData() {
       return
     }
 
-    // 准备标题行
     const headers = ['学号', '姓名']
     tags.forEach(tag => {
       headers.push(tag.name)
     })
 
-    // 准备数据行
     const data = [headers]
 
     students.forEach(student => {
@@ -420,7 +779,6 @@ export function useExcelData() {
         student.name || ''
       ]
 
-      // 为每个标签列添加值
       tags.forEach(tag => {
         const hasTag = student.tags && student.tags.includes(tag.id)
         row.push(hasTag ? '1' : '0')
@@ -437,212 +795,31 @@ export function useExcelData() {
     XLSX.writeFile(wb, `学生名单_${timestamp}.xlsx`)
   }
 
-  /**
-   * 核心函数：生成用于导出的 Excel 工作簿和主工作表（用于直接渲染高保真预览或文件导出）
-   */
-  const generateSeatChartWorkbook = async (organizedSeats, students, tags = [], seatConfig, options = {}) => {
+  const generateSeatChartWorkbook = async (organizedSeats, students, tags = [], seatConfig, userOptions = {}) => {
     const XLSX = await loadXlsx()
-    const {
-      showStudentId    = true,
-      showRowNumbers   = true,
-      showGroupLabels  = true,
-      showTitle        = true,
-      showPodium       = true,
-      colorMode        = 'color',
-      nameFontSize     = 12,
-      idFontSize       = 10,
-      cellWidth        = 10,
-      seatRowHeight    = 40,
-      showTagTable     = false,
-      tagTableNewSheet = false,
-      reverseOrder     = false,
-      showGroupGap     = true,
-      title            = '班级座位表',
-      borderColor      = '#000000',
-      showBorders      = true,
-      borderStyle      = 'thin',
-      innerBorderStyle = 'thin',
-      outerBorderStyle = 'thin',
-      innerBorderColor = '#000000',
-      outerBorderColor = '#000000',
-      cellFormat       = '%n\n%i',
-      rowNumberScheme  = 'arabic',
-      groupNumberScheme = 'arabic',
-      serialNumberScheme = 'arabic',
-      
-      titleFontBold    = true,
-      titleFontSize    = 16,
-      titleFontColor   = '#1F4E78',
-      titleFillColor   = '',
 
-      headerFontBold   = true,
-      headerFontSize   = 12,
-      headerFontColor  = '#1F4E78',
-      headerFillColor  = '',
+    const legacyConfig = convertLegacyExcelOptions(userOptions)
+    const config = mergeExcelConfig(defaultExcelConfig, legacyConfig)
+    const { layout, sizing, content, numbering } = config
 
-      seatFontBold     = false,
-      seatFontSize     = 12,
-      seatFontColor    = '#000000',
-
-      rowNumFillColor  = '',
-      podiumFillColor  = '',
-      seatFillColor    = '',
-      emptyFillColor   = '',
-      vacantFillColor  = '',
-      tagHeaderFillColor = ''
-    } = options
-
-    const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig
     const studentMap = new Map(students.map(s => [s.id, s]))
+    const styleBuilder = createExcelStyleBuilder(config)
+    const layoutCalc = createExcelLayoutCalculator(seatConfig, config)
 
-    // ── 纯净无底色排版 (完全贴合普通表格预览，只做对齐和描边) ──
-    const borderRgb = normalizeHexColor(borderColor, '000000')
-    const innerBorderRgb = normalizeHexColor(innerBorderColor, '000000')
-    const outerBorderRgb = normalizeHexColor(outerBorderColor, '000000')
-    const titleFontRgb = normalizeHexColor(titleFontColor, '1F4E78')
-    const headerFontRgb = normalizeHexColor(headerFontColor, '1F4E78')
-    const seatFontRgb = normalizeHexColor(seatFontColor, '000000')
-
-    const titleFillRgb   = normalizeHexColor(titleFillColor, '') || null
-    const headerFillRgb  = normalizeHexColor(headerFillColor, '') || null
-    const rowNumFillRgb  = normalizeHexColor(rowNumFillColor, '') || null
-    const podiumFillRgb  = normalizeHexColor(podiumFillColor, '') || null
-    const seatFillRgb    = normalizeHexColor(seatFillColor, '') || null
-    const emptyFillRgb   = normalizeHexColor(emptyFillColor, '') || null
-    const vacantFillRgb  = normalizeHexColor(vacantFillColor, '') || null
-    const tagHeaderFillRgb = normalizeHexColor(tagHeaderFillColor, '') || null
-
-    const buildFill = (colorRgb) => {
-      if (!colorRgb) return {}
-      return { fill: { patternType: 'solid', fgColor: { rgb: colorRgb } } }
-    }
-    
-    const createBorder = (style, color) => {
-      if (!showBorders) return {};
-      return {
-        top:    { style, color: { rgb: color } },
-        bottom: { style, color: { rgb: color } },
-        left:   { style, color: { rgb: color } },
-        right:  { style, color: { rgb: color } }
-      }
-    }
-
-    const createBorderSide = (style, color) => {
-      if (!showBorders) return {};
-      return { style, color: { rgb: color } }
-    }
-    
-    const thinBorder = (clr = borderRgb) => createBorder(borderStyle, clr)
-    const innerBorder = () => createBorder(innerBorderStyle, innerBorderRgb)
-    const outerBorderObj = () => createBorder(outerBorderStyle, outerBorderRgb)
-    const cellEdgeBorder = (isTop, isBottom, isLeft, isRight) => ({
-      top:    isTop    ? createBorderSide(outerBorderStyle, outerBorderRgb) : createBorderSide(innerBorderStyle, innerBorderRgb),
-      bottom: isBottom ? createBorderSide(outerBorderStyle, outerBorderRgb) : createBorderSide(innerBorderStyle, innerBorderRgb),
-      left:   isLeft   ? createBorderSide(outerBorderStyle, outerBorderRgb) : createBorderSide(innerBorderStyle, innerBorderRgb),
-      right:  isRight  ? createBorderSide(outerBorderStyle, outerBorderRgb) : createBorderSide(innerBorderStyle, innerBorderRgb)
-    })
-    
-    const buildRichText = (parts, baseFont = {}) => {
-      const rich = []
-      parts.forEach(part => {
-        if (part.type === 'text') {
-          rich.push({
-            t: part.content,
-            s: { font: baseFont }
-          })
-        } else if (part.type === 'placeholder') {
-          const font = { ...baseFont }
-          if (part.style) {
-            if (part.style.bold !== undefined) font.bold = part.style.bold
-            if (part.style.size !== undefined) font.sz = part.style.size
-            if (part.style.color !== undefined) {
-              font.color = { rgb: normalizeHexColor(part.style.color, '000000') }
-            }
-          }
-          rich.push({
-            t: part.content,
-            s: { font }
-          })
-        }
-      })
-      return rich
-    }
-    // 居中对齐参数
-    const center = { horizontal: 'center', vertical: 'center', wrapText: true }
-
-    // 原生单元格属性
-    const styleHeader = {
-      font: { bold: headerFontBold, sz: headerFontSize, color: { rgb: headerFontRgb } },
-      alignment: center,
-      border: thinBorder(),
-      ...buildFill(headerFillRgb)
-    }
-    const styleTitle = {
-      font: { bold: titleFontBold, sz: titleFontSize, color: { rgb: titleFontRgb } },
-      alignment: center,
-      border: thinBorder(),
-      ...buildFill(titleFillRgb)
-    }
-    const styleRowNum = {
-      font: { bold: headerFontBold, sz: headerFontSize, color: { rgb: headerFontRgb } },
-      alignment: center,
-      border: thinBorder(),
-      ...buildFill(rowNumFillRgb)
-    }
-    const styleSeatName = {
-      font: { bold: true, sz: seatFontSize, color: { rgb: seatFontRgb } },
-      alignment: center,
-      border: innerBorder(),
-      ...buildFill(seatFillRgb)
-    }
-    const styleSeat = {
-      font: { bold: seatFontBold, sz: seatFontSize, color: { rgb: seatFontRgb } },
-      alignment: center,
-      border: innerBorder(),
-      ...buildFill(seatFillRgb)
-    }
-    const styleEmpty = {
-      font: { bold: seatFontBold, sz: seatFontSize, color: { rgb: seatFontRgb } },
-      alignment: center,
-      border: innerBorder(),
-      ...buildFill(emptyFillRgb)
-    }
-    const styleVacant = {
-      font: { bold: seatFontBold, sz: seatFontSize, color: { rgb: seatFontRgb } },
-      alignment: center,
-      border: innerBorder(),
-      ...buildFill(vacantFillRgb)
-    }
-    const stylePodium = {
-      font: { bold: headerFontBold, sz: headerFontSize, color: { rgb: headerFontRgb } },
-      alignment: center,
-      border: thinBorder(),
-      ...buildFill(podiumFillRgb)
-    }
-    const styleTagHeader = {
-      font: { bold: headerFontBold, sz: headerFontSize, color: { rgb: headerFontRgb } },
-      alignment: center,
-      border: thinBorder(),
-      ...buildFill(tagHeaderFillRgb)
-    }
-
-    // ── 布局计算 ──
-    const groupGapCols     = showGroupGap ? 1 : 0
-    const seatsPerGroup    = columnsPerGroup * seatsPerColumn
-    const precomputedGroupLabels = Array.from({ length: groupCount }, (_, i) => formatIndex(i + 1, groupNumberScheme))
-    const dataColOffset    = showRowNumbers ? 1 : 0
-    const groupStartCol    = (g) => dataColOffset + g * (columnsPerGroup + groupGapCols)
-    const totalCols        = dataColOffset + groupCount * columnsPerGroup + (groupCount - 1) * groupGapCols
-    const titleRowOffset   = showTitle ? 1 : 0
-    // 翻转时讲台在最前；正序时在最后
-    const podiumTopOffset  = reverseOrder && showPodium ? 1 : 0
-    const groupLabelOffset = showGroupLabels ? 1 : 0
-    const headerRowOffset  = titleRowOffset + podiumTopOffset + groupLabelOffset
-    const podiumRows       = showPodium ? 1 : 0
-    const totalSeatRows    = headerRowOffset + seatsPerColumn + (reverseOrder ? 0 : podiumRows)
+    const { styles, cellEdgeBorder, buildRichText, seatFontRgb } = styleBuilder
+    const {
+      groupCount, columnsPerGroup, seatsPerColumn, seatsPerGroup,
+      precomputedGroupLabels, dataColOffset, groupStartCol, totalCols,
+      titleRowOffset, podiumTopOffset, headerRowOffset, totalSeatRows
+    } = layoutCalc
 
     const ws = {}
     const merges = []
+
+    const edgeBd = (r, c) => cellEdgeBorder(
+      layoutCalc.isTopEdge(r), layoutCalc.isBottomEdge(r),
+      layoutCalc.isLeftEdge(c), layoutCalc.isRightEdge(c)
+    )
 
     const setCell = (r, c, v, s, t = 's', richText = null, borderOverride = null) => {
       const finalStyle = borderOverride ? { ...s, border: borderOverride } : s
@@ -658,148 +835,125 @@ export function useExcelData() {
       ws[XLSX.utils.encode_cell({ r, c })] = cell
     }
 
-    const totalRows = totalSeatRows
-    const isTopEdge = (r) => r === 0
-    const isBottomEdge = (r) => r === totalRows - 1
-    const isLeftEdge = (c) => c === 0
-    const isRightEdge = (c) => c === totalCols - 1
-    const edgeBd = (r, c) => cellEdgeBorder(isTopEdge(r), isBottomEdge(r), isLeftEdge(c), isRightEdge(c))
-
-    // ── 标题行 ──
-    if (showTitle) {
-      for (let c = 0; c < totalCols; c++) setCell(0, c, c === 0 ? title : '', styleTitle, 's', null, edgeBd(0, c))
+    if (layout.showTitle) {
+      for (let c = 0; c < totalCols; c++) setCell(0, c, c === 0 ? content.title : '', styles.title, 's', null, edgeBd(0, c))
       merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } })
     }
 
-    // ── 讲台行（翻转时，放在组号上方） ──
-    if (showPodium && reverseOrder) {
+    if (layout.showPodium && layout.reverseOrder) {
       const pRow = titleRowOffset
-      for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', stylePodium, 's', null, edgeBd(pRow, c))
+      for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', styles.podium, 's', null, edgeBd(pRow, c))
       merges.push({ s: { r: pRow, c: 0 }, e: { r: pRow, c: totalCols - 1 } })
     }
 
-    // ── 组号行 ──
-    if (showGroupLabels) {
+    if (layout.showGroupLabels) {
       const hRow = titleRowOffset + podiumTopOffset
-      if (showRowNumbers) setCell(hRow, 0, '', styleHeader, 's', null, edgeBd(hRow, 0))
+      if (layout.showRowNumbers) setCell(hRow, 0, '', styles.header, 's', null, edgeBd(hRow, 0))
       for (let g = 0; g < groupCount; g++) {
         const sc = groupStartCol(g)
         const groupLabel = precomputedGroupLabels[g]
-        setCell(hRow, sc, `第 ${groupLabel} 组`, styleHeader, 's', null, edgeBd(hRow, sc))
-        for (let c = 1; c < columnsPerGroup; c++) setCell(hRow, sc + c, '', styleHeader, 's', null, edgeBd(hRow, sc + c))
+        setCell(hRow, sc, `第 ${groupLabel} 组`, styles.header, 's', null, edgeBd(hRow, sc))
+        for (let c = 1; c < columnsPerGroup; c++) setCell(hRow, sc + c, '', styles.header, 's', null, edgeBd(hRow, sc + c))
         if (columnsPerGroup > 1) merges.push({ s: { r: hRow, c: sc }, e: { r: hRow, c: sc + columnsPerGroup - 1 } })
       }
     }
 
-    // ── 座位行 ──
     for (let r = 0; r < seatsPerColumn; r++) {
       const eRow = headerRowOffset + r
-      // 翻转时：读取数据源行索引反向
-      const srcRow = reverseOrder ? (seatsPerColumn - 1 - r) : r
-      // 行号显示：前端座位(srcRow=N-1)显示1，最后端(srcRow=0)显示N
+      const srcRow = layout.reverseOrder ? (seatsPerColumn - 1 - r) : r
       const displayRow = seatsPerColumn - srcRow
-      const rowLabel = formatIndex(displayRow, rowNumberScheme)
-      if (showRowNumbers) setCell(eRow, 0, `第${rowLabel}排`, styleRowNum, 's', null, edgeBd(eRow, 0))
+      const rowLabel = formatIndex(displayRow, numbering.rowNumberScheme)
+      if (layout.showRowNumbers) setCell(eRow, 0, `第${rowLabel}排`, styles.rowNum, 's', null, edgeBd(eRow, 0))
       for (let g = 0; g < groupCount; g++) {
         const groupLabel = precomputedGroupLabels[g]
         for (let c = 0; c < columnsPerGroup; c++) {
           const eCol = groupStartCol(g) + c
           const seat = organizedSeats[g]?.[c]?.[srcRow]
           const serial = g * seatsPerGroup + c * seatsPerColumn + (r + 1)
-          const serialLabel = formatIndex(serial, serialNumberScheme)
+          const serialLabel = formatIndex(serial, numbering.serialNumberScheme)
           if (!seat) {
-            setCell(eRow, eCol, '', styleSeat, 's', null, edgeBd(eRow, eCol))
+            setCell(eRow, eCol, '', styles.seat, 's', null, edgeBd(eRow, eCol))
           } else if (seat.isEmpty) {
-            setCell(eRow, eCol, '空置', styleEmpty, 's', null, edgeBd(eRow, eCol))
+            setCell(eRow, eCol, '空置', styles.empty, 's', null, edgeBd(eRow, eCol))
           } else if (seat.studentId) {
             const stu = studentMap.get(seat.studentId)
             if (stu) {
-              const content = formatCellContent(cellFormat, {
+              const cellContent = formatCellContent(content.cellFormat, {
                 name: stu.name || '未命名',
-                studentId: showStudentId ? (stu.studentNumber || '') : '',
+                studentId: layout.showStudentId ? (stu.studentNumber || '') : '',
                 rowLabel,
                 groupLabel,
                 serialLabel
               })
-
-              const baseFont = { bold: true, sz: seatFontSize, color: { rgb: seatFontRgb } }
-              const richText = buildRichText(content.richParts, baseFont)
-
-              setCell(eRow, eCol, content.text, styleSeatName, 's', richText, edgeBd(eRow, eCol))
+              const baseFont = { bold: true, sz: sizing.seatFontSize, color: { rgb: seatFontRgb } }
+              const richText = buildRichText(cellContent.richParts, baseFont)
+              setCell(eRow, eCol, cellContent.text, styles.seatName, 's', richText, edgeBd(eRow, eCol))
             } else {
-              setCell(eRow, eCol, '', styleSeat, 's', null, edgeBd(eRow, eCol))
+              setCell(eRow, eCol, '', styles.seat, 's', null, edgeBd(eRow, eCol))
             }
           } else {
-            setCell(eRow, eCol, '', styleVacant, 's', null, edgeBd(eRow, eCol))
+            setCell(eRow, eCol, '', styles.vacant, 's', null, edgeBd(eRow, eCol))
           }
         }
-        // 组间空列
-        if (showGroupGap && g < groupCount - 1) {
+        if (layout.showGroupGap && g < groupCount - 1) {
           const gapCol = groupStartCol(g) + columnsPerGroup
           setCell(eRow, gapCol, '', {}, 's', null, edgeBd(eRow, gapCol))
         }
       }
     }
 
-    // ── 讲台行（正序时，放在最后） ──
-    if (showPodium && !reverseOrder) {
+    if (layout.showPodium && !layout.reverseOrder) {
       const pRow = headerRowOffset + seatsPerColumn
-      for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', stylePodium, 's', null, edgeBd(pRow, c))
+      for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', styles.podium, 's', null, edgeBd(pRow, c))
       merges.push({ s: { r: pRow, c: 0 }, e: { r: pRow, c: totalCols - 1 } })
     }
 
-    // ── 列宽 / 行高 ──
     ws['!cols'] = Array.from({ length: totalCols }, (_, c) => {
-      if (showRowNumbers && c === 0) return { wch: 7 }
+      if (layout.showRowNumbers && c === 0) return { wch: 7 }
       const baseC = c - dataColOffset
-      if (showGroupGap) {
+      if (layout.showGroupGap) {
         if (baseC % (columnsPerGroup + 1) === columnsPerGroup) return { wch: 2 }
       }
-      return { wch: cellWidth }
+      return { wch: sizing.cellWidth }
     })
     ws['!rows'] = Array.from({ length: totalSeatRows }, (_, r) => {
-      if (showTitle && r === 0) return { hpt: 28 }
-      if (showGroupLabels && r === titleRowOffset + podiumTopOffset) return { hpt: 22 }
-      // 翻转：讲台行在 titleRowOffset 
-      if (reverseOrder && showPodium && r === titleRowOffset) return { hpt: 22 }
-      // 正序：讲台行在最后
-      if (!reverseOrder && r === totalSeatRows - 1 && showPodium) return { hpt: 22 }
-      return { hpt: seatRowHeight }
+      if (layout.showTitle && r === 0) return { hpt: 28 }
+      if (layout.showGroupLabels && r === titleRowOffset + podiumTopOffset) return { hpt: 22 }
+      if (layout.reverseOrder && layout.showPodium && r === titleRowOffset) return { hpt: 22 }
+      if (!layout.reverseOrder && r === totalSeatRows - 1 && layout.showPodium) return { hpt: 22 }
+      return { hpt: sizing.seatRowHeight }
     })
 
-    // ── 标签统计表构建函数 ──
     const buildTagTable = (targetWs, targetMerges, startRow, targetCols) => {
       if (!tags || tags.length === 0) return startRow
       const totalSpan = Math.max(3, targetCols)
-      // 标题
       for (let c = 0; c < totalSpan; c++) {
         targetWs[XLSX.utils.encode_cell({ r: startRow, c })] = {
-          v: c === 0 ? '标签统计' : '', t: 's', s: styleTagHeader
+          v: c === 0 ? '标签统计' : '', t: 's', s: styles.tagHeader
         }
       }
       targetMerges.push({ s: { r: startRow, c: 0 }, e: { r: startRow, c: totalSpan - 1 } })
-      
-      // 表头
+
       const hRow = startRow + 1
-      targetWs[XLSX.utils.encode_cell({ r: hRow, c: 0 })] = { v: '标签', t: 's', s: styleTagHeader }
-      targetWs[XLSX.utils.encode_cell({ r: hRow, c: 1 })] = { v: '人数', t: 's', s: styleTagHeader }
+      targetWs[XLSX.utils.encode_cell({ r: hRow, c: 0 })] = { v: '标签', t: 's', s: styles.tagHeader }
+      targetWs[XLSX.utils.encode_cell({ r: hRow, c: 1 })] = { v: '人数', t: 's', s: styles.tagHeader }
       for (let c = 2; c < totalSpan; c++) {
-        targetWs[XLSX.utils.encode_cell({ r: hRow, c })] = { v: c === 2 ? '学生名单' : '', t: 's', s: styleTagHeader }
+        targetWs[XLSX.utils.encode_cell({ r: hRow, c })] = { v: c === 2 ? '学生名单' : '', t: 's', s: styles.tagHeader }
       }
       if (totalSpan > 3) {
         targetMerges.push({ s: { r: hRow, c: 2 }, e: { r: hRow, c: totalSpan - 1 } })
       }
-      
+
       let dRow = hRow + 1
       for (const tag of tags) {
         const tagStus = students.filter(s => s.tags && s.tags.includes(tag.id))
         if (tagStus.length === 0) continue
-        targetWs[XLSX.utils.encode_cell({ r: dRow, c: 0 })] = { v: tag.name, t: 's', s: styleRowNum }
-        targetWs[XLSX.utils.encode_cell({ r: dRow, c: 1 })] = { v: tagStus.length, t: 'n', s: styleSeat }
+        targetWs[XLSX.utils.encode_cell({ r: dRow, c: 0 })] = { v: tag.name, t: 's', s: styles.rowNum }
+        targetWs[XLSX.utils.encode_cell({ r: dRow, c: 1 })] = { v: tagStus.length, t: 'n', s: styles.seat }
         for (let c = 2; c < totalSpan; c++) {
           targetWs[XLSX.utils.encode_cell({ r: dRow, c })] = {
             v: c === 2 ? tagStus.map(s => s.name).join('、 ') : '', t: 's',
-            s: { ...styleSeat, alignment: { horizontal: 'left', vertical: 'center', wrapText: true } }
+            s: { ...styles.seat, alignment: { horizontal: 'left', vertical: 'center', wrapText: true } }
           }
         }
         if (totalSpan > 3) {
@@ -810,14 +964,12 @@ export function useExcelData() {
       return dRow - 1
     }
 
-    // ── 确定范围 & 处理标签表 ──
     const wb = XLSX.utils.book_new()
     let maxRow = totalSeatRows - 1
     let maxCol = totalCols - 1
 
-    if (showTagTable && tags.length > 0) {
-      if (tagTableNewSheet) {
-        // 独立工作表
+    if (layout.showTagTable && tags.length > 0) {
+      if (layout.tagTableNewSheet) {
         const tagWs = {}
         const tagMerges = []
         const lastRow = buildTagTable(tagWs, tagMerges, 0, 3)
@@ -827,7 +979,6 @@ export function useExcelData() {
         tagWs['!rows'] = Array.from({ length: lastRow + 1 }, (_, i) => ({ hpt: i < 2 ? 22 : 28 }))
         XLSX.utils.book_append_sheet(wb, tagWs, '标签统计')
       } else {
-        // 同 Sheet，空 2 行后追加
         const tagStart = totalSeatRows + 2
         const lastRow = buildTagTable(ws, merges, tagStart, totalCols)
         maxRow = lastRow
@@ -838,19 +989,16 @@ export function useExcelData() {
     ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxRow, c: maxCol } })
     ws['!merges'] = merges
 
-    XLSX.utils.book_append_sheet(wb, ws, title || '座位表')
-    
+    XLSX.utils.book_append_sheet(wb, ws, content.title || '座位表')
+
     return {
       wb,
-      ws,     // 主工作表
-      maxRow, // 主工作表最大行索引
-      maxCol  // 主工作表最大列索引
+      ws,
+      maxRow,
+      maxCol
     }
   }
 
-  /**
-   * 将座位表导出为 Excel 并触发下载
-   */
   const exportSeatChartToExcel = async (organizedSeats, students, tags = [], seatConfig, options = {}) => {
     const XLSX = await loadXlsx()
     const { wb } = await generateSeatChartWorkbook(organizedSeats, students, tags, seatConfig, options)
@@ -858,9 +1006,6 @@ export function useExcelData() {
     XLSX.writeFile(wb, `座位表_${timestamp}.xlsx`)
   }
 
-  /**
-   * 将座位表导出为 ArrayBuffer, 供上传云端使用
-   */
   const exportSeatChartToExcelBuffer = async (organizedSeats, students, tags = [], seatConfig, options = {}) => {
     const XLSX = await loadXlsx()
     const { wb } = await generateSeatChartWorkbook(organizedSeats, students, tags, seatConfig, options)
@@ -875,6 +1020,7 @@ export function useExcelData() {
     exportToExcel,
     generateSeatChartWorkbook,
     exportSeatChartToExcel,
-    exportSeatChartToExcelBuffer
+    exportSeatChartToExcelBuffer,
+    buildExcelOptionsFromSettings
   }
 }

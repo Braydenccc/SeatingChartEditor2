@@ -18,7 +18,7 @@
         <button
           v-if="isMobile"
           @click="undo"
-          :disabled="!canUndo()"
+          :disabled="!canUndo"
           class="mobile-undo-btn"
           title="撤销"
         >
@@ -27,7 +27,7 @@
         <button
           v-if="isMobile"
           @click="redo"
-          :disabled="!canRedo()"
+          :disabled="!canRedo"
           class="mobile-redo-btn"
           title="重做"
         >
@@ -1430,10 +1430,10 @@ const rectSelectStyle = computed(() => {
   }
 
   .mobile-select-btn {
-    height: 28px;
-    padding: 0 12px;
-    font-size: 12px;
-    border-radius: 4px;
+    height: 36px;
+    padding: 0 14px;
+    font-size: 13px;
+    border-radius: 6px;
     background: white;
     color: #23587b;
     border: 1px solid #23587b;
@@ -1448,13 +1448,13 @@ const rectSelectStyle = computed(() => {
 
   .mobile-undo-btn,
   .mobile-redo-btn {
-    height: 28px;
-    width: 28px;
+    height: 36px;
+    width: 36px;
     padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: 6px;
     background: white;
     color: #23587b;
     border: 1px solid #d0d7dc;
@@ -1478,7 +1478,7 @@ const rectSelectStyle = computed(() => {
     top: 36px;
     z-index: 10;
     background: #f5f5f5;
-    height: 40px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1495,14 +1495,14 @@ const rectSelectStyle = computed(() => {
 
   .selection-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
   }
 
   .selection-actions button {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     padding: 0;
-    border-radius: 4px;
+    border-radius: 6px;
     background: white;
     border: 1px solid #ddd;
     display: flex;
@@ -1615,14 +1615,14 @@ const rectSelectStyle = computed(() => {
   }
 
   .zoom-btn {
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     font-size: 16px;
   }
 
   .zoom-label {
-    min-width: 44px;
-    height: 28px;
+    min-width: 48px;
+    height: 36px;
     font-size: 11px;
   }
 }
