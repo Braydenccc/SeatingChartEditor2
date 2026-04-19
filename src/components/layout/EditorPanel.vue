@@ -71,10 +71,12 @@ import SeatChart from '../seat/SeatChart.vue'
 @media (max-width: 1024px) {
   .editor-panel {
     width: 100%;
-    height: calc(100% - 56px);
+    height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* 为底部固定的 Tab 栏留出空间 */
+    padding-bottom: 56px;
   }
 
   .editor {
@@ -100,10 +102,12 @@ import SeatChart from '../seat/SeatChart.vue'
 @media (max-width: 768px) {
   .editor-panel {
     width: 100%;
-    height: calc(100% - 56px);
+    height: 100%;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    /* 为底部固定的 Tab 栏留出空间 */
+    padding-bottom: 56px;
   }
 
   .editor {
