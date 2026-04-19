@@ -71,16 +71,17 @@ import SeatChart from '../seat/SeatChart.vue'
 @media (max-width: 1024px) {
   .editor-panel {
     width: 100%;
-    flex: 1;
+    height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* 为底部固定的 Tab 栏留出空间 */
+    padding-bottom: 56px;
   }
 
   .editor {
-    flex: none;
-    height: calc(100vh - 146px);
-    min-height: unset;
+    flex: 1;
+    min-height: 0;
     background: #ffffff;
     overflow: hidden;
     border-bottom: 1px solid #e0e0e0;
@@ -89,25 +90,24 @@ import SeatChart from '../seat/SeatChart.vue'
   }
 
   .student-list-area {
-    flex: none;
-    max-height: none;
-    height: calc(100vh - 146px - 90px);
-    min-height: unset;
+    flex: 0 0 35%;
+    min-height: 0;
     overflow: hidden;
   }
 }
 
 /* 响应式设计 - 移动设备
-   布局从上到下：座位图 → 功能栏 → 学生列表 → 底部Tab栏(56px)
+   布局从上到下：座位图 → 学生列表 → 底部Tab栏(56px)
    可用高度 = 100vh - 48px(header) - 56px(tab bar) = 100vh - 104px */
 @media (max-width: 768px) {
   .editor-panel {
     width: 100%;
+    height: 100%;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    flex: 1;
-    min-height: 0;
+    /* 为底部固定的 Tab 栏留出空间 */
+    padding-bottom: 56px;
   }
 
   .editor {
@@ -116,17 +116,14 @@ import SeatChart from '../seat/SeatChart.vue'
     background: #ffffff;
     overflow: hidden;
     border-bottom: 1px solid #e0e0e0;
-    order: 1;
     display: flex;
     flex-direction: column;
   }
 
   .student-list-area {
-    flex: 0 0 auto;
-    max-height: 40%;
+    flex: 0 0 35%;
     min-height: 0;
     overflow: hidden;
-    order: 2;
   }
 }
 </style>

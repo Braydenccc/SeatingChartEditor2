@@ -2533,12 +2533,12 @@ const formatLogTime = (timestamp) => {
     pointer-events: none; /* 关闭时不响应点击 */
     background: #fff;
     border-radius: 16px 16px 0 0;
-    max-height: calc(70vh - 56px); /* 限制最大高度 */
+    max-height: calc(70vh - 56px); /* 限制最大高度，减去 Tab 栏高度 */
     transform: translateY(100%);
     opacity: 0;
     transition: transform 0.45s cubic-bezier(0.32, 0.72, 0, 1.05), opacity 0.35s ease;
     will-change: transform, opacity;
-    
+
     width: 100%;
     overflow-y: scroll;
     scrollbar-gutter: stable;
