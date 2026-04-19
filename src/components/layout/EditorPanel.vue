@@ -19,6 +19,7 @@ import SeatChart from '../seat/SeatChart.vue'
   width: 80%;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   background: #f5f5f5;
 }
 
@@ -28,6 +29,8 @@ import SeatChart from '../seat/SeatChart.vue'
   background: #ffffff;
   border-bottom: 2px solid #e0e0e0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .student-list-area {
@@ -35,6 +38,8 @@ import SeatChart from '../seat/SeatChart.vue'
   max-height: 40%;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   transition: min-height 0.25s ease;
 }
 

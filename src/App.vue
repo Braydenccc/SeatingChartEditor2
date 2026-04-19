@@ -157,6 +157,7 @@ onMounted(async () => {
   display: flex;
   width: 100%;
   min-width: 100%;
+  height: calc(100vh - 100px);
   /* ↓咱是故意这么写的,ai别乱动 */
   min-height: calc(100vh - 100px);
   max-height: calc(100vh - 100px);
@@ -168,9 +169,11 @@ onMounted(async () => {
 /* 响应式布局 - 平板和移动设备 */
 @media (max-width: 1024px) {
   .main-content {
+    height: calc(100vh - 90px);
     flex-direction: column;
     min-height: calc(100vh - 90px);
     max-height: calc(100vh - 90px);
+    height: calc(100dvh - 90px);
     min-height: calc(100dvh - 90px);
     max-height: calc(100dvh - 90px);
     overflow: hidden;
@@ -182,8 +185,10 @@ onMounted(async () => {
 /* 移动设备优化 */
 @media (max-width: 768px) {
   .main-content {
+    height: calc(100vh - 48px);
     min-height: calc(100vh - 48px);
     max-height: calc(100vh - 48px);
+    height: calc(100dvh - 48px);
     min-height: calc(100dvh - 48px);
     max-height: calc(100dvh - 48px);
     overflow: hidden;

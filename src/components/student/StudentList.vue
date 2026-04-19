@@ -434,6 +434,7 @@ const handleDrop = (e) => {
 .student-list-container {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   height: 100%;
   background: #f5f5f5;
 }
