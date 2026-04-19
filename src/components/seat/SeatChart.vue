@@ -942,16 +942,32 @@ watch(
 
 // 窗口大小变化时重新自适应
 let resizeObserver = null
-onMounted(() => {
-  if (viewportRef.value) {
+let removeViewportResizeListener = null
+
+const startViewportResizeTracking = () => {
+  if (!viewportRef.value) return
+
+  if (typeof window.ResizeObserver === 'function') {
     resizeObserver = new ResizeObserver(() => {
       fitToViewport()
     })
     resizeObserver.observe(viewportRef.value)
+    return
   }
+
+  const handleViewportResize = () => fitToViewport()
+  window.addEventListener('resize', handleViewportResize)
+  removeViewportResizeListener = () => {
+    window.removeEventListener('resize', handleViewportResize)
+  }
+}
+
+onMounted(() => {
+  startViewportResizeTracking()
 })
 onUnmounted(() => {
   resizeObserver?.disconnect()
+  removeViewportResizeListener?.()
 })
 
 // 计算总座位数
