@@ -53,9 +53,9 @@
           <Plus :size="12" stroke-width="2.5" />
         </button>
         
-        <teleport to="body">
+        <Teleport to="body">
           <transition name="dropdown-pop">
-            <div v-if="showTagDropdown" ref="dropdownRef" class="tag-dropdown" :style="dropdownStyle" @click.stop>
+            <div v-show="showTagDropdown" ref="dropdownRef" class="tag-dropdown" :style="dropdownStyle" @click.stop>
               <div class="dropdown-header">选择标签</div>
               <div class="tag-options">
                 <template v-for="tag in availableTags" :key="tag.id">
@@ -72,7 +72,7 @@
               </div>
             </div>
           </transition>
-        </teleport>
+        </Teleport>
       </div>
     </div>
 

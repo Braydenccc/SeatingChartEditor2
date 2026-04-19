@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="export-overlay"
+    <div v-show="visible" class="export-overlay"
       @mousedown.self="overlayMouseDownSelf = true"
       @mouseup.self="handleOverlayMouseUp">
       <div class="export-dialog">

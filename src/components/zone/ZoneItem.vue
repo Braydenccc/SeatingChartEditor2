@@ -60,9 +60,9 @@
       {{ isDeletingZone.value ? '再次点击确认' : '删除' }}
     </button>
 
-    <!-- 标签选择器 (teleport 到 body 避免被父容器裁剪) -->
-    <teleport to="body">
-      <div v-if="showTagPicker" class="tag-picker" ref="tagPickerRef" :style="tagPickerStyle" @click.stop>
+    <!-- 标签选择器保持稳定挂载，避免 Teleport 在条件切换时触发运行时锚点异常 -->
+    <Teleport to="body">
+      <div v-show="showTagPicker" class="tag-picker" ref="tagPickerRef" :style="tagPickerStyle" @click.stop>
         <div
           v-for="tag in availableTagsForZone"
           :key="tag.id"
@@ -76,7 +76,7 @@
           暂无可添加的标签
         </div>
       </div>
-    </teleport>
+    </Teleport>
   </div>
 </template>
 

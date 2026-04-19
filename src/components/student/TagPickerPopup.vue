@@ -1,6 +1,6 @@
 <template>
-  <teleport to="body">
-    <div v-if="show" class="tag-picker-popup" ref="popupRef" :style="popupStyle" @click.stop>
+  <Teleport to="body">
+    <div v-show="show" class="tag-picker-popup" ref="popupRef" :style="popupStyle" @click.stop>
       <div v-for="tag in availableTags" :key="tag.id" class="tag-option" @click="$emit('add', tag.id)">
         <span class="tag-dot" :style="{ background: tag.color }"></span>
         <span>{{ tag.name }}</span>
@@ -9,7 +9,7 @@
         暂无可添加的标签
       </div>
     </div>
-  </teleport>
+  </Teleport>
 </template>
 
 <script setup>
