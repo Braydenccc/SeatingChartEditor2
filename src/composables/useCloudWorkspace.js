@@ -92,6 +92,7 @@ export function useCloudWorkspace() {
         
         if (webdavConfig.value && !(backupMode.value && currentUser.value)) {
             tasks.push((async () => {
+                startFetch()
                 try {
                     const files = await listFiles(webdavConfig.value, '/sce_data')
                     return {
@@ -112,6 +113,8 @@ export function useCloudWorkspace() {
                     }
                 } catch (err) {
                     return { success: false, source: 'webdav', message: err.message || '获取WebDAV列表失败' }
+                } finally {
+                    endFetch()
                 }
             })())
         }
@@ -129,8 +132,6 @@ export function useCloudWorkspace() {
         
         if (tasks.length === 0) return { success: false, message: '请先登录云端账户' }
         
-        // 不在这里操作 isFetching，避免和 callWorkspaceApi 内部的竞态。
-        // isFetching 由 callWorkspaceApi 统一管理其 SCE 路径；WebDAV 不需要这个全局状态。
         const results = await Promise.all(tasks)
         
         let allData = []
