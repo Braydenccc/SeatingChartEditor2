@@ -81,7 +81,7 @@ const DEFAULT_EXPORT_SETTINGS = {
 }
 
 // 导出设置
-const exportSettings = ref({ ...DEFAULT_EXPORT_SETTINGS })
+const exportSettings = ref(structuredClone(DEFAULT_EXPORT_SETTINGS))
 
 export function useExportSettings() {
   // 更新标题
@@ -138,7 +138,7 @@ export function useExportSettings() {
 
   // 重置导出设置为默认值（工作区切换时调用）
   const resetExportSettings = () => {
-    exportSettings.value = { ...DEFAULT_EXPORT_SETTINGS }
+    exportSettings.value = structuredClone(DEFAULT_EXPORT_SETTINGS)
   }
 
   return {
