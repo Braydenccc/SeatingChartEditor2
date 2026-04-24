@@ -11,6 +11,7 @@ const panY = ref(0)
 let viewportEl = null
 let chartEl = null
 let isFitting = false
+let hasPendingFit = false
 
 export function useZoom() {
     const zoomIn = () => {
@@ -43,22 +44,24 @@ export function useZoom() {
 
     const fitToViewport = async () => {
         if (!viewportEl || !chartEl) return
-        if (isFitting) return
+        if (isFitting) {
+            hasPendingFit = true
+            return
+        }
 
         isFitting = true
+        const currentChartEl = chartEl
+        const prevTransform = currentChartEl.style.transform
 
         try {
-            const prevTransform = chartEl.style.transform
-            chartEl.style.transform = 'none'
+            currentChartEl.style.transform = 'none'
 
             await nextTick()
 
-            if (!viewportEl || !chartEl) return
+            if (!viewportEl || !chartEl || chartEl !== currentChartEl) return
 
             const vpRect = viewportEl.getBoundingClientRect()
-            const chartRect = chartEl.getBoundingClientRect()
-
-            chartEl.style.transform = prevTransform
+            const chartRect = currentChartEl.getBoundingClientRect()
 
             if (chartRect.width === 0 || chartRect.height === 0) return
 
@@ -76,7 +79,13 @@ export function useZoom() {
             setScale(Math.max(MIN_SCALE, fitScale))
             setPan(0, 0)
         } finally {
+            currentChartEl.style.transform = prevTransform
             isFitting = false
+            const shouldRefit = hasPendingFit
+            hasPendingFit = false
+            if (shouldRefit) {
+                await fitToViewport()
+            }
         }
     }
 
