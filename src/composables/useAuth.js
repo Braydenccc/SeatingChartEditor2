@@ -293,7 +293,7 @@ export function useAuth() {
             eraseCookie('sce_backup_mode')
             // 断开 WebDAV 后若还有 SCE 账号，切换到 retiehe
             if (authType.value === 'webdav') {
-                authType.value = currentUser.value ? 'retiehe' : 'retiehe'
+                authType.value = currentUser.value ? 'retiehe' : 'webdav'
             }
         }
 
