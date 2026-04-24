@@ -291,9 +291,13 @@ export function useAuth() {
             backupMode.value = false
             eraseCookie('sce_webdav_config')
             eraseCookie('sce_backup_mode')
-            // 断开 WebDAV 后若还有 SCE 账号，切换到 retiehe
+            // 断开 WebDAV 后切换到 retiehe；若无 SCE 登录（token 为空），
+            // 同时清理由 WebDAV 写入的 currentUser，避免退出后仍被视为已登录
             if (authType.value === 'webdav') {
-                authType.value = currentUser.value ? 'retiehe' : 'retiehe'
+                if (!token.value) {
+                    currentUser.value = null
+                }
+                authType.value = 'retiehe'
             }
         }
 
