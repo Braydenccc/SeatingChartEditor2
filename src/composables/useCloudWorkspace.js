@@ -5,6 +5,8 @@ import { getOrCreateCsrfToken } from './useAuth'
 import { fetchWithRetry } from '@/utils/fetchHelpers'
 import { useLogger } from './useLogger'
 
+const workspaceFormatErrorMessage = '工作区数据格式错误'
+
 export function useCloudWorkspace() {
     const { currentUser, token, authType, webdavConfig, backupMode } = useAuth()
     const { listFiles, putFile, getFileText, deleteFile } = useWebDav()
@@ -154,8 +156,8 @@ export function useCloudWorkspace() {
             parsedContent = typeof content === 'string' ? JSON.parse(content) : content
         } catch (e) {
             console.error('Failed to parse workspace content:', e)
-            error('工作区数据格式错误')
-            return { success: false, message: '工作区数据格式错误', error: '工作区数据格式错误' }
+            error(workspaceFormatErrorMessage)
+            return { success: false, message: workspaceFormatErrorMessage, error: workspaceFormatErrorMessage }
         }
         const jsonStr = typeof content === 'string' ? content : JSON.stringify(content, null, 2)
         
