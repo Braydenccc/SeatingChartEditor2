@@ -5,11 +5,13 @@
       :class="{ 'drag-over': isDragOver, 'is-empty': unassignedStudents.length === 0, 'has-placeholder': showEmptyPlaceholder, 'touch-dragging': isTouchDraggingFromSeat }">
 
       <!-- 有未分配学生时正常显示 -->
-      <CandidateItem
-        v-for="student in unassignedStudents"
-        :key="student.id"
-        :student="student"
-      />
+      <TransitionGroup name="list" tag="div" class="candidates-grid">
+        <CandidateItem
+          v-for="student in unassignedStudents"
+          :key="student.id"
+          :student="student"
+        />
+      </TransitionGroup>
 
       <!-- 空状态占位：无学生数据 -->
       <div v-if="students.length === 0" class="empty-placeholder">
@@ -324,6 +326,36 @@ const handleDrop = (e) => {
   justify-content: start;
 }
 
+/* 候选区网格容器 */
+.candidates-grid {
+  display: contents;
+  position: relative;
+}
+
+/* 列表动画 */
+.list-enter-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.list-enter-from {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+.list-leave-active {
+  transition: all 0.2s ease;
+  position: absolute;
+}
+
+.list-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.list-move {
+  transition: transform 0.3s ease;
+}
+
 .student-items.drag-over {
   background: rgba(35, 88, 123, 0.06);
   border-color: var(--color-primary);
@@ -385,7 +417,7 @@ const handleDrop = (e) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px 20px;
+  padding: 40px 20px;
   text-align: left;
   gap: 16px;
 }
@@ -398,11 +430,21 @@ const handleDrop = (e) => {
 }
 
 .empty-icon {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  opacity: 0.85;
-  color: #6b7280;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  opacity: 0.5;
+  color: var(--color-text-muted, #9ca3af);
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 .empty-icon svg {
@@ -415,6 +457,7 @@ const handleDrop = (e) => {
   height: 32px;
   min-width: 32px;
   color: #52B788;
+  animation: none;
 }
 
 .empty-text-group {
@@ -426,15 +469,17 @@ const handleDrop = (e) => {
 .empty-title {
   font-size: 14px;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-muted, #6b7280);
   margin: 0;
+  line-height: 1.6;
 }
 
 .empty-hint {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--color-text-muted, #9ca3af);
+  opacity: 0.7;
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.6;
 }
 
 /* 空状态操作按钮 */

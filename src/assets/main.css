@@ -4,9 +4,11 @@
   --color-primary: #23587b;
   --color-primary-rgb: 35, 88, 123;
   --color-primary-light: #2d6a94;
+  --color-primary-dark: #1a4460;
   --color-surface: #fff;
   --color-surface-rgb: 255, 255, 255;
   --color-bg-selected: #e8f4f8;
+  --color-bg-card: #fafbfc;
   --color-danger: #f44336;
   --color-danger-hover: #d32f2f;
   --color-text-primary: #334155;
@@ -20,9 +22,12 @@
   --color-info-bg: #eff6ff;
   --color-success: #059669;
   --color-success-bg: #d1fae5;
+  --color-success-bg-light: #f0fdf4;
+  --color-warning-bg-light: #fffbeb;
   --color-danger-text: #ef4444;
   --color-danger-bg: #fef2f2;
-  
+  --color-error-bg-light: #fef2f2;
+
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
   --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.25);
@@ -103,7 +108,7 @@ a,
 
 /* 全局响应式优化 */
 * {
-  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* 确保在移动设备上有更好的触摸体验 */
@@ -113,12 +118,20 @@ a,
     -webkit-text-size-adjust: 100%;
   }
 
-  /* 移动设备上的按钮和交互元素有更大的触摸区域 */
+  /* 确保触摸区域足够大 */
   button,
   input[type="button"],
-  input[type="submit"] {
+  input[type="submit"],
+  .clickable {
     min-height: 44px;
     min-width: 44px;
+  }
+
+  /* 优化触摸反馈 */
+  button:active,
+  .clickable:active {
+    background-color: rgba(35, 88, 123, 0.1);
+    transition: background-color 0.1s ease;
   }
 
   /* 优化滚动性能 */
@@ -132,4 +145,31 @@ a,
   body {
     font-size: 13px;
   }
+}
+
+/* 全局动画 */
+@keyframes pulse-primary {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(35, 88, 123, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(35, 88, 123, 0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

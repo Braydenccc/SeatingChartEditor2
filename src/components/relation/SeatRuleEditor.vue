@@ -1,6 +1,7 @@
 <template>
-  <div v-if="visible" class="modal-overlay" @mousedown.self="close">
-    <div class="modal-container">
+  <Transition name="modal">
+    <div v-if="visible" class="modal-overlay" @mousedown.self="close">
+      <div class="modal-container">
       <div class="modal-header">
         <h3>座位规则 & 联系编辑</h3>
         <button class="close-btn" @click="close" aria-label="关闭">
@@ -81,8 +82,9 @@
         </span>
         <button class="btn-secondary" @click="close">关闭</button>
       </div>
+      </div>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup>
@@ -208,6 +210,7 @@ const close = () => {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -225,12 +228,43 @@ const close = () => {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  animation: modal-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes modal-pop {
-  0% { transform: scale(0.95); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+/* Modal transition styles */
+.modal-enter-active {
+  transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
+}
+
+.modal-enter-active .modal-container {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modal-enter-from {
+  opacity: 0;
+  backdrop-filter: blur(0px);
+}
+
+.modal-enter-from .modal-container {
+  opacity: 0;
+  transform: scale(0.9) translateY(-20px);
+}
+
+.modal-leave-active {
+  transition: opacity 0.2s ease, backdrop-filter 0.2s ease;
+}
+
+.modal-leave-active .modal-container {
+  transition: all 0.2s ease;
+}
+
+.modal-leave-to {
+  opacity: 0;
+  backdrop-filter: blur(0px);
+}
+
+.modal-leave-to .modal-container {
+  opacity: 0;
+  transform: scale(0.95);
 }
 
 /* ==================== Tab 导航 ==================== */

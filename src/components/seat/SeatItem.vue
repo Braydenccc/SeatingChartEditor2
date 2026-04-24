@@ -609,6 +609,12 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
+.seat-item:not(.dragging):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
 .seat-item.clickable:not(.selection-selected):hover {
   border-color: var(--color-primary);
   box-shadow: 0 2px 8px rgba(35, 88, 123, 0.2);
@@ -649,10 +655,19 @@ onUnmounted(() => {
 }
 
 .seat-item.drag-over {
-  border-color: #0ea5e9;
-  border-width: 3px;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.3);
-  background: rgba(14, 165, 233, 0.08);
+  background: rgba(35, 88, 123, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.2);
+  animation: pulse-primary 1s infinite;
+}
+
+@keyframes pulse-primary {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.4);
+  }
 }
 
 /* 空置座位样式 */
@@ -806,9 +821,11 @@ onUnmounted(() => {
 
 /* 交换模式下第一个选中的座位 */
 .seat-item.selected {
+  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.3);
+  transform: scale(1.05);
+  transition: all 0.2s ease;
   border-color: #ff9800;
   border-width: 3px;
-  box-shadow: 0 0 12px rgba(255, 152, 0, 0.4);
 }
 
 /* 撤销/重做高亮效果 - 灰色显示 */
@@ -855,8 +872,11 @@ onUnmounted(() => {
 .seat-item.selection-selected {
   border-color: #0ea5e9;
   border-width: 2.5px;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.3), 0 4px 12px rgba(35, 88, 123, 0.2);
   background: rgba(14, 165, 233, 0.06);
+  transform: scale(1.05);
+  z-index: 10;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .seat-item.selection-selected.occupied {

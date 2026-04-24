@@ -1861,8 +1861,8 @@ const formatLogTime = (timestamp) => {
 .options-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 16px;
+  margin-bottom: 28px;
   padding-bottom: 20px;
   border-bottom: 1px solid #f0f0f0;
 }
@@ -1907,7 +1907,7 @@ const formatLogTime = (timestamp) => {
   justify-content: center;
   gap: 10px;
   width: 100%;
-  padding: 12px 16px;
+  padding: 14px 20px;
   background: #f8f9fa;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
@@ -1923,30 +1923,35 @@ const formatLogTime = (timestamp) => {
   background: #ffffff;
   border-color: var(--color-primary);
   color: var(--color-primary);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(35, 88, 123, 0.2);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .option-button:active {
-  transform: scale(0.98);
-  background: #f1f5f9;
+  transform: translateY(0) scale(0.98);
+  transition: all 0.1s ease;
 }
 
 .option-button.primary {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, #23587b 0%, #2d6a94 100%);
   color: white;
   border-color: var(--color-primary);
   font-weight: 600;
 }
 
+.option-button.primary:not(:disabled):not(.confirming) {
+  animation: pulse-primary 2s infinite;
+}
+
 .option-button.primary:hover {
-  background: #1a4460;
-  box-shadow: 0 4px 10px rgba(35, 88, 123, 0.3);
+  background: linear-gradient(135deg, #1a4460 0%, #23587b 100%);
+  box-shadow: 0 8px 20px rgba(35, 88, 123, 0.3);
 }
 
 .option-button.primary:active {
-  transform: scale(0.98);
-  background: #153850;
+  transform: translateY(0) scale(0.98);
+  transition: all 0.1s ease;
 }
 
 .option-button.active {
@@ -2412,6 +2417,15 @@ const formatLogTime = (timestamp) => {
   flex-shrink: 0;
 }
 
+@keyframes pulse-primary {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(35, 88, 123, 0.2);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(35, 88, 123, 0.35);
+  }
+}
+
 /* .zone-rot-del icons use :size prop */
 
 /* ==================== 移动端遮罩 ==================== */
@@ -2509,9 +2523,10 @@ const formatLogTime = (timestamp) => {
 
   .tab-button {
     flex: 1;
+    min-height: 56px;
     height: 56px;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     border-bottom: none;
     border-right: none;
     padding: 8px 4px;
@@ -2550,7 +2565,7 @@ const formatLogTime = (timestamp) => {
 
   .tab-icon {
     display: block;
-    font-size: 20px;
+    font-size: 22px;
     line-height: 1;
   }
 

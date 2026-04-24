@@ -105,18 +105,24 @@ const {
 }
 
 .candidate-item:hover {
+  background: linear-gradient(135deg, #e8f4f8 0%, #d4e9f2 100%);
+  border-left: 4px solid var(--color-primary);
   box-shadow: 0 4px 12px rgba(35, 88, 123, 0.2);
-  transform: translateY(-2px);
+  transform: translateX(4px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .candidate-item:active {
   cursor: grabbing;
+  transform: scale(0.98);
 }
 
 .candidate-item.dragging {
+  opacity: 0.5;
+  transform: scale(1.05) rotate(2deg);
   background: transparent !important;
   border-color: #d0d7dc !important;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 .student-display {
