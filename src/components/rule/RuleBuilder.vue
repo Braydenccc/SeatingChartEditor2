@@ -568,8 +568,7 @@ const applyQuickTemplate = (key) => {
     subRules.value[0].predicate = tpl.predicate
     subRules.value[0].params = tpl.params()
     subRules.value[0].not = false
-    const minSubjects = PREDICATE_META[tpl.predicate]?.minSubjects ?? 1
-    ensureMinimumSubjects(0, minSubjects)
+    ensureMinimumSharedSubjects()
   }
 }
 
