@@ -8,6 +8,7 @@ import { useLogger } from './useLogger'
 export function useCloudWorkspace() {
     const { currentUser, token, authType, webdavConfig, backupMode } = useAuth()
     const { listFiles, putFile, getFileText, deleteFile } = useWebDav()
+    const { error } = useLogger()
     const isFetching = ref(false)
 
     // 获取与更新 WebDAV 设置 (例如导出路径)
@@ -153,8 +154,8 @@ export function useCloudWorkspace() {
             parsedContent = typeof content === 'string' ? JSON.parse(content) : content
         } catch (e) {
             console.error('Failed to parse workspace content:', e)
-            useLogger().error('工作区数据格式错误')
-            return { success: false, error: '工作区数据格式错误' }
+            error('工作区数据格式错误')
+            return { success: false, message: '工作区数据格式错误', error: '工作区数据格式错误' }
         }
         const jsonStr = typeof content === 'string' ? content : JSON.stringify(content, null, 2)
         
