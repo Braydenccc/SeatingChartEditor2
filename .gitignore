@@ -69,3 +69,6 @@ pnpm-lock.yaml
 __screenshots__/
 test-results/
 .vitest/
+
+# Git worktrees
+.worktrees/
