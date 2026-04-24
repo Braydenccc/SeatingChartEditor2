@@ -251,6 +251,11 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.25);
 }
 
+.user-info:active {
+  transform: scale(0.98);
+  background: rgba(255, 255, 255, 0.2);
+}
+
 .user-avatar {
   flex-shrink: 0;
 }
@@ -278,6 +283,11 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.8);
   transform: translateY(-1px);
+}
+
+.auth-btn:active {
+  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .login-btn {

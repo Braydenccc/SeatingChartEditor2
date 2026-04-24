@@ -1,50 +1,5 @@
 <template>
-  <div class="student-list-container" :class="{ 'all-assigned': unassignedStudents.length === 0 }">
-    <div class="student-list-header">
-      <div class="header-left">
-        <template v-if="students.length === 0">
-          <div class="status-block empty-state">
-            <div class="status-indicator"></div>
-            <span class="status-text">暂无学生数据</span>
-          </div>
-        </template>
-        <template v-else>
-          <div class="status-block">
-            <div class="status-indicator" :class="`mode-${currentMode.toLowerCase()}`"></div>
-            <span class="status-text">{{ modeLabel }}</span>
-            <span class="candidate-count" v-if="unassignedStudents.length > 0">
-              {{ unassignedStudents.length }}
-            </span>
-          </div>
-          <div class="header-actions">
-            <button v-if="currentMode !== EditMode.NORMAL" class="icon-btn btn-ghost" title="退出当前模式" @click="exitCurrentMode">
-              <X :size="14" stroke-width="2.5" />
-              <span>{{ currentMode === EditMode.ZONE_EDIT ? '完成' : '取消' }}</span>
-            </button>
-            <button v-else class="icon-btn btn-primary-light" title="开始导出" @click="showExportDialog = true">
-              <FileOutput :size="14" stroke-width="2.5" />
-              <span>导出</span>
-            </button>
-          </div>
-        </template>
-      </div>
-      <div class="header-divider"></div>
-      <div class="header-right">
-        <button v-if="unassignedStudents.length > 0" class="icon-btn btn-primary" title="随机排位" @click="handleRandomAssign">
-          <Shuffle :size="15" stroke-width="2.5" />
-          <span>一键排入</span>
-        </button>
-        <button class="icon-btn" title="标签设置" @click="showTagSettingsDialog = true">
-          <Tag :size="15" stroke-width="2.5" />
-          <span>标签</span>
-        </button>
-        <button class="icon-btn" title="编辑名单" @click="showRosterDialog = true">
-          <Users :size="15" stroke-width="2.5" />
-          <span>名单</span>
-        </button>
-      </div>
-    </div>
-
+  <div class="student-list-container" :class="{ 'all-assigned': unassignedStudents.length === 0, 'is-collapsed': isCollapsed }">
     <!-- 学生列表 / 空状态占位 -->
     <div ref="studentItemsRef" class="student-items" @dragover.prevent="handleDragOver" @drop.prevent="handleDrop" @dragleave="handleDragLeave"
       :class="{ 'drag-over': isDragOver, 'is-empty': unassignedStudents.length === 0, 'has-placeholder': showEmptyPlaceholder, 'touch-dragging': isTouchDraggingFromSeat }">
@@ -68,8 +23,8 @@
           </div>
         </div>
 
-        <!-- 操作按钮组 -->
-        <div class="empty-actions">
+        <!-- 操作按钮组 - 仅在高度足够时显示 -->
+        <div v-if="!isHeightConstrained" class="empty-actions">
           <input ref="excelInput" type="file" accept=".xlsx,.xls" style="display: none" @change="handleImportExcel" />
           <button class="empty-action-btn primary" @click="$refs.excelInput.click()">
             <FileInput :size="16" stroke-width="2" />
@@ -118,31 +73,13 @@
 
     <!-- 导出设置弹窗 -->
     <ExportDialog v-if="showExportDialog" :visible="showExportDialog" @close="showExportDialog = false" @exported="onExported" />
-
-    <!-- 桌面端快捷键提示栏 -->
-    <div v-if="!isMobile" class="shortcuts-hint-bar">
-      <div class="hint-group">
-        <span class="hint-label">快捷键:</span>
-        <span class="hint-item"><kbd>Ctrl+Z</kbd> 撤销</span>
-        <span class="hint-item"><kbd>Ctrl+Y</kbd> 重做</span>
-        <span class="hint-item"><kbd>Esc</kbd> 清除选择</span>
-      </div>
-      <div class="hint-divider"></div>
-      <div class="hint-group">
-        <span class="hint-label">鼠标:</span>
-        <span class="hint-item">左键 分配/操作座位</span>
-        <span class="hint-item">右键拖拽 多选座位</span>
-        <span class="hint-item">滚轮 平移</span>
-        <span class="hint-item"><kbd>Ctrl</kbd>+滚轮 缩放</span>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, defineAsyncComponent, onBeforeUnmount, onMounted, onUnmounted } from 'vue'
 import { useWindowSize } from '@vueuse/core'
-import { Shuffle, Users, Tag, X, FileInput, FolderOpen, CloudDownload, FileOutput, Settings2, Loader2, CheckCircle, LogOut } from 'lucide-vue-next'
+import { Users, FileInput, FolderOpen, CloudDownload, CheckCircle, LogOut } from 'lucide-vue-next'
 import CandidateItem from './CandidateItem.vue'
 // 修改为动态导入，避免阻塞主 chunk 进行加载
 // import StudentRosterDialog from './StudentRosterDialog.vue'
@@ -151,68 +88,46 @@ import { useTagData } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useLogger } from '@/composables/useLogger'
-import { useEditMode } from '@/composables/useEditMode'
 import { useWorkspace } from '@/composables/useWorkspace'
 import { useAuth } from '@/composables/useAuth'
 import { useExcelData } from '@/composables/useExcelData'
-import { useExportSettings } from '@/composables/useExportSettings'
-import { useImageExport } from '@/composables/useImageExport'
 import { useDragState } from '@/composables/useDragState'
 import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
+import { useResizablePanel } from '@/composables/useResizablePanel'
 
-const ExportDialog = defineAsyncComponent(() => import('../layout/ExportPreview.vue'))
 const StudentRosterDialog = defineAsyncComponent(() => import('./StudentRosterDialog.vue'))
 const TagSettingsDialog = defineAsyncComponent(() => import('./TagSettingsDialog.vue'))
 
 const showRosterDialog = ref(false)
 const showTagSettingsDialog = ref(false)
-const showExportDialog = ref(false)
-const lastExportUrl = ref('')
-const isExporting = ref(false)
-let lastExportObjectUrl = ''
 
 const { tags, addTag, clearAllTags } = useTagData()
 const { students, updateStudent, deleteStudent, clearAllStudents, addStudent } = useStudentData()
 const { findSeatByStudent, getEmptySeats, assignStudent, clearSeat, getStudentAtSeat } = useSeatChart()
 const { success, warning, error } = useLogger()
-const { currentMode, setMode, EditMode, clearFirstSelectedSeat } = useEditMode()
 const { loadWorkspace, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
 const { isLoggedIn, isLoginDialogVisible } = useAuth()
 const { importFromExcel, downloadTemplate } = useExcelData()
-const { exportSettings } = useExportSettings()
-const { exportToImage } = useImageExport()
 const { isTouchDraggingFromSeat } = useDragState()
 const { recordClear } = useUndo()
 const { width: windowWidth } = useWindowSize()
 const { openCloudLoad } = useCloudWorkspaceDialog()
+const { userHeight, getEffectiveHeight } = useResizablePanel()
 
 const isMobile = computed(() => windowWidth.value < 1024)
 
-const excelInput = ref(null)
-const workspaceInput = ref(null)
+// 折叠状态检测
+const isCollapsed = computed(() => userHeight.value === 0)
 
-const modeLabel = computed(() => {
-  switch (currentMode.value) {
-    case EditMode.NORMAL:
-      return '正常分配'
-    case EditMode.SWAP:
-      return '交换座位'
-    case EditMode.CLEAR:
-      return '清空座位'
-    case EditMode.EMPTY_EDIT:
-      return '空置座位'
-    case EditMode.ZONE_EDIT:
-      return '选区编辑'
-    default:
-      return '正常分配'
-  }
+// 检测高度是否受限（用于简化空状态占位符）
+const isHeightConstrained = computed(() => {
+  const effectiveHeight = getEffectiveHeight(unassignedStudents.value.length)
+  return effectiveHeight < 200 // 高度小于 200px 时隐藏操作按钮
 })
 
-const exitCurrentMode = () => {
-  setMode(EditMode.NORMAL)
-  clearFirstSelectedSeat()
-}
+const excelInput = ref(null)
+const workspaceInput = ref(null)
 
 const handleImportExcel = async (event) => {
   const file = event.target.files[0]
@@ -288,29 +203,6 @@ const handleLoadWorkspace = async (event) => {
   }
 }
 
-const onExported = (payload) => {
-  if (!(payload instanceof Blob)) {
-    if (lastExportObjectUrl) {
-      URL.revokeObjectURL(lastExportObjectUrl)
-      lastExportObjectUrl = ''
-    }
-    lastExportUrl.value = ''
-    return
-  }
-  if (lastExportObjectUrl) {
-    URL.revokeObjectURL(lastExportObjectUrl)
-  }
-  lastExportObjectUrl = URL.createObjectURL(payload)
-  lastExportUrl.value = lastExportObjectUrl
-}
-
-onBeforeUnmount(() => {
-  if (lastExportObjectUrl) {
-    URL.revokeObjectURL(lastExportObjectUrl)
-    lastExportObjectUrl = ''
-  }
-})
-
 const isDragOver = ref(false)
 const isTouchDropOver = ref(false)  // 触摸移出区域 hover 状态
 const studentItemsRef = ref(null)   // .student-items 元素引用
@@ -355,39 +247,6 @@ onUnmounted(() => {
   document.removeEventListener('touchmove', handleGlobalTouchMove)
   document.removeEventListener('touchend', handleGlobalTouchEnd)
 })
-
-// 随机排位功能
-const handleRandomAssign = () => {
-  if (unassignedStudents.value.length === 0) {
-    warning('没有需要分配的学生候选')
-    return
-  }
-
-  const emptySeats = getEmptySeats()
-  if (emptySeats.length === 0) {
-    warning('没有空余座位可用')
-    return
-  }
-
-  // 待分配学生列表拷贝
-  const candidates = [...unassignedStudents.value]
-  
-  // 座位列表打乱
-  const shuffledSeats = [...emptySeats]
-  for (let i = shuffledSeats.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffledSeats[i], shuffledSeats[j]] = [shuffledSeats[j], shuffledSeats[i]]
-  }
-
-  // 开始分配，直到候选人分完或座位填满
-  let assignedCount = 0
-  for (let i = 0; i < candidates.length && i < shuffledSeats.length; i++) {
-    assignStudent(shuffledSeats[i].id, candidates[i].id)
-    assignedCount++
-  }
-
-  success(`已随机入座 ${assignedCount} 名学生！`)
-}
 
 const handleDragOver = (e) => {
   e.dataTransfer.dropEffect = 'move'
@@ -439,270 +298,13 @@ const handleDrop = (e) => {
   background: #f5f5f5;
 }
 
-.shortcuts-hint-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 6px 16px;
-  background: #ffffff;
-  border-top: 1px solid #e8eef2;
-  font-size: 11px;
-  color: #6b7280;
-  flex-shrink: 0;
-  min-height: 28px;
-}
-
-.hint-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.hint-label {
-  font-weight: 600;
-  color: #374151;
-}
-
-.hint-item {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  white-space: nowrap;
-}
-
-.hint-item kbd {
-  display: inline-block;
-  padding: 1px 5px;
-  font-size: 10px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-weight: 500;
-  line-height: 1.4;
-  color: #374151;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  box-shadow: inset 0 -1px 0 #d1d5db;
-}
-
-.hint-divider {
-  width: 1px;
-  height: 14px;
-  background: #e5e7eb;
+/* 折叠时隐藏整个容器 */
+.student-list-container.is-collapsed {
+  display: none;
 }
 
 .student-list-container.all-assigned {
   height: auto;
-}
-
-.student-list-header {
-  display: flex;
-  align-items: center;
-  padding: 10px 16px;
-  background: #ffffff;
-  border-bottom: 1px solid #e8eef2;
-  gap: 4px;
-  min-height: 48px;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-}
-
-.header-divider {
-  width: 1px;
-  height: 24px;
-  background: #e0e0e0;
-  flex-shrink: 0;
-}
-
-.status-block {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.status-block.empty-state .status-indicator {
-  width: 3px;
-  height: 14px;
-  border-radius: 2px;
-  background: #bbb;
-}
-
-.status-indicator {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  background: #23587b;
-  transition: background 0.2s ease;
-}
-
-.status-indicator.mode-swap { background: #f59e0b; }
-.status-indicator.mode-clear { background: #ef4444; }
-.status-indicator.mode-empty_edit { background: #8b5cf6; }
-.status-indicator.mode-zone_edit { background: #06b6d4; }
-
-.status-text {
-  font-size: 13px;
-  font-weight: 500;
-  color: #374151;
-  white-space: nowrap;
-}
-
-.candidate-count {
-  background: #23587b;
-  color: white;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 10px;
-  line-height: 1.6;
-  min-width: 18px;
-  text-align: center;
-  box-shadow: 0 1px 3px rgba(35, 88, 123, 0.25);
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.quick-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.btn-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-  padding: 6px 10px;
-  background: #f3f4f6;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: default;
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.btn-group-label {
-  color: #6b7280;
-  border-right: 1px solid #e5e7eb;
-  padding-right: 8px;
-  margin-right: 6px;
-}
-
-.btn-group-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 7px;
-  background: transparent;
-  color: #4b5563;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  border-radius: 4px;
-}
-
-.btn-group-item:hover {
-  background: #e5e7eb;
-  color: #23587b;
-}
-
-.btn-group-item:active {
-  background: #d1d5db;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.icon-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  background: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  line-height: 1;
-}
-
-.icon-btn:hover {
-  background: #e5e7eb;
-  color: #23587b;
-  border-color: #d1d5db;
-}
-
-.icon-btn:active {
-  transform: scale(0.97);
-}
-
-.icon-btn.btn-primary {
-  background: #23587b;
-  color: #ffffff;
-  border-color: transparent;
-  box-shadow: 0 1px 3px rgba(35, 88, 123, 0.2);
-}
-
-.icon-btn.btn-primary:hover {
-  background: #1a4460;
-  box-shadow: 0 2px 6px rgba(35, 88, 123, 0.3);
-  color: #ffffff;
-  border-color: transparent;
-  transform: translateY(-1px);
-}
-
-.icon-btn.btn-primary:active {
-  transform: translateY(0) scale(0.97);
-}
-
-.icon-btn.btn-primary-light {
-  background: rgba(35, 88, 123, 0.08);
-  color: #23587b;
-  border: 1px solid rgba(35, 88, 123, 0.15);
-}
-
-.icon-btn.btn-primary-light:hover {
-  background: rgba(35, 88, 123, 0.15);
-  border-color: rgba(35, 88, 123, 0.25);
-  color: #1a4460;
-}
-
-.icon-btn.btn-ghost {
-  background: transparent;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
-}
-
-.icon-btn.btn-ghost:hover {
-  background: #f9fafb;
-  color: #374151;
-  border-color: #d1d5db;
 }
 
 .student-items {
@@ -957,152 +559,25 @@ const handleDrop = (e) => {
 }
 
 @media (max-width: 1366px) and (min-width: 1025px) {
-  .student-list-header {
-    padding: 8px 12px;
-    gap: 4px;
-  }
-
-  .header-divider {
-    height: 20px;
-  }
-
-  .icon-btn {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-
-  .btn-group {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-
-  .status-text {
-    font-size: 12px;
-  }
-
   .student-items {
     padding: 8px;
     grid-template-columns: repeat(auto-fill, 102px);
     grid-auto-rows: 68px;
   }
-
-  .shortcuts-hint-bar {
-    padding: 5px 12px;
-    gap: 12px;
-    font-size: 10px;
-  }
-
-  .hint-group {
-    gap: 8px;
-  }
-
-  .hint-item kbd {
-    font-size: 9px;
-    padding: 1px 4px;
-  }
 }
 
 /* 小高度屏幕优化 */
 @media (max-height: 820px) and (min-width: 1025px) {
-  .student-list-header {
-    padding: 7px 10px;
-    gap: 3px;
-  }
-
-  .header-divider {
-    height: 18px;
-  }
-
-  .icon-btn {
-    padding: 4px 7px;
-    font-size: 11px;
-  }
-
-  .btn-group {
-    padding: 4px 7px;
-    font-size: 11px;
-  }
-
-  .status-text {
-    font-size: 11px;
-  }
-
   .student-items {
     padding: 6px;
     grid-template-columns: repeat(auto-fill, 96px);
     grid-auto-rows: 64px;
-  }
-
-  .shortcuts-hint-bar {
-    padding: 4px 10px;
-    gap: 10px;
-    font-size: 10px;
-    min-height: 24px;
-  }
-
-  .hint-group {
-    gap: 6px;
-  }
-
-  .hint-item kbd {
-    font-size: 9px;
-    padding: 1px 3px;
   }
 }
 
 @media (max-width: 768px) {
   .student-list-container {
     border-top: none;
-  }
-
-  .student-list-header {
-    padding: 6px 10px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    flex-wrap: nowrap;
-  }
-
-  .student-list-header::-webkit-scrollbar {
-    display: none;
-  }
-
-  .header-divider {
-    display: none;
-  }
-
-  .header-left {
-    flex-shrink: 1;
-    min-width: 0;
-    gap: 8px;
-  }
-
-  .header-actions {
-    margin-left: auto;
-  }
-
-  .header-right {
-    flex-shrink: 0;
-    gap: 4px;
-  }
-
-  .icon-btn {
-    padding: 5px 7px;
-    font-size: 11px;
-  }
-
-  .btn-group {
-    padding: 5px 7px;
-    font-size: 11px;
-  }
-
-  .status-text {
-    font-size: 12px;
-  }
-
-  .status-indicator,
-  .status-block.empty-state .status-indicator {
-    height: 12px;
   }
 
   .student-items {

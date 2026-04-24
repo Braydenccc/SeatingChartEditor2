@@ -167,32 +167,41 @@ App.vue (主布局 - 高度严格限制)
 - [07-云端同步](.agents/features/07-cloud-sync.md)
 - [08-导出系统](.agents/features/08-export-system.md)
 
-## GitHub Issue 提交规范
+## GitHub 集成
 
-发现项目问题时，需提交到 GitHub Issues。必须遵循以下规范：
+项目已配置 GitHub MCP server，可直接通过 Claude Code 管理 GitHub Issues、Pull Requests 等。
 
-### 标签要求
+### GitHub MCP Server 配置
 
-每个 Issue 必须包含 **两个标签**：
+**全局配置位置**：`~/.claude/settings.json`
+
+```json
+{
+  "env": {
+    "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_xxxxx"
+  },
+  "enabledPlugins": {
+    "github@claude-plugins-official": true
+  }
+}
+```
+
+**获取 GitHub Token**：
+1. 访问 https://github.com/settings/tokens
+2. 生成 Personal Access Token (classic)
+3. 必需权限：`repo`、`workflow`、`admin:org`（可选）
+
+### GitHub Issue 提交规范
+
+发现项目问题时，使用 GitHub MCP server 直接创建 Issue。
+
+**标签要求**：
 - **`agent`** — 必须添加，标识为 Agent 发现的问题
 - **`Bug`** 或 **`功能建议`** — 二选一
   - `Bug`：代码缺陷、功能异常
   - `功能建议`：功能建议、优化改进
 
-### 提交方式
-
-使用 `github-operator` 智能体提交 Issue：
-
-```javascript
-Task({
-  subagent_type: "github-operator",
-  query: "创建 GitHub Issue：title: <标题>, body: <问题描述>, labels: agent,Bug",
-  description: "创建 GitHub Issue"
-})
-```
-
-### Issue 模板要求
-
+**Issue 模板**：
 - **标题格式**：`[<严重程度>] <简短描述>`
   - 严重程度：`严重`/`高危`/`中等`/`低`
   - 示例：`[严重] SidebarPanel ref访问缺少.value`
@@ -201,3 +210,5 @@ Task({
   2. 影响范围
   3. 代码位置（具体文件和行号）
   4. 修复建议（可选）
+
+**提交方式**：直接使用 GitHub MCP server 工具创建 Issue，无需通过智能体代理。
