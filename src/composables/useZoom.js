@@ -10,6 +10,7 @@ const panY = ref(0)
 
 let viewportEl = null
 let chartEl = null
+let isFitting = false
 
 export function useZoom() {
     const zoomIn = () => {
@@ -40,13 +41,18 @@ export function useZoom() {
         chartEl = chart
     }
 
-    const fitToViewport = () => {
+    const fitToViewport = async () => {
         if (!viewportEl || !chartEl) return
+        if (isFitting) return
 
-        const prevTransform = chartEl.style.transform
-        chartEl.style.transform = 'none'
+        isFitting = true
 
-        nextTick(() => {
+        try {
+            const prevTransform = chartEl.style.transform
+            chartEl.style.transform = 'none'
+
+            await nextTick()
+
             if (!viewportEl || !chartEl) return
 
             const vpRect = viewportEl.getBoundingClientRect()
@@ -69,7 +75,9 @@ export function useZoom() {
 
             setScale(Math.max(MIN_SCALE, fitScale))
             setPan(0, 0)
-        })
+        } finally {
+            isFitting = false
+        }
     }
 
     return {
