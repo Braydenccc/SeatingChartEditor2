@@ -84,6 +84,7 @@ const deepClone = (value) => {
   if (typeof globalThis.structuredClone === 'function') {
     return globalThis.structuredClone(value)
   }
+  // 兜底仅用于当前纯数据配置对象（不支持函数、Symbol、循环引用等复杂类型）
   return JSON.parse(JSON.stringify(value))
 }
 
