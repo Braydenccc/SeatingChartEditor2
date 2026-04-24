@@ -80,8 +80,16 @@ const DEFAULT_EXPORT_SETTINGS = {
   webdavExportDir: '' // 云端导出的自定义路径, 为空表示跟目录或系统默认
 }
 
+const deepClone = (value) => {
+  if (typeof globalThis.structuredClone === 'function') {
+    return globalThis.structuredClone(value)
+  }
+  // 兜底仅用于当前纯数据配置对象（不支持函数、Symbol、循环引用等复杂类型）
+  return JSON.parse(JSON.stringify(value))
+}
+
 // 导出设置
-const exportSettings = ref({ ...DEFAULT_EXPORT_SETTINGS })
+const exportSettings = ref(deepClone(DEFAULT_EXPORT_SETTINGS))
 
 export function useExportSettings() {
   // 更新标题
@@ -138,7 +146,7 @@ export function useExportSettings() {
 
   // 重置导出设置为默认值（工作区切换时调用）
   const resetExportSettings = () => {
-    exportSettings.value = { ...DEFAULT_EXPORT_SETTINGS }
+    exportSettings.value = deepClone(DEFAULT_EXPORT_SETTINGS)
   }
 
   return {

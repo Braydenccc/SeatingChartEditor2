@@ -1,10 +1,22 @@
 // 简单的 Markdown 解析器
 export function useMarkdown() {
+  // HTML 转义函数，防止 XSS 攻击
+  const escapeHtml = (value) => {
+    const str = typeof value === 'string' ? value : String(value ?? '')
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
   // 将 Markdown 转换为 HTML
   const parseMarkdown = (markdown) => {
     if (!markdown) return ''
-    
-    let html = markdown
+
+    // 首先转义所有 HTML 字符
+    let html = escapeHtml(markdown)
     
     // 标题转换
     html = html.replace(/^# (.*$)/gm, '<h1 class="guide-title">$1</h1>')
