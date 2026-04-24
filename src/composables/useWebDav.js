@@ -65,13 +65,13 @@ export function useWebDav() {
   const mkcol = async (config, path) => {
     const collPath = path.endsWith('/') ? path : path + '/'
     try {
-      const response = await request(config, collPath, { method: 'MKCOL' })
-      // 201 Created or 405 Method Not Allowed (Already exists)
-      if (!response.ok && response.status !== 405 && response.status !== 409) {
-        throw new Error(`创建文件夹失败 (${response.status})`)
-      }
+      await request(config, collPath, { method: 'MKCOL' })
       return true
     } catch (e) {
+      // 405/409 means folder already exists, treat as success
+      if (e.message && (e.message.includes('405') || e.message.includes('409'))) {
+        return true
+      }
       if (e.message === 'Failed to fetch' || e.name === 'TypeError') {
         throw new Error('网络请求失败 (Failed to fetch)。请检查：1.URL是否正确；2.WebDAV服务器是否开启了CORS支持；3.路径重定向问题。')
       }
