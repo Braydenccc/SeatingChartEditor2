@@ -115,7 +115,7 @@ const { width: windowWidth } = useWindowSize()
 const { openCloudLoad } = useCloudWorkspaceDialog()
 const { userHeight, getEffectiveHeight } = useResizablePanel()
 
-const isMobile = computed(() => windowWidth.value < 1024)
+const isMobile = computed(() => windowWidth.value <= 1024)
 
 // 折叠状态检测
 const isCollapsed = computed(() => userHeight.value === 0)

@@ -151,9 +151,10 @@ export function useResizablePanel() {
   // 窗口大小变化时，验证当前高度是否仍在有效范围内
   watch([windowHeight, windowWidth], () => {
     if (userHeight.value !== null && userHeight.value > 0) {
-      const constraints = getConstraints(0) // 使用 0 作为保守估计
-      if (userHeight.value > constraints.max) {
-        userHeight.value = constraints.max
+      const availableHeight = windowHeight.value - 100
+      const absoluteMax = availableHeight * MAX_HEIGHT_RATIO
+      if (userHeight.value > absoluteMax) {
+        userHeight.value = absoluteMax
       }
     }
   })

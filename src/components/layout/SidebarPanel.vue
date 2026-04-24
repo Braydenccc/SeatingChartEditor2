@@ -1678,12 +1678,7 @@ const formatLogTime = (timestamp) => {
   color: var(--color-primary);
 }
 
-.tab-button:active {
-  transform: scale(0.98);
-  background: rgba(35, 88, 123, 0.15);
-}
-
-.tab-button.active {
+.tab-button.active::before {
   content: '';
   position: absolute;
   left: 0;
@@ -1715,16 +1710,6 @@ const formatLogTime = (timestamp) => {
   }
 }
 
-.tab-button:hover {
-  background: rgba(35, 88, 123, 0.08);
-  color: var(--color-primary);
-}
-
-.tab-button:active {
-  transform: scale(0.98);
-  background: rgba(35, 88, 123, 0.15);
-}
-
 .tab-button.active {
   background: rgba(35, 88, 123, 0.12);
   color: var(--color-primary);
@@ -1733,6 +1718,15 @@ const formatLogTime = (timestamp) => {
 
 .tab-button.active::before {
   height: 60%;
+}
+
+.tab-button:active {
+  transform: scale(0.98);
+  background: rgba(35, 88, 123, 0.15);
+}
+
+.tab-button.active:active {
+  background: rgba(35, 88, 123, 0.2);
 }
 
 .tab-label {

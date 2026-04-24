@@ -281,13 +281,35 @@
 
 /* 15. 防止双击缩放 */
 @media (hover: none) and (pointer: coarse) {
-  * {
+  body,
+  main,
+  section,
+  header,
+  footer,
+  nav,
+  aside,
+  div,
+  span,
+  button,
+  a,
+  label,
+  ul,
+  ol,
+  li,
+  table,
+  form,
+  fieldset {
     touch-action: manipulation;
   }
 
-  /* 允许特定元素缩放 */
   .zoomable,
   .seat-chart {
     touch-action: pinch-zoom;
+  }
+
+  input,
+  textarea,
+  select {
+    touch-action: manipulation;
   }
 }
