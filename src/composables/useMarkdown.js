@@ -1,7 +1,8 @@
 // 简单的 Markdown 解析器
 export function useMarkdown() {
   // HTML 转义函数，防止 XSS 攻击
-  const escapeHtml = (str) => {
+  const escapeHtml = (value) => {
+    const str = typeof value === 'string' ? value : String(value ?? '')
     return str
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
