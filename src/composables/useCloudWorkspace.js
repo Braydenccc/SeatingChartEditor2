@@ -3,6 +3,7 @@ import { useAuth } from './useAuth'
 import { useWebDav } from './useWebDav'
 import { getOrCreateCsrfToken } from './useAuth'
 import { fetchWithRetry } from '@/utils/fetchHelpers'
+import { useLogger } from './useLogger'
 
 export function useCloudWorkspace() {
     const { currentUser, token, authType, webdavConfig, backupMode } = useAuth()
@@ -147,7 +148,14 @@ export function useCloudWorkspace() {
 
     // Save a workspace
     const saveWorkspaceToCloud = async (name, content, fileId = null, target = authType.value) => {
-        const parsedContent = typeof content === 'string' ? JSON.parse(content) : content
+        let parsedContent
+        try {
+            parsedContent = typeof content === 'string' ? JSON.parse(content) : content
+        } catch (e) {
+            console.error('Failed to parse workspace content:', e)
+            useLogger().error('工作区数据格式错误')
+            return { success: false, error: '工作区数据格式错误' }
+        }
         const jsonStr = typeof content === 'string' ? content : JSON.stringify(content, null, 2)
         
         if (target === 'webdav' && !(backupMode.value && currentUser.value)) {
