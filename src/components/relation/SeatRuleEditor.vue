@@ -211,6 +211,7 @@ const close = () => {
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -242,6 +243,7 @@ const close = () => {
 .modal-enter-from {
   opacity: 0;
   backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
 }
 
 .modal-enter-from .modal-container {
@@ -260,6 +262,7 @@ const close = () => {
 .modal-leave-to {
   opacity: 0;
   backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
 }
 
 .modal-leave-to .modal-container {

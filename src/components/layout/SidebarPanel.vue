@@ -2417,15 +2417,6 @@ const formatLogTime = (timestamp) => {
   flex-shrink: 0;
 }
 
-@keyframes pulse-primary {
-  0%, 100% {
-    box-shadow: 0 4px 12px rgba(35, 88, 123, 0.2);
-  }
-  50% {
-    box-shadow: 0 4px 16px rgba(35, 88, 123, 0.35);
-  }
-}
-
 /* .zone-rot-del icons use :size prop */
 
 /* ==================== 移动端遮罩 ==================== */

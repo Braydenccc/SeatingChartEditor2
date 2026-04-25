@@ -382,6 +382,7 @@ const formatSize = (bytes) => {
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -763,6 +764,7 @@ const formatSize = (bytes) => {
 .dialog-fade-enter-from {
   opacity: 0;
   backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
 }
 
 .dialog-fade-enter-from .cloud-workspace-dialog {
@@ -781,6 +783,7 @@ const formatSize = (bytes) => {
 .dialog-fade-leave-to {
   opacity: 0;
   backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
 }
 
 .dialog-fade-leave-to .cloud-workspace-dialog {

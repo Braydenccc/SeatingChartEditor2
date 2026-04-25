@@ -329,7 +329,6 @@ const handleDrop = (e) => {
 /* 候选区网格容器 */
 .candidates-grid {
   display: contents;
-  position: relative;
 }
 
 /* 列表动画 */
@@ -436,15 +435,6 @@ const handleDrop = (e) => {
   opacity: 0.5;
   color: var(--color-text-muted, #9ca3af);
   animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
 }
 
 .empty-icon svg {

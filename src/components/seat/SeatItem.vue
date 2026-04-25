@@ -661,15 +661,6 @@ onUnmounted(() => {
   animation: pulse-primary 1s infinite;
 }
 
-@keyframes pulse-primary {
-  0%, 100% {
-    box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.4);
-  }
-}
-
 /* 空置座位样式 */
 .seat-item.empty {
   background: #f5f5f5;
