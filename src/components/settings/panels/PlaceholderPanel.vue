@@ -1,12 +1,16 @@
 <template>
   <div class="placeholder-panel">
-    <div class="placeholder-icon">⚙️</div>
+    <div class="placeholder-icon">
+      <Settings :size="48" stroke-width="1.5" />
+    </div>
     <h3 class="placeholder-title">{{ title }}</h3>
     <p class="placeholder-text">此面板将在后续阶段实现</p>
   </div>
 </template>
 
 <script setup>
+import { Settings } from 'lucide-vue-next'
+
 defineProps({
   title: {
     type: String,
@@ -27,9 +31,9 @@ defineProps({
 }
 
 .placeholder-icon {
-  font-size: 48px;
   margin-bottom: 16px;
   opacity: 0.5;
+  color: #64748b;
 }
 
 .placeholder-title {
