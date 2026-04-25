@@ -2,6 +2,7 @@
 
 const MIN_TOKEN_LENGTH = 32;
 
+// Database 类存根（仅用于本地开发，生产环境由 Retinbox 平台提供）
 if (!class_exists('Database')) {
     class Database {
         public function __construct($name) {}
