@@ -152,6 +152,11 @@ App.vue (主布局 - 高度严格限制)
 - **命名规范**：组件使用 PascalCase，Composable 使用 camelCase + `use` 前缀，常量使用 camelCase
 - **禁止修改 dist 目录**：`dist/` 是构建输出目录，禁止直接修改其中的文件。所有修改应在源文件（`public/`、`src/` 等）中进行，通过构建流程同步到 `dist/`
 - **测试脚本管理**：临时测试脚本应放在 `test-scr/` 目录，不要放在 `public/` 或 `src/` 中。创建测试脚本后提醒用户手动部署
+- **Write 工具使用规范**：如果你是 claude code ，调用 Write 工具前必须验证参数完整性
+  - ✅ 确保 `content` 参数非空且已正确赋值
+  - ✅ 使用正确的参数名：`file_path`（绝对路径）和 `content`
+  - ✅ 避免传递空字符串或未初始化的变量
+  - ❌ 禁止在未准备好内容时调用 Write（会导致 "Write failed" 错误）
 
 ## 后端开发规范（Retinbox 平台）
 
