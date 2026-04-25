@@ -26,6 +26,10 @@ function isValidUsername($username) {
     return is_string($username) && preg_match('/^[A-Za-z0-9_-]{1,32}$/', $username);
 }
 
+function isValidFileId($fileId) {
+    return is_string($fileId) && preg_match('/^[A-Za-z0-9_-]{1,64}$/', $fileId);
+}
+
 function ensureCsrfMatched($input = null) {
     if ($input === null) {
         global $input;
@@ -61,6 +65,10 @@ function isAuthorized($sessionDb, $username, $token) {
     }
 
     return hash_equals($data['token'], $token);
+}
+
+function sanitizeDbKey($key) {
+    return preg_replace('/[^a-zA-Z0-9_-]/', '_', $key);
 }
 
 function getClientIp() {

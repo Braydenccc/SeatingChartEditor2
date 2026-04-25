@@ -40,6 +40,11 @@ try {
         }
 
         $fileId = isset($input['fileId']) && !empty($input['fileId']) ? $input['fileId'] : bin2hex(random_bytes(FILE_ID_BYTES));
+
+        if (!isValidFileId($fileId)) {
+            respond(['success' => false, 'message' => '文件ID格式无效']);
+        }
+
         $contentSize = is_string($content) ? strlen($content) : strlen(json_encode($content));
 
         $metadata = [
@@ -112,6 +117,10 @@ try {
             respond(['success' => false, 'message' => '缺少 fileId']);
         }
 
+        if (!isValidFileId($fileId)) {
+            respond(['success' => false, 'message' => '文件ID格式无效']);
+        }
+
         $fileRaw = $dbFiles->get($fileId);
         if ($fileRaw === null) {
             respond(['success' => false, 'message' => '文件不存在或已被删除']);
@@ -135,6 +144,10 @@ try {
          $fileId = isset($input['fileId']) ? trim($input['fileId']) : null;
          if (!$fileId) {
              respond(['success' => false, 'message' => '缺少 fileId']);
+         }
+
+         if (!isValidFileId($fileId)) {
+             respond(['success' => false, 'message' => '文件ID格式无效']);
          }
 
          $fileRaw = $dbFiles->get($fileId);

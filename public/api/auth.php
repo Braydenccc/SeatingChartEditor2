@@ -79,7 +79,7 @@ function checkRateLimit($username) {
 }
 
 function checkIpRateLimit() {
-    checkRateLimitGeneric('ip_' . getClientIp(), MAX_ATTEMPTS * 3, 'IP 请求过于频繁', 'rate_limit_ip', 'N/A');
+    checkRateLimitGeneric('ip_' . sanitizeDbKey(getClientIp()), MAX_ATTEMPTS * 3, 'IP 请求过于频繁', 'rate_limit_ip', 'N/A');
 }
 
 function validatePassword($password) {
