@@ -212,25 +212,21 @@ const handleSubmit = async () => {
   }
 
   loading.value = true
-  
-  try {
-    const action = tabMode.value === 'login' ? login : register
-    const result = await action(username.value.trim(), password.value)
 
-    if (result.success) {
-      successMessage.value = result.message
-      setTimeout(() => {
-        close()
-        emit('success')
-      }, 500)
-    } else {
-      errorMessage.value = result.message
-    }
-  } catch (error) {
-    errorMessage.value = '网络请求发送失败'
-  } finally {
-    loading.value = false
+  const action = tabMode.value === 'login' ? login : register
+  const result = await action(username.value.trim(), password.value)
+
+  if (result.success) {
+    successMessage.value = result.message
+    setTimeout(() => {
+      close()
+      emit('success')
+    }, 500)
+  } else {
+    errorMessage.value = result.message || '操作失败，请重试'
   }
+
+  loading.value = false
 }
 </script>
 

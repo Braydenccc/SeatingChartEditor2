@@ -1,4 +1,6 @@
 <?php
+// 使用 Retinbox 平台规范：从网站根目录开始的绝对路径（省略开头的 /）
+// auth.php 位于 api/ 目录下，所以需要引用同目录的 common.php
 require_once "api/common.php";
 header('Content-Type: application/json; charset=utf-8');
 
@@ -107,26 +109,25 @@ function issueSessionToken($sessionDb, $username, $rememberMe = false) {
     return $token;
 }
 
-$input = parseRequestInput();
-
-$action = $input['action'];
-$username = isset($input['username']) ? trim($input['username']) : '';
-$password = isset($input['password']) && is_string($input['password']) ? $input['password'] : '';
-$token = isset($input['token']) ? trim($input['token']) : '';
-
-$allowedActions = ['register', 'login', 'logout', 'set_settings', 'get_settings'];
-if (!in_array($action, $allowedActions, true)) {
-    respond(['success' => false, 'message' => 'Unknown action'], 400);
-}
-
-if (!ensureCsrfMatched($input)) {
-    respond(['success' => false, 'message' => 'CSRF 校验失败'], 403);
-}
-
-$db = new Database("users");
-$sessionDb = new Database("users_sessions");
-
 try {
+    $input = parseRequestInput();
+
+    $action = $input['action'];
+    $username = isset($input['username']) ? trim($input['username']) : '';
+    $password = isset($input['password']) && is_string($input['password']) ? $input['password'] : '';
+    $token = isset($input['token']) ? trim($input['token']) : '';
+
+    $allowedActions = ['register', 'login', 'logout', 'set_settings', 'get_settings'];
+    if (!in_array($action, $allowedActions, true)) {
+        respond(['success' => false, 'message' => 'Unknown action'], 400);
+    }
+
+    if (!ensureCsrfMatched($input)) {
+        respond(['success' => false, 'message' => 'CSRF 校验失败'], 403);
+    }
+
+    $db = new Database("users");
+    $sessionDb = new Database("users_sessions");
     if ($action === 'register') {
         ensureHttps();
         checkIpRateLimit();
@@ -216,7 +217,8 @@ try {
     }
 } catch (Exception $e) {
     // 在测试环境显示详细错误信息，生产环境隐藏
-    $isTestEnv = strpos($_SERVER['HTTP_HOST'] ?? '', 'test.') === 0;
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    $isTestEnv = strpos($host, 'test') !== false || strpos($host, 'localhost') !== false;
     $message = $isTestEnv
         ? 'Internal Server Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine()
         : 'Internal Server Error';
