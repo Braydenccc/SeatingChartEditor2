@@ -40,7 +40,7 @@
                 <h2>{{ currentCategoryLabel }}</h2>
               </div>
               <div class="content-body">
-                <PlaceholderPanel :category="currentCategoryLabel" />
+                <PlaceholderPanel :title="currentCategoryLabel" />
               </div>
             </div>
           </div>
@@ -66,7 +66,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Cloud, Palette, Edit, Info, Grid, RotateCw, Wand2, FileDown } from 'lucide-vue-next'
 import PlaceholderPanel from './panels/PlaceholderPanel.vue'
 
@@ -103,6 +103,25 @@ const currentCategories = computed(() => {
 const currentCategoryLabel = computed(() => {
   const category = currentCategories.value.find(c => c.id === activeCategory.value)
   return category ? category.label : ''
+})
+
+// Reset activeCategory when switching tabs
+watch(activeTab, (newTab) => {
+  const categories = newTab === 'global' ? globalCategories : workspaceCategories
+  activeCategory.value = categories[0].id
+})
+
+// Handle Escape key to close dialog
+const handleKeydown = (e) => {
+  if (e.key === 'Escape') handleCancel()
+}
+
+watch(() => props.visible, (newVal) => {
+  if (newVal) {
+    document.addEventListener('keydown', handleKeydown)
+  } else {
+    document.removeEventListener('keydown', handleKeydown)
+  }
 })
 
 const handleSave = () => {
