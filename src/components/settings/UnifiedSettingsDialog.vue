@@ -80,20 +80,20 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'save'])
 
 const activeTab = ref('global')
-const activeCategory = ref('appearance')
+const activeCategory = ref('sync')
 
 const globalCategories = [
-  { id: 'appearance', label: '外观', icon: Palette },
-  { id: 'editor', label: '编辑器', icon: Edit },
-  { id: 'about', label: '关于', icon: Info }
+  { id: 'sync', label: '云端同步', icon: Cloud },
+  { id: 'ui', label: '界面偏好', icon: Palette },
+  { id: 'editor', label: '编辑器行为', icon: Edit }
 ]
 
 const workspaceCategories = [
-  { id: 'layout', label: '布局', icon: Grid },
-  { id: 'rotation', label: '轮换', icon: RotateCw },
-  { id: 'assignment', label: '分配', icon: Wand2 },
-  { id: 'export', label: '导出', icon: FileDown },
-  { id: 'cloud', label: '云端', icon: Cloud }
+  { id: 'info', label: '工作区信息', icon: Info },
+  { id: 'seat', label: '座位表配置', icon: Grid },
+  { id: 'rotation', label: '自动轮换', icon: RotateCw },
+  { id: 'assignment', label: '智能排位', icon: Wand2 },
+  { id: 'export', label: '导出配置', icon: FileDown }
 ]
 
 const currentCategories = computed(() => {
@@ -198,7 +198,7 @@ const handleReset = () => {
   background: none;
   cursor: pointer;
   font-size: 14px;
-  color: #64748b;
+  color: #334155;
   transition: all 0.2s;
   text-align: left;
 }
