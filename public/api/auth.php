@@ -1,40 +1,16 @@
 <?php
+require_once __DIR__ . '/common.php';
 header('Content-Type: application/json; charset=utf-8');
-
-function respond($payload, $code = 200) {
-    http_response_code($code);
-    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
-    exit($code >= 400 ? 1 : 0);
-}
 
 if (!class_exists('Database')) {
     respond(['success' => false, 'message' => 'Environment error: Database not supported.'], 503);
 }
-
-const MIN_TOKEN_LENGTH = 32;
 const MIN_PASSWORD_LENGTH = 6;
 const RATE_LIMIT_WINDOW = 300;
 const MAX_ATTEMPTS = 5;
 const TOKEN_EXPIRY_DAYS = 30;
 const TOKEN_EXPIRY_REMEMBER_ME = 90;
 const REQUIRE_HTTPS = false;
-
-function isValidUsername($username) {
-    return is_string($username) && preg_match('/^[A-Za-z0-9_-]{1,32}$/', $username);
-}
-
-function getClientIp() {
-    $ip = $_SERVER['HTTP_X_REAL_IP'] ??
-          $_SERVER['HTTP_X_FORWARDED_FOR'] ??
-          $_SERVER['REMOTE_ADDR'] ??
-          'unknown';
-
-    if (strpos($ip, ',') !== false) {
-        $ip = explode(',', $ip)[0];
-    }
-
-    return trim($ip);
-}
 
 function logSecurityEvent($event, $username, $details = []) {
     try {
@@ -49,7 +25,7 @@ function logSecurityEvent($event, $username, $details = []) {
         ], JSON_UNESCAPED_UNICODE);
         $logDb->push('events', $logEntry);
     } catch (Exception $e) {
-        // 日志记录失败不应影响主流程
+        error_log("Security log failed: {$event} for {$username} - " . $e->getMessage());
     }
 }
 
@@ -71,6 +47,7 @@ function checkRateLimitGeneric($key, $maxAttempts, $errorMessage, $logEvent = nu
     $data = $rateLimitDb->get($key);
     $now = time();
 
+    $attempts = [];
     if ($data) {
         $attempts = json_decode($data, true);
         if (!is_array($attempts)) {
@@ -89,12 +66,10 @@ function checkRateLimitGeneric($key, $maxAttempts, $errorMessage, $logEvent = nu
             }
             respond(['success' => false, 'message' => $errorMessage . "，请在 {$waitTime} 秒后重试"], 429);
         }
-
-        $attempts[] = $now;
-        $rateLimitDb->set($key, json_encode($attempts));
-    } else {
-        $rateLimitDb->set($key, json_encode([$now]));
     }
+
+    $attempts[] = $now;
+    $rateLimitDb->set($key, json_encode($attempts));
 }
 
 function checkRateLimit($username) {
@@ -123,69 +98,16 @@ function validatePassword($password) {
     }
 }
 
-function ensureCsrfMatched() {
-    global $input;
-
-    $csrfHeader = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? trim($_SERVER['HTTP_X_CSRF_TOKEN']) : '';
-    $bodyCsrf = (is_array($input) && isset($input['_csrf']) && is_string($input['_csrf'])) ? trim($input['_csrf']) : '';
-
-    if ($csrfHeader !== '' && $bodyCsrf !== '' && hash_equals($csrfHeader, $bodyCsrf)) {
-        return true;
-    }
-
-    return false;
-}
-
 function issueSessionToken($sessionDb, $username, $rememberMe = false) {
     $token = bin2hex(random_bytes(32));
     $expiryDays = $rememberMe ? TOKEN_EXPIRY_REMEMBER_ME : TOKEN_EXPIRY_DAYS;
     $expiry = time() + ($expiryDays * 86400);
-    $sessionData = $token . '|' . $expiry;
+    $sessionData = json_encode(['token' => $token, 'expiry' => $expiry]);
     $sessionDb->set($username, $sessionData);
     return $token;
 }
 
-function isAuthorized($sessionDb, $username, $token) {
-    if (!is_string($username) || !is_string($token) || strlen($token) < MIN_TOKEN_LENGTH) {
-        return false;
-    }
-    $savedData = $sessionDb->get($username);
-    if (!$savedData) {
-        return false;
-    }
-
-    $parts = explode('|', $savedData, 2);
-    if (count($parts) !== 2) {
-        return false;
-    }
-
-    [$savedToken, $expiry] = $parts;
-
-    if (time() > (int)$expiry) {
-        $sessionDb->delete($username);
-        return false;
-    }
-
-    return hash_equals($savedToken, $token);
-}
-
-$rawInput = file_get_contents('php://input');
-$input = json_decode($rawInput, true);
-
-if (!$input && !empty($_POST)) {
-    $input = $_POST;
-}
-
-if ((!$input || !isset($input['action'])) && !empty($_GET) && isset($_GET['action'])) {
-    $input = $_GET;
-}
-
-if (!$input || !isset($input['action'])) {
-    respond([
-        'success' => false, 
-        'message' => 'Invalid Request'
-    ], 400);
-}
+$input = parseRequestInput();
 
 $action = $input['action'];
 $username = isset($input['username']) ? trim($input['username']) : '';
@@ -197,7 +119,7 @@ if (!in_array($action, $allowedActions, true)) {
     respond(['success' => false, 'message' => 'Unknown action'], 400);
 }
 
-if (!ensureCsrfMatched()) {
+if (!ensureCsrfMatched($input)) {
     respond(['success' => false, 'message' => 'CSRF 校验失败'], 403);
 }
 

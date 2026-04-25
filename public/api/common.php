@@ -1,0 +1,105 @@
+<?php
+
+const MIN_TOKEN_LENGTH = 32;
+
+if (!class_exists('Database')) {
+    class Database {
+        public function __construct($name) {}
+        public function get($key) { return null; }
+        public function set($key, $value) { return true; }
+        public function delete($key, $value = null) { return true; }
+        public function list_keys() { return []; }
+        public function search_value($pattern) { return []; }
+        public function push($key, $value) { return true; }
+        public function get_array($key) { return null; }
+    }
+}
+
+function respond($payload, $code = 200) {
+    http_response_code($code);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+    exit($code >= 400 ? 1 : 0);
+}
+
+function isValidUsername($username) {
+    return is_string($username) && preg_match('/^[A-Za-z0-9_-]{1,32}$/', $username);
+}
+
+function ensureCsrfMatched($input = null) {
+    if ($input === null) {
+        global $input;
+    }
+
+    $csrfHeader = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? trim($_SERVER['HTTP_X_CSRF_TOKEN']) : '';
+    $bodyCsrf = (is_array($input) && isset($input['_csrf']) && is_string($input['_csrf'])) ? trim($input['_csrf']) : '';
+
+    if ($csrfHeader !== '' && $bodyCsrf !== '' && hash_equals($csrfHeader, $bodyCsrf)) {
+        return true;
+    }
+
+    return false;
+}
+
+function isAuthorized($sessionDb, $username, $token) {
+    if (!is_string($username) || !is_string($token) || strlen($token) < MIN_TOKEN_LENGTH) {
+        return false;
+    }
+    $savedData = $sessionDb->get($username);
+    if (!$savedData) {
+        return false;
+    }
+
+    $data = json_decode($savedData, true);
+    if (!is_array($data) || !isset($data['token']) || !isset($data['expiry'])) {
+        return false;
+    }
+
+    if (time() > (int)$data['expiry']) {
+        $sessionDb->delete($username);
+        return false;
+    }
+
+    return hash_equals($data['token'], $token);
+}
+
+function getClientIp() {
+    static $cachedIp = null;
+
+    if ($cachedIp !== null) {
+        return $cachedIp;
+    }
+
+    $ip = $_SERVER['HTTP_X_REAL_IP'] ??
+          $_SERVER['HTTP_X_FORWARDED_FOR'] ??
+          $_SERVER['REMOTE_ADDR'] ??
+          'unknown';
+
+    if (strpos($ip, ',') !== false) {
+        $ip = explode(',', $ip)[0];
+    }
+
+    $cachedIp = trim($ip);
+    return $cachedIp;
+}
+
+function parseRequestInput() {
+    $rawInput = file_get_contents('php://input');
+    $input = json_decode($rawInput, true);
+
+    if (!$input && !empty($_POST)) {
+        $input = $_POST;
+    }
+
+    if ((!$input || !isset($input['action'])) && !empty($_GET) && isset($_GET['action'])) {
+        $input = $_GET;
+    }
+
+    if (!$input || !isset($input['action'])) {
+        respond([
+            'success' => false,
+            'message' => 'Invalid Request'
+        ], 400);
+    }
+
+    return $input;
+}
