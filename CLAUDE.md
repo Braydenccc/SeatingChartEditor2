@@ -149,6 +149,26 @@ App.vue (主布局 - 高度严格限制)
 - **TypeScript 迁移**：新文件使用 `.ts` 扩展名，类型定义在 `src/types/`。`tsconfig.json` 配置为宽松模式（`strict: false`）。优先使用 `.ts` 文件而非 `.js` 文件
 - **命名规范**：组件使用 PascalCase，Composable 使用 camelCase + `use` 前缀，常量使用 camelCase
 
+## 后端开发规范（Retinbox 平台）
+
+**遇到后端问题时，优先查阅以下文档：**
+
+1. **[docs/Retinbox Web Hosting Documentation](docs/Retinbox%20Web%20Hosting%20Documentation)** — Retinbox 平台完整文档
+2. **[.trae/rules/rth-php-functions.md](.trae/rules/rth-php-functions.md)** — PHP 云函数规范
+3. **[.trae/rules/rth-database.md](.trae/rules/rth-database.md)** — KV 数据库使用
+4. **[.trae/rules/rth-overview.md](.trae/rules/rth-overview.md)** — 平台概览
+
+**关键规则：**
+
+- **文件引用**：使用从网站根目录开始的绝对路径，省略开头的 `/`
+  - ✅ 正确：`require_once "api/common.php"`
+  - ❌ 错误：`require_once __DIR__ . '/common.php'`（`__DIR__` 不支持）
+  - ❌ 错误：`require_once "/api/common.php"`（不要开头的 `/`）
+- **数据库**：使用内置 KV 数据库 `new Database("db_name")`，不需要外部数据库
+- **云函数**：PHP 文件以 `.php` 结尾，Node.js 文件以 `.node.js` 结尾
+- **部署**：使用 `npm run deploy:test` 部署到测试环境，`npm run deploy:main` 部署到生产环境
+
+
 ## 详细规范
 
 图标尺寸表、视觉规范（品牌色 `#23587b`、阴影、圆角）、命名规范、交互细节等请参阅 [.agents/rules/项目规范.md](.agents/rules/项目规范.md)。
