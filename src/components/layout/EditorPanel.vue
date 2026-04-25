@@ -3,15 +3,92 @@
     <div class="editor">
       <SeatChart />
     </div>
-    <div class="student-list-area">
-      <StudentList />
+
+    <!-- 学生列表工具栏 - 桌面端固定在候选栏外部，移动端在候选栏内部 -->
+    <StudentListHeader
+      v-if="!isMobile"
+      :unassigned-count="unassignedCount"
+      @open-tag-settings="showTagSettingsDialog = true"
+      @open-roster="showRosterDialog = true"
+    />
+
+    <!-- 桌面端：添加可拖动分隔条 -->
+    <ResizeDivider v-if="!isMobile" :unassigned-count="unassignedCount" />
+
+    <div class="student-list-area" :style="candidatePanelStyle">
+      <!-- 移动端：工具栏在候选栏内部 -->
+      <StudentListHeader
+        v-if="isMobile"
+        :unassigned-count="unassignedCount"
+        @open-tag-settings="showTagSettingsDialog = true"
+        @open-roster="showRosterDialog = true"
+      />
+
+      <StudentList
+        :show-tag-settings="showTagSettingsDialog"
+        :show-roster="showRosterDialog"
+        @update:show-tag-settings="showTagSettingsDialog = $event"
+        @update:show-roster="showRosterDialog = $event"
+      />
+    </div>
+
+    <!-- 桌面端快捷键提示栏 - 从 StudentList 移出，固定在底部 -->
+    <div v-if="!isMobile" class="shortcuts-hint-bar">
+      <div class="hint-group">
+        <span class="hint-label">快捷键:</span>
+        <span class="hint-item"><kbd>Ctrl+Z</kbd> 撤销</span>
+        <span class="hint-item"><kbd>Ctrl+Y</kbd> 重做</span>
+        <span class="hint-item"><kbd>Esc</kbd> 清除选择</span>
+      </div>
+      <div class="hint-divider"></div>
+      <div class="hint-group">
+        <span class="hint-label">鼠标:</span>
+        <span class="hint-item">左键 分配/操作座位</span>
+        <span class="hint-item">右键拖拽 多选座位</span>
+        <span class="hint-item">滚轮 平移</span>
+        <span class="hint-item"><kbd>Ctrl</kbd>+滚轮 缩放</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed, ref } from 'vue'
+import { useWindowSize } from '@vueuse/core'
 import StudentList from '../student/StudentList.vue'
+import StudentListHeader from '../student/StudentListHeader.vue'
 import SeatChart from '../seat/SeatChart.vue'
+import ResizeDivider from '../ui/ResizeDivider.vue'
+import { useResizablePanel } from '@/composables/useResizablePanel'
+import { useStudentData } from '@/composables/useStudentData'
+import { useSeatChart } from '@/composables/useSeatChart'
+
+const { students } = useStudentData()
+const { findSeatByStudent } = useSeatChart()
+const { getEffectiveHeight } = useResizablePanel()
+const { width: windowWidth } = useWindowSize()
+
+const isMobile = computed(() => windowWidth.value <= 1024)
+const showTagSettingsDialog = ref(false)
+const showRosterDialog = ref(false)
+
+const unassignedCount = computed(() => {
+  return students.value.reduce((count, s) =>
+    !findSeatByStudent(s.id) ? count + 1 : count, 0)
+})
+
+const candidatePanelStyle = computed(() => {
+  if (isMobile.value) {
+    return {}
+  }
+  const height = getEffectiveHeight(unassignedCount.value)
+  return {
+    height: `${height}px`,
+    minHeight: `${height}px`,
+    maxHeight: `${height}px`,
+    flex: 'none'
+  }
+})
 </script>
 
 <style scoped>
@@ -25,7 +102,7 @@ import SeatChart from '../seat/SeatChart.vue'
 
 .editor {
   flex: 1;
-  min-height: 60%;
+  min-height: 0;
   background: #ffffff;
   border-bottom: 2px solid #e0e0e0;
   overflow: hidden;
@@ -34,13 +111,64 @@ import SeatChart from '../seat/SeatChart.vue'
 }
 
 .student-list-area {
-  flex: 0 1 auto;
-  max-height: 40%;
+  flex: 0 0 auto;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: min-height 0.25s ease;
+  transition: height 0.1s ease;
+}
+
+/* 桌面端快捷键提示栏 - 固定在底部 */
+.shortcuts-hint-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 16px;
+  background: #ffffff;
+  border-top: 1px solid #e8eef2;
+  font-size: 11px;
+  color: #6b7280;
+  flex-shrink: 0;
+  min-height: 28px;
+}
+
+.hint-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hint-label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.hint-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.hint-item kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  box-shadow: inset 0 -1px 0 #d1d5db;
+}
+
+.hint-divider {
+  width: 1px;
+  height: 14px;
+  background: #e5e7eb;
 }
 
 /* 响应式设计 - 中等屏幕 */
@@ -98,10 +226,11 @@ import SeatChart from '../seat/SeatChart.vue'
   }
 
   .student-list-area {
-    flex: 0 0 32%;
+    flex: 0 0 32% !important;
     min-height: 0;
     max-height: 40%;
     overflow: hidden;
+    height: auto !important;
   }
 }
 
@@ -133,10 +262,11 @@ import SeatChart from '../seat/SeatChart.vue'
   }
 
   .student-list-area {
-    flex: 0 0 32%;
+    flex: 0 0 32% !important;
     min-height: 0;
     max-height: 40%;
     overflow: hidden;
+    height: auto !important;
   }
 }
 </style>

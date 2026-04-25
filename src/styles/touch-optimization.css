@@ -1,0 +1,315 @@
+/* 触摸屏全局优化样式 */
+
+/* 1. 触摸目标尺寸优化 - 确保所有可交互元素至少 44x44px */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"],
+  .clickable,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* 小按钮增加内边距 */
+  button:not(.large-btn) {
+    padding: 12px 16px;
+  }
+
+  /* 图标按钮增加点击区域 */
+  .icon-btn,
+  .action-btn {
+    padding: 12px;
+  }
+
+  /* 输入框增加高度 */
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    min-height: 44px;
+    padding: 12px 16px;
+    font-size: 16px;
+  }
+
+  /* 下拉菜单项增加高度 */
+  .dropdown-item,
+  .menu-item,
+  .list-item {
+    min-height: 48px;
+    padding: 12px 16px;
+  }
+}
+
+/* 2. 触摸反馈效果 */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a,
+  .clickable,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Active 状态视觉反馈 */
+  button:active,
+  .clickable:active,
+  [role="button"]:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+    transition: transform 0.1s ease, opacity 0.1s ease;
+  }
+
+  /* 主要按钮的 active 效果 */
+  .primary-btn:active,
+  .action-btn:active {
+    filter: brightness(0.9);
+  }
+
+  /* 禁用 hover 效果，避免触摸后残留 */
+  button:hover,
+  a:hover,
+  .clickable:hover {
+    transform: none;
+  }
+}
+
+/* 3. 拖拽优化 */
+@media (hover: none) and (pointer: coarse) {
+  [draggable="true"] {
+    -webkit-user-drag: none;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+
+  /* 拖拽预览增大 */
+  .touch-drag-preview,
+  .drag-preview-seat {
+    min-width: 100px;
+    min-height: 50px;
+    font-size: 16px;
+    padding: 12px 20px;
+  }
+
+  /* 拖拽目标高亮增强 */
+  .drag-over {
+    border-width: 4px !important;
+    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.3) !important;
+  }
+}
+
+/* 4. 滚动优化 */
+@media (hover: none) and (pointer: coarse) {
+  .scrollable,
+  .overflow-auto,
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* 滚动条在触摸设备上隐藏 */
+  .scrollable::-webkit-scrollbar,
+  .overflow-auto::-webkit-scrollbar,
+  .overflow-y-auto::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 5. 间距优化 - 增加元素间距，防止误触 */
+@media (hover: none) and (pointer: coarse) {
+  .button-group > button,
+  .action-group > button {
+    margin: 4px;
+  }
+
+  .list-item + .list-item {
+    margin-top: 8px;
+  }
+}
+
+/* 6. 文字选择优化 */
+@media (hover: none) and (pointer: coarse) {
+  /* 禁止选择 UI 元素文字 */
+  button,
+  .header,
+  .toolbar,
+  .sidebar,
+  [role="button"] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* 允许选择内容区域文字 */
+  .content,
+  .text-content,
+  input,
+  textarea {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+}
+
+/* 7. 长按菜单禁用（避免与拖拽冲突） */
+@media (hover: none) and (pointer: coarse) {
+  .seat-item,
+  .student-item,
+  [draggable="true"] {
+    -webkit-touch-callout: none;
+  }
+}
+
+/* 8. 焦点样式优化 */
+@media (hover: none) and (pointer: coarse) {
+  /* 触摸设备上移除焦点轮廓，使用其他视觉反馈 */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.3);
+  }
+}
+
+/* 9. 模态框和弹出层优化 */
+@media (hover: none) and (pointer: coarse) {
+  .modal,
+  .dialog,
+  .popup {
+    /* 增加内边距，避免边缘误触 */
+    padding: 24px;
+  }
+
+  .modal-close,
+  .dialog-close {
+    min-width: 48px;
+    min-height: 48px;
+  }
+}
+
+/* 10. 表单优化 */
+@media (hover: none) and (pointer: coarse) {
+  /* 防止 iOS 自动缩放 */
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* 增加表单元素间距 */
+  .form-group + .form-group {
+    margin-top: 20px;
+  }
+
+  /* 复选框和单选框增大 */
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* 11. 桌面触摸屏优化（如 Surface） */
+@media (hover: hover) and (pointer: coarse) {
+  /* 保留 hover 效果，但增加触摸目标 */
+  button,
+  a,
+  .clickable {
+    min-height: 40px;
+    min-width: 40px;
+  }
+
+  button:active,
+  .clickable:active {
+    transform: scale(0.98);
+  }
+}
+
+/* 12. 横屏优化 */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  /* 横屏时减小垂直间距 */
+  .button-group > button {
+    margin: 2px;
+  }
+
+  /* 横屏时减小按钮高度 */
+  button:not(.large-btn) {
+    min-height: 40px;
+    padding: 10px 14px;
+  }
+}
+
+/* 13. 小屏幕触摸优化 */
+@media (hover: none) and (pointer: coarse) and (max-width: 480px) {
+  /* 全宽按钮 */
+  .primary-btn,
+  .submit-btn {
+    width: 100%;
+  }
+
+  /* 增加底部安全区域 */
+  .bottom-bar,
+  .footer {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+/* 14. 性能优化 - GPU 加速 */
+@media (hover: none) and (pointer: coarse) {
+  /* 仅对拖拽相关元素使用 GPU 加速 */
+  .drag-preview-overlay,
+  .drag-preview-seat {
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  /* 减少动画时长 */
+  .animated,
+  .transition {
+    transition-duration: 0.2s !important;
+  }
+}
+
+/* 15. 防止双击缩放 */
+@media (hover: none) and (pointer: coarse) {
+  body,
+  main,
+  section,
+  header,
+  footer,
+  nav,
+  aside,
+  div,
+  span,
+  button,
+  a,
+  label,
+  ul,
+  ol,
+  li,
+  table,
+  form,
+  fieldset {
+    touch-action: manipulation;
+  }
+
+  .zoomable,
+  .seat-chart {
+    touch-action: pinch-zoom;
+  }
+
+  input,
+  textarea,
+  select {
+    touch-action: manipulation;
+  }
+}

@@ -1,77 +1,106 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+
+vi.mock('../useAuth')
+vi.mock('../useWebDav')
+vi.mock('@/utils/fetchHelpers')
+vi.mock('../useLogger')
+
 import { useCloudWorkspace } from '../useCloudWorkspace'
+import { useAuth } from '../useAuth'
+import { useWebDav } from '../useWebDav'
+import { fetchWithRetry } from '@/utils/fetchHelpers'
+import { useLogger } from '../useLogger'
 
-const {
-  mockListFiles,
-  mockPutFile,
-  mockGetFileText,
-  mockDeleteFile,
-  mockFetchWithRetry,
-  mockLoggerError,
-  mockCurrentUser,
-  mockToken,
-  mockAuthType,
-  mockWebdavConfig,
-  mockBackupMode
-} = vi.hoisted(() => ({
-  mockListFiles: vi.fn(),
-  mockPutFile: vi.fn(),
-  mockGetFileText: vi.fn(),
-  mockDeleteFile: vi.fn(),
-  mockFetchWithRetry: vi.fn(),
-  mockLoggerError: vi.fn(),
-  mockCurrentUser: { value: { username: 'tester' } },
-  mockToken: { value: 'token' },
-  mockAuthType: { value: 'retiehe' },
-  mockWebdavConfig: { value: { baseUrl: 'https://example.com' } },
-  mockBackupMode: { value: false }
-}))
+const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0))
 
-vi.mock('../useAuth', () => ({
-  useAuth: () => ({
-    currentUser: mockCurrentUser,
-    token: mockToken,
-    authType: mockAuthType,
-    webdavConfig: mockWebdavConfig,
-    backupMode: mockBackupMode
-  }),
-  getOrCreateCsrfToken: () => 'csrf-token'
-}))
-
-vi.mock('../useWebDav', () => ({
-  useWebDav: () => ({
-    listFiles: mockListFiles,
-    putFile: mockPutFile,
-    getFileText: mockGetFileText,
-    deleteFile: mockDeleteFile
+const createDeferred = () => {
+  let resolve
+  let reject
+  const promise = new Promise((res, rej) => {
+    resolve = res
+    reject = rej
   })
-}))
-
-vi.mock('@/utils/fetchHelpers', () => ({
-  fetchWithRetry: mockFetchWithRetry
-}))
-
-vi.mock('../useLogger', () => ({
-  useLogger: () => ({
-    error: mockLoggerError
-  })
-}))
+  return { promise, resolve, reject }
+}
 
 describe('useCloudWorkspace', () => {
+  let mockListFiles
+  let mockPutFile
+  let mockGetFileText
+  let mockDeleteFile
+  let mockCurrentUser
+  let mockToken
+  let mockAuthType
+  let mockWebdavConfig
+  let mockBackupMode
+  let mockLoggerError
+
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockCurrentUser.value = { username: 'tester' }
-    mockToken.value = 'token'
-    mockAuthType.value = 'retiehe'
-    mockWebdavConfig.value = { baseUrl: 'https://example.com' }
-    mockBackupMode.value = false
+    const { ref } = require('vue')
+
+    mockCurrentUser = ref({ username: 'tester' })
+    mockToken = ref('token')
+    mockAuthType = ref('retiehe')
+    mockWebdavConfig = ref({ url: 'https://dav.example.com', username: 'u', password: 'p' })
+    mockBackupMode = ref(false)
+
+    mockListFiles = vi.fn()
+    mockPutFile = vi.fn()
+    mockGetFileText = vi.fn()
+    mockDeleteFile = vi.fn()
+    mockLoggerError = vi.fn()
+
+    vi.mocked(useAuth).mockReturnValue({
+      currentUser: mockCurrentUser,
+      token: mockToken,
+      authType: mockAuthType,
+      webdavConfig: mockWebdavConfig,
+      backupMode: mockBackupMode
+    })
+
+    vi.mocked(useWebDav).mockReturnValue({
+      listFiles: mockListFiles,
+      putFile: mockPutFile,
+      getFileText: mockGetFileText,
+      deleteFile: mockDeleteFile
+    })
+
+    vi.mocked(useLogger).mockReturnValue({
+      error: mockLoggerError
+    })
+
+    vi.mocked(fetchWithRetry).mockReset()
   })
 
-  it('should return message on invalid JSON and stop save flow', async () => {
-    const cloudWorkspace = useCloudWorkspace()
+  it('keeps isFetching true until overlapping WebDAV and API list calls both settle', async () => {
+    const workspace = useCloudWorkspace()
+    const webdavDeferred = createDeferred()
+    const apiDeferred = createDeferred()
+
+    mockListFiles.mockReturnValueOnce(webdavDeferred.promise)
+    vi.mocked(fetchWithRetry).mockReturnValueOnce(apiDeferred.promise)
+
+    const listPromise = workspace.listWorkspaces()
+    expect(workspace.isFetching.value).toBe(true)
+
+    apiDeferred.resolve({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ success: true, data: [] })
+    })
+    await flushPromises()
+    await flushPromises()
+    expect(workspace.isFetching.value).toBe(true)
+
+    webdavDeferred.resolve([])
+    await listPromise
+    expect(workspace.isFetching.value).toBe(false)
+  })
+
+  it('returns message on invalid JSON and stops save flow', async () => {
+    const workspace = useCloudWorkspace()
 
     await expect(
-      cloudWorkspace.saveWorkspaceToCloud('invalid-json', '{invalid json')
+      workspace.saveWorkspaceToCloud('invalid-json', '{invalid json')
     ).resolves.toEqual({
       success: false,
       message: '工作区数据格式错误',
@@ -79,7 +108,7 @@ describe('useCloudWorkspace', () => {
     })
 
     expect(mockLoggerError).toHaveBeenCalledWith('工作区数据格式错误')
-    expect(mockFetchWithRetry).not.toHaveBeenCalled()
+    expect(fetchWithRetry).not.toHaveBeenCalled()
     expect(mockPutFile).not.toHaveBeenCalled()
   })
 })

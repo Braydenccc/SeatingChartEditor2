@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useAuth } from './useAuth'
 import { useWebDav } from './useWebDav'
 import { getOrCreateCsrfToken } from './useAuth'
@@ -11,7 +11,13 @@ export function useCloudWorkspace() {
     const { currentUser, token, authType, webdavConfig, backupMode } = useAuth()
     const { listFiles, putFile, getFileText, deleteFile } = useWebDav()
     const { error } = useLogger()
-    const isFetching = ref(false)
+    const fetchingCount = ref(0)
+    const isFetching = computed(() => fetchingCount.value > 0)
+
+    const startFetch = () => fetchingCount.value++
+    const endFetch = () => {
+        if (fetchingCount.value > 0) fetchingCount.value--
+    }
 
     // 获取与更新 WebDAV 设置 (例如导出路径)
     const loadCloudSettings = async () => {
@@ -48,7 +54,7 @@ export function useCloudWorkspace() {
         }
 
         try {
-            isFetching.value = true
+            startFetch()
             const csrfToken = getOrCreateCsrfToken()
             const response = await fetchWithRetry('/api/workspace.php', {
                 method: 'POST',
@@ -80,7 +86,7 @@ export function useCloudWorkspace() {
             console.error('Workspace API Error:', err)
             return { success: false, message: err.message || '网络请求失败' }
         } finally {
-            isFetching.value = false
+            endFetch()
         }
     }
 
@@ -90,6 +96,7 @@ export function useCloudWorkspace() {
         
         if (webdavConfig.value && !(backupMode.value && currentUser.value)) {
             tasks.push((async () => {
+                startFetch()
                 try {
                     const files = await listFiles(webdavConfig.value, '/sce_data')
                     return {
@@ -110,6 +117,8 @@ export function useCloudWorkspace() {
                     }
                 } catch (err) {
                     return { success: false, source: 'webdav', message: err.message || '获取WebDAV列表失败' }
+                } finally {
+                    endFetch()
                 }
             })())
         }
@@ -127,8 +136,6 @@ export function useCloudWorkspace() {
         
         if (tasks.length === 0) return { success: false, message: '请先登录云端账户' }
         
-        // 不在这里操作 isFetching，避免和 callWorkspaceApi 内部的竞态。
-        // isFetching 由 callWorkspaceApi 统一管理其 SCE 路径；WebDAV 不需要这个全局状态。
         const results = await Promise.all(tasks)
         
         let allData = []
@@ -160,10 +167,10 @@ export function useCloudWorkspace() {
             return { success: false, message: workspaceFormatErrorMessage, error: workspaceFormatErrorMessage }
         }
         const jsonStr = typeof content === 'string' ? content : JSON.stringify(content, null, 2)
-        
+
         if (target === 'webdav' && !(backupMode.value && currentUser.value)) {
             if (!webdavConfig.value) return { success: false, message: '请先连接 WebDAV' }
-            isFetching.value = true
+            startFetch()
             try {
                 const targetFileId = fileId || `${name}.sce`
                 await putFile(webdavConfig.value, `/sce_data/${targetFileId}`, jsonStr, 'application/json')
@@ -172,7 +179,7 @@ export function useCloudWorkspace() {
                 console.error(err)
                 return { success: false, message: err.message || '保存失败' }
             } finally {
-                isFetching.value = false
+                endFetch()
             }
         }
 
@@ -196,7 +203,7 @@ export function useCloudWorkspace() {
     const loadWorkspaceFromCloud = async (fileId, source = authType.value) => {
         if (source === 'webdav') {
             if (!webdavConfig.value) return { success: false, message: '请先连接 WebDAV' }
-            isFetching.value = true
+            startFetch()
             try {
                 const text = await getFileText(webdavConfig.value, `/sce_data/${fileId}`)
                 if (!text) throw new Error('文件不存在')
@@ -208,7 +215,7 @@ export function useCloudWorkspace() {
                 console.error(err)
                 return { success: false, message: err.message || '加载失败' }
             } finally {
-                isFetching.value = false
+                endFetch()
             }
         }
         return await callWorkspaceApi('load', { fileId })
@@ -218,7 +225,7 @@ export function useCloudWorkspace() {
     const deleteWorkspaceFromCloud = async (fileId, source = authType.value) => {
         if (source === 'webdav' && !(backupMode.value && currentUser.value)) {
             if (!webdavConfig.value) return { success: false, message: '请先连接 WebDAV' }
-            isFetching.value = true
+            startFetch()
             try {
                 await deleteFile(webdavConfig.value, `/sce_data/${fileId}`)
                 return { success: true }
@@ -226,18 +233,18 @@ export function useCloudWorkspace() {
                 console.error(err)
                 return { success: false, message: err.message || '删除失败' }
             } finally {
-                isFetching.value = false
+                endFetch()
             }
         }
-        
+
         const primaryResult = await callWorkspaceApi('delete', { fileId })
-        
+
         if (primaryResult.success && backupMode.value && webdavConfig.value) {
             deleteFile(webdavConfig.value, `/sce_data/${fileId}`).catch(e => {
                 console.log('WebDAV静默删除文件失败:', e)
             })
         }
-        
+
         return primaryResult
     }
 

@@ -1673,7 +1673,12 @@ const formatLogTime = (timestamp) => {
   }
 }
 
-.tab-button::before {
+.tab-button:hover {
+  background: rgba(35, 88, 123, 0.08);
+  color: var(--color-primary);
+}
+
+.tab-button.active::before {
   content: '';
   position: absolute;
   left: 0;
@@ -1705,11 +1710,6 @@ const formatLogTime = (timestamp) => {
   }
 }
 
-.tab-button:hover {
-  background: rgba(35, 88, 123, 0.08);
-  color: var(--color-primary);
-}
-
 .tab-button.active {
   background: rgba(35, 88, 123, 0.12);
   color: var(--color-primary);
@@ -1718,6 +1718,15 @@ const formatLogTime = (timestamp) => {
 
 .tab-button.active::before {
   height: 60%;
+}
+
+.tab-button:active {
+  transform: scale(0.98);
+  background: rgba(35, 88, 123, 0.15);
+}
+
+.tab-button.active:active {
+  background: rgba(35, 88, 123, 0.2);
 }
 
 .tab-label {
@@ -1907,8 +1916,14 @@ const formatLogTime = (timestamp) => {
 .option-button:hover {
   background: #ffffff;
   border-color: var(--color-primary);
-  box-shadow: 0 2px 6px rgba(35, 88, 123, 0.15);
-  transform: translateX(2px);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.15);
+}
+
+.option-button:active {
+  transform: scale(0.98);
+  background: #f1f5f9;
 }
 
 .option-button.primary {
@@ -1921,6 +1936,11 @@ const formatLogTime = (timestamp) => {
 .option-button.primary:hover {
   background: #1a4460;
   box-shadow: 0 4px 10px rgba(35, 88, 123, 0.3);
+}
+
+.option-button.primary:active {
+  transform: scale(0.98);
+  background: #153850;
 }
 
 .option-button.active {

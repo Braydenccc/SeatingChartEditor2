@@ -344,10 +344,9 @@ const handleTouchStart = (e) => {
   touchDragTimer = setTimeout(() => {
     touchDragActive = true
     isDragging.value = true
-    startTouchDragFromSeat()  // 通知候选区显示触摸移出目标
-    if (navigator.vibrate) navigator.vibrate(40)  // 震动反馈
+    startTouchDragFromSeat()
+    if (navigator.vibrate) navigator.vibrate(50)
 
-    // 使用统一的拖拽预览系统
     const isSelection = isInSelection.value && selectedSeatsArray.value.length > 1
     const selectionData = isSelection ? selectedSeatsArray.value : [props.seat.id]
 
@@ -367,9 +366,7 @@ const handleTouchMove = (e) => {
   const dy = touch.clientY - touchStartY
   const moved = Math.abs(dx) > 5 || Math.abs(dy) > 5
 
-  // 手机端选择模式：检测移动后取消长按，进入涂抹选择
   if (isMobile.value && isSelectionMode.value && !touchDragActive && !touchSelectionActive && moved) {
-    // 取消长按定时器
     if (touchDragTimer) {
       clearTimeout(touchDragTimer)
       touchDragTimer = null
@@ -384,31 +381,39 @@ const handleTouchMove = (e) => {
 
   if (touchSelectionActive) {
     e.preventDefault()
-    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)
-    if (targetEl) {
-      const seatEl = findParentSeat(targetEl)
-      if (seatEl && seatEl.dataset.seatId) {
-        const seatId = seatEl.dataset.seatId
+    const clientX = touch.clientX
+    const clientY = touch.clientY
 
-        if (touchSelectionVisited.has(seatId)) return
-        touchSelectionVisited.add(seatId)
+    if (touchMoveRafId) {
+      cancelAnimationFrame(touchMoveRafId)
+    }
 
-        const isSelected = selectedSeatIds.value.has(seatId)
+    touchMoveRafId = requestAnimationFrame(() => {
+      touchMoveRafId = null
+      const targetEl = document.elementFromPoint(clientX, clientY)
+      if (targetEl) {
+        const seatEl = findParentSeat(targetEl)
+        if (seatEl && seatEl.dataset.seatId) {
+          const seatId = seatEl.dataset.seatId
 
-        if (touchSelectionMode === TOUCH_SELECTION_MODE.ADD && !isSelected) {
-          toggleSeatInSelection(seatId)
-        } else if (touchSelectionMode === TOUCH_SELECTION_MODE.REMOVE && isSelected) {
-          toggleSeatInSelection(seatId)
+          if (touchSelectionVisited.has(seatId)) return
+          touchSelectionVisited.add(seatId)
+
+          const isSelected = selectedSeatIds.value.has(seatId)
+
+          if (touchSelectionMode === TOUCH_SELECTION_MODE.ADD && !isSelected) {
+            toggleSeatInSelection(seatId)
+          } else if (touchSelectionMode === TOUCH_SELECTION_MODE.REMOVE && isSelected) {
+            toggleSeatInSelection(seatId)
+          }
         }
       }
-    }
+    })
     return
   }
 
   if (!touchDragActive) {
-    // 判断手指移动距离，超过阈值才认为是滑动（取消长按）
-    // 小幅抖动（≤ 8px）不取消定时器，让长按继续激活拖拽
-    if (Math.sqrt(dx * dx + dy * dy) > 8) {
+    if (Math.sqrt(dx * dx + dy * dy) > 10) {
       if (touchDragTimer) {
         clearTimeout(touchDragTimer)
         touchDragTimer = null
@@ -417,26 +422,34 @@ const handleTouchMove = (e) => {
     return
   }
 
-  // 拖拽激活：阻止页面滚动
   e.preventDefault()
 
-  // 使用统一的拖拽预览更新
-  updateDragPreview(touch.clientX, touch.clientY)
+  const clientX = touch.clientX
+  const clientY = touch.clientY
 
-  // 高亮目标座位
-  const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)
-  clearAllTouchHighlights()
-  if (targetEl) {
-    const seatEl = findParentSeat(targetEl)
-    if (seatEl && seatEl.dataset.seatId !== props.seat.id) {
-      seatEl.classList.add('drag-over')
-    } else {
-      const studentListEl = findParentByClass(targetEl, 'student-items')
-      if (studentListEl && props.seat.studentId != null) {
-        studentListEl.classList.add('drag-over')
+  updateDragPreview(clientX, clientY)
+
+  if (touchMoveRafId) {
+    cancelAnimationFrame(touchMoveRafId)
+  }
+
+  touchMoveRafId = requestAnimationFrame(() => {
+    touchMoveRafId = null
+
+    const targetEl = document.elementFromPoint(clientX, clientY)
+    clearAllTouchHighlights()
+    if (targetEl) {
+      const seatEl = findParentSeat(targetEl)
+      if (seatEl && seatEl.dataset.seatId !== props.seat.id) {
+        seatEl.classList.add('drag-over')
+      } else {
+        const studentListEl = findParentByClass(targetEl, 'student-items')
+        if (studentListEl && props.seat.studentId != null) {
+          studentListEl.classList.add('drag-over')
+        }
       }
     }
-  }
+  })
 }
 
 // 公共清理函数：取消定时器、移除预览、重置所有状态
@@ -565,6 +578,10 @@ const clearAllTouchHighlights = () => {
 
 onUnmounted(() => {
   cleanupTouchDrag()
+  if (touchMoveRafId) {
+    cancelAnimationFrame(touchMoveRafId)
+    touchMoveRafId = null
+  }
 })
 </script>
 

@@ -1,4 +1,5 @@
 import './assets/main.css'
+import './styles/touch-optimization.css'
 
 import { createApp } from 'vue'
 import App from './App.vue'

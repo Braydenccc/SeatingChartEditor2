@@ -21,6 +21,7 @@ const state = reactive({
 let chartEl = null
 let cachedChartRect = null
 let previewEl = null
+let updateRafId = null
 
 export function useDragPreview() {
   const { seatConfig, getSeat } = useSeatChart()
@@ -85,7 +86,6 @@ export function useDragPreview() {
     if (previewEl) {
       previewEl.style.left = `${clientX}px`
       previewEl.style.top = `${clientY}px`
-      // 不缩放，使用原始大小
       previewEl.style.transform = 'translate(-50%, -50%)'
       previewEl.style.transition = 'none'
     }
@@ -97,20 +97,33 @@ export function useDragPreview() {
     state.mouseX = clientX
     state.mouseY = clientY
 
-    const local = clientToChartLocal(clientX, clientY)
-    if (local) {
-      state.snapGrid = chartLocalToGrid(local.x, local.y)
-    }
-
-    // 直接更新位置
     if (previewEl) {
       previewEl.style.left = `${clientX}px`
       previewEl.style.top = `${clientY}px`
     }
+
+    if (updateRafId) {
+      cancelAnimationFrame(updateRafId)
+    }
+
+    updateRafId = requestAnimationFrame(() => {
+      updateRafId = null
+
+      const local = clientToChartLocal(clientX, clientY)
+      if (local) {
+        state.snapGrid = chartLocalToGrid(local.x, local.y)
+      }
+    })
   }
 
   const endDragPreview = (dropTargetSeatIds = null) => {
     if (!state.isActive) return
+
+    if (updateRafId) {
+      cancelAnimationFrame(updateRafId)
+      updateRafId = null
+    }
+
     resetState()
   }
 
@@ -138,7 +151,6 @@ export function useDragPreview() {
     const anchor = parseSeatId(state.anchorSeatId)
     const cpg = seatConfig.value.columnsPerGroup
 
-    // 获取实际座位尺寸和间距
     let seatW = L.SEAT_W
     let seatH = L.SEAT_H
     let colGap = L.COL_GAP
@@ -146,7 +158,6 @@ export function useDragPreview() {
     let groupGap = L.GROUP_GAP
 
     if (chartEl) {
-      // 尝试获取实际座位元素的尺寸
       const seatEl = chartEl.querySelector('.seat-item')
       if (seatEl) {
         const rect = seatEl.getBoundingClientRect()
@@ -154,7 +165,6 @@ export function useDragPreview() {
         seatH = rect.height
       }
 
-      // 尝试获取实际间距
       const columnEl = chartEl.querySelector('.seat-column')
       if (columnEl) {
         const style = window.getComputedStyle(columnEl)
@@ -177,13 +187,11 @@ export function useDragPreview() {
       }
     }
 
-    // 使用实际尺寸计算组宽度
     const groupW = cpg * seatW + (cpg - 1) * colGap
 
     return state.selectedSeatIds.map(sid => {
       const parsed = parseSeatId(sid)
 
-      // 计算相对于锚点的偏移（使用实际尺寸和间距）
       const dx = (parsed.groupIndex * (groupW + groupGap) + parsed.columnIndex * (seatW + colGap)) -
                  (anchor.groupIndex * (groupW + groupGap) + anchor.columnIndex * (seatW + colGap))
       const dy = (parsed.rowIndex * (seatH + rowGap)) - (anchor.rowIndex * (seatH + rowGap))
@@ -198,7 +206,6 @@ export function useDragPreview() {
         studentName: student?.name || '',
         isAnchor,
         style: {
-          // 相对于容器中心的偏移，锚点座位在中心 (0, 0)
           left: `calc(50% + ${dx}px)`,
           top: `calc(50% + ${dy}px)`,
           transform: 'translate(-50%, -50%)',
