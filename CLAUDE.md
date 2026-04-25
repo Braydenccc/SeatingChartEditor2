@@ -12,7 +12,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `npm run build` | 完整构建：Vite + pkg + NSIS 安装包 (Windows) |
 | `npm run build:test` | 构建测试环境版本（会临时修改文件，构建后自动还原） |
 | `npm run preview` | 预览构建结果 |
-| `npm run deploy:test` | 部署到测试环境 |
 | `npm run deploy:main` | 合并到 main 并推送 |
 | `npm run test` | 运行测试（watch 模式） |
 | `npm run test:run` | 运行测试（单次） |
@@ -21,7 +20,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `npm run test:student` | 运行学生数据测试 |
 | `npm run test:seat` | 运行座位图测试 |
 | `npm run test:assignment` | 运行分配算法测试 |
-| `npm run type-check` | TypeScript 类型检查 |
+| `npm run test:integration` | 运行集成测试 |
+| `npm run test:edge` | 运行边界情况测试 |
+| `npm run type-check` | TypeScript 类型检查（单次） |
+| `npm run type-check:watch` | TypeScript 类型检查（watch 模式） |
 
 Node.js >= 20.0.0。无 linter、formatter。测试框架使用 Vitest + happy-dom。
 
