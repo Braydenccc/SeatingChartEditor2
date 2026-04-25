@@ -21,6 +21,7 @@ import { useWorkspace } from '@/composables/useWorkspace'
 import { useLogger } from '@/composables/useLogger'
 import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
+import { useGlobalSettings } from '@/composables/useGlobalSettings'
 
 const { isLoginDialogVisible, initAuth, isLoggedIn } = useAuth()
 const { loadWorkspaceFromCloud } = useCloudWorkspace()
@@ -28,12 +29,16 @@ const { applyWorkspaceData, getLastWorkspace } = useWorkspace()
 const { success, warning } = useLogger()
 const { undo, redo, canUndo, canRedo } = useUndo()
 const { showCloudDialog, cloudDialogMode, handleCloudSuccess } = useCloudWorkspaceDialog()
+const { loadFromLocalStorage } = useGlobalSettings()
 
 const loginDialogInitialTab = ref('login')
 const handleOpenLogin = (tab = 'login') => {
   loginDialogInitialTab.value = tab
   isLoginDialogVisible.value = true
 }
+
+// Load global settings from localStorage on app startup
+loadFromLocalStorage()
 
 // Restore auth state from cookies on app startup
 initAuth()
