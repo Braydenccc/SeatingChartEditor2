@@ -68,9 +68,9 @@ jobs:
         run: node scripts/deploy-staging.js --site sce.jbyc.cc --outdir dist
 
 
-  # ── 测试环境：dev 分支 → test.sce.jbyc.cc ────────────────────────────────
+  # ── 测试环境：dev 分支 → testsce.jbyc.cc ────────────────────────────────
   deploy-staging:
-    name: 🧪 Staging (test.sce.jbyc.cc)
+    name: 🧪 Staging (testsce.jbyc.cc)
     if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
 
@@ -95,7 +95,7 @@ jobs:
         continue-on-error: true
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: node scripts/deploy-staging.js --site test.sce.jbyc.cc --outdir dist
+        run: node scripts/deploy-staging.js --site testsce.jbyc.cc --outdir dist
 
       # 第 2 次尝试
       - name: Wait before retry (1→2)
@@ -110,7 +110,7 @@ jobs:
         continue-on-error: true
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: node scripts/deploy-staging.js --site test.sce.jbyc.cc --outdir dist
+        run: node scripts/deploy-staging.js --site testsce.jbyc.cc --outdir dist
 
       # 第 3 次尝试
       - name: Wait before retry (2→3)
@@ -123,7 +123,7 @@ jobs:
         if: steps.d2.outcome == 'failure'
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: node scripts/deploy-staging.js --site test.sce.jbyc.cc --outdir dist
+        run: node scripts/deploy-staging.js --site testsce.jbyc.cc --outdir dist
 
       - name: Show staging URL
-        run: 'echo "Staging URL: https://test.sce.jbyc.cc"'
+        run: 'echo "Staging URL: https://testsce.jbyc.cc"'

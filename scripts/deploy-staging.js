@@ -9,7 +9,7 @@
  *
  * Usage:
  *   node scripts/deploy-staging.js \
- *     --site test.sce.jbyc.cc \
+ *     --site testsce.jbyc.cc \
  *     --deploy-path test \
  *     --outdir dist
  *
@@ -244,35 +244,46 @@ async function main() {
   }
   console.log(`Found ${localFiles.length} local files.`);
 
-  // 3. Fetch remote file map
+  // 3. Fetch remote file map (with fallback mode)
   console.log('Getting current site content...');
-  const remote = await retryWithBackoff(
-    () => fetchRemoteContent(site, username),
-    3,
-    2000
-  );
-  console.log('Site content retrieved.');
+  let remote = {};
+  let fallbackMode = false;
 
-  // Build sets of remote keys that belong to our deployPath scope
-  // Key format in Retiehe: e.g. "test/index.html", "test/assets/main.js"
-  const remoteKeysInScope = new Set(
-    Object.keys(remote).filter((k) => prefixSlash === '' || k.startsWith(prefixSlash)),
-  );
+  try {
+    remote = await retryWithBackoff(
+      () => fetchRemoteContent(site, username),
+      3,
+      2000
+    );
+    console.log('Site content retrieved.');
+  } catch (err) {
+    console.warn('Failed to fetch remote content:', err.message);
+    console.warn('Entering fallback mode: will upload all files without MD5 check or cleanup.');
+    fallbackMode = true;
+  }
 
-  // 4. Build expected remote key set from local files
-  const expectedRemoteKeys = new Set(
-    localFiles.map((f) => (prefixSlash ? `${prefixSlash}${f}` : f)),
-  );
+  if (!fallbackMode) {
+    // Build sets of remote keys that belong to our deployPath scope
+    // Key format in Retiehe: e.g. "test/index.html", "test/assets/main.js"
+    const remoteKeysInScope = new Set(
+      Object.keys(remote).filter((k) => prefixSlash === '' || k.startsWith(prefixSlash)),
+    );
 
-  // 5. Delete remote files that no longer exist locally (within scope)
-  const toDelete = new Set([...remoteKeysInScope].filter((k) => !expectedRemoteKeys.has(k)));
-  if (toDelete.size > 0) {
-    console.log(`Deleting ${toDelete.size} stale remote file(s) within "${prefix || '/'}"...`);
-    for (const k of toDelete) console.log('  Delete:', k);
-    await deleteRemoteFiles(site, username, toDelete);
-    console.log('Stale files deleted.');
-  } else {
-    console.log('No stale files to delete.');
+    // 4. Build expected remote key set from local files
+    const expectedRemoteKeys = new Set(
+      localFiles.map((f) => (prefixSlash ? `${prefixSlash}${f}` : f)),
+    );
+
+    // 5. Delete remote files that no longer exist locally (within scope)
+    const toDelete = new Set([...remoteKeysInScope].filter((k) => !expectedRemoteKeys.has(k)));
+    if (toDelete.size > 0) {
+      console.log(`Deleting ${toDelete.size} stale remote file(s) within "${prefix || '/'}"...`);
+      for (const k of toDelete) console.log('  Delete:', k);
+      await deleteRemoteFiles(site, username, toDelete);
+      console.log('Stale files deleted.');
+    } else {
+      console.log('No stale files to delete.');
+    }
   }
 
   // 6. Upload new / changed files
@@ -291,14 +302,16 @@ async function main() {
       continue;
     }
 
-    // Check if file changed via md5 comparison
-    const remoteEntry = remote[remoteKey];
-    if (remoteEntry?.url) {
-      const remoteHash = remoteEntry.url.split('/')[2]; // Retiehe stores md5 in URL segment
-      const localHash = md5File(localPath);
-      if (localHash === remoteHash) {
-        console.log('Unchanged:', remoteKey);
-        continue;
+    // Check if file changed via md5 comparison (skip in fallback mode)
+    if (!fallbackMode) {
+      const remoteEntry = remote[remoteKey];
+      if (remoteEntry?.url) {
+        const remoteHash = remoteEntry.url.split('/')[2]; // Retiehe stores md5 in URL segment
+        const localHash = md5File(localPath);
+        if (localHash === remoteHash) {
+          console.log('Unchanged:', remoteKey);
+          continue;
+        }
       }
     }
 
