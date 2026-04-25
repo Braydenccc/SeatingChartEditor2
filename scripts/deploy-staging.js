@@ -103,12 +103,22 @@ function shouldSkip(filePath) {
  */
 async function fetchRemoteContent(domain, username) {
   const url = `${API_BASE}/host-v3/site/content?domain=${encodeURIComponent(domain)}&username=${encodeURIComponent(username)}`;
+  console.log(`Fetching: ${url}`);
+
   const res = await fetch(url, { headers: getHeaders() });
+
+  console.log(`Response status: ${res.status} ${res.statusText}`);
+  console.log(`Response headers:`, Object.fromEntries(res.headers.entries()));
+
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`GET site content failed: ${res.status}${body ? ` – ${body}` : ''}`);
+    console.error(`Response body: ${body}`);
+    throw new Error(`GET site content failed: ${res.status} ${res.statusText}${body ? ` – ${body}` : ''}`);
   }
+
   const data = await res.json();
+  console.log(`Response data keys:`, Object.keys(data));
+
   if (data.alert && !data.result) throw new Error(data.alert);
   return data.result ?? {};
 }
@@ -185,6 +195,25 @@ async function verifyApiKey() {
   return data.username;
 }
 
+/** Retry a function with exponential backoff */
+async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 2000) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        const delay = initialDelay * Math.pow(2, attempt - 1);
+        console.log(`Attempt ${attempt} failed: ${err.message}`);
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -217,7 +246,11 @@ async function main() {
 
   // 3. Fetch remote file map
   console.log('Getting current site content...');
-  const remote = await fetchRemoteContent(site, username);
+  const remote = await retryWithBackoff(
+    () => fetchRemoteContent(site, username),
+    3,
+    2000
+  );
   console.log('Site content retrieved.');
 
   // Build sets of remote keys that belong to our deployPath scope
