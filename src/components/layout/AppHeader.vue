@@ -15,7 +15,12 @@
               <RefreshCw :size="15" stroke-width="2" /> 同步设置
             </button>
             <div class="dropdown-divider" v-if="hasRetiehe"></div>
-            
+
+            <!-- Unified Settings entry -->
+            <button class="dropdown-item" @click="openUnifiedSettings">
+              <Settings :size="15" stroke-width="2" /> 统一设置
+            </button>
+
             <button class="dropdown-item" @click="openWorkspaceManagement">
               <FolderOpen :size="15" stroke-width="2" /> 工作区管理
             </button>
@@ -45,29 +50,40 @@
       </a>
     </div>
 
-    <SyncSettingsDialog 
+    <SyncSettingsDialog
       v-if="showSyncSettings"
-      :visible="showSyncSettings" 
-      @update:visible="showSyncSettings = $event" 
+      :visible="showSyncSettings"
+      @update:visible="showSyncSettings = $event"
+    />
+
+    <UnifiedSettingsDialog
+      v-if="showUnifiedSettings"
+      :visible="showUnifiedSettings"
+      @update:visible="showUnifiedSettings = $event"
+      @save="handleSaveSettings"
     />
   </header>
 </template>
 
 <script setup>
 import { onMounted, ref, onBeforeUnmount, computed, defineAsyncComponent } from 'vue'
-import { Cloud, FolderOpen, Github, LogIn, RefreshCw, User } from 'lucide-vue-next'
+import { Cloud, FolderOpen, Github, LogIn, RefreshCw, Settings, User } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
+import { useGlobalSettings } from '@/composables/useGlobalSettings'
 
 const SyncSettingsDialog = defineAsyncComponent(() => import('../auth/SyncSettingsDialog.vue'))
+const UnifiedSettingsDialog = defineAsyncComponent(() => import('../settings/UnifiedSettingsDialog.vue'))
 
 const emit = defineEmits(['open-login'])
 
 const { currentUser, webdavConfig, isLoggedIn, logout, authType, initAuth } = useAuth()
 const { openCloudDialog } = useCloudWorkspaceDialog()
+const { saveToLocalStorage } = useGlobalSettings()
 
 const showDropdown = ref(false)
 const showSyncSettings = ref(false)
+const showUnifiedSettings = ref(false)
 const menuContainer = ref(null)
 
 const hasRetiehe = computed(() => !!currentUser.value)
@@ -85,6 +101,15 @@ const openWorkspaceManagement = () => {
 const openSyncSettings = () => {
   showSyncSettings.value = true
   showDropdown.value = false
+}
+
+const openUnifiedSettings = () => {
+  showUnifiedSettings.value = true
+  showDropdown.value = false
+}
+
+const handleSaveSettings = () => {
+  saveToLocalStorage()
 }
 
 const handleLogout = (target) => {
