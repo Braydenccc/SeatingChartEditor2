@@ -148,6 +148,8 @@ App.vue (主布局 - 高度严格限制)
 - **禁止 base64**：不在任何地方使用 base64 编码，显示本地图片用 `URL.createObjectURL()`
 - **TypeScript 迁移**：新文件使用 `.ts` 扩展名，类型定义在 `src/types/`。`tsconfig.json` 配置为宽松模式（`strict: false`）。优先使用 `.ts` 文件而非 `.js` 文件
 - **命名规范**：组件使用 PascalCase，Composable 使用 camelCase + `use` 前缀，常量使用 camelCase
+- **禁止修改 dist 目录**：`dist/` 是构建输出目录，禁止直接修改其中的文件。所有修改应在源文件（`public/`、`src/` 等）中进行，通过构建流程同步到 `dist/`
+- **测试脚本管理**：临时测试脚本应放在 `test-scr/` 目录，不要放在 `public/` 或 `src/` 中。创建测试脚本后提醒用户手动部署
 
 ## 后端开发规范（Retinbox 平台）
 
