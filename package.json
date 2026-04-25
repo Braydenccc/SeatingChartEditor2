@@ -17,7 +17,6 @@
     "preview": "vite preview",
     "build:nsis": "vite build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin && makensis installer.nsi",
     "build:exe": "npm run build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin",
-    "deploy:test": "node scripts/deploy-test.js",
     "deploy:main": "git checkout main && git merge @{-1} --no-edit && git push origin main && git checkout @{-1}",
     "type-check": "vue-tsc --noEmit",
     "type-check:watch": "vue-tsc --noEmit --watch",

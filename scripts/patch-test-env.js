@@ -3,20 +3,6 @@ import { execSync } from 'child_process';
 
 const TEST_HOST = 'https://test.sce.jbyc.cc';
 
-// --- 子测试环境配置 ---
-// 从外部配置文件读取（如果没有配置子测试，内部默认至少应有一项指向主测试环境，或者直接读取配置即可）
-const envsFile = fs.readFileSync('test-envs.json', 'utf8');
-const SUB_TEST_ENVS = JSON.parse(envsFile);
-
-function encodeHtmlEntities(text) {
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 try {
   // 解决 GitHub Actions 容器环境下的 git 目录所有权安全限制
   try {
@@ -25,21 +11,17 @@ try {
     // Ignore errors if this fails (e.g. locally without perms)
   }
 
-  // 仅保留基础环境变量（如果需要的话，目前脚本不再依赖当前环境名字来决定下拉状态
-  // 而是通过浏览器端实际访问的 URL 或简单保持下拉框供跳转）
+  console.log('Patching test environment markers');
 
-  console.log(`Patching test env with static sub-test selector`);
-
-  // 1. index.html
+  // 1. index.html - 添加 [test] 前缀到标题
   let indexHtml = fs.readFileSync('index.html', 'utf8');
-  // 保留可能存在的 title 属性，同时避免重复注入 [test] 前缀
   indexHtml = indexHtml.replace(/(<title(?:\s[^>]*)?>)([\s\S]*?)(<\/title>)/, (_, openTag, title, closeTag) => {
     const cleanedTitle = String(title).trim().replace(/^\[test\]\s*/i, '');
     return `${openTag}[test] ${cleanedTitle}${closeTag}`;
   });
   fs.writeFileSync('index.html', indexHtml);
 
-  // 2. LoginDialog.vue
+  // 2. LoginDialog.vue - 添加测试环境警告
   const loginPath = 'src/components/auth/LoginDialog.vue';
   let loginVue = fs.readFileSync(loginPath, 'utf8');
   loginVue = loginVue.replace(
@@ -48,41 +30,73 @@ try {
   );
   fs.writeFileSync(loginPath, loginVue);
 
-  // 3. AppHeader.vue
+  // 3. AppHeader.vue - 添加测试版标识
   const headerPath = 'src/components/layout/AppHeader.vue';
   let appHeader = fs.readFileSync(headerPath, 'utf8');
-  
-  // 生成固定的下拉选项
-  const optionsHtml = SUB_TEST_ENVS
-    .map((env) => {
-      // 在编译时我们不再动态判断哪个是当前选中的，而是可以让前端在加载时或者只做简单跳转即可
-      // 此处暂时取消默认选中逻辑，因为静态生成不能反映动态 URL。如果要完美匹配当前 URL，需通过 JS 设置。
-      // 但为了简单，可以在客户端写入一小段脚本来选中当前页面匹配的 Option。
-      return `<option value="${encodeHtmlEntities(env.url)}">${encodeHtmlEntities(env.label)}</option>`;
-    })
-    .join('');
-    
-  const selectorHtml = `<select class="subtest-selector" onchange="if (this.value) { window.location.href = this.value; }" id="envSelectorPlaceholder">${optionsHtml}</select><script>setTimeout(()=>{const sel=document.getElementById('envSelectorPlaceholder');if(!sel)return;Array.from(sel.options).forEach(opt=>{if(window.location.href.startsWith(opt.value)){opt.selected=true;}});},0);</script>`;
-  
+
+  // 在标题后添加测试版标识
   appHeader = appHeader.replace(
     '<h1 class="header-text">BraydenSCE V2</h1>',
-    `<h1 class="header-text">\n        BraydenSCE V2\n        ${selectorHtml}\n      </h1>`
+    '<h1 class="header-text">BraydenSCE V2<span class="test-badge">测试版</span></h1>'
   );
-  
-  // 如果之前存在旧的 branch-selector 样式，先清理掉它
-  if (appHeader.includes('.branch-selector')) {
-    // 因为正则替换可能有点复杂，直接新增新的 class 原有不管，或者兼容
-    appHeader = appHeader.replace(/\.branch-selector/g, '.subtest-selector');
-  } else if (!appHeader.includes('.subtest-selector')) {
+
+  // 添加测试版标识样式
+  if (!appHeader.includes('.test-badge')) {
     appHeader = appHeader.replace(
       '</style>',
-      `.subtest-selector { display: inline-block; font-size: 11px; font-weight: 500; font-family: monospace; background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.95); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; padding: 2px 8px; margin-left: 10px; vertical-align: middle; max-width: 300px; cursor: pointer; }\n.subtest-selector option { color: #1f2937; }\n</style>`
+      `.test-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  background: #ff9800;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 4px 10px;
+  margin-left: 12px;
+  vertical-align: middle;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 1366px) and (min-width: 1025px) {
+  .test-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    margin-left: 10px;
+  }
+}
+
+@media (max-height: 820px) and (min-width: 1025px) {
+  .test-badge {
+    font-size: 10px;
+    padding: 3px 7px;
+    margin-left: 8px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .test-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    margin-left: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .test-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    margin-left: 6px;
+  }
+}
+</style>`
     );
   }
   fs.writeFileSync(headerPath, appHeader);
-  
-  console.log('Successfully patched files for test environment with static sub-test configs.');
+
+  console.log('Successfully patched files for test environment.');
 } catch (e) {
-  console.error('Failed to patch test environment notices:', e);
+  console.error('Failed to patch test environment:', e);
   process.exit(1);
 }

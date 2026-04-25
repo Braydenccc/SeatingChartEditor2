@@ -7,8 +7,7 @@ on:
   push:
     branches:
       - main
-      - test
-      - 'test-*'
+      - dev
 
 jobs:
   # ── 生产环境：main 分支 → sce.jbyc.cc ─────────────────────────────────────
@@ -69,13 +68,11 @@ jobs:
         run: node scripts/deploy-staging.js --site sce.jbyc.cc --outdir dist
 
 
-  # ── 测试环境：test 分支 → test.sce.jbyc.cc ────────────────────────────────
+  # ── 测试环境：dev 分支 → test.sce.jbyc.cc ────────────────────────────────
   deploy-staging:
     name: 🧪 Staging (test.sce.jbyc.cc)
-    if: github.ref == 'refs/heads/test' || startsWith(github.ref, 'refs/heads/test-')
+    if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
-    container:
-      image: shangzheny/rth-host-helper@sha256:789428be24aefa9c839075687bd8ca0e0819776ef439b81e7610a36eebc107fc
 
     steps:
       - name: Checkout repository
@@ -87,20 +84,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Resolve staging deploy path
-        id: resolve-path
-        shell: bash
-        run: |
-          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          RESOLVED=$(node ./scripts/resolve-staging-site.js "$BRANCH_NAME")
-          DEPLOY_SITE=$(echo "$RESOLVED" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).deploySite)')
-          DEPLOY_PATH=$(echo "$RESOLVED" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).deployPath)')
-          SITE_URL=$(echo "$RESOLVED"   | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).siteUrl)')
-          echo "deploy_site=$DEPLOY_SITE"   >> "$GITHUB_OUTPUT"
-          echo "deploy_path=$DEPLOY_PATH"   >> "$GITHUB_OUTPUT"
-          echo "site_url=$SITE_URL"         >> "$GITHUB_OUTPUT"
+        run: npm ci --ignore-scripts
 
       - name: Build for test
         run: npm run build:test
@@ -111,11 +95,7 @@ jobs:
         continue-on-error: true
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: |
-          node scripts/deploy-staging.js \
-            --site "${{ steps.resolve-path.outputs.deploy_site }}" \
-            --deploy-path "${{ steps.resolve-path.outputs.deploy_path }}" \
-            --outdir dist
+        run: node scripts/deploy-staging.js --site test.sce.jbyc.cc --outdir dist
 
       # 第 2 次尝试
       - name: Wait before retry (1→2)
@@ -130,11 +110,7 @@ jobs:
         continue-on-error: true
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: |
-          node scripts/deploy-staging.js \
-            --site "${{ steps.resolve-path.outputs.deploy_site }}" \
-            --deploy-path "${{ steps.resolve-path.outputs.deploy_path }}" \
-            --outdir dist
+        run: node scripts/deploy-staging.js --site test.sce.jbyc.cc --outdir dist
 
       # 第 3 次尝试
       - name: Wait before retry (2→3)
@@ -147,11 +123,7 @@ jobs:
         if: steps.d2.outcome == 'failure'
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: |
-          node scripts/deploy-staging.js \
-            --site "${{ steps.resolve-path.outputs.deploy_site }}" \
-            --deploy-path "${{ steps.resolve-path.outputs.deploy_path }}" \
-            --outdir dist
+        run: node scripts/deploy-staging.js --site test.sce.jbyc.cc --outdir dist
 
       - name: Show staging URL
-        run: 'echo "Staging URL: ${{ steps.resolve-path.outputs.site_url }}"'
+        run: 'echo "Staging URL: https://test.sce.jbyc.cc"'
