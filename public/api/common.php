@@ -84,15 +84,13 @@ function getClientIp() {
 }
 
 function parseRequestInput() {
-    $rawInput = file_get_contents('php://input');
-    $input = json_decode($rawInput, true);
-
-    if (!$input && !empty($_POST)) {
+    // 优先使用 $_POST（Retinbox 平台会自动解析 JSON 请求体到 $_POST）
+    if (!empty($_POST)) {
         $input = $_POST;
-    }
-
-    if ((!$input || !isset($input['action'])) && !empty($_GET) && isset($_GET['action'])) {
+    } elseif (!empty($_GET) && isset($_GET['action'])) {
         $input = $_GET;
+    } else {
+        $input = null;
     }
 
     if (!$input || !isset($input['action'])) {
