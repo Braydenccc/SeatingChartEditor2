@@ -16,11 +16,6 @@
             </button>
             <div class="dropdown-divider" v-if="hasRetiehe"></div>
 
-            <!-- Unified Settings entry -->
-            <button class="dropdown-item" @click="openUnifiedSettings">
-              <Settings :size="15" stroke-width="2" /> 统一设置
-            </button>
-
             <button class="dropdown-item" @click="openWorkspaceManagement">
               <FolderOpen :size="15" stroke-width="2" /> 工作区管理
             </button>
@@ -39,6 +34,16 @@
       </div>
       <button v-else class="auth-btn login-btn" @click="emit('open-login')">
         <Cloud :size="15" stroke-width="2" />登录
+      </button>
+
+      <!-- 统一设置按钮 -->
+      <button
+        class="settings-button"
+        @click="openUnifiedSettings"
+        title="统一设置"
+      >
+        <Settings :size="20" stroke-width="2" />
+        <span>设置</span>
       </button>
 
       <h1 class="header-text">BraydenSCE V2</h1>
@@ -329,6 +334,34 @@ onBeforeUnmount(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.settings-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.settings-button:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.settings-button:active {
+  transform: scale(0.98);
+  background: rgba(255, 255, 255, 0.2);
+}
+
 /* .btn-icon: size controlled by :size prop */
 
 .header-right {
@@ -471,8 +504,34 @@ onBeforeUnmount(() => {
     background: #1c4b6b; /* Solid color to fuse with title bar, replacing transparency */
     backdrop-filter: none;
     border: none;
-    border-right: 1px solid rgba(255, 255, 255, 0.1); 
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
     padding: 0 16px;
+  }
+
+  .settings-button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    border-radius: 0;
+    background: #1c4b6b;
+    border: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0 16px;
+    gap: 4px;
+  }
+
+  .settings-button span {
+    display: none;
+  }
+
+  .settings-button:hover {
+    transform: none;
+    background: #18415c;
+  }
+
+  .settings-button:active {
+    transform: none;
   }
 
   .login-btn {
