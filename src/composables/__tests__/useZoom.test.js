@@ -15,6 +15,10 @@ describe('useZoom', () => {
     zoom = useZoom()
     zoom.resetZoom()
     zoom.registerViewport(null, null)
+
+    expect(zoom.scale.value).toBe(1)
+    expect(zoom.panX.value).toBe(0)
+    expect(zoom.panY.value).toBe(0)
   })
 
   it('restores chart transform when fit exits early after nextTick', async () => {
@@ -26,6 +30,9 @@ describe('useZoom', () => {
     await fitting
 
     expect(chart.style.transform).toBe('translate(10px, 20px) scale(1)')
+    expect(zoom.scale.value).toBe(1)
+    expect(zoom.panX.value).toBe(0)
+    expect(zoom.panY.value).toBe(0)
   })
 
   it('reruns once when fit is requested during an in-flight fit', async () => {
@@ -46,8 +53,10 @@ describe('useZoom', () => {
     const secondFit = zoom.fitToViewport()
     await Promise.all([firstFit, secondFit])
 
+    const expectedScale = Math.round((Math.min((300 - 40) / 600, (300 - 30) / 600, 1) * 100)) / 100
+
     expect(chart.getBoundingClientRect).toHaveBeenCalledTimes(2)
-    expect(zoom.scale.value).toBe(0.43)
+    expect(zoom.scale.value).toBe(expectedScale)
     expect(zoom.panX.value).toBe(0)
     expect(zoom.panY.value).toBe(0)
   })
