@@ -3,11 +3,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 vi.mock('../useAuth')
 vi.mock('../useWebDav')
 vi.mock('@/utils/fetchHelpers')
+vi.mock('../useLogger')
 
 import { useCloudWorkspace } from '../useCloudWorkspace'
 import { useAuth } from '../useAuth'
 import { useWebDav } from '../useWebDav'
 import { fetchWithRetry } from '@/utils/fetchHelpers'
+import { useLogger } from '../useLogger'
 
 const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0))
 
@@ -31,6 +33,7 @@ describe('useCloudWorkspace', () => {
   let mockAuthType
   let mockWebdavConfig
   let mockBackupMode
+  let mockLoggerError
 
   beforeEach(() => {
     const { ref } = require('vue')
@@ -45,6 +48,7 @@ describe('useCloudWorkspace', () => {
     mockPutFile = vi.fn()
     mockGetFileText = vi.fn()
     mockDeleteFile = vi.fn()
+    mockLoggerError = vi.fn()
 
     vi.mocked(useAuth).mockReturnValue({
       currentUser: mockCurrentUser,
@@ -59,6 +63,10 @@ describe('useCloudWorkspace', () => {
       putFile: mockPutFile,
       getFileText: mockGetFileText,
       deleteFile: mockDeleteFile
+    })
+
+    vi.mocked(useLogger).mockReturnValue({
+      error: mockLoggerError
     })
 
     vi.mocked(fetchWithRetry).mockReset()
@@ -86,5 +94,21 @@ describe('useCloudWorkspace', () => {
     webdavDeferred.resolve([])
     await listPromise
     expect(workspace.isFetching.value).toBe(false)
+  })
+
+  it('returns message on invalid JSON and stops save flow', async () => {
+    const workspace = useCloudWorkspace()
+
+    await expect(
+      workspace.saveWorkspaceToCloud('invalid-json', '{invalid json')
+    ).resolves.toEqual({
+      success: false,
+      message: '工作区数据格式错误',
+      error: '工作区数据格式错误'
+    })
+
+    expect(mockLoggerError).toHaveBeenCalledWith('工作区数据格式错误')
+    expect(fetchWithRetry).not.toHaveBeenCalled()
+    expect(mockPutFile).not.toHaveBeenCalled()
   })
 })
