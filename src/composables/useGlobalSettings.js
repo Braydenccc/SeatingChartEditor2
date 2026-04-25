@@ -31,12 +31,42 @@ const settings = ref(JSON.parse(JSON.stringify(defaultSettings)))
 const STORAGE_KEY = 'sce-global-settings'
 
 /**
+ * 安全读取 localStorage
+ * @param {string} key - 存储键
+ * @returns {string|null} 存储的值或 null
+ */
+const safeStorageGet = (key) => {
+  try {
+    return localStorage.getItem(key)
+  } catch (error) {
+    console.warn(`Failed to read localStorage key "${key}":`, error)
+    return null
+  }
+}
+
+/**
+ * 安全写入 localStorage
+ * @param {string} key - 存储键
+ * @param {string} value - 要存储的值
+ * @returns {boolean} 是否成功写入
+ */
+const safeStorageSet = (key, value) => {
+  try {
+    localStorage.setItem(key, value)
+    return true
+  } catch (error) {
+    console.warn(`Failed to write localStorage key "${key}":`, error)
+    return false
+  }
+}
+
+/**
  * 从 localStorage 加载设置
  * @returns {boolean} 是否成功加载
  */
 const loadFromLocalStorage = () => {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = safeStorageGet(STORAGE_KEY)
     if (stored) {
       const parsed = JSON.parse(stored)
       // 合并策略：先展开默认值，再展开加载的值，保留新字段
@@ -60,8 +90,7 @@ const loadFromLocalStorage = () => {
  */
 const saveToLocalStorage = () => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings.value))
-    return true
+    return safeStorageSet(STORAGE_KEY, JSON.stringify(settings.value))
   } catch (error) {
     console.error('Failed to save settings to localStorage:', error)
     return false
@@ -133,6 +162,9 @@ const resetSettings = (category) => {
     return false
   }
 }
+
+// 模块初始化时自动加载设置
+loadFromLocalStorage()
 
 export function useGlobalSettings() {
   return {
