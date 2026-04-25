@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/common.php';
+require_once "api/common.php";
 header('Content-Type: application/json; charset=utf-8');
 
 if (!class_exists('Database')) {
