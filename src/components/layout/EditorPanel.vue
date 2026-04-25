@@ -133,6 +133,13 @@ const candidatePanelStyle = computed(() => {
   min-height: 28px;
 }
 
+/* 移动端隐藏快捷键提示栏 */
+@media (max-width: 768px) {
+  .shortcuts-hint-bar {
+    display: none;
+  }
+}
+
 .hint-group {
   display: flex;
   align-items: center;
@@ -226,7 +233,7 @@ const candidatePanelStyle = computed(() => {
   }
 
   .student-list-area {
-    flex: 0 0 32% !important;
+    flex: 0 0 35% !important;
     min-height: 0;
     max-height: 40%;
     overflow: hidden;
@@ -262,7 +269,7 @@ const candidatePanelStyle = computed(() => {
   }
 
   .student-list-area {
-    flex: 0 0 32% !important;
+    flex: 0 0 35% !important;
     min-height: 0;
     max-height: 40%;
     overflow: hidden;

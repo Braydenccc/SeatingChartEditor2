@@ -381,6 +381,8 @@ const formatSize = (bytes) => {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -477,12 +479,6 @@ const formatSize = (bytes) => {
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
-  animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
 }
 
 .dialog-header {
@@ -757,23 +753,41 @@ const formatSize = (bytes) => {
 }
 
 /* Transition styles */
-.dialog-fade-enter-active,
-.dialog-fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.dialog-fade-enter-from,
-.dialog-fade-leave-to {
-  opacity: 0;
+.dialog-fade-enter-active {
+  transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
 }
 
 .dialog-fade-enter-active .cloud-workspace-dialog {
-  animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dialog-fade-enter-from {
+  opacity: 0;
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+}
+
+.dialog-fade-enter-from .cloud-workspace-dialog {
+  opacity: 0;
+  transform: scale(0.9) translateY(-20px);
+}
+
+.dialog-fade-leave-active {
+  transition: opacity 0.2s ease, backdrop-filter 0.2s ease;
 }
 
 .dialog-fade-leave-active .cloud-workspace-dialog {
-  transform: translateY(20px);
+  transition: all 0.2s ease;
+}
+
+.dialog-fade-leave-to {
   opacity: 0;
-  transition: all 0.3s ease;
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+}
+
+.dialog-fade-leave-to .cloud-workspace-dialog {
+  opacity: 0;
+  transform: scale(0.95);
 }
 </style>
