@@ -29,18 +29,14 @@ const MIN_TOKEN_LENGTH = 32;
 
 function ensureCsrfMatched() {
     global $input;
-    
+
     $csrfHeader = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? trim($_SERVER['HTTP_X_CSRF_TOKEN']) : '';
     $bodyCsrf = (is_array($input) && isset($input['_csrf']) && is_string($input['_csrf'])) ? trim($input['_csrf']) : '';
-    
+
     if ($csrfHeader !== '' && $bodyCsrf !== '' && hash_equals($csrfHeader, $bodyCsrf)) {
         return true;
     }
-    
-    if ($csrfHeader !== '' || $bodyCsrf !== '') {
-        return true;
-    }
-    
+
     return false;
 }
 
@@ -52,8 +48,24 @@ function isAuthorized($sessionDb, $username, $token) {
     if (!is_string($username) || !is_string($token) || strlen($token) < MIN_TOKEN_LENGTH) {
         return false;
     }
-    $saved = $sessionDb->get($username);
-    return is_string($saved) && hash_equals($saved, $token);
+    $savedData = $sessionDb->get($username);
+    if (!$savedData) {
+        return false;
+    }
+
+    $parts = explode('|', $savedData, 2);
+    if (count($parts) !== 2) {
+        return false;
+    }
+
+    [$savedToken, $expiry] = $parts;
+
+    if (time() > (int)$expiry) {
+        $sessionDb->delete($username);
+        return false;
+    }
+
+    return hash_equals($savedToken, $token);
 }
 
 $rawInput = file_get_contents('php://input');
@@ -103,7 +115,7 @@ try {
             respond(['success' => false, 'message' => '工作区内容不能为空']);
         }
 
-        $fileId = isset($input['fileId']) && !empty($input['fileId']) ? $input['fileId'] : uniqid('ws_');
+        $fileId = isset($input['fileId']) && !empty($input['fileId']) ? $input['fileId'] : bin2hex(random_bytes(16));
         $contentSize = is_string($content) ? strlen($content) : strlen(json_encode($content));
 
         $metadata = [
