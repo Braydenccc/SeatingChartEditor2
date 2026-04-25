@@ -3,24 +3,24 @@ import { ref } from 'vue'
 // 默认设置结构
 const defaultSettings = {
   sync: {
-    url: '',
-    username: '',
-    password: '',
-    autoSync: false,
+    webdavUrl: '',
+    webdavUsername: '',
+    webdavPassword: '',
+    autoSync: true,
     syncInterval: 300000 // 5分钟
   },
   ui: {
     language: 'zh-CN',
     themeColor: '#23587b',
-    defaultZoom: 1.0,
+    defaultZoom: 100,
     enableAnimations: true,
     compactMode: false
   },
   editor: {
-    autoSaveInterval: 30000, // 30秒
-    defaultFileFormat: 'json',
+    autoSaveInterval: 60000, // 1分钟
+    defaultFileFormat: '.sce',
     undoHistorySize: 50,
-    dragSensitivity: 5,
+    dragSensitivity: 1.0,
     doubleClickAction: 'edit' // 'edit' 或 'assign'
   }
 }
