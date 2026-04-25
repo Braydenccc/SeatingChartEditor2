@@ -130,6 +130,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeDropdownOnOutsideClick)
+  showUnifiedSettings.value = false  // Ensure dialog cleanup
+  showSyncSettings.value = false     // Same for SyncSettingsDialog
 })
 </script>
 
