@@ -215,6 +215,13 @@ try {
         respond(['success' => true, 'data' => $settings]);
     }
 } catch (Exception $e) {
-    respond(['success' => false, 'message' => 'Internal Server Error'], 500);
+    // 在测试环境显示详细错误信息，生产环境隐藏
+    $isTestEnv = strpos($_SERVER['HTTP_HOST'] ?? '', 'test.') === 0;
+    $message = $isTestEnv
+        ? 'Internal Server Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine()
+        : 'Internal Server Error';
+
+    error_log("Auth API Exception: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+    respond(['success' => false, 'message' => $message], 500);
 }
 ?>

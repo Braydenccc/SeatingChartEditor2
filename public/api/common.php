@@ -84,13 +84,18 @@ function getClientIp() {
 }
 
 function parseRequestInput() {
-    // 优先使用 $_POST（Retinbox 平台会自动解析 JSON 请求体到 $_POST）
-    if (!empty($_POST)) {
+    // 优先解析 JSON 请求体（前端使用 Content-Type: application/json）
+    $rawInput = file_get_contents('php://input');
+    $input = json_decode($rawInput, true);
+
+    // 回退到 $_POST（表单提交）
+    if (!$input && !empty($_POST)) {
         $input = $_POST;
-    } elseif (!empty($_GET) && isset($_GET['action'])) {
+    }
+
+    // 回退到 $_GET（URL 参数）
+    if ((!$input || !isset($input['action'])) && !empty($_GET) && isset($_GET['action'])) {
         $input = $_GET;
-    } else {
-        $input = null;
     }
 
     if (!$input || !isset($input['action'])) {
