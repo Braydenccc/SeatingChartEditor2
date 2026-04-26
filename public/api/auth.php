@@ -1,7 +1,7 @@
 <?php
 // 使用 Retinbox 平台规范：从网站根目录开始的绝对路径（省略开头的 /）
 // auth.php 位于 api/ 目录下，所以需要引用同目录的 common.php
-require_once "public/api/common.php";
+require_once "api/common.php";
 header('Content-Type: application/json; charset=utf-8');
 
 if (!class_exists('Database')) {
@@ -13,7 +13,7 @@ const MAX_ATTEMPTS = 5;
 const TOKEN_EXPIRY_DAYS = 30;
 const TOKEN_EXPIRY_REMEMBER_ME = 90;
 // 生产环境强制 HTTPS，开发环境可通过环境变量禁用
-const REQUIRE_HTTPS = getenv('REQUIRE_HTTPS') !== 'false';
+const REQUIRE_HTTPS = function_exists('getenv') && getenv('REQUIRE_HTTPS') !== 'false';
 
 function logSecurityEvent($event, $username, $details = []) {
     try {
