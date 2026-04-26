@@ -222,14 +222,14 @@ const close = () => {
   background: none;
   border: none;
   font-size: 24px;
-  color: var(--color-text-muted, #999);
+  color: var(--color-text-disabled);
   cursor: pointer;
   line-height: 1;
   padding: 0;
 }
 
 .close-btn:hover {
-  color: var(--color-text-primary, #333);
+  color: var(--color-text-primary);
 }
 
 .dialog-body {
@@ -237,7 +237,7 @@ const close = () => {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  background: #f5f5f5;
+  background: var(--color-bg-secondary);
 }
 
 /* 原始 StudentList 样式适配过来 */
@@ -253,13 +253,13 @@ const close = () => {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: #ffffff;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .student-list-header h3 {
   margin: 0;
-  color: #23587b;
+  color: var(--color-primary);
   font-size: 16px;
   font-weight: 600;
 }
@@ -272,14 +272,14 @@ const close = () => {
 
 .student-count-control label {
   font-size: 14px;
-  color: #666;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .student-count-input {
   width: 70px;
   padding: 6px 10px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 4px;
   font-size: 14px;
   text-align: center;
@@ -288,13 +288,13 @@ const close = () => {
 
 .student-count-input:focus {
   outline: none;
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .student-count-input.error {
-  border-color: #f44336;
+  border-color: var(--color-danger);
   background-color: #ffebee;
-  color: #f44336;
+  color: var(--color-danger);
 }
 
 .student-count-input::-webkit-inner-spin-button,
@@ -304,20 +304,20 @@ const close = () => {
 
 .add-student-btn {
   padding: 8px 16px;
-  background: #23587b;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-surface);
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(35, 88, 123, 0.2);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .add-student-btn:hover {
-  background: #1a4460;
-  box-shadow: 0 4px 8px rgba(35, 88, 123, 0.3);
+  background: var(--color-primary-hover);
+  box-shadow: 0 4px 8px color-mix(in srgb, var(--color-primary) 30%, transparent);
   transform: translateY(-1px);
 }
 
@@ -336,18 +336,18 @@ const close = () => {
 }
 
 .student-items::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--scrollbar-track);
   border-radius: 4px;
 }
 
 .student-items::-webkit-scrollbar-thumb {
-  background: #bbb;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
   transition: background 0.3s;
 }
 
 .student-items::-webkit-scrollbar-thumb:hover {
-  background: #888;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Transition styles */

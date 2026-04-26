@@ -17,12 +17,12 @@
           <div class="preview-seat-chart" :class="localConfig.seatAlignment === 'top' ? 'align-top' : 'align-bottom'">
             <div v-for="(group, gIndex) in previewGroups" :key="gIndex" class="preview-group">
               <div class="preview-group-content">
-                <div v-for="(col, cIndex) in group.columns" :key="cIndex" class="preview-column">
-                  <div 
-                    v-for="(seat, rIndex) in group.rows" 
-                    :key="rIndex" 
+                <div v-for="cIndex in group.columns" :key="cIndex" class="preview-column">
+                  <div
+                    v-for="rIndex in group.rows"
+                    :key="rIndex"
                     class="preview-seat"
-                    :class="{ 'first-row': (localConfig.seatAlignment === 'bottom' && rIndex === group.rows - 1) || (localConfig.seatAlignment === 'top' && rIndex === 0) }"
+                    :class="{ 'first-row': (localConfig.seatAlignment === 'bottom' && rIndex === group.rows) || (localConfig.seatAlignment === 'top' && rIndex === 1) }"
                   ></div>
                 </div>
               </div>
@@ -183,15 +183,17 @@ function initLocalConfig() {
   localConfig.value.groupCount = config.groupCount
   localConfig.value.podiumPosition = config.podiumPosition || 'bottom'
   localConfig.value.seatAlignment = config.seatAlignment || 'bottom'
-  localConfig.value.groups = []
-  
+
+  // 重新创建 groups 数组以确保响应式更新
+  const newGroups = []
   for (let i = 0; i < config.groupCount; i++) {
-    const groupConfig = config.groups && config.groups[i] 
+    const groupConfig = config.groups && config.groups[i]
       ? { columns: config.groups[i].columns || config.columnsPerGroup, rows: config.groups[i].rows || config.seatsPerColumn }
       : { columns: config.columnsPerGroup, rows: config.seatsPerColumn }
-    localConfig.value.groups.push({ ...groupConfig })
+    newGroups.push({ ...groupConfig })
   }
-  
+  localConfig.value.groups = newGroups
+
   if (localConfig.value.groups.length > 0) {
     uniformValue.value.columns = localConfig.value.groups[0].columns
     uniformValue.value.rows = localConfig.value.groups[0].rows
@@ -306,7 +308,7 @@ function handleConfirm() {
 }
 
 .seat-config-dialog {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   width: 100%;
   max-width: 900px;
@@ -322,14 +324,14 @@ function handleConfirm() {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid #e8eef2;
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .dialog-header h2 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .close-btn {
@@ -337,7 +339,7 @@ function handleConfirm() {
   background: transparent;
   cursor: pointer;
   padding: 4px;
-  color: #666;
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -346,8 +348,8 @@ function handleConfirm() {
 }
 
 .close-btn:hover {
-  background: #f0f0f0;
-  color: #333;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
 }
 
 .dialog-body {
@@ -360,8 +362,8 @@ function handleConfirm() {
 }
 
 .info-tip {
-  background: #f0f7fb;
-  border: 1px solid #cfe0f0;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-light);
   border-radius: 8px;
   padding: 12px 16px;
 }
@@ -369,12 +371,12 @@ function handleConfirm() {
 .info-tip p {
   margin: 0;
   font-size: 13px;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .preview-container {
-  background: #f8f9fa;
-  border: 1px solid #e8eef2;
+  background: var(--color-bg-hover);
+  border: 1px solid var(--color-border-light);
   border-radius: 8px;
   padding: 24px;
   overflow-x: auto;
@@ -416,12 +418,12 @@ function handleConfirm() {
 .preview-seat {
   width: 28px;
   height: 22px;
-  background: #23587b;
+  background: var(--color-primary);
   border-radius: 4px;
 }
 
 .preview-seat.first-row {
-  background: #d97706;
+  background: var(--color-warning);
   box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.3);
 }
 
@@ -430,17 +432,17 @@ function handleConfirm() {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  background: white;
+  background: var(--color-surface);
   padding: 8px 10px;
   border-radius: 6px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   min-width: 100px;
 }
 
 .group-label {
   font-size: 12px;
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .control-row {
@@ -457,7 +459,7 @@ function handleConfirm() {
 
 .control-label {
   font-size: 10px;
-  color: #666;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
@@ -473,18 +475,18 @@ function handleConfirm() {
   justify-content: center;
   width: 22px;
   height: 22px;
-  border: 1px solid #ddd;
-  background: white;
-  color: #333;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .control-btn:hover:not(:disabled) {
-  border-color: #23587b;
-  color: #23587b;
-  background: #f0f7fb;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-bg-subtle);
 }
 
 .control-btn:active:not(:disabled) {
@@ -501,7 +503,7 @@ function handleConfirm() {
   text-align: center;
   font-size: 12px;
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .global-actions {
@@ -525,9 +527,9 @@ function handleConfirm() {
 
 .alignment-btn {
   padding: 8px 16px;
-  border: 1px solid #ddd;
-  background: white;
-  color: #666;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
@@ -536,14 +538,14 @@ function handleConfirm() {
 }
 
 .alignment-btn:hover {
-  border-color: #23587b;
-  color: #23587b;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .alignment-btn.active {
-  border-color: #23587b;
-  background: #23587b;
-  color: white;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-surface);
 }
 
 .input-group {
@@ -554,7 +556,7 @@ function handleConfirm() {
 
 .input-group label {
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
@@ -569,7 +571,7 @@ function handleConfirm() {
   text-align: center;
   font-size: 16px;
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .quick-actions {
@@ -579,9 +581,9 @@ function handleConfirm() {
 
 .quick-btn {
   padding: 8px 16px;
-  border: 1px solid #23587b;
-  background: white;
-  color: #23587b;
+  border: 1px solid var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-primary);
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
@@ -590,13 +592,13 @@ function handleConfirm() {
 }
 
 .quick-btn:hover {
-  background: #23587b;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-surface);
 }
 
 .total-stats {
-  background: #f0f7fb;
-  border: 1px solid #cfe0f0;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-light);
   border-radius: 8px;
   padding: 12px 16px;
   text-align: center;
@@ -604,7 +606,7 @@ function handleConfirm() {
 
 .total-stats span {
   font-size: 14px;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .total-stats strong {
@@ -617,7 +619,7 @@ function handleConfirm() {
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 20px;
-  border-top: 1px solid #e8eef2;
+  border-top: 1px solid var(--color-border-light);
 }
 
 .cancel-btn,
@@ -631,25 +633,25 @@ function handleConfirm() {
 }
 
 .cancel-btn {
-  border: 1px solid #ddd;
-  background: white;
-  color: #666;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
 }
 
 .cancel-btn:hover {
-  background: #f5f5f5;
-  border-color: #ccc;
+  background: var(--color-bg-secondary);
+  border-color: var(--color-text-disabled);
 }
 
 .confirm-btn {
   border: none;
-  background: #23587b;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-surface);
 }
 
 .confirm-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(35, 88, 123, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .confirm-btn:active {
@@ -657,7 +659,7 @@ function handleConfirm() {
 }
 
 .confirm-btn.confirming {
-  background: #dc2626;
+  background: var(--color-danger);
 }
 
 .confirm-btn.confirming:hover {

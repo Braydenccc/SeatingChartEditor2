@@ -1103,7 +1103,7 @@ const zoneArrowData = computed(() => {
     if (group.type === 'swap') {
       biDirLines(centroids[0], centroids[1]).forEach(({ from, to }, idx) => {
         const adj = adjustLine(from, to, 24, 6)
-        arrows.push({ ...adj, color: '#6366f1', markerId: `sw-${group.id}-${idx}` })
+        arrows.push({ ...adj, color: 'var(--color-accent)', markerId: `sw-${group.id}-${idx}` })
       })
     } else {
       // cycle arrows: 0→1→2→...→n-1→0
@@ -1111,7 +1111,7 @@ const zoneArrowData = computed(() => {
         const from = centroids[i]
         const to = centroids[(i + 1) % centroids.length]
         const adj = adjustLine(from, to, 24, 6)
-        arrows.push({ ...adj, color: '#23587b', markerId: `cy-${group.id}-${i}` })
+        arrows.push({ ...adj, color: 'var(--color-primary)', markerId: `cy-${group.id}-${i}` })
       }
     }
     res.push({ group, circles, arrows })
@@ -1158,10 +1158,10 @@ const rectSelectStyle = computed(() => {
 
 .drag-preview-seat {
   position: absolute;
-  border: 2px solid var(--color-primary, #23587b);
+  border: 2px solid var(--color-primary);
   border-radius: 12px;
-  background: var(--color-bg-selected, #e8f4f8);
-  color: #333;
+  background: var(--color-bg-selected);
+  color: var(--color-text-primary);
   font-size: 20px;
   font-weight: 600;
   display: flex;
@@ -1172,20 +1172,20 @@ const rectSelectStyle = computed(() => {
   white-space: nowrap;
   text-overflow: ellipsis;
   padding: 8px;
-  box-shadow: 0 8px 24px rgba(35, 88, 123, 0.35);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary) 35%, transparent);
   opacity: 0.95;
 }
 
 .drag-preview-seat.is-anchor {
   border-width: 3px;
-  box-shadow: 0 12px 32px rgba(35, 88, 123, 0.45);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-primary) 45%, transparent);
   z-index: 10;
 }
 
 .rect-select-overlay {
   position: fixed;
   background: rgba(14, 165, 233, 0.15);
-  border: 2px solid #0ea5e9;
+  border: 2px solid var(--color-info);
   border-radius: 4px;
   pointer-events: none;
   z-index: 1000;
@@ -1198,7 +1198,7 @@ const rectSelectStyle = computed(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   overflow: hidden;
 }
 
@@ -1208,8 +1208,8 @@ const rectSelectStyle = computed(() => {
   align-items: center;
   justify-content: space-between;
   padding: 6px 16px;
-  background: #ffffff;
-  border-bottom: 1px solid #e8eef2;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
   z-index: 10;
   pointer-events: auto;
   flex-shrink: 0;
@@ -1221,16 +1221,16 @@ const rectSelectStyle = computed(() => {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 .info-item {
   font-weight: 500;
-  color: #888;
+  color: var(--color-text-muted);
 }
 
 .info-separator {
-  color: #ccc;
+  color: var(--color-border);
 }
 
 /* 缩放视口 — 无滚动条 */
@@ -1283,7 +1283,7 @@ const rectSelectStyle = computed(() => {
   text-align: center;
   font-size: 15px;
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
   padding: 0px 0px;
   order: 1;
 }
@@ -1320,23 +1320,23 @@ const rectSelectStyle = computed(() => {
   justify-content: center;
   font-size: 18px;
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
   transition: all 0.15s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 .zoom-btn:hover:not(:disabled) {
-  background: #e8f4f8;
+  background: var(--color-bg-selected);
 }
 
 .zoom-btn:active:not(:disabled) {
-  background: #d0e9f2;
+  background: var(--color-bg-hover);
   transform: scale(0.92);
 }
 
 .zoom-btn:disabled {
-  color: #bbb;
+  color: var(--color-text-disabled);
   cursor: not-allowed;
 }
 
@@ -1349,15 +1349,15 @@ const rectSelectStyle = computed(() => {
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
-  color: #555;
+  color: var(--color-text-primary);
   transition: all 0.15s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 .zoom-label:hover {
-  background: #f0f0f0;
-  color: #23587b;
+  background: var(--color-bg-secondary);
+  color: var(--color-primary);
 }
 
 @media (max-width: 1366px) and (min-width: 1025px) {
@@ -1452,16 +1452,16 @@ const rectSelectStyle = computed(() => {
     padding: 0 14px;
     font-size: 13px;
     border-radius: 6px;
-    background: white;
-    color: #23587b;
-    border: 1px solid #23587b;
+    background: var(--color-surface);
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
     transition: all 0.2s;
     cursor: pointer;
   }
 
   .mobile-select-btn.active {
-    background: #23587b;
-    color: white;
+    background: var(--color-primary);
+    color: var(--color-surface);
   }
 
   .mobile-undo-btn,
@@ -1473,9 +1473,9 @@ const rectSelectStyle = computed(() => {
     align-items: center;
     justify-content: center;
     border-radius: 6px;
-    background: white;
-    color: #23587b;
-    border: 1px solid #d0d7dc;
+    background: var(--color-surface);
+    color: var(--color-primary);
+    border: 1px solid var(--color-border);
     transition: all 0.2s;
     cursor: pointer;
   }
@@ -1488,26 +1488,26 @@ const rectSelectStyle = computed(() => {
 
   .mobile-undo-btn:not(:disabled):active,
   .mobile-redo-btn:not(:disabled):active {
-    background: #f0f4f7;
+    background: var(--color-bg-hover);
   }
 
   .mobile-selection-toolbar-fixed {
     position: sticky;
     top: 36px;
     z-index: 10;
-    background: #f5f5f5;
+    background: var(--color-bg-secondary);
     height: 44px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
   }
 
   .selection-info {
     font-size: 12px;
-    color: #666;
+    color: var(--color-text-secondary);
     font-weight: 500;
   }
 
@@ -1521,8 +1521,8 @@ const rectSelectStyle = computed(() => {
     height: 36px;
     padding: 0;
     border-radius: 6px;
-    background: white;
-    border: 1px solid #ddd;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1540,9 +1540,9 @@ const rectSelectStyle = computed(() => {
   }
 
   .selection-actions button.cancel-btn {
-    background: #ff4444;
-    color: white;
-    border-color: #ff4444;
+    background: var(--color-danger);
+    color: var(--color-surface);
+    border-color: var(--color-danger);
   }
 
   .toolbar-info {
@@ -1553,7 +1553,7 @@ const rectSelectStyle = computed(() => {
   }
 
   .info-item {
-    color: #23587b;
+    color: var(--color-primary);
     font-weight: 500;
   }
 

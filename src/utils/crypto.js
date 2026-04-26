@@ -110,3 +110,65 @@ export async function decrypt(ciphertext, userKey = null) {
         return null
     }
 }
+
+/**
+ * 加密密码用于传输（使用服务器公钥派生的密钥）
+ * @param {string} password - 明文密码
+ * @param {string} username - 用户名（用作 salt）
+ * @returns {Promise<string>} Base64 编码的加密数据
+ */
+export async function encryptPasswordForTransport(password, username) {
+    try {
+        const encoder = new TextEncoder()
+        const data = encoder.encode(password)
+
+        // 使用用户名作为密钥材料的一部分
+        const keyMaterial = `sce-auth-${username}`
+        const keyData = encoder.encode(keyMaterial)
+
+        // 导入密钥材料
+        const importedKey = await crypto.subtle.importKey(
+            'raw',
+            keyData,
+            'PBKDF2',
+            false,
+            ['deriveBits', 'deriveKey']
+        )
+
+        // 使用 PBKDF2 派生密钥
+        const salt = encoder.encode('sce-transport-salt-v1')
+        const key = await crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: salt,
+                iterations: 100000,
+                hash: 'SHA-256'
+            },
+            importedKey,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt']
+        )
+
+        // 生成随机 IV
+        const iv = crypto.getRandomValues(new Uint8Array(12))
+
+        // 加密
+        const encrypted = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            data
+        )
+
+        // 组合 IV + 密文
+        const combined = new Uint8Array(iv.length + encrypted.byteLength)
+        combined.set(iv, 0)
+        combined.set(new Uint8Array(encrypted), iv.length)
+
+        // Base64 编码
+        return btoa(String.fromCharCode(...combined))
+    } catch (error) {
+        console.error('Password encryption for transport failed:', error)
+        return null
+    }
+}

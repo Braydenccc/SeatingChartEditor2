@@ -222,7 +222,7 @@ const handleSubmit = async () => {
 }
 
 .login-dialog {
-  background: white;
+  background: var(--color-surface);
   width: 90%;
   max-width: 400px;
   border-radius: 12px;
@@ -247,13 +247,13 @@ const handleSubmit = async () => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .dialog-header h3 {
   margin: 0;
-  color: #23587b;
+  color: var(--color-primary);
   font-size: 18px;
 }
 
@@ -261,14 +261,14 @@ const handleSubmit = async () => {
   background: none;
   border: none;
   font-size: 24px;
-  color: #666;
+  color: var(--color-text-secondary);
   cursor: pointer;
   line-height: 1;
   padding: 0;
 }
 
 .close-btn:hover {
-  color: #f44336;
+  color: var(--color-danger);
 }
 
 .dialog-body {
@@ -276,11 +276,11 @@ const handleSubmit = async () => {
 }
 
 .info-text {
-  color: #64748b;
+  color: var(--color-text-muted);
   font-size: 13px;
   margin-bottom: 20px;
   line-height: 1.5;
-  background: #f1f5f9;
+  background: var(--color-bg-subtle);
   padding: 12px;
   border-radius: 6px;
 }
@@ -292,7 +292,7 @@ const handleSubmit = async () => {
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 500;
 }
@@ -302,7 +302,7 @@ const handleSubmit = async () => {
 .form-group input[type="password"] {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   font-size: 15px;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -311,13 +311,13 @@ const handleSubmit = async () => {
 
 .form-group input:focus {
   outline: none;
-  border-color: #23587b;
-  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .backup-mode-group, .sync-preference-group {
-    background: #f8fafc;
-    border: 1px dashed #cbd5e1;
+    background: var(--color-bg-subtle);
+    border: 1px dashed var(--color-border-strong);
     padding: 14px;
     border-radius: 6px;
     margin-top: 16px;
@@ -328,7 +328,7 @@ const handleSubmit = async () => {
     margin-bottom: 10px;
     font-weight: 600;
     font-size: 13px;
-    color: #475569;
+    color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
@@ -344,7 +344,7 @@ const handleSubmit = async () => {
     gap: 6px;
     cursor: pointer;
     font-size: 14px;
-    color: #334155;
+    color: var(--color-text-primary);
 }
 
 .sync-preference-group .radio-label input[type="radio"] {
@@ -356,13 +356,13 @@ const handleSubmit = async () => {
 
 .hint-text {
     font-size: 12px;
-    color: #64748b;
+    color: var(--color-text-muted);
     margin: 8px 0 0;
     line-height: 1.5;
 }
 
 .hint-green {
-    color: #059669;
+    color: var(--color-success);
 }
 
 .switch-label {
@@ -381,32 +381,32 @@ const handleSubmit = async () => {
 
 .switch-text {
     font-size: 14px;
-    color: #475569;
+    color: var(--color-text-secondary);
     font-weight: 600;
 }
 
 .switch-text.active {
-    color: #0ea5e9;
+    color: var(--color-info);
 }
 
 .error-message {
-  color: #ef4444;
+  color: var(--color-danger);
   font-size: 13px;
   margin-top: 16px;
-  background: #fef2f2;
+  background: var(--color-danger-bg);
   padding: 8px 12px;
   border-radius: 6px;
-  border-left: 3px solid #ef4444;
+  border-left: 3px solid var(--color-danger);
 }
 
 .success-message {
-  color: #10b981;
+  color: var(--color-success);
   font-size: 13px;
   margin-top: 16px;
-  background: #ecfdf5;
+  background: var(--color-success-bg);
   padding: 8px 12px;
   border-radius: 6px;
-  border-left: 3px solid #10b981;
+  border-left: 3px solid var(--color-success);
 }
 
 .dialog-actions {
@@ -418,8 +418,8 @@ const handleSubmit = async () => {
 .btn-primary {
   flex: 1;
   padding: 12px;
-  background: #23587b;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-surface);
   border: none;
   border-radius: 6px;
   font-size: 15px;
@@ -430,7 +430,7 @@ const handleSubmit = async () => {
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(35, 88, 123, 0.2);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .btn-primary:disabled, .btn-secondary:disabled {
@@ -440,9 +440,9 @@ const handleSubmit = async () => {
 
 .btn-secondary {
    padding: 12px 18px;
-   background: white;
-   color: #ef4444;
-   border: 1px solid #ef4444;
+   background: var(--color-surface);
+   color: var(--color-danger);
+   border: 1px solid var(--color-danger);
    border-radius: 6px;
    font-size: 14px;
    cursor: pointer;
@@ -450,6 +450,6 @@ const handleSubmit = async () => {
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background: #fef2f2;
+    background: var(--color-danger-bg);
 }
 </style>

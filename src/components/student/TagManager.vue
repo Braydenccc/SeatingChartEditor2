@@ -80,7 +80,7 @@ const getTagStudentCount = (tagId) => {
 
 const dialogVisible = ref(false)
 const isEditing = ref(false)
-const currentTag = ref({ id: null, name: '', color: '#23587b' })
+const currentTag = ref({ id: null, name: '', color: 'var(--color-primary)' })
 const nameInputRef = ref(null)
 const selectedStudentIds = ref([])
 
@@ -111,7 +111,7 @@ const editTagHandler = (tag) => {
 
 const closeDialog = () => {
   dialogVisible.value = false
-  currentTag.value = { id: null, name: '', color: '#23587b' }
+  currentTag.value = { id: null, name: '', color: 'var(--color-primary)' }
   selectedStudentIds.value = []
 }
 
@@ -156,8 +156,8 @@ const deleteTagHandler = (tagId, tagName) => {
 
 <style scoped>
 .tag-manager {
-  background: #ffffff;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .tag-header {
@@ -165,12 +165,12 @@ const deleteTagHandler = (tagId, tagName) => {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .tag-header h4 {
   margin: 0;
-  color: #23587b;
+  color: var(--color-primary);
   font-size: 16px;
   font-weight: 600;
 }
@@ -183,8 +183,8 @@ const deleteTagHandler = (tagId, tagName) => {
   height: 28px;
   padding: 0;
   background: transparent;
-  color: #999;
-  border: 1px dashed #ccc;
+  color: var(--color-text-disabled);
+  border: 1px dashed var(--color-border);
   border-radius: 4px;
   cursor: pointer;
   font-size: 18px;
@@ -194,9 +194,9 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .add-tag-btn:hover {
-  background: #f0f7f0;
-  color: #4CAF50;
-  border-color: #4CAF50;
+  background: var(--color-success-bg-light);
+  color: var(--color-success);
+  border-color: var(--color-success);
 }
 
 .add-tag-btn:active {
@@ -218,17 +218,17 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--scrollbar-track);
   border-radius: 2px;
 }
 
 .tag-list::-webkit-scrollbar-thumb {
-  background: #bbb;
+  background: var(--scrollbar-thumb);
   border-radius: 2px;
 }
 
 .tag-list::-webkit-scrollbar-thumb:hover {
-  background: #888;
+  background: var(--scrollbar-thumb-hover);
 }
 
 .tag-item {
@@ -236,7 +236,7 @@ const deleteTagHandler = (tagId, tagName) => {
   align-items: center;
   gap: 0;
   padding: 0;
-  background: color-mix(in srgb, var(--tag-color) 12%, #fff);
+  background: color-mix(in srgb, var(--tag-color) 12%, var(--color-surface));
   border: 1px solid color-mix(in srgb, var(--tag-color) 30%, transparent);
   border-radius: 4px;
   font-size: 13px;
@@ -247,7 +247,7 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-item:hover {
-  background: color-mix(in srgb, var(--tag-color) 20%, #fff);
+  background: color-mix(in srgb, var(--tag-color) 20%, var(--color-surface));
   border-color: color-mix(in srgb, var(--tag-color) 50%, transparent);
   box-shadow: 0 1px 4px color-mix(in srgb, var(--tag-color) 20%, transparent);
 }
@@ -259,7 +259,7 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-name {
-  color: color-mix(in srgb, var(--tag-color) 80%, #1a1a1a);
+  color: color-mix(in srgb, var(--tag-color) 80%, var(--color-text-primary));
   font-weight: 600;
   font-size: 12px;
   padding: 0 8px;
@@ -268,7 +268,7 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-count {
-  color: color-mix(in srgb, var(--tag-color) 85%, #1a1a1a);
+  color: color-mix(in srgb, var(--tag-color) 85%, var(--color-text-primary));
   font-size: 11px;
   font-weight: 700;
   padding: 0 6px;
@@ -297,7 +297,7 @@ const deleteTagHandler = (tagId, tagName) => {
   cursor: pointer;
   font-size: 14px;
   transition: all 0.15s ease;
-  color: color-mix(in srgb, var(--tag-color) 60%, #666);
+  color: color-mix(in srgb, var(--tag-color) 60%, var(--color-text-secondary));
   line-height: 1;
 }
 
@@ -308,17 +308,17 @@ const deleteTagHandler = (tagId, tagName) => {
 
 .tag-action-btn:hover {
   background: color-mix(in srgb, var(--tag-color) 25%, transparent);
-  color: color-mix(in srgb, var(--tag-color) 90%, #000);
+  color: color-mix(in srgb, var(--tag-color) 90%, var(--color-text-primary));
 }
 
 .tag-action-btn.delete:hover {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 .tag-action-btn.delete.confirming {
-  background: #dc2626 !important;
-  color: white !important;
+  background: var(--color-danger) !important;
+  color: var(--color-surface) !important;
 }
 
 /* 对话框样式 */
@@ -347,7 +347,7 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .dialog {
-  background: white;
+  background: var(--color-surface);
   padding: 28px;
   border-radius: 12px;
   min-width: 420px;
@@ -371,7 +371,7 @@ const deleteTagHandler = (tagId, tagName) => {
 
 .dialog h3 {
   margin: 0 0 24px 0;
-  color: #23587b;
+  color: var(--color-primary);
   font-size: 20px;
   font-weight: 600;
 }
@@ -383,7 +383,7 @@ const deleteTagHandler = (tagId, tagName) => {
 .form-group label {
   display: block;
   margin-bottom: 10px;
-  color: #555;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 500;
 }
@@ -391,7 +391,7 @@ const deleteTagHandler = (tagId, tagName) => {
 .form-group input[type="text"] {
   width: 100%;
   padding: 10px 14px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
   box-sizing: border-box;
@@ -400,7 +400,7 @@ const deleteTagHandler = (tagId, tagName) => {
 
 .form-group input[type="text"]:focus {
   outline: none;
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .color-picker {
@@ -412,18 +412,18 @@ const deleteTagHandler = (tagId, tagName) => {
 .color-picker input[type="color"] {
   width: 70px;
   height: 40px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
   transition: border-color 0.3s;
 }
 
 .color-picker input[type="color"]:hover {
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .color-value {
-  color: #666;
+  color: var(--color-text-secondary);
   font-family: 'Courier New', monospace;
   font-size: 14px;
   font-weight: 500;
@@ -449,23 +449,23 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .btn-cancel {
-  background: #e0e0e0;
-  color: #333;
+  background: var(--color-border);
+  color: var(--color-text-primary);
 }
 
 .btn-cancel:hover {
-  background: #d0d0d0;
+  background: var(--color-border);
 }
 
 .btn-confirm {
-  background: #23587b;
-  color: white;
-  box-shadow: 0 2px 6px rgba(35, 88, 123, 0.2);
+  background: var(--color-primary);
+  color: var(--color-surface);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .btn-confirm:hover {
-  background: #1a4460;
-  box-shadow: 0 4px 10px rgba(35, 88, 123, 0.3);
+  background: var(--color-primary-hover);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--color-primary) 30%, transparent);
   transform: translateY(-1px);
 }
 

@@ -31,6 +31,10 @@
   --color-border-strong: #cbd5e1;
   --color-border-hover: #cbd5e1;
   --color-border-light: #f1f5f9;
+  --color-border-dark: #94a3b8;
+
+  /* 次要背景色 */
+  --color-bg-secondary: #f5f5f5;
 
   /* 状态颜色 */
   --color-danger: #f44336;
@@ -61,11 +65,14 @@
   --color-error-bg-light: #fef2f2;
   --color-link: #2563eb;
   --color-link-hover: #1d4ed8;
+  --color-accent: #6366f1;
+  --color-warning-light: #fed7aa;
 
   /* 阴影 */
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.25);
+  --shadow-sm: rgba(0, 0, 0, 0.06);
+  --shadow-md: rgba(0, 0, 0, 0.08);
+  --shadow-lg: rgba(0, 0, 0, 0.15);
+  --shadow-primary: rgba(35, 88, 123, 0.28);
 
   /* 特定组件颜色 */
   --color-header-bg: #ffffff;
@@ -77,6 +84,23 @@
   --color-button-secondary-text: #64748b;
   --color-tag-bg: #e0e7ff;
   --color-tag-text: #4338ca;
+
+  /* 滚动条颜色 */
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+
+  /* 标签调色板 */
+  --tag-color-1: #FF6B6B;
+  --tag-color-2: #4ECDC4;
+  --tag-color-3: #45B7D1;
+  --tag-color-4: #FFA07A;
+  --tag-color-5: #98D8C8;
+  --tag-color-6: #F7DC6F;
+  --tag-color-7: #BB8FCE;
+  --tag-color-8: #85C1E2;
+  --tag-color-9: #F8B739;
+  --tag-color-10: #52B788;
 }
 
 /* 深色模式 */
@@ -110,6 +134,10 @@
   --color-border-strong: #475569;
   --color-border-hover: #475569;
   --color-border-light: #1e293b;
+  --color-border-dark: #64748b;
+
+  /* 次要背景色 */
+  --color-bg-secondary: #0f172a;
 
   /* 状态颜色 */
   --color-danger: #f87171;
@@ -140,11 +168,14 @@
   --color-error-bg-light: #450a0a;
   --color-link: #60a5fa;
   --color-link-hover: #93c5fd;
+  --color-accent: #818cf8;
+  --color-warning-light: #92400e;
 
   /* 阴影 */
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.6);
+  --shadow-sm: rgba(0, 0, 0, 0.3);
+  --shadow-md: rgba(0, 0, 0, 0.4);
+  --shadow-lg: rgba(0, 0, 0, 0.6);
+  --shadow-primary: rgba(74, 158, 255, 0.4);
 
   /* 特定组件颜色 */
   --color-header-bg: #0f172a;
@@ -156,6 +187,23 @@
   --color-button-secondary-text: #cbd5e1;
   --color-tag-bg: #1e3a8a;
   --color-tag-text: #93c5fd;
+
+  /* 滚动条颜色 */
+  --scrollbar-track: #0f172a;
+  --scrollbar-thumb: #475569;
+  --scrollbar-thumb-hover: #64748b;
+
+  /* 标签调色板（深色模式调整亮度） */
+  --tag-color-1: #ff8a8a;
+  --tag-color-2: #6eddd4;
+  --tag-color-3: #64c7e1;
+  --tag-color-4: #ffb89a;
+  --tag-color-5: #b8e8d8;
+  --tag-color-6: #f9e87f;
+  --tag-color-7: #cbafde;
+  --tag-color-8: #a5d1f2;
+  --tag-color-9: #fac759;
+  --tag-color-10: #72c7a8;
 }
 
 /* 定制模式（通过 JS 动态设置 CSS 变量） */
@@ -174,16 +222,20 @@
 }
 
 html,
-body,
-#app {
+body {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 #app {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   font-weight: normal;
-  min-height: 100vh;
-  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }

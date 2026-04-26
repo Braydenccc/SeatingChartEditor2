@@ -184,6 +184,9 @@ const applyColorScheme = () => {
     // 定制模式：应用自定义颜色
     root.setAttribute('data-theme', 'custom')
   }
+
+  // 强制触发重绘，确保 CSS 变量立即生效
+  void root.offsetHeight
 }
 
 // 应用主题色到 CSS 变量
@@ -195,6 +198,7 @@ const applyThemeColor = () => {
     // 简单模式：只应用主题色
     if (themeColor) {
       root.style.setProperty('--color-primary', themeColor)
+      root.style.setProperty('--color-primary-rgb', hexToRgb(themeColor))
     }
   } else {
     // 定制模式：应用所有自定义颜色
@@ -235,6 +239,9 @@ const applyThemeColor = () => {
     root.style.setProperty('--color-info', customColors.info)
     root.style.setProperty('--color-info-hover', customColors.infoHover)
   }
+
+  // 强制触发重绘，确保 CSS 变量立即生效
+  void root.offsetHeight
 }
 
 // 辅助函数：hex 转 rgb

@@ -178,13 +178,13 @@ const resetDoubleClickAction = () => {
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin: 0 0 8px 0;
 }
 
 .section-desc {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin: 0 0 20px 0;
 }
 
@@ -203,17 +203,17 @@ const resetDoubleClickAction = () => {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #334155;
+  color: var(--color-text-primary);
   margin-bottom: 0;
 }
 
 .reset-btn {
   padding: 4px 8px;
   background: transparent;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   cursor: pointer;
-  color: #64748b;
+  color: var(--color-text-muted);
   transition: all 0.2s;
   display: flex;
   align-items: center;
@@ -221,9 +221,9 @@ const resetDoubleClickAction = () => {
 }
 
 .reset-btn:hover:not(:disabled) {
-  background: #f8f9fa;
-  border-color: #23587b;
-  color: #23587b;
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .reset-btn:disabled {
@@ -235,7 +235,7 @@ const resetDoubleClickAction = () => {
 .setting-select {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
   transition: border-color 0.2s;
@@ -244,7 +244,7 @@ const resetDoubleClickAction = () => {
 .setting-input:focus,
 .setting-select:focus {
   outline: none;
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .setting-range {
@@ -254,18 +254,18 @@ const resetDoubleClickAction = () => {
 
 .range-value {
   font-size: 14px;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-weight: 500;
 }
 
 .hint-text {
   display: block;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-top: 4px;
 }
 
 .hint-text.error {
-  color: #ef4444;
+  color: var(--color-danger);
 }
 </style>

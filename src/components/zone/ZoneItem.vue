@@ -262,22 +262,22 @@ onUnmounted(() => {
   position: relative;
   padding: 12px;
   margin-bottom: 10px;
-  background: white;
-  border: 2px solid #e0e0e0;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .zone-item:hover {
-  border-color: #23587b;
-  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 
 .zone-item.selected {
-  border-color: #23587b;
-  background: #e8f4f8;
-  box-shadow: 0 2px 12px rgba(35, 88, 123, 0.25);
+  border-color: var(--color-primary);
+  background: var(--color-bg-hover);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--color-primary) 25%, transparent);
 }
 
 .zone-header {
@@ -292,15 +292,15 @@ onUnmounted(() => {
   height: 16px;
   border-radius: 50%;
   flex-shrink: 0;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1px #ccc;
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-text-disabled);
 }
 
 .zone-name {
   flex: 1;
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .zone-name-input {
@@ -308,7 +308,7 @@ onUnmounted(() => {
   padding: 4px 8px;
   font-size: 14px;
   font-weight: 600;
-  border: 2px solid #23587b;
+  border: 2px solid var(--color-primary);
   border-radius: 4px;
   outline: none;
 }
@@ -318,7 +318,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-secondary);
   cursor: pointer;
 }
 
@@ -343,7 +343,7 @@ onUnmounted(() => {
   gap: 4px;
   padding: 3px 8px;
   border-radius: 12px;
-  color: white;
+  color: var(--color-surface);
   font-size: 11px;
   font-weight: 500;
 }
@@ -351,7 +351,7 @@ onUnmounted(() => {
 .remove-tag-btn {
   background: rgba(255, 255, 255, 0.3);
   border: none;
-  color: white;
+  color: var(--color-surface);
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -373,30 +373,30 @@ onUnmounted(() => {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #e0e0e0;
+  background: var(--color-border);
   border: none;
   cursor: pointer;
   font-size: 14px;
   line-height: 1;
-  color: #666;
+  color: var(--color-text-secondary);
   transition: all 0.2s;
 }
 
 .add-tag-btn:hover {
-  background: #23587b;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-surface);
 }
 
 .zone-info {
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 .delete-zone-btn {
   width: 100%;
   padding: 6px;
-  background: #f44336;
-  color: white;
+  background: var(--color-danger);
+  color: var(--color-surface);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -406,19 +406,19 @@ onUnmounted(() => {
 }
 
 .delete-zone-btn:hover {
-  background: #d32f2f;
+  background: var(--color-danger-hover);
 }
 
 .delete-zone-btn.confirming {
-  background: #dc2626 !important;
+  background: var(--color-danger) !important;
   box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
 }
 
 .tag-picker {
   position: absolute;
   margin-top: 4px;
-  background: white;
-  border: 2px solid #23587b;
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   z-index: 1000;
@@ -434,11 +434,11 @@ onUnmounted(() => {
   cursor: pointer;
   transition: background 0.2s;
   font-size: 13px;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .tag-option:hover {
-  background: #e8f4f8;
+  background: var(--color-bg-hover);
 }
 
 .tag-dot {
@@ -451,7 +451,7 @@ onUnmounted(() => {
 .no-tags {
   padding: 12px;
   text-align: center;
-  color: #999;
+  color: var(--color-text-disabled);
   font-size: 12px;
 }
 

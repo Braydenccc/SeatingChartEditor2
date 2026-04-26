@@ -184,7 +184,7 @@ const close = () => {
 }
 
 .student-edit-dialog {
-  background: white;
+  background: var(--color-surface);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   width: 90%;
@@ -200,14 +200,14 @@ const close = () => {
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .dialog-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .close-btn {
@@ -215,7 +215,7 @@ const close = () => {
   border: none;
   padding: 4px;
   cursor: pointer;
-  color: #64748b;
+  color: var(--color-text-muted);
   border-radius: 6px;
   transition: all 0.2s;
   display: flex;
@@ -224,8 +224,8 @@ const close = () => {
 }
 
 .close-btn:hover {
-  background: #f1f5f9;
-  color: #334155;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
 }
 
 .dialog-body {
@@ -246,28 +246,28 @@ const close = () => {
   display: block;
   font-size: 14px;
   font-weight: 600;
-  color: #334155;
+  color: var(--color-text-primary);
   margin-bottom: 8px;
 }
 
 .form-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   font-size: 14px;
-  color: #1e293b;
+  color: var(--color-text-primary);
   transition: border-color 0.2s;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: var(--color-primary, #23587b);
-  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .form-input::placeholder {
-  color: #94a3b8;
+  color: var(--color-text-disabled);
 }
 
 .tags-container {
@@ -290,7 +290,7 @@ const close = () => {
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: white;
+  color: var(--color-surface);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -314,19 +314,19 @@ const close = () => {
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
-  background: white;
+  background: var(--color-surface);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .tag-option:hover {
   background: currentColor;
-  color: white !important;
+  color: var(--color-surface) !important;
 }
 
 .no-tags {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--color-text-disabled);
   font-style: italic;
 }
 
@@ -336,8 +336,8 @@ const close = () => {
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 24px;
-  border-top: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
 }
 
 .btn {
@@ -351,23 +351,23 @@ const close = () => {
 }
 
 .btn-secondary {
-  background: white;
-  color: #64748b;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
 }
 
 .btn-secondary:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-strong);
 }
 
 .btn-primary {
-  background: var(--color-primary, #23587b);
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-surface);
 }
 
 .btn-primary:hover {
-  background: #1a4460;
+  background: var(--color-primary-hover);
 }
 
 .dialog-fade-enter-active,

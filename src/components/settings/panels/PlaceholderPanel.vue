@@ -27,20 +27,20 @@ defineProps({
   justify-content: center;
   height: 100%;
   min-height: 300px;
-  color: #64748b;
+  color: var(--color-text-secondary);
 }
 
 .placeholder-icon {
   margin-bottom: 16px;
   opacity: 0.5;
-  color: #64748b;
+  color: var(--color-text-secondary);
 }
 
 .placeholder-title {
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 8px 0;
-  color: #334155;
+  color: var(--color-text-primary);
 }
 
 .placeholder-text {

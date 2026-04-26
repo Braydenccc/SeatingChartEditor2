@@ -41,14 +41,14 @@ defineProps({
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(35, 88, 123, 0.1);
-  border-top: 3px solid #23587b;
+  border: 3px solid color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border-top: 3px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
 .loading-text {
-  color: #23587b;
+  color: var(--color-primary);
   font-size: 14px;
   font-weight: 500;
 }

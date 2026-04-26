@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { safeStorageGet as storageGet, safeStorageSet as storageSet, safeStorageRemove as storageRemove } from '@/utils/storage'
-import { encrypt, decrypt } from '@/utils/crypto'
+import { encrypt, decrypt, encryptPasswordForTransport } from '@/utils/crypto'
 
 const currentUser = ref(null)
 const token = ref(null)
@@ -185,9 +185,12 @@ export function useAuth() {
     })
     const callAuthApi = async (action, username, password) => {
         try {
-            // Passwords must be transmitted over HTTPS to prevent plaintext exposure.
-            // Server-side bcrypt hashing (already implemented in the backend) provides
-            // the primary password security layer.
+            // 加密密码用于传输（额外的安全层）
+            const encryptedPassword = await encryptPasswordForTransport(password, username)
+            if (!encryptedPassword) {
+                return { success: false, message: '密码加密失败，请重试' }
+            }
+
             const csrfToken = getOrCreateCsrfToken()
             const response = await fetch('/api/auth.php', {
                 method: 'POST',
@@ -196,7 +199,12 @@ export function useAuth() {
                     'Content-Type': 'application/json',
                     'X-CSRF-Token': csrfToken
                 },
-                body: JSON.stringify({ action, username, password, _csrf: csrfToken })
+                body: JSON.stringify({
+                    action,
+                    username,
+                    encryptedPassword,
+                    _csrf: csrfToken
+                })
             })
 
             if (!response.ok) {

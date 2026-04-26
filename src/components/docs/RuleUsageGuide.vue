@@ -123,17 +123,17 @@
 }
 
 .guide-section {
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
   border-radius: 12px;
   padding: 16px;
-  border: 1px solid #eef2f6;
+  border: 1px solid var(--color-border-light);
 }
 
 .guide-title {
   margin: 0 0 12px 0;
   font-size: 15px;
   font-weight: 700;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .guide-content {
@@ -145,7 +145,7 @@
 .guide-text {
   margin: 0;
   font-size: 13px;
-  color: #475569;
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 
@@ -160,16 +160,16 @@
   align-items: flex-start;
   gap: 10px;
   padding: 8px 12px;
-  background: white;
+  background: var(--color-surface);
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
 }
 
 .step-number {
   width: 24px;
   height: 24px;
-  background: #23587b;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-surface);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -181,7 +181,7 @@
 
 .step-text {
   font-size: 13px;
-  color: #334155;
+  color: var(--color-text-primary);
   line-height: 1.6;
 }
 
@@ -192,17 +192,17 @@
 }
 
 .rule-type-card {
-  background: white;
+  background: var(--color-surface);
   border-radius: 8px;
   padding: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
 }
 
 .rule-type-title {
   margin: 0 0 8px 0;
   font-size: 13px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .rule-type-list {
@@ -215,7 +215,7 @@
 
 .rule-type-list li {
   font-size: 12px;
-  color: #475569;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
@@ -226,26 +226,26 @@
 }
 
 .priority-card {
-  background: white;
+  background: var(--color-surface);
   border-radius: 8px;
   padding: 12px;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--color-border);
   text-align: center;
 }
 
 .priority-card.required {
-  border-color: #fee2e2;
-  background: #fee2e2;
+  border-color: var(--color-danger-bg);
+  background: var(--color-danger-bg);
 }
 
 .priority-card.prefer {
-  border-color: #fef9c3;
-  background: #fef9c3;
+  border-color: var(--color-warning-bg);
+  background: var(--color-warning-bg);
 }
 
 .priority-card.optional {
-  border-color: #f1f5f9;
-  background: #f1f5f9;
+  border-color: var(--color-bg-subtle);
+  background: var(--color-bg-subtle);
 }
 
 .priority-title {
@@ -255,21 +255,21 @@
 }
 
 .priority-card.required .priority-title {
-  color: #dc2626;
+  color: var(--color-danger);
 }
 
 .priority-card.prefer .priority-title {
-  color: #b45309;
+  color: var(--color-warning-hover);
 }
 
 .priority-card.optional .priority-title {
-  color: #475569;
+  color: var(--color-text-secondary);
 }
 
 .priority-desc {
   margin: 0;
   font-size: 12px;
-  color: #475569;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
@@ -280,34 +280,34 @@
 }
 
 .subject-item {
-  background: white;
+  background: var(--color-surface);
   border-radius: 8px;
   padding: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
 }
 
 .subject-title {
   margin: 0 0 6px 0;
   font-size: 13px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .subject-desc {
   margin: 0;
   font-size: 12px;
-  color: #475569;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
 .guide-tip {
   margin: 0;
   padding: 10px 12px;
-  background: #eff6ff;
+  background: var(--color-info-bg);
   border-radius: 8px;
   border: 1px solid #bfdbfe;
   font-size: 12px;
-  color: #1d4ed8;
+  color: var(--color-info);
   line-height: 1.5;
 }
 
@@ -321,7 +321,7 @@
 
 .tips-list li {
   font-size: 13px;
-  color: #475569;
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 

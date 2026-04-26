@@ -145,6 +145,7 @@ App.vue (主布局 - 高度严格限制)
 - **布局限制**：`App.vue` 具有严格的高度限制，不要修改其布局结构
 - **不自动构建/启动**：开发完成后不自动运行 `npm run build` 或 `npm run dev`
 - **图标库**：统一使用 `lucide-vue-next`，按需具名导入，通过 `:size` prop 控制尺寸（不用 CSS width/height）。禁止内联 SVG 和 Unicode 字符充当图标
+- **CSS 颜色规范**：所有颜色必须使用 CSS 变量（`var(--color-*)`），严禁硬编码十六进制（`#23587b`）或 RGB/RGBA（`rgba(0,0,0,0.5)`）颜色值。颜色变量定义在 `src/assets/main.css`，详见 [.agents/rules/项目规范.md](.agents/rules/项目规范.md#71-颜色系统)
 - **中文文档**：所有项目规则和文档使用中文编写
 - **托管平台**：项目使用 Retinbox Web Hosting 部署，不建议其他平台
 - **禁止 base64**：不在任何地方使用 base64 编码，显示本地图片用 `URL.createObjectURL()`

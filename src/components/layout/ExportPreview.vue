@@ -328,7 +328,7 @@
             </button>
           </template>
           <template v-if="activeTab === 'excel'">
-            <button v-if="authType === 'webdav'" class="btn excel" style="background:#059669;" :disabled="isExcelDownloading || isUploading" @click="handleCloudExportExcel">
+            <button v-if="authType === 'webdav'" class="btn excel" style="background:var(--color-success);" :disabled="isExcelDownloading || isUploading" @click="handleCloudExportExcel">
               <Loader2 v-if="isUploading" :size="14" stroke-width="2" class="spin-icon" />
               <CloudUpload v-else :size="14" stroke-width="2" />
               {{ isUploading ? '上传中...' : '保存至云盘' }}
@@ -639,7 +639,7 @@ const excelPreviewHtml = computed(() => {
   const rows = ws['!rows'] || []
 
   // 4. 开始构建 HTML 表格（含 Excel 式的外层标号 A, B, 1, 2）
-  let html = `<div style="font-family:Calibri,'Microsoft YaHei',sans-serif;display:flex;flex-direction:column;width:max-content;border:1px solid #d0d0d0;background:#fff;">`
+  let html = `<div style="font-family:Calibri,'Microsoft YaHei',sans-serif;display:flex;flex-direction:column;width:max-content;border:1px solid var(--color-border-strong);background:var(--color-surface);">`
   html += `<div style="overflow:auto;background:#e6e6e6;max-height:65vh;">`
   html += `<table style="border-collapse:collapse;font-family:inherit;margin:0;table-layout:fixed;">`
 
@@ -655,10 +655,10 @@ const excelPreviewHtml = computed(() => {
 
   // `<thead>` 顶部的 A, B, C 列标
   html += `<thead><tr style="height:22px;">`
-  html += `<th style="background:#f0f0f0;border-right:1px solid #d0d0d0;border-bottom:1px solid #d0d0d0;position:sticky;top:0;left:0;z-index:2;"></th>`
+  html += `<th style="background:var(--color-bg-secondary);border-right:1px solid var(--color-border-strong);border-bottom:1px solid var(--color-border-strong);position:sticky;top:0;left:0;z-index:2;"></th>`
   for (let c = 0; c <= maxCol; c++) {
     const colStr = c < 26 ? String.fromCharCode(65 + c) : String.fromCharCode(64 + Math.floor(c / 26)) + String.fromCharCode(65 + c % 26)
-    html += `<th style="background:#f0f0f0;border-right:1px solid #d0d0d0;border-bottom:1px solid #d0d0d0;font-size:12px;font-weight:normal;color:#444;position:sticky;top:0;z-index:1;">${colStr}</th>`
+    html += `<th style="background:var(--color-bg-secondary);border-right:1px solid var(--color-border-strong);border-bottom:1px solid var(--color-border-strong);font-size:12px;font-weight:normal;color:var(--color-text-secondary);position:sticky;top:0;z-index:1;">${colStr}</th>`
   }
   html += `</tr></thead><tbody>`
 
@@ -669,7 +669,7 @@ const excelPreviewHtml = computed(() => {
     html += `<tr style="height:${h}px;">`
     
     // 左侧的 1, 2, 3 行标
-    html += `<td style="background:#f0f0f0;border-right:1px solid #d0d0d0;border-bottom:1px solid #d0d0d0;text-align:center;font-size:12px;color:#444;position:sticky;left:0;z-index:1;user-select:none;">${r + 1}</td>`
+    html += `<td style="background:var(--color-bg-secondary);border-right:1px solid var(--color-border-strong);border-bottom:1px solid var(--color-border-strong);text-align:center;font-size:12px;color:var(--color-text-secondary);position:sticky;left:0;z-index:1;user-select:none;">${r + 1}</td>`
     
     // 遍历每一个单元格
     for (let c = 0; c <= maxCol; c++) {
@@ -681,9 +681,9 @@ const excelPreviewHtml = computed(() => {
       
       let tdAttr = `style="`
       // Excel 单元格基础重置样式
-      tdAttr += `padding:0 4px;box-sizing:border-box;background:#fff;overflow:hidden;`
+      tdAttr += `padding:0 4px;box-sizing:border-box;background:var(--color-surface);overflow:hidden;`
       if (!exportSettings.value.excelShowBorders) {
-        tdAttr += `border:1px solid #e0e0e0;`
+        tdAttr += `border:1px solid var(--color-border);`
       }
       let v = ''
       
@@ -982,7 +982,7 @@ onBeforeUnmount(() => {
 
 /* ── 对话框 ── */
 .export-dialog {
-  background: white;
+  background: var(--color-surface);
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
   display: flex;
@@ -1000,25 +1000,25 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   padding: 14px 20px;
-  border-bottom: 1px solid #e8eef2;
+  border-bottom: 1px solid var(--color-border-light);
   flex-shrink: 0;
 }
-.dialog-header h3 { margin: 0; font-size: 17px; font-weight: 600; color: #23587b; }
+.dialog-header h3 { margin: 0; font-size: 17px; font-weight: 600; color: var(--color-primary); }
 .close-btn {
-  width: 30px; height: 30px; border: none; background: #f0f0f0;
-  border-radius: 8px; cursor: pointer; font-size: 15px; color: #666;
+  width: 30px; height: 30px; border: none; background: var(--color-bg-secondary);
+  border-radius: 8px; cursor: pointer; font-size: 15px; color: var(--color-text-secondary);
   display: flex; align-items: center; justify-content: center; transition: all 0.15s;
 }
-.close-btn:hover { background: #e0e0e0; color: #333; }
+.close-btn:hover { background: var(--color-border); color: var(--color-text-primary); }
 
 /* ── Tab 栏 ── */
 .tab-bar {
   display: flex;
   gap: 2px;
   padding: 10px 20px 0;
-  border-bottom: 1px solid #e8eef2;
+  border-bottom: 1px solid var(--color-border-light);
   flex-shrink: 0;
-  background: #fafbfc;
+  background: var(--color-bg-subtle);
 }
 .tab-btn {
   padding: 8px 20px;
@@ -1027,14 +1027,14 @@ onBeforeUnmount(() => {
   border-radius: 8px 8px 0 0;
   font-size: 13px;
   font-weight: 500;
-  color: #888;
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: all 0.15s;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
 }
-.tab-btn:hover { color: #23587b; background: #edf3f8; }
-.tab-btn.active { color: #23587b; font-weight: 700; border-bottom: 2px solid #23587b; background: white; }
+.tab-btn:hover { color: var(--color-primary); background: var(--color-bg-hover); }
+.tab-btn.active { color: var(--color-primary); font-weight: 700; border-bottom: 2px solid var(--color-primary); background: var(--color-surface); }
 
 /* ── 主体 ── */
 .dialog-body {
@@ -1050,102 +1050,104 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   overflow-y: auto;
   padding: 16px;
-  border-right: 1px solid #e8eef2;
+  border-right: 1px solid var(--color-border-light);
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 .settings-panel::-webkit-scrollbar { width: 5px; }
-.settings-panel::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+.settings-panel::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+.settings-panel::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+.settings-panel::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
-.settings-section { padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; }
+.settings-section { padding-bottom: 12px; border-bottom: 1px solid var(--color-bg-secondary); }
 .settings-section:last-child { border-bottom: none; }
 .settings-section h4 {
   margin: 0 0 8px 0; font-size: 12px; font-weight: 600;
-  color: #555;
+  color: var(--color-text-secondary);
 }
 
 .setting-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
-.setting-row label { font-size: 12px; color: #666; font-weight: 500; }
+.setting-row label { font-size: 12px; color: var(--color-text-secondary); font-weight: 500; }
 .setting-row input[type="text"] {
-  padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; transition: border-color 0.2s;
+  padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 6px; font-size: 13px; transition: border-color 0.2s;
 }
 .setting-row textarea,
 .num-input select {
   padding: 6px 8px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 13px;
   width: 100%;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--color-surface);
 }
 .setting-row input[type="color"] {
   width: 60px;
   height: 30px;
   padding: 2px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--color-surface);
   cursor: pointer;
 }
-.setting-row input[type="text"]:focus { outline: none; border-color: #23587b; }
+.setting-row input[type="text"]:focus { outline: none; border-color: var(--color-primary); }
 .setting-row textarea:focus,
 .num-input select:focus,
-.setting-row input[type="color"]:focus { outline: none; border-color: #23587b; }
+.setting-row input[type="color"]:focus { outline: none; border-color: var(--color-primary); }
 .format-textarea { resize: vertical; min-height: 64px; }
-.format-hint { color: #888; font-size: 11px; line-height: 1.4; }
+.format-hint { color: var(--color-text-muted); font-size: 11px; line-height: 1.4; }
 
-.check-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; font-size: 13px; color: #444; }
+.check-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; font-size: 13px; color: var(--color-text-secondary); }
 .check-item input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
 
 .mode-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; flex-wrap: wrap; }
-.mode-label { font-size: 12px; color: #666; font-weight: 500; }
-.radio-item { display: flex; align-items: center; gap: 3px; cursor: pointer; font-size: 13px; color: #444; }
+.mode-label { font-size: 12px; color: var(--color-text-secondary); font-weight: 500; }
+.radio-item { display: flex; align-items: center; gap: 3px; cursor: pointer; font-size: 13px; color: var(--color-text-secondary); }
 .radio-item input[type="radio"] { width: 14px; height: 14px; cursor: pointer; }
 
 .spacing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .num-input { display: flex; flex-direction: column; gap: 2px; }
-.num-input label { font-size: 11px; color: #888; }
+.num-input label { font-size: 11px; color: var(--color-text-muted); }
 .num-input input[type="number"] {
-  padding: 5px 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 13px; width: 100%; box-sizing: border-box;
+  padding: 5px 8px; border: 1px solid var(--color-border); border-radius: 5px; font-size: 13px; width: 100%; box-sizing: border-box;
 }
-.num-input input[type="number"]:focus { outline: none; border-color: #23587b; }
+.num-input input[type="number"]:focus { outline: none; border-color: var(--color-primary); }
 
 .tag-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .tag-row {
   display: flex; flex-direction: column; gap: 4px; padding: 6px 8px;
-  background: #fafbfc; border-radius: 6px; border: 1px solid #eee;
+  background: var(--color-bg-subtle); border-radius: 6px; border: 1px solid #eee;
 }
 .tag-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0; }
 .tag-input {
-  padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;
+  padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 4px;
   font-size: 12px; width: 100%; box-sizing: border-box;
 }
-.tag-input:focus { outline: none; border-color: #23587b; }
+.tag-input:focus { outline: none; border-color: var(--color-primary); }
 
 /* 标签统计预览列表 */
 .tag-table-options { margin-top: 4px; }
-.tag-empty-hint { color: #999; font-size: 12px; margin-top: 6px; }
+.tag-empty-hint { color: var(--color-text-disabled); font-size: 12px; margin-top: 6px; }
 .tag-preview-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .tag-preview-item {
-  display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555;
-  padding: 4px 8px; background: #f5f8fb; border-radius: 5px; border: 1px solid #e8eef2;
+  display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-secondary);
+  padding: 4px 8px; background: var(--color-bg-subtle); border-radius: 5px; border: 1px solid var(--color-border-light);
 }
-.tag-count { margin-left: auto; color: #23587b; font-weight: 600; font-size: 11px; }
+.tag-count { margin-left: auto; color: var(--color-primary); font-weight: 600; font-size: 11px; }
 
 /* 字体样式子区域 */
 .subsection-title {
   font-size: 12px;
   font-weight: 600;
-  color: #555;
+  color: var(--color-text-secondary);
   margin: 0 0 8px 0;
 }
 
 /* 字体样式区域 */
 .font-style-section,
 .placeholder-style-section {
-  background: #f5f8fb;
+  background: var(--color-bg-subtle);
   padding: 10px;
   border-radius: 6px;
   margin-bottom: 8px;
@@ -1179,15 +1181,15 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 26px;
   padding: 2px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 5px;
-  background: #fff;
+  background: var(--color-surface);
   cursor: pointer;
   box-sizing: border-box;
 }
 .color-input label {
   font-size: 11px;
-  color: #888;
+  color: var(--color-text-muted);
 }
 
 .fill-color-picker {
@@ -1198,12 +1200,12 @@ onBeforeUnmount(() => {
 .fill-color-swatch {
   width: 18px;
   height: 18px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border-strong);
   border-radius: 3px;
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
-  background-image: repeating-linear-gradient(45deg, #ccc 0, #ccc 1px, #f8f8f8 1px, #f8f8f8 5px);
+  background-image: repeating-linear-gradient(45deg, var(--color-border-strong) 0, var(--color-border-strong) 1px, #f8f8f8 1px, #f8f8f8 5px);
   background-size: 6px 6px;
   box-sizing: border-box;
 }
@@ -1224,17 +1226,17 @@ onBeforeUnmount(() => {
 .fill-color-hex {
   width: 56px;
   height: 22px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   padding: 0 4px;
   font-size: 11px;
-  color: #555;
-  background: #fff;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
   box-sizing: border-box;
   font-family: Consolas, Monaco, monospace;
 }
 .fill-color-hex::placeholder {
-  color: #bbb;
+  color: var(--color-text-disabled);
 }
 
 .sub-fill-row {
@@ -1247,54 +1249,54 @@ onBeforeUnmount(() => {
 /* ── 预览面板 ── */
 .preview-panel {
   flex: 1; display: flex; align-items: center; justify-content: center;
-  background: #f5f5f5; overflow: auto; padding: 20px; min-height: 300px;
+  background: var(--color-bg-secondary); overflow: auto; padding: 20px; min-height: 300px;
 }
 
 /* 图片预览 */
 .preview-img { max-width: 100%; max-height: 60vh; border-radius: 6px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
-.preview-loading, .preview-empty { color: #999; font-size: 14px; }
+.preview-loading, .preview-empty { color: var(--color-text-disabled); font-size: 14px; }
 .preview-loading { animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 /* Excel 预览 */
 .excel-preview-wrap { display: flex; flex-direction: column; width: 100%; height: 100%; }
 .excel-preview-hint {
-  font-size: 11px; color: #aaa; text-align: center;
+  font-size: 11px; color: var(--color-text-disabled); text-align: center;
   margin-bottom: 8px; flex-shrink: 0;
 }
 .excel-preview-scroll {
-  flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; background: #e0e4e8; padding: 10px; border-radius: 4px;
+  flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; background: var(--color-bg-secondary); padding: 10px; border-radius: 4px;
 }
 .excel-preview-content {
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 /* Excel Sheet 标签页 */
 .excel-preview-tabs {
   display: flex;
   gap: 2px;
-  background: #e0e4e8;
+  background: var(--color-bg-secondary);
   padding: 4px 10px 0;
-  border-top: 1px solid #ccc;
+  border-top: 1px solid var(--color-border-strong);
   border-radius: 0 0 4px 4px;
 }
 .excel-tab-btn {
   padding: 6px 16px;
-  background: #f0f0f0;
-  border: 1px solid #ccc;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-strong);
   border-bottom: none;
   border-radius: 6px 6px 0 0;
   font-size: 12px;
-  color: #555;
+  color: var(--color-text-secondary);
   cursor: pointer;
   z-index: 1;
   position: relative;
   margin-bottom: -1px;
 }
 .excel-tab-btn:hover {
-  background: #fafafa;
+  background: var(--color-bg-subtle);
 }
 .excel-preview-scale-wrapper {
   transform-origin: top center;
@@ -1306,17 +1308,17 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: var(--color-surface);
   gap: 12px;
-  color: #23587b;
+  color: var(--color-primary);
   font-size: 14px;
 }
 
 .excel-preview-loading .spinner {
   width: 30px;
   height: 30px;
-  border: 3px solid rgba(35, 88, 123, 0.1);
-  border-top: 3px solid #23587b;
+  border: 3px solid color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border-top: 3px solid var(--color-primary);
   border-radius: 50%;
   animation: excel-spin 1s linear infinite;
 }
@@ -1327,10 +1329,10 @@ onBeforeUnmount(() => {
 }
 
 .excel-tab-btn.active {
-  background: #fff;
-  border-bottom: 1px solid #fff;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-surface);
   font-weight: 600;
-  color: #1d6b3a;
+  color: var(--color-success);
   z-index: 3;
 }
 
@@ -1338,26 +1340,26 @@ onBeforeUnmount(() => {
 /* ── 底部 ── */
 .dialog-footer {
   display: flex; justify-content: flex-end; gap: 10px;
-  padding: 12px 20px; border-top: 1px solid #e8eef2; flex-shrink: 0;
+  padding: 12px 20px; border-top: 1px solid var(--color-border-light); flex-shrink: 0;
 }
 .btn {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 8px 20px; border-radius: 8px; font-size: 13px;
   font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
 }
-.btn.secondary { background: #f0f0f0; color: #555; }
-.btn.secondary:hover { background: #e0e0e0; }
-.btn.primary { background: #23587b; color: white; }
-.btn.primary:hover { background: #1a4460; box-shadow: 0 3px 10px rgba(35,88,123,0.3); }
-.btn.excel { background: #1d6b3a; color: white; }
-.btn.excel:hover { background: #155229; box-shadow: 0 3px 10px rgba(29,107,58,0.3); }
+.btn.secondary { background: var(--color-bg-secondary); color: var(--color-text-secondary); }
+.btn.secondary:hover { background: var(--color-border); }
+.btn.primary { background: var(--color-primary); color: var(--color-surface); }
+.btn.primary:hover { background: var(--color-primary-hover); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-primary) 30%, transparent); }
+.btn.excel { background: var(--color-success); color: var(--color-surface); }
+.btn.excel:hover { background: var(--color-success-hover); box-shadow: 0 3px 10px rgba(29,107,58,0.3); }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ── 响应式 ── */
 @media (max-width: 768px) {
   .export-dialog { width: 98vw; max-height: 92vh; border-radius: 12px; }
   .dialog-body { flex-direction: column; }
-  .settings-panel { width: 100%; max-height: 45vh; border-right: none; border-bottom: 1px solid #e8eef2; }
+  .settings-panel { width: 100%; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--color-border-light); }
   .preview-panel { min-height: 160px; padding: 14px; }
   .preview-img { max-height: 28vh; }
   .setting-row input[type="text"] { min-height: 44px; padding: 10px 12px; font-size: 15px; }

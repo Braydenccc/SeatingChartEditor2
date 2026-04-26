@@ -143,7 +143,7 @@ const handleDoubleClick = () => {
 .candidate-item:hover {
   background: linear-gradient(135deg, #e8f4f8 0%, #d4e9f2 100%);
   border-left: 4px solid var(--color-primary);
-  box-shadow: 0 4px 12px rgba(35, 88, 123, 0.2);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 20%, transparent);
   transform: translateX(4px);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -157,7 +157,7 @@ const handleDoubleClick = () => {
   opacity: 0.5;
   transform: scale(1.05) rotate(2deg);
   background: transparent !important;
-  border-color: #d0d7dc !important;
+  border-color: var(--color-border) !important;
   transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
@@ -226,7 +226,7 @@ const handleDoubleClick = () => {
 .student-name {
   font-size: 20px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   text-align: center;
   word-break: break-all;
   line-height: 1.3;

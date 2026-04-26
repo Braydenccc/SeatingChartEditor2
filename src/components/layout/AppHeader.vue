@@ -3,8 +3,8 @@
     <div class="header-left">
         <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
           <div class="user-info" @click="toggleDropdown">
-          <Cloud v-if="authType === 'webdav'" :size="18" stroke-width="1.8" :title="'WebDAV 模式'" />
-          <User v-else :size="18" stroke-width="1.8" :title="'普通账号'" />
+          <Cloud v-if="authType === 'webdav'" :size="20" stroke-width="2" :title="'WebDAV 模式'" />
+          <User v-else :size="20" stroke-width="2" :title="'普通账号'" />
           <span class="welcome-text">{{ currentUser?.username }}</span>
           <span class="dropdown-icon">▼</span>
         </div>
@@ -40,6 +40,23 @@
         <span>设置</span>
       </button>
 
+      <!-- 主题切换 -->
+      <div class="theme-switcher">
+        <button
+          v-for="mode in themeModes"
+          :key="mode.value"
+          class="theme-btn"
+          :class="{ active: currentColorScheme === mode.value }"
+          @click="switchTheme(mode.value)"
+          :title="mode.label"
+        >
+          <component :is="mode.icon" :size="15" stroke-width="2" />
+          <Transition name="theme-label">
+            <span v-if="currentColorScheme === mode.value" class="theme-label">{{ mode.label }}</span>
+          </Transition>
+        </button>
+      </div>
+
       <h1 class="header-text">BraydenSCE V2</h1>
     </div>
     <div class="header-right">
@@ -60,7 +77,7 @@
 
 <script setup>
 import { onMounted, ref, onBeforeUnmount, computed, defineAsyncComponent } from 'vue'
-import { Cloud, FolderOpen, Github, LogIn, Settings, User } from 'lucide-vue-next'
+import { Cloud, FolderOpen, Github, LogIn, Monitor, Moon, Settings, Sun, User } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
@@ -71,7 +88,7 @@ const emit = defineEmits(['open-login'])
 
 const { currentUser, webdavConfig, isLoggedIn, logout, authType, initAuth } = useAuth()
 const { openCloudDialog } = useCloudWorkspaceDialog()
-const { saveToLocalStorage } = useGlobalSettings()
+const { settings, saveToLocalStorage, applyColorScheme, applyThemeColor } = useGlobalSettings()
 
 const showDropdown = ref(false)
 const showUnifiedSettings = ref(false)
@@ -79,6 +96,22 @@ const menuContainer = ref(null)
 
 const hasRetiehe = computed(() => !!currentUser.value)
 const hasWebdav = computed(() => !!webdavConfig.value)
+
+// 主题切换
+const themeModes = [
+  { value: 'light', label: '浅色', icon: Sun },
+  { value: 'dark', label: '深色', icon: Moon },
+  { value: 'auto', label: '自适应', icon: Monitor }
+]
+
+const currentColorScheme = computed(() => settings.value.ui.colorScheme)
+
+const switchTheme = (mode) => {
+  settings.value.ui.colorScheme = mode
+  applyColorScheme()
+  applyThemeColor()
+  saveToLocalStorage()
+}
 
 const toggleDropdown = () => {
   showDropdown.value = !showDropdown.value
@@ -128,7 +161,7 @@ onBeforeUnmount(() => {
   width: 100%;
   background: var(--color-primary);
   height: 100px;
-  color: var(--color-surface);
+  color: white;
   padding: 0 30px;
   box-shadow: var(--shadow-md);
 }
@@ -137,6 +170,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 24px;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .user-menu-container {
@@ -204,12 +240,12 @@ onBeforeUnmount(() => {
 
 .dropdown-group {
   padding: 12px 16px;
-  background: #f8fafc;
+  background: var(--color-bg-hover);
 }
 
 .group-title {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-bottom: 8px;
   font-weight: 600;
 }
@@ -219,7 +255,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #334155;
+  color: var(--color-text-primary);
   margin-bottom: 6px;
   cursor: pointer;
 }
@@ -229,12 +265,12 @@ onBeforeUnmount(() => {
 }
 
 .disabled-text {
-  color: #94a3b8;
+  color: var(--color-text-disabled);
 }
 
 .dropdown-divider {
   height: 1px;
-  background: #e2e8f0;
+  background: var(--color-border);
   margin: 4px 0;
 }
 
@@ -248,7 +284,7 @@ onBeforeUnmount(() => {
 .user-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(4px);
   padding: 8px 16px;
@@ -256,11 +292,13 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .user-info:hover {
   background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .user-info:active {
@@ -275,6 +313,7 @@ onBeforeUnmount(() => {
 .welcome-text {
   font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .auth-btn {
@@ -344,10 +383,76 @@ onBeforeUnmount(() => {
 
 /* .btn-icon: size controlled by :size prop */
 
-.header-right {
+/* 主题切换器 */
+.theme-switcher {
   display: flex;
   align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.theme-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.theme-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.theme-btn.active {
+  background: rgba(255, 255, 255, 0.22);
+  color: white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.theme-label {
+  display: inline-block;
+  overflow: hidden;
+}
+
+.theme-label-enter-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-label-leave-active {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-label-enter-from,
+.theme-label-leave-to {
+  opacity: 0;
+  max-width: 0;
+  margin-left: 0;
+}
+
+.theme-label-enter-to,
+.theme-label-leave-from {
+  opacity: 1;
+  max-width: 60px;
+}
+
+.header-right {
+  display: flex;
+  align-items: flex-end;
   gap: 16px;
+  flex-shrink: 0;
 }
 
 .header-subtitle {
@@ -355,19 +460,23 @@ onBeforeUnmount(() => {
   font-size: 20px;
   opacity: 0.9;
   font-weight: 300;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .header-subtitle a {
-  color: var(--color-surface);
+  color: white;
   text-decoration: underline;
 }
 
 .github-link {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-surface);
+  color: var(--color-text-inverse);
   transition: opacity 0.2s, transform 0.2s;
+  flex-shrink: 0;
 }
 
 /* .github-icon: size controlled by :size prop */
@@ -438,7 +547,7 @@ onBeforeUnmount(() => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 60%;
+    max-width: 100%;
   }
 }
 
@@ -481,7 +590,7 @@ onBeforeUnmount(() => {
     margin: 0;
     transform: none; /* remove translateY */
     border-radius: 0; /* drop rounded corners */
-    background: #1c4b6b; /* Solid color to fuse with title bar, replacing transparency */
+    background: var(--color-primary-dark); /* Solid color to fuse with title bar, replacing transparency */
     backdrop-filter: none;
     border: none;
     border-right: 1px solid rgba(255, 255, 255, 0.1);
@@ -494,7 +603,7 @@ onBeforeUnmount(() => {
     top: 0;
     height: 100%;
     border-radius: 0;
-    background: #1c4b6b;
+    background: var(--color-primary-dark);
     border: none;
     border-left: 1px solid rgba(255, 255, 255, 0.1);
     padding: 0 16px;
@@ -507,25 +616,29 @@ onBeforeUnmount(() => {
 
   .settings-button:hover {
     transform: none;
-    background: #18415c;
+    background: var(--color-primary-darker);
   }
 
   .settings-button:active {
     transform: none;
   }
 
+  .theme-switcher {
+    display: none;
+  }
+
   .login-btn {
     border-radius: 0;
     margin: 0;
     transform: none;
-    background: #1c4b6b;
+    background: var(--color-primary-dark);
     border: none;
     border-right: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   .user-info:hover, .login-btn:hover {
-    transform: none; 
-    background: #18415c;
+    transform: none;
+    background: var(--color-primary-darker);
   }
 
   .user-dropdown {

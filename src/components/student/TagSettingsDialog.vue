@@ -273,7 +273,7 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .dialog {
-  background: white;
+  background: var(--color-surface);
   padding: 28px;
   border-radius: 12px;
   width: 90%;
@@ -303,7 +303,7 @@ const deleteTagHandler = (tagId, tagName) => {
 
 .dialog h3 {
   margin: 0 0 20px 0;
-  color: #23587b;
+  color: var(--color-primary);
   font-size: 20px;
   font-weight: 600;
 }
@@ -327,7 +327,7 @@ const deleteTagHandler = (tagId, tagName) => {
 .mode-label {
   display: block;
   font-size: 13px;
-  color: #666;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
@@ -342,21 +342,21 @@ const deleteTagHandler = (tagId, tagName) => {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .mode-option:hover {
-  background: #f0f4f8;
-  border-color: #c0d0e0;
+  background: var(--color-bg-subtle);
+  border-color: var(--color-border);
 }
 
 .mode-option.active {
-  background: #e8f4f8;
-  border-color: #23587b;
+  background: var(--color-bg-selected);
+  border-color: var(--color-primary);
 }
 
 .mode-option input[type="radio"] {
@@ -370,8 +370,8 @@ const deleteTagHandler = (tagId, tagName) => {
   height: 36px;
   border-radius: 4px;
   position: relative;
-  background: #f5f5f5;
-  border: 1px solid #ddd;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -384,7 +384,7 @@ const deleteTagHandler = (tagId, tagName) => {
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 11px;
-  color: #666;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
@@ -407,8 +407,8 @@ const deleteTagHandler = (tagId, tagName) => {
 
 .dot-icon::after {
   background:
-    radial-gradient(circle, #e74c3c 1.5px, transparent 1.5px) 0 0,
-    radial-gradient(circle, #3498db 1.5px, transparent 1.5px) 6px 0,
+    radial-gradient(circle, var(--color-danger) 1.5px, transparent 1.5px) 0 0,
+    radial-gradient(circle, var(--color-primary) 1.5px, transparent 1.5px) 6px 0,
     radial-gradient(circle, #f39c12 1.5px, transparent 1.5px) 12px 0;
   background-size: 4px 4px, 4px 4px, 4px 4px;
   background-repeat: no-repeat;
@@ -421,8 +421,8 @@ const deleteTagHandler = (tagId, tagName) => {
   right: 2px;
   font-size: 9px;
   font-weight: 700;
-  color: #fff;
-  background: #e74c3c;
+  color: var(--color-surface);
+  background: var(--color-danger);
   padding: 1px 4px;
   border-radius: 2px;
   line-height: 1.2;
@@ -436,8 +436,8 @@ const deleteTagHandler = (tagId, tagName) => {
   transform: translateX(-50%);
   font-size: 8px;
   font-weight: 700;
-  color: #fff;
-  background: #e74c3c;
+  color: var(--color-surface);
+  background: var(--color-danger);
   padding: 1px 5px;
   border-radius: 2px;
   line-height: 1.2;
@@ -445,7 +445,7 @@ const deleteTagHandler = (tagId, tagName) => {
 
 .mode-text {
   font-size: 13px;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .checkbox-label {
@@ -454,7 +454,7 @@ const deleteTagHandler = (tagId, tagName) => {
   gap: 8px;
   cursor: pointer;
   font-size: 14px;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .checkbox-label input[type="checkbox"] {
@@ -478,7 +478,7 @@ const deleteTagHandler = (tagId, tagName) => {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: #555;
+  color: var(--color-text-primary);
 }
 
 .add-tag-btn {
@@ -486,9 +486,9 @@ const deleteTagHandler = (tagId, tagName) => {
   align-items: center;
   gap: 4px;
   padding: 6px 12px;
-  background: #f0f7f0;
-  color: #4CAF50;
-  border: 1px solid #4CAF50;
+  background: var(--color-success-bg-light);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
@@ -497,8 +497,8 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .add-tag-btn:hover {
-  background: #4CAF50;
-  color: white;
+  background: var(--color-success);
+  color: var(--color-surface);
 }
 
 .tag-list {
@@ -511,7 +511,7 @@ const deleteTagHandler = (tagId, tagName) => {
 
 .empty-hint {
   text-align: center;
-  color: #999;
+  color: var(--color-text-disabled);
   font-size: 14px;
   padding: 20px;
 }
@@ -521,7 +521,7 @@ const deleteTagHandler = (tagId, tagName) => {
   align-items: center;
   gap: 0;
   padding: 0;
-  background: color-mix(in srgb, var(--tag-color) 12%, #fff);
+  background: color-mix(in srgb, var(--tag-color) 12%, var(--color-surface));
   border: 1px solid color-mix(in srgb, var(--tag-color) 30%, transparent);
   border-radius: 6px;
   font-size: 13px;
@@ -532,7 +532,7 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-item:hover {
-  background: color-mix(in srgb, var(--tag-color) 20%, #fff);
+  background: color-mix(in srgb, var(--tag-color) 20%, var(--color-surface));
   border-color: color-mix(in srgb, var(--tag-color) 50%, transparent);
   box-shadow: 0 1px 4px color-mix(in srgb, var(--tag-color) 20%, transparent);
 }
@@ -578,7 +578,7 @@ const deleteTagHandler = (tagId, tagName) => {
   gap: 4px;
   padding: 0 8px;
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-secondary);
   cursor: pointer;
 }
 
@@ -615,13 +615,13 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-action-btn.delete:hover {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 .tag-action-btn.delete.confirming {
-  background: #dc2626 !important;
-  color: white !important;
+  background: var(--color-danger) !important;
+  color: var(--color-surface) !important;
 }
 
 .form-group {
@@ -631,7 +631,7 @@ const deleteTagHandler = (tagId, tagName) => {
 .form-group label {
   display: block;
   margin-bottom: 10px;
-  color: #555;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 500;
 }
@@ -639,7 +639,7 @@ const deleteTagHandler = (tagId, tagName) => {
 .form-group input[type="text"] {
   width: 100%;
   padding: 10px 14px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
   box-sizing: border-box;
@@ -648,7 +648,7 @@ const deleteTagHandler = (tagId, tagName) => {
 
 .form-group input[type="text"]:focus {
   outline: none;
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .color-picker {
@@ -660,18 +660,18 @@ const deleteTagHandler = (tagId, tagName) => {
 .color-picker input[type="color"] {
   width: 70px;
   height: 40px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
   transition: border-color 0.3s;
 }
 
 .color-picker input[type="color"]:hover {
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .color-value {
-  color: #666;
+  color: var(--color-text-secondary);
   font-family: 'Courier New', monospace;
   font-size: 14px;
   font-weight: 500;
@@ -697,23 +697,23 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .btn-cancel {
-  background: #e0e0e0;
-  color: #333;
+  background: var(--color-border);
+  color: var(--color-text-primary);
 }
 
 .btn-cancel:hover {
-  background: #d0d0d0;
+  background: var(--color-border);
 }
 
 .btn-confirm {
-  background: #23587b;
-  color: white;
-  box-shadow: 0 2px 6px rgba(35, 88, 123, 0.2);
+  background: var(--color-primary);
+  color: var(--color-surface);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .btn-confirm:hover {
-  background: #1a4460;
-  box-shadow: 0 4px 10px rgba(35, 88, 123, 0.3);
+  background: var(--color-primary-hover);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--color-primary) 30%, transparent);
   transform: translateY(-1px);
 }
 
@@ -726,17 +726,17 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--scrollbar-track);
   border-radius: 3px;
 }
 
 .tag-list::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 .tag-list::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--scrollbar-thumb-hover);
 }
 
 @media (max-width: 768px) {

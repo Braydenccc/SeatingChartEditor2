@@ -120,13 +120,13 @@ const handleToggleVisible = (zoneId) => {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .add-zone-btn {
   padding: 6px 12px;
-  background: #23587b;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-surface);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -136,7 +136,7 @@ const handleToggleVisible = (zoneId) => {
 }
 
 .add-zone-btn:hover {
-  background: #1a4460;
+  background: var(--color-primary-hover);
   transform: translateY(-1px);
 }
 
@@ -151,23 +151,23 @@ const handleToggleVisible = (zoneId) => {
 }
 
 .zone-list-content::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--scrollbar-track);
   border-radius: 3px;
 }
 
 .zone-list-content::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 .zone-list-content::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--scrollbar-thumb-hover);
 }
 
 .empty-zone-list {
   text-align: center;
   padding: 30px 20px;
-  color: #999;
+  color: var(--color-text-disabled);
 }
 
 .empty-zone-list p {
@@ -177,7 +177,7 @@ const handleToggleVisible = (zoneId) => {
 
 .empty-zone-list .hint {
   font-size: 12px;
-  color: #bbb;
+  color: var(--color-text-disabled);
 }
 
 /* 响应式设计 */

@@ -189,7 +189,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   display: flex;
   align-items: center;
   gap: 16px;
-  background: #ffffff;
+  background: var(--color-surface);
   padding: 10px 16px;
   border-radius: 10px;
   margin-bottom: 8px;
@@ -200,8 +200,8 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
 }
 
 .student-list-item:hover {
-  box-shadow: 0 5px 15px rgba(35, 88, 123, 0.08);
-  border-color: #d1e2ec;
+  box-shadow: 0 5px 15px color-mix(in srgb, var(--color-primary) 8%, transparent);
+  border-color: var(--color-border);
   transform: translateY(-1px);
 }
 
@@ -219,14 +219,14 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   position: relative;
   display: flex;
   align-items: center;
-  background: #f7f9fa;
+  background: var(--color-bg-secondary);
   border-radius: 6px;
   transition: background 0.3s ease;
 }
 
 .input-wrapper:hover,
 .input-wrapper:focus-within {
-  background: #f0f4f8;
+  background: var(--color-bg-subtle);
 }
 
 .input-line {
@@ -235,7 +235,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   left: 50%;
   width: 0;
   height: 2px;
-  background: #23587b;
+  background: var(--color-primary);
   transition: width 0.3s ease, left 0.3s ease;
   border-radius: 2px;
 }
@@ -250,14 +250,14 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   background: transparent;
   padding: 8px 12px;
   font-size: 14px;
-  color: #333;
+  color: var(--color-text-primary);
   width: 100%;
   outline: none;
   font-family: inherit;
 }
 
 .info-input::placeholder {
-  color: #a0aec0;
+  color: var(--color-text-disabled);
   font-weight: 400;
 }
 
@@ -267,7 +267,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
 
 .name-wrapper .info-input {
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .number-wrapper {
@@ -276,7 +276,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
 }
 
 .number-prefix {
-  color: #a0aec0;
+  color: var(--color-text-disabled);
   font-size: 13px;
   font-weight: bold;
   user-select: none;
@@ -341,18 +341,18 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #f0f4f8;
-  border: 1px dashed #cbd5e1;
-  color: #64748b;
+  background: var(--color-bg-subtle);
+  border: 1px dashed var(--color-border-strong);
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .add-tag-btn:hover,
 .add-tag-btn.active {
-  background: #e2e8f0;
-  color: #23587b;
-  border-color: #94a3b8;
+  background: var(--color-border);
+  color: var(--color-primary);
+  border-color: var(--color-border-strong);
 }
 
 
@@ -373,15 +373,15 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
-  color: #94a3b8;
+  color: var(--color-text-disabled);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .delete-btn:hover {
-  background: #fee2e2;
-  color: #ef4444;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 /* ================= 响应式 ================= */
@@ -396,7 +396,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
     width: 100%;
     order: 3;
     padding-top: 8px;
-    border-top: 1px dashed #e2e8f0;
+    border-top: 1px dashed var(--color-border);
   }
   
   .student-info {
@@ -411,10 +411,10 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   position: fixed;
   z-index: 9999;
   width: 160px;
-  background: white;
+  background: var(--color-surface);
   border-radius: 10px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   overflow: hidden;
 }
 
@@ -422,9 +422,9 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  color: var(--color-text-muted);
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .tag-dropdown .tag-options {
@@ -438,13 +438,13 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   gap: 8px;
   padding: 8px 12px;
   font-size: 13px;
-  color: #334155;
+  color: var(--color-text-primary);
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .tag-dropdown .tag-option:hover {
-  background: #f1f5f9;
+  background: var(--color-bg-secondary);
 }
 
 .tag-dropdown .tag-color-dot {
@@ -458,7 +458,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   padding: 12px;
   text-align: center;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--color-text-disabled);
 }
 
 /* 下拉菜单展开动画 */

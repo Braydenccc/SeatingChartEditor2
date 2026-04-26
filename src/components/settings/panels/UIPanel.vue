@@ -297,6 +297,22 @@
                   />
                 </div>
               </div>
+
+              <div class="color-item">
+                <label class="color-label">悬停背景</label>
+                <div class="color-input-group">
+                  <input
+                    v-model="localSettings.customColors.bgHover"
+                    type="color"
+                    class="color-picker-small"
+                  />
+                  <input
+                    v-model="localSettings.customColors.bgHover"
+                    type="text"
+                    class="setting-input color-input-small"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -368,6 +384,22 @@
                   />
                 </div>
               </div>
+
+              <div class="color-item">
+                <label class="color-label">禁用文字</label>
+                <div class="color-input-group">
+                  <input
+                    v-model="localSettings.customColors.textDisabled"
+                    type="color"
+                    class="color-picker-small"
+                  />
+                  <input
+                    v-model="localSettings.customColors.textDisabled"
+                    type="text"
+                    class="setting-input color-input-small"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -400,6 +432,22 @@
                   />
                   <input
                     v-model="localSettings.customColors.borderStrong"
+                    type="text"
+                    class="setting-input color-input-small"
+                  />
+                </div>
+              </div>
+
+              <div class="color-item">
+                <label class="color-label">边框（悬停）</label>
+                <div class="color-input-group">
+                  <input
+                    v-model="localSettings.customColors.borderHover"
+                    type="color"
+                    class="color-picker-small"
+                  />
+                  <input
+                    v-model="localSettings.customColors.borderHover"
                     type="text"
                     class="setting-input color-input-small"
                   />
@@ -460,6 +508,54 @@
               </div>
 
               <div class="color-item">
+                <label class="color-label">成功（悬停）</label>
+                <div class="color-input-group">
+                  <input
+                    v-model="localSettings.customColors.successHover"
+                    type="color"
+                    class="color-picker-small"
+                  />
+                  <input
+                    v-model="localSettings.customColors.successHover"
+                    type="text"
+                    class="setting-input color-input-small"
+                  />
+                </div>
+              </div>
+
+              <div class="color-item">
+                <label class="color-label">警告</label>
+                <div class="color-input-group">
+                  <input
+                    v-model="localSettings.customColors.warning"
+                    type="color"
+                    class="color-picker-small"
+                  />
+                  <input
+                    v-model="localSettings.customColors.warning"
+                    type="text"
+                    class="setting-input color-input-small"
+                  />
+                </div>
+              </div>
+
+              <div class="color-item">
+                <label class="color-label">警告（悬停）</label>
+                <div class="color-input-group">
+                  <input
+                    v-model="localSettings.customColors.warningHover"
+                    type="color"
+                    class="color-picker-small"
+                  />
+                  <input
+                    v-model="localSettings.customColors.warningHover"
+                    type="text"
+                    class="setting-input color-input-small"
+                  />
+                </div>
+              </div>
+
+              <div class="color-item">
                 <label class="color-label">信息</label>
                 <div class="color-input-group">
                   <input
@@ -469,6 +565,22 @@
                   />
                   <input
                     v-model="localSettings.customColors.info"
+                    type="text"
+                    class="setting-input color-input-small"
+                  />
+                </div>
+              </div>
+
+              <div class="color-item">
+                <label class="color-label">信息（悬停）</label>
+                <div class="color-input-group">
+                  <input
+                    v-model="localSettings.customColors.infoHover"
+                    type="color"
+                    class="color-picker-small"
+                  />
+                  <input
+                    v-model="localSettings.customColors.infoHover"
                     type="text"
                     class="setting-input color-input-small"
                   />
@@ -648,13 +760,13 @@ watch(() => localSettings.value.customColors, () => {
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin: 0 0 8px 0;
 }
 
 .section-desc {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin: 0 0 20px 0;
 }
 
@@ -673,17 +785,17 @@ watch(() => localSettings.value.customColors, () => {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #334155;
+  color: var(--color-text-primary);
   margin-bottom: 0;
 }
 
 .reset-btn {
   padding: 4px 8px;
   background: transparent;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   cursor: pointer;
-  color: #64748b;
+  color: var(--color-text-muted);
   transition: all 0.2s;
   display: flex;
   align-items: center;
@@ -691,9 +803,9 @@ watch(() => localSettings.value.customColors, () => {
 }
 
 .reset-btn:hover:not(:disabled) {
-  background: #f8f9fa;
-  border-color: #23587b;
-  color: #23587b;
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .reset-btn:disabled {
@@ -705,16 +817,18 @@ watch(() => localSettings.value.customColors, () => {
 .setting-select {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
   transition: border-color 0.2s;
+  background: var(--color-input-bg);
+  color: var(--color-text-primary);
 }
 
 .setting-input:focus,
 .setting-select:focus {
   outline: none;
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .setting-checkbox {
@@ -737,7 +851,7 @@ watch(() => localSettings.value.customColors, () => {
 .color-picker {
   width: 60px;
   height: 40px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
 }
@@ -749,13 +863,13 @@ watch(() => localSettings.value.customColors, () => {
 .hint-text {
   display: block;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--color-text-disabled);
   margin-top: 4px;
   font-style: italic;
 }
 
 .setting-select:disabled {
-  background-color: #f1f5f9;
+  background-color: var(--color-bg-soft);
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -768,24 +882,24 @@ watch(() => localSettings.value.customColors, () => {
 .mode-tab {
   flex: 1;
   padding: 10px 16px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  color: #64748b;
+  color: var(--color-text-muted);
   transition: all 0.2s;
 }
 
 .mode-tab:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: var(--color-bg-soft);
+  border-color: var(--color-border-strong);
 }
 
 .mode-tab.active {
-  background: #23587b;
-  border-color: #23587b;
-  color: #fff;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 .scheme-options {
@@ -808,22 +922,22 @@ watch(() => localSettings.value.customColors, () => {
   align-items: center;
   gap: 8px;
   padding: 16px;
-  background: #f8fafc;
-  border: 2px solid #e2e8f0;
+  background: var(--color-bg-subtle);
+  border: 2px solid var(--color-border);
   border-radius: 8px;
   transition: all 0.2s;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .scheme-option:hover .scheme-card {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: var(--color-bg-soft);
+  border-color: var(--color-border-strong);
 }
 
 .scheme-radio:checked + .scheme-card {
-  background: #e8f4f8;
-  border-color: #23587b;
-  color: #23587b;
+  background: var(--color-bg-selected);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .custom-colors-section {
@@ -837,7 +951,7 @@ watch(() => localSettings.value.customColors, () => {
 .category-title {
   font-size: 14px;
   font-weight: 600;
-  color: #475569;
+  color: var(--color-text-secondary);
   margin: 0 0 12px 0;
 }
 
@@ -855,7 +969,7 @@ watch(() => localSettings.value.customColors, () => {
 
 .color-label {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .color-input-group {
@@ -867,7 +981,7 @@ watch(() => localSettings.value.customColors, () => {
 .color-picker-small {
   width: 40px;
   height: 32px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   cursor: pointer;
 }
@@ -888,18 +1002,18 @@ watch(() => localSettings.value.customColors, () => {
 .contrast-badge {
   padding: 2px 8px;
   border-radius: 4px;
-  color: #fff;
+  color: var(--color-text-inverse);
   font-weight: 500;
 }
 
 .contrast-ratio {
-  color: #94a3b8;
+  color: var(--color-text-disabled);
 }
 
 .reset-custom-colors {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-border);
 }
 
 .reset-all-btn {
@@ -908,17 +1022,17 @@ watch(() => localSettings.value.customColors, () => {
   gap: 8px;
   padding: 8px 16px;
   background: transparent;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-size: 14px;
   transition: all 0.2s;
 }
 
 .reset-all-btn:hover {
-  background: #f8f9fa;
-  border-color: #23587b;
-  color: #23587b;
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 </style>

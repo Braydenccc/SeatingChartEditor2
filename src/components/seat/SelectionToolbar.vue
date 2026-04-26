@@ -65,8 +65,8 @@ const handleCancel = () => emit('cancel')
   align-items: center;
   gap: 2px;
   padding: 4px 6px;
-  background: #fff;
-  border: 1px solid #d0d7dc;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
   transform: translateX(-50%);
@@ -85,14 +85,14 @@ const handleCancel = () => emit('cancel')
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
-  color: #555;
+  color: var(--color-text-secondary);
   white-space: nowrap;
   transition: all 0.15s ease;
 }
 
 .sel-btn:hover {
-  background: #f0f4f7;
-  color: #23587b;
+  background: var(--color-bg-hover);
+  color: var(--color-primary);
 }
 
 .sel-btn:active {
@@ -100,66 +100,66 @@ const handleCancel = () => emit('cancel')
 }
 
 .sel-btn--edit:hover {
-  background: #f0f4f8;
-  color: #23587b;
+  background: var(--color-bg-hover);
+  color: var(--color-primary);
 }
 
 .sel-btn--edit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   background: transparent;
-  color: #999;
+  color: var(--color-text-disabled);
 }
 
 .sel-btn--clear:hover {
-  background: #fef2f2;
-  color: #dc2626;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 .sel-btn--shuffle:hover {
-  background: #f0f9ff;
-  color: #0369a1;
+  background: var(--color-info-bg);
+  color: var(--color-info);
 }
 
 .sel-btn--shuffle:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   background: transparent;
-  color: #999;
+  color: var(--color-text-disabled);
 }
 
 .sel-btn--swap:hover {
-  background: #fef3c7;
-  color: #d97706;
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
 }
 
 .sel-btn--swap:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   background: transparent;
-  color: #999;
+  color: var(--color-text-disabled);
 }
 
 .sel-btn--assign:hover {
-  background: #f0fdf4;
-  color: #15803d;
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .sel-btn--assign:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   background: transparent;
-  color: #999;
+  color: var(--color-text-disabled);
 }
 
 .sel-btn--cancel {
   padding: 5px;
-  color: #999;
+  color: var(--color-text-disabled);
 }
 
 .sel-btn--cancel:hover {
-  background: #f5f5f5;
-  color: #666;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
 }
 
 .sel-btn-label {
@@ -169,7 +169,7 @@ const handleCancel = () => emit('cancel')
 .sel-divider {
   width: 1px;
   height: 20px;
-  background: #e0e0e0;
+  background: var(--color-border);
   margin: 0 2px;
   flex-shrink: 0;
 }

@@ -97,14 +97,14 @@ const candidatePanelStyle = computed(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #f5f5f5;
+  background: var(--color-bg-secondary);
 }
 
 .editor {
   flex: 1;
   min-height: 0;
-  background: #ffffff;
-  border-bottom: 2px solid #e0e0e0;
+  background: var(--color-surface);
+  border-bottom: 2px solid var(--color-border);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -125,10 +125,10 @@ const candidatePanelStyle = computed(() => {
   align-items: center;
   gap: 16px;
   padding: 6px 16px;
-  background: #ffffff;
-  border-top: 1px solid #e8eef2;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
   font-size: 11px;
-  color: #6b7280;
+  color: var(--color-text-secondary);
   flex-shrink: 0;
   min-height: 28px;
 }
@@ -148,7 +148,7 @@ const candidatePanelStyle = computed(() => {
 
 .hint-label {
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-primary);
 }
 
 .hint-item {
@@ -165,17 +165,17 @@ const candidatePanelStyle = computed(() => {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-weight: 500;
   line-height: 1.4;
-  color: #374151;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
-  box-shadow: inset 0 -1px 0 #d1d5db;
+  box-shadow: inset 0 -1px 0 var(--color-border);
 }
 
 .hint-divider {
   width: 1px;
   height: 14px;
-  background: #e5e7eb;
+  background: var(--color-border-light);
 }
 
 /* 响应式设计 - 中等屏幕 */
@@ -225,9 +225,9 @@ const candidatePanelStyle = computed(() => {
   .editor {
     flex: 1 1 auto;
     min-height: 0;
-    background: #ffffff;
+    background: var(--color-surface);
     overflow: hidden;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
   }
@@ -261,9 +261,9 @@ const candidatePanelStyle = computed(() => {
   .editor {
     flex: 1 1 auto;
     min-height: 0;
-    background: #ffffff;
+    background: var(--color-surface);
     overflow: hidden;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
   }

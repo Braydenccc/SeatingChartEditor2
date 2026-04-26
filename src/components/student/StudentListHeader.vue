@@ -171,7 +171,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   padding: 10px 16px;
-  background: #ffffff;
+  background: var(--color-surface);
   border-bottom: 1px solid #e8eef2;
   gap: 4px;
   min-height: 48px;
@@ -189,7 +189,7 @@ onBeforeUnmount(() => {
 .header-divider {
   width: 1px;
   height: 24px;
-  background: #e0e0e0;
+  background: var(--color-border);
   flex-shrink: 0;
 }
 
@@ -204,32 +204,32 @@ onBeforeUnmount(() => {
   width: 3px;
   height: 14px;
   border-radius: 2px;
-  background: #bbb;
+  background: var(--color-border);
 }
 
 .status-indicator {
   width: 3px;
   height: 16px;
   border-radius: 2px;
-  background: #23587b;
+  background: var(--color-primary);
   transition: background 0.2s ease;
 }
 
 .status-indicator.mode-swap { background: #f59e0b; }
-.status-indicator.mode-clear { background: #ef4444; }
+.status-indicator.mode-clear { background: var(--color-danger-text); }
 .status-indicator.mode-empty_edit { background: #8b5cf6; }
 .status-indicator.mode-zone_edit { background: #06b6d4; }
 
 .status-text {
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-primary);
   white-space: nowrap;
 }
 
 .candidate-count {
-  background: #23587b;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-surface);
   font-size: 11px;
   font-weight: 600;
   padding: 1px 7px;
@@ -237,7 +237,7 @@ onBeforeUnmount(() => {
   line-height: 1.6;
   min-width: 18px;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(35, 88, 123, 0.25);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-primary) 25%, transparent);
 }
 
 .header-actions {
@@ -259,8 +259,8 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 4px;
   padding: 6px 10px;
-  background: #f3f4f6;
-  color: #4b5563;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
   border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
@@ -272,9 +272,9 @@ onBeforeUnmount(() => {
 }
 
 .icon-btn:hover {
-  background: #e5e7eb;
-  color: #23587b;
-  border-color: #d1d5db;
+  background: var(--color-bg-secondary);
+  color: var(--color-primary);
+  border-color: var(--color-border-strong);
 }
 
 .icon-btn:active {
@@ -282,16 +282,16 @@ onBeforeUnmount(() => {
 }
 
 .icon-btn.btn-primary {
-  background: #23587b;
-  color: #ffffff;
+  background: var(--color-primary);
+  color: var(--color-surface);
   border-color: transparent;
-  box-shadow: 0 1px 3px rgba(35, 88, 123, 0.2);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .icon-btn.btn-primary:hover {
-  background: #1a4460;
-  box-shadow: 0 2px 6px rgba(35, 88, 123, 0.3);
-  color: #ffffff;
+  background: var(--color-primary-hover);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  color: var(--color-surface);
   border-color: transparent;
   transform: translateY(-1px);
 }
@@ -301,27 +301,27 @@ onBeforeUnmount(() => {
 }
 
 .icon-btn.btn-primary-light {
-  background: rgba(35, 88, 123, 0.08);
-  color: #23587b;
-  border: 1px solid rgba(35, 88, 123, 0.15);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 
 .icon-btn.btn-primary-light:hover {
-  background: rgba(35, 88, 123, 0.15);
-  border-color: rgba(35, 88, 123, 0.25);
-  color: #1a4460;
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
+  color: var(--color-primary-hover);
 }
 
 .icon-btn.btn-ghost {
   background: transparent;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-bg-secondary);
 }
 
 .icon-btn.btn-ghost:hover {
-  background: #f9fafb;
-  color: #374151;
-  border-color: #d1d5db;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
 }
 
 @media (max-width: 1366px) and (min-width: 1025px) {

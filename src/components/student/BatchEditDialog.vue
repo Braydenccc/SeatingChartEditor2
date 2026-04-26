@@ -262,8 +262,8 @@ const close = () => {
 
 .selected-count {
   font-size: 13px;
-  color: #666;
-  background: #e8f4f8;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-selected);
   padding: 2px 10px;
   border-radius: 12px;
 }
@@ -273,14 +273,14 @@ const close = () => {
   background: none;
   border: none;
   font-size: 24px;
-  color: var(--color-text-muted, #999);
+  color: var(--color-text-disabled);
   cursor: pointer;
   line-height: 1;
   padding: 0;
 }
 
 .close-btn:hover {
-  color: var(--color-text-primary, #333);
+  color: var(--color-text-primary);
 }
 
 .dialog-body {
@@ -288,7 +288,7 @@ const close = () => {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  background: #f5f5f5;
+  background: var(--color-bg-secondary);
 }
 
 .student-list-section {
@@ -305,7 +305,7 @@ const close = () => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px;
-  background: #fff;
+  background: var(--color-surface);
   border-bottom: 1px solid #e8eef2;
 }
 
@@ -313,12 +313,12 @@ const close = () => {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .section-header .hint {
   font-size: 12px;
-  color: #888;
+  color: var(--color-text-muted);
 }
 
 .student-items {
@@ -331,7 +331,7 @@ const close = () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #ffffff;
+  background: var(--color-surface);
   padding: 10px 14px;
   border-radius: 10px;
   margin-bottom: 8px;
@@ -341,8 +341,8 @@ const close = () => {
 }
 
 .student-edit-item:hover {
-  box-shadow: 0 3px 10px rgba(35, 88, 123, 0.06);
-  border-color: #d1e2ec;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--color-primary) 6%, transparent);
+  border-color: var(--color-border);
 }
 
 .student-info {
@@ -355,14 +355,14 @@ const close = () => {
   position: relative;
   display: flex;
   align-items: center;
-  background: #f7f9fa;
+  background: var(--color-bg-secondary);
   border-radius: 6px;
   transition: background 0.3s ease;
 }
 
 .input-wrapper:hover,
 .input-wrapper:focus-within {
-  background: #f0f4f8;
+  background: var(--color-bg-subtle);
 }
 
 .input-line {
@@ -371,7 +371,7 @@ const close = () => {
   left: 50%;
   width: 0;
   height: 2px;
-  background: #23587b;
+  background: var(--color-primary);
   transition: width 0.3s ease, left 0.3s ease;
   border-radius: 2px;
 }
@@ -386,14 +386,14 @@ const close = () => {
   background: transparent;
   padding: 7px 10px;
   font-size: 13px;
-  color: #333;
+  color: var(--color-text-primary);
   width: 100%;
   outline: none;
   font-family: inherit;
 }
 
 .info-input::placeholder {
-  color: #a0aec0;
+  color: var(--color-text-disabled);
   font-weight: 400;
 }
 
@@ -403,7 +403,7 @@ const close = () => {
 
 .name-wrapper .info-input {
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .number-wrapper {
@@ -412,7 +412,7 @@ const close = () => {
 }
 
 .number-prefix {
-  color: #a0aec0;
+  color: var(--color-text-disabled);
   font-size: 12px;
   font-weight: bold;
   user-select: none;
@@ -442,18 +442,18 @@ const close = () => {
 
 .no-tags-hint {
   font-size: 11px;
-  color: #aaa;
+  color: var(--color-text-disabled);
 }
 
 .empty-hint {
   text-align: center;
   padding: 20px;
-  color: #999;
+  color: var(--color-text-disabled);
   font-size: 13px;
 }
 
 .tags-section {
-  background: #fff;
+  background: var(--color-surface);
   border-top: 1px solid #e8eef2;
 }
 
@@ -469,29 +469,29 @@ const close = () => {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   border: 1px solid #e0e4e8;
   border-radius: 8px;
   cursor: pointer;
   font-size: 12px;
-  color: #444;
+  color: var(--color-text-primary);
   transition: all 0.2s ease;
 }
 
 .tag-action-btn:hover {
-  background: #f0f4f8;
-  border-color: #c0c8d0;
+  background: var(--color-bg-subtle);
+  border-color: var(--color-border-strong);
 }
 
 .tag-action-btn.all-have {
-  background: #e8f4f8;
-  border-color: #23587b;
-  color: #23587b;
+  background: var(--color-bg-selected);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .tag-action-btn.some-have {
-  background: #fef9e7;
-  border-color: #d4a947;
+  background: var(--color-warning-bg-light);
+  border-color: var(--color-warning);
 }
 
 .tag-dot {
@@ -509,18 +509,18 @@ const close = () => {
   display: flex;
   align-items: center;
   font-size: 11px;
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 .tag-action-btn.all-have .tag-status {
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .no-tags-available {
   width: 100%;
   text-align: center;
   padding: 12px;
-  color: #999;
+  color: var(--color-text-disabled);
   font-size: 12px;
 }
 

@@ -159,7 +159,12 @@ const handleImportExcel = async (event) => {
 
     clearAllStudents()
     clearAllTags()
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788']
+    const colors = [
+      'var(--tag-color-1)', 'var(--tag-color-2)', 'var(--tag-color-3)',
+      'var(--tag-color-4)', 'var(--tag-color-5)', 'var(--tag-color-6)',
+      'var(--tag-color-7)', 'var(--tag-color-8)', 'var(--tag-color-9)',
+      'var(--tag-color-10)'
+    ]
     const tagNameToId = {}
 
     result.tagNames.forEach((tagName, index) => {
@@ -310,7 +315,7 @@ const handleDrop = (e) => {
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  background: #f5f5f5;
+  background: var(--color-bg-secondary);
 }
 
 /* 折叠时隐藏整个容器 */
@@ -369,7 +374,7 @@ const handleDrop = (e) => {
 }
 
 .student-items.drag-over {
-  background: rgba(35, 88, 123, 0.06);
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
   border-color: var(--color-primary);
 }
 
@@ -382,10 +387,10 @@ const handleDrop = (e) => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: rgba(35, 88, 123, 0.18);
-  border: 2px dashed rgba(35, 88, 123, 0.6);
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  border: 2px dashed color-mix(in srgb, var(--color-primary) 60%, transparent);
   border-radius: 8px;
-  color: #23587b;
+  color: var(--color-primary);
   font-size: 13px;
   font-weight: 600;
   pointer-events: none;
@@ -395,10 +400,10 @@ const handleDrop = (e) => {
 }
 
 .touch-drop-out-overlay.touch-drop-over {
-  background: rgba(35, 88, 123, 0.28);
-  border-color: #23587b;
+  background: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  border-color: var(--color-primary);
   border-style: solid;
-  color: #1a4460;
+  color: var(--color-primary-hover);
 }
 
 @keyframes touch-overlay-in {
@@ -459,7 +464,7 @@ const handleDrop = (e) => {
   width: 32px;
   height: 32px;
   min-width: 32px;
-  color: #52B788;
+  color: var(--color-success);
   animation: none;
 }
 
@@ -511,14 +516,14 @@ const handleDrop = (e) => {
 }
 
 .empty-action-btn.primary {
-  background: #23587b;
-  color: white;
-  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.25);
+  background: var(--color-primary);
+  color: var(--color-surface);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 25%, transparent);
 }
 
 .empty-action-btn.primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(35, 88, 123, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .empty-action-btn.primary:active {
@@ -526,15 +531,15 @@ const handleDrop = (e) => {
 }
 
 .empty-action-btn.outline {
-  background: #f8f9fa;
-  color: #4b5563;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
 }
 
 .empty-action-btn.outline:hover {
-  background: #f0f4f7;
-  border-color: #23587b;
-  color: #23587b;
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .empty-action-row {
@@ -566,8 +571,8 @@ const handleDrop = (e) => {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: #23587b;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-surface);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -592,18 +597,18 @@ const handleDrop = (e) => {
 }
 
 .student-items::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--scrollbar-track);
   border-radius: 4px;
 }
 
 .student-items::-webkit-scrollbar-thumb {
-  background: #bbb;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
   transition: background 0.3s;
 }
 
 .student-items::-webkit-scrollbar-thumb:hover {
-  background: #888;
+  background: var(--scrollbar-thumb-hover);
 }
 
 @media (max-width: 1366px) and (min-width: 1025px) {

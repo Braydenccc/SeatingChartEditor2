@@ -152,13 +152,13 @@ const openTagSettings = () => {
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin: 0 0 8px 0;
 }
 
 .section-desc {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-secondary);
   margin: 0 0 20px 0;
 }
 
@@ -170,7 +170,7 @@ const openTagSettings = () => {
 }
 
 .info-item {
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   padding: 16px;
   border-radius: 8px;
   display: flex;
@@ -180,7 +180,7 @@ const openTagSettings = () => {
 }
 
 .info-item:hover {
-  background: #f1f3f5;
+  background: var(--color-bg-secondary);
   transform: translateY(-2px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
@@ -189,11 +189,11 @@ const openTagSettings = () => {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: #e8f2f7;
+  background: var(--color-info-bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #23587b;
+  color: var(--color-primary);
   flex-shrink: 0;
 }
 
@@ -206,20 +206,20 @@ const openTagSettings = () => {
 
 .info-label {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .info-value {
   font-size: 24px;
-  color: #23587b;
+  color: var(--color-primary);
   font-weight: 600;
   line-height: 1;
 }
 
 .section-divider {
   height: 1px;
-  background: #e2e8f0;
+  background: var(--color-border);
   margin: 32px 0;
 }
 
@@ -234,20 +234,20 @@ const openTagSettings = () => {
   align-items: center;
   gap: 16px;
   padding: 16px;
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   text-align: left;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .action-button:hover {
-  border-color: #23587b;
-  background: #f8fafb;
+  border-color: var(--color-primary);
+  background: var(--color-bg-secondary);
   transform: translateX(4px);
-  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.1);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .button-content {
@@ -260,11 +260,11 @@ const openTagSettings = () => {
 .button-title {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .button-desc {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-secondary);
 }
 </style>

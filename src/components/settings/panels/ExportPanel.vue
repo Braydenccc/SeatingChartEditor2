@@ -116,13 +116,13 @@ const openExportPreview = () => {
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin: 0 0 8px 0;
 }
 
 .section-desc {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin: 0 0 20px 0;
 }
 
@@ -138,7 +138,7 @@ const openExportPreview = () => {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: #f8f9fa;
+  background: var(--color-bg-hover);
   border-radius: 6px;
 }
 
@@ -153,13 +153,13 @@ const openExportPreview = () => {
 }
 
 .feature-icon.image {
-  background: #dbeafe;
-  color: #2563eb;
+  background: var(--color-info-bg);
+  color: var(--color-info);
 }
 
 .feature-icon.excel {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .feature-content {
@@ -171,16 +171,16 @@ const openExportPreview = () => {
 .feature-title {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .feature-desc {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .config-preview {
-  background: #f8f9fa;
+  background: var(--color-bg-hover);
   padding: 16px;
   border-radius: 8px;
   margin-bottom: 20px;
@@ -189,7 +189,7 @@ const openExportPreview = () => {
 .preview-title {
   font-size: 14px;
   font-weight: 600;
-  color: #334155;
+  color: var(--color-text-primary);
   margin: 0 0 12px 0;
 }
 
@@ -207,21 +207,21 @@ const openExportPreview = () => {
 
 .preview-label {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .preview-value {
   font-size: 13px;
   font-weight: 500;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .hint-box {
   padding: 12px;
-  background: #f1f5f9;
+  background: var(--color-bg-soft);
   border-radius: 6px;
   font-size: 13px;
-  color: #475569;
+  color: var(--color-text-secondary);
   margin-bottom: 20px;
 }
 
@@ -248,21 +248,21 @@ const openExportPreview = () => {
   align-items: center;
   gap: 16px;
   padding: 16px;
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   text-align: left;
-  color: #23587b;
+  color: var(--color-primary);
   width: 100%;
 }
 
 .action-button:hover {
-  border-color: #23587b;
-  background: #f8fafb;
+  border-color: var(--color-primary);
+  background: var(--color-bg-subtle);
   transform: translateX(4px);
-  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.1);
+  box-shadow: 0 2px 8px var(--color-primary-shadow);
 }
 
 .button-content {
@@ -275,11 +275,11 @@ const openExportPreview = () => {
 .button-title {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
 }
 
 .button-desc {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 </style>

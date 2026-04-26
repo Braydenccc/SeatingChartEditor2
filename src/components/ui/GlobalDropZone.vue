@@ -76,13 +76,13 @@ const handleDrop = (e) => {
   align-items: center;
   justify-content: center;
   padding: 12px 20px;
-  background: #23587b;
+  background: var(--color-primary);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
   cursor: pointer;
 }
 
 .global-drop-zone.drag-over {
-  background: #1a4460;
+  background: var(--color-primary-hover);
 }
 
 .drop-zone-content {
@@ -91,7 +91,7 @@ const handleDrop = (e) => {
   gap: 10px;
   font-size: 15px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--color-surface);
 }
 
 .drop-zone-icon {

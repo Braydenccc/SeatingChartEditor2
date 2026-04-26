@@ -87,8 +87,8 @@ const popupStyle = computed(() => {
 
 <style scoped>
 .tag-picker-popup {
-  background: white;
-  border: 2px solid var(--color-primary, #23587b);
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
   border-radius: 8px;
   box-shadow: var(--shadow-lg, 0 6px 20px rgba(0, 0, 0, 0.25));
   min-width: 220px;
@@ -99,15 +99,15 @@ const popupStyle = computed(() => {
   width: 6px;
 }
 .tag-picker-popup::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--scrollbar-track);
   border-radius: 3px;
 }
 .tag-picker-popup::-webkit-scrollbar-thumb {
-  background: #bbb;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 .tag-picker-popup::-webkit-scrollbar-thumb:hover {
-  background: #888;
+  background: var(--scrollbar-thumb-hover);
 }
 
 .tag-option {
@@ -117,7 +117,7 @@ const popupStyle = computed(() => {
   padding: 12px 16px;
   cursor: pointer;
   transition: background 0.2s;
-  color: #333;
+  color: var(--color-text-primary);
   font-size: 15px;
   font-weight: 500;
 }
@@ -133,7 +133,7 @@ const popupStyle = computed(() => {
 .no-tags {
   padding: 16px;
   text-align: center;
-  color: #999;
+  color: var(--color-text-disabled);
   font-size: 14px;
 }
 </style>

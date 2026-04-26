@@ -106,7 +106,7 @@ const handleToggleClick = (e) => {
 .resize-divider {
   position: relative;
   height: 6px;
-  background: #e8eef2;
+  background: var(--color-border-light);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -130,15 +130,15 @@ const handleToggleClick = (e) => {
 }
 
 .divider-drag-area:hover {
-  background: rgba(35, 88, 123, 0.05);
+  background: color-mix(in srgb, var(--color-primary) 5%, transparent);
 }
 
 .resize-divider.is-dragging {
-  background: rgba(35, 88, 123, 0.2);
+  background: color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .resize-divider.is-dragging .divider-drag-area {
-  background: rgba(35, 88, 123, 0.1);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .divider-handle {
@@ -147,10 +147,10 @@ const handleToggleClick = (e) => {
   justify-content: center;
   width: 48px;
   height: 20px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
   border-radius: 8px;
-  color: #9ca3af;
+  color: var(--color-text-disabled);
   opacity: 1;
   transition: all 0.2s ease;
   pointer-events: none;
@@ -158,15 +158,15 @@ const handleToggleClick = (e) => {
 }
 
 .divider-drag-area:hover .divider-handle {
-  border-color: #23587b;
-  color: #23587b;
-  box-shadow: 0 2px 4px rgba(35, 88, 123, 0.15);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 
 .resize-divider.is-dragging .divider-handle {
-  border-color: #1a4460;
-  color: #1a4460;
-  box-shadow: 0 2px 6px rgba(35, 88, 123, 0.25);
+  border-color: var(--color-primary-hover);
+  color: var(--color-primary-hover);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 25%, transparent);
   transform: scale(1.05);
 }
 
@@ -180,10 +180,10 @@ const handleToggleClick = (e) => {
   justify-content: center;
   width: 24px;
   height: 24px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
   border-radius: 10px;
-  color: #6b7280;
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: all 0.2s ease;
   z-index: 11;
@@ -192,10 +192,10 @@ const handleToggleClick = (e) => {
 }
 
 .collapse-toggle:hover {
-  background: #f9fafb;
-  border-color: #23587b;
-  color: #23587b;
-  box-shadow: 0 2px 4px rgba(35, 88, 123, 0.15);
+  background: var(--color-bg-subtle);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--color-primary) 15%, transparent);
   transform: translateY(-50%) scale(1.1);
 }
 
@@ -204,20 +204,20 @@ const handleToggleClick = (e) => {
 }
 
 .collapse-toggle.is-collapsed {
-  background: #23587b;
-  border-color: #23587b;
-  color: white;
-  box-shadow: 0 2px 4px rgba(35, 88, 123, 0.25);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-surface);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--color-primary) 25%, transparent);
 }
 
 .collapse-toggle.is-collapsed:hover {
-  background: #1a4460;
-  border-color: #1a4460;
-  box-shadow: 0 2px 6px rgba(35, 88, 123, 0.35);
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 35%, transparent);
 }
 
 .resize-divider.is-collapsed {
-  background: rgba(35, 88, 123, 0.15);
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 
 .resize-divider.is-collapsed .divider-handle {
@@ -248,11 +248,11 @@ const handleToggleClick = (e) => {
 
   .collapse-toggle:active {
     transform: translateY(-50%) scale(0.9);
-    background: #e5e7eb;
+    background: var(--color-bg-secondary);
   }
 
   .collapse-toggle.is-collapsed:active {
-    background: #1a4460;
+    background: var(--color-primary-hover);
   }
 }
 

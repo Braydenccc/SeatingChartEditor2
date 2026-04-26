@@ -101,6 +101,46 @@ function validatePassword($password) {
     }
 }
 
+/**
+ * 解密客户端加密的密码
+ * @param string $encryptedPassword Base64 编码的加密数据
+ * @param string $username 用户名（用作密钥派生）
+ * @return string|null 明文密码或 null（解密失败）
+ */
+function decryptPasswordFromTransport($encryptedPassword, $username) {
+    try {
+        // Base64 解码
+        $combined = base64_decode($encryptedPassword, true);
+        if ($combined === false) {
+            return null;
+        }
+
+        // 分离 IV (12 字节) 和密文
+        $iv = substr($combined, 0, 12);
+        $ciphertext = substr($combined, 12);
+
+        // 派生密钥（与客户端相同的算法）
+        $keyMaterial = "sce-auth-{$username}";
+        $salt = "sce-transport-salt-v1";
+        $key = hash_pbkdf2('sha256', $keyMaterial, $salt, 100000, 32, true);
+
+        // 解密（AES-256-GCM）
+        $decrypted = openssl_decrypt(
+            $ciphertext,
+            'aes-256-gcm',
+            $key,
+            OPENSSL_RAW_DATA,
+            $iv,
+            substr($ciphertext, -16) // GCM tag 在密文末尾
+        );
+
+        return $decrypted !== false ? $decrypted : null;
+    } catch (Exception $e) {
+        error_log("Password decryption failed: " . $e->getMessage());
+        return null;
+    }
+}
+
 function issueSessionToken($sessionDb, $username, $rememberMe = false) {
     $token = bin2hex(random_bytes(32));
     $expiryDays = $rememberMe ? TOKEN_EXPIRY_REMEMBER_ME : TOKEN_EXPIRY_DAYS;
@@ -119,7 +159,23 @@ try {
 
     $action = $input['action'];
     $username = isset($input['username']) ? trim($input['username']) : '';
+
+    // 支持加密密码和明文密码（向后兼容）
+    $encryptedPassword = isset($input['encryptedPassword']) && is_string($input['encryptedPassword']) ? $input['encryptedPassword'] : '';
     $password = isset($input['password']) && is_string($input['password']) ? $input['password'] : '';
+
+    // 如果提供了加密密码，尝试解密
+    if ($encryptedPassword !== '' && $username !== '') {
+        $decrypted = decryptPasswordFromTransport($encryptedPassword, $username);
+        if ($decrypted !== null) {
+            $password = $decrypted;
+        } else {
+            // 解密失败，记录日志但不暴露详细信息
+            error_log("Failed to decrypt password for user: {$username}");
+            respond(['success' => false, 'message' => '密码格式错误，请重试'], 400);
+        }
+    }
+
     $token = isset($input['token']) ? trim($input['token']) : '';
 
     $allowedActions = ['register', 'login', 'logout', 'set_settings', 'get_settings'];

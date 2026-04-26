@@ -258,13 +258,13 @@ const handleSave = async () => {
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-text-primary);
   margin: 0 0 8px 0;
 }
 
 .section-desc {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin: 0 0 20px 0;
   line-height: 1.5;
 }
@@ -274,10 +274,10 @@ const handleSave = async () => {
   align-items: center;
   gap: 8px;
   padding: 12px;
-  background: #e0f2fe;
-  border: 1px solid #0ea5e9;
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info);
   border-radius: 6px;
-  color: #075985;
+  color: var(--color-info);
   font-size: 13px;
   margin-bottom: 20px;
 }
@@ -290,14 +290,14 @@ const handleSave = async () => {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #475569;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
 .setting-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   font-size: 15px;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -306,8 +306,8 @@ const handleSave = async () => {
 
 .setting-input:focus {
   outline: none;
-  border-color: #23587b;
-  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-shadow);
 }
 
 .setting-checkbox {
@@ -319,8 +319,8 @@ const handleSave = async () => {
 
 .backup-mode-group,
 .sync-preference-group {
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
+  background: var(--color-bg-subtle);
+  border: 1px dashed var(--color-border-strong);
   padding: 14px;
   border-radius: 6px;
   margin-top: 16px;
@@ -336,12 +336,12 @@ const handleSave = async () => {
 
 .switch-text {
   font-size: 14px;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-weight: 600;
 }
 
 .switch-text.active {
-  color: #0ea5e9;
+  color: var(--color-info);
 }
 
 .sync-preference-group .section-label {
@@ -349,7 +349,7 @@ const handleSave = async () => {
   margin-bottom: 10px;
   font-weight: 600;
   font-size: 13px;
-  color: #475569;
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -366,7 +366,7 @@ const handleSave = async () => {
   gap: 6px;
   cursor: pointer;
   font-size: 14px;
-  color: #334155;
+  color: var(--color-text-primary);
 }
 
 .radio-label input[type='radio'] {
@@ -378,33 +378,33 @@ const handleSave = async () => {
 
 .hint-text {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin: 8px 0 0;
   line-height: 1.5;
 }
 
 .hint-green {
-  color: #059669;
+  color: var(--color-success);
 }
 
 .error-message {
-  color: #ef4444;
+  color: var(--color-danger);
   font-size: 13px;
   margin-top: 16px;
-  background: #fef2f2;
+  background: var(--color-danger-bg);
   padding: 8px 12px;
   border-radius: 6px;
-  border-left: 3px solid #ef4444;
+  border-left: 3px solid var(--color-danger);
 }
 
 .success-message {
-  color: #10b981;
+  color: var(--color-success);
   font-size: 13px;
   margin-top: 16px;
-  background: #ecfdf5;
+  background: var(--color-success-bg);
   padding: 8px 12px;
   border-radius: 6px;
-  border-left: 3px solid #10b981;
+  border-left: 3px solid var(--color-success);
 }
 
 .action-buttons {
@@ -426,14 +426,14 @@ const handleSave = async () => {
 
 .btn-primary {
   flex: 1;
-  background: #23587b;
+  background: var(--color-primary);
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #1d4763;
+  background: var(--color-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(35, 88, 123, 0.2);
+  box-shadow: 0 4px 12px var(--color-primary-shadow);
 }
 
 .btn-primary:disabled,
@@ -444,11 +444,11 @@ const handleSave = async () => {
 
 .btn-danger {
   background: white;
-  color: #ef4444;
-  border: 1px solid #ef4444;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #fef2f2;
+  background: var(--color-danger-bg);
 }
 </style>

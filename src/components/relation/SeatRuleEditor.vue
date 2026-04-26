@@ -274,7 +274,7 @@ const close = () => {
 .tab-bar {
   display: flex;
   gap: 12px;
-  border-bottom: 1px solid #eef2f6;
+  border-bottom: 1px solid var(--color-border-light);
   background: rgba(248, 250, 252, 0.5);
   padding: 0 24px;
   flex-shrink: 0;
@@ -289,7 +289,7 @@ const close = () => {
   background: transparent;
   font-size: 14px;
   font-weight: 500;
-  color: #475569; /* Darkened for readability */
+  color: var(--color-text-secondary); /* Darkened for readability */
   cursor: pointer;
   position: relative;
   transition: all 0.2s;
@@ -309,7 +309,7 @@ const close = () => {
   transition: transform 0.2s;
 }
 
-.tab-btn:hover { color: #334155; }
+.tab-btn:hover { color: var(--color-text-primary); }
 .tab-btn.active { color: var(--color-primary); font-weight: 600; }
 .tab-btn.active::after { transform: scaleX(1); }
 
@@ -322,7 +322,7 @@ const close = () => {
   font-weight: 700;
   min-width: 16px;
   text-align: center;
-  box-shadow: 0 2px 4px rgba(35, 88, 123, 0.2);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 /* .tab-icon: size controlled by :size prop on <component :is> */
@@ -342,9 +342,9 @@ const close = () => {
   margin-bottom: 14px;
   padding: 10px 12px;
   min-height: 44px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
 }
 
 .mode-switch-left {
@@ -357,9 +357,9 @@ const close = () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #dbe3ea;
-  background: white;
-  color: #334155;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
@@ -368,24 +368,24 @@ const close = () => {
   padding: 0 12px;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 2px var(--shadow-sm);
 }
 
 .mode-btn:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  border-color: var(--color-border-strong);
+  box-shadow: 0 2px 6px var(--shadow-md);
 }
 
 .mode-btn.active {
-  background: #23587b;
-  border-color: #23587b;
-  color: white;
-  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.28);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-surface);
+  box-shadow: 0 2px 8px var(--shadow-primary);
 }
 
 .mode-hint {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   line-height: 1.2;
   display: inline-flex;
   align-items: center;
@@ -394,7 +394,7 @@ const close = () => {
 
 .tab-divider {
   height: 2px;
-  background: #e2e8f0;
+  background: var(--color-border);
   border-radius: 1px;
 }
 
@@ -404,22 +404,22 @@ const close = () => {
   align-items: flex-start;
   gap: 14px;
   padding: 24px;
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
   border-radius: 12px;
-  border: 2px dashed #e2e8f0;
+  border: 2px dashed var(--color-border);
 }
 
 .tip-title {
   margin: 0 0 6px 0;
   font-size: 15px;
   font-weight: 600;
-  color: #334155;
+  color: var(--color-text-primary);
 }
 
 .tip-desc {
   margin: 0;
   font-size: 13px;
-  color: #475569; /* Darkened for readability */
+  color: var(--color-text-secondary); /* Darkened for readability */
   line-height: 1.6;
 }
 
@@ -428,9 +428,9 @@ const close = () => {
 }
 
 .tip-action-btn {
-  border: 1px solid #23587b;
-  background: #23587b;
-  color: #fff;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-surface);
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 12px;
@@ -439,9 +439,9 @@ const close = () => {
 }
 
 .tip-action-btn {
-  border: 1px solid #23587b;
-  background: #23587b;
-  color: #fff;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-surface);
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 12px;
@@ -450,8 +450,8 @@ const close = () => {
 }
 
 .tip-action-btn:hover {
-  background: #2d6a94;
-  border-color: #2d6a94;
+  background: var(--color-primary-light);
+  border-color: var(--color-primary-light);
 }
 
 
@@ -460,14 +460,14 @@ const close = () => {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .modal-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-text-primary);
   letter-spacing: -0.01em;
 }
 
@@ -475,12 +475,12 @@ const close = () => {
   width: 32px;
   height: 32px;
   border: none;
-  background: #f0f0f0;
+  background: var(--color-bg-secondary);
   border-radius: 50%;
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
-  color: #666;
+  color: var(--color-text-secondary);
   transition: all 0.2s;
   display: flex;
   align-items: center;
@@ -488,8 +488,8 @@ const close = () => {
 }
 
 .close-btn:hover {
-  background: #e0e0e0;
-  color: #333;
+  background: var(--color-border);
+  color: var(--color-text-primary);
 }
 
 .modal-body {
@@ -503,24 +503,28 @@ const close = () => {
 }
 
 .modal-body::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--scrollbar-track);
 }
 
 .modal-body::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }
 
 .modal-body h4 {
   margin: 0 0 12px 0;
   font-size: 15px;
   font-weight: 600;
-  color: #23587b;
+  color: var(--color-primary);
 }
 
 .relation-count {
   font-weight: 400;
-  color: #999;
+  color: var(--color-text-disabled);
   font-size: 13px;
 }
 
@@ -532,11 +536,11 @@ const close = () => {
 .empty-relation {
   text-align: center;
   padding: 20px;
-  color: #999;
+  color: var(--color-text-disabled);
   font-size: 14px;
-  background: #fafafa;
+  background: var(--color-bg-secondary);
   border-radius: 8px;
-  border: 1px dashed #e0e0e0;
+  border: 1px dashed var(--color-border);
 }
 
 .relation-item {
@@ -544,8 +548,8 @@ const close = () => {
   align-items: center;
   padding: 10px 14px;
   margin-bottom: 6px;
-  background: #fafafa;
-  border: 1px solid #eee;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-left: 3px solid var(--rel-color);
   border-radius: 6px;
   transition: all 0.15s;
@@ -553,8 +557,8 @@ const close = () => {
 }
 
 .relation-item:hover {
-  background: #f0f4f8;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  background: var(--color-bg-subtle);
+  box-shadow: 0 1px 4px var(--shadow-sm);
 }
 
 .relation-badge {
@@ -578,7 +582,7 @@ const close = () => {
 .student-name-tag {
   font-size: 13px;
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -586,7 +590,7 @@ const close = () => {
 
 .relation-sep {
   font-size: 13px;
-  color: #ccc;
+  color: var(--color-text-disabled);
   flex-shrink: 0;
 }
 
@@ -607,7 +611,7 @@ const close = () => {
 
 .distance-info {
   font-size: 11px;
-  color: #888;
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 
@@ -615,8 +619,8 @@ const close = () => {
   width: 26px;
   height: 26px;
   background: transparent;
-  color: #ccc;
-  border: 1px solid #e0e0e0;
+  color: var(--color-text-disabled);
+  border: 1px solid var(--color-border);
   border-radius: 50%;
   cursor: pointer;
   font-size: 14px;
@@ -630,22 +634,22 @@ const close = () => {
 }
 
 .delete-relation-btn:hover {
-  background: #fee2e2;
-  color: #dc2626;
-  border-color: #dc2626;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
 .delete-relation-btn.confirming {
-  background: #dc2626 !important;
-  color: white !important;
-  border-color: #dc2626 !important;
+  background: var(--color-danger) !important;
+  color: var(--color-surface) !important;
+  border-color: var(--color-danger) !important;
   font-size: 11px;
 }
 
 /* ==================== 添加表单 ==================== */
 .add-relation-form {
   padding-top: 20px;
-  border-top: 2px solid #e0e0e0;
+  border-top: 2px solid var(--color-border);
 }
 
 /* 关系类型卡片 */
@@ -661,23 +665,23 @@ const close = () => {
   flex-direction: column;
   align-items: center;
   padding: 12px 6px;
-  border: 2px solid #e8e8e8;
+  border: 2px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   text-align: center;
   transition: all 0.2s ease;
-  background: white;
+  background: var(--color-surface);
   gap: 4px;
 }
 
 .type-card:hover {
   border-color: var(--card-color);
-  background: color-mix(in srgb, var(--card-color) 5%, #fff);
+  background: color-mix(in srgb, var(--card-color) 5%, var(--color-surface));
 }
 
 .type-card.active {
   border-color: var(--card-color);
-  background: color-mix(in srgb, var(--card-color) 10%, #fff);
+  background: color-mix(in srgb, var(--card-color) 10%, var(--color-surface));
   box-shadow: 0 0 0 1px var(--card-color);
 }
 
@@ -699,12 +703,12 @@ const close = () => {
 .type-label {
   font-size: 13px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .type-desc {
   font-size: 10px;
-  color: #999;
+  color: var(--color-text-disabled);
   line-height: 1.3;
 }
 
@@ -723,7 +727,7 @@ const close = () => {
 .student-select-wrapper label {
   display: block;
   font-size: 12px;
-  color: #888;
+  color: var(--color-text-muted);
   margin-bottom: 4px;
   font-weight: 500;
 }
@@ -738,7 +742,7 @@ const close = () => {
 .student-select {
   width: 100%;
   padding: 9px 10px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 6px;
   font-size: 13px;
   outline: none;
@@ -746,12 +750,12 @@ const close = () => {
 }
 
 .student-select:focus {
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 /* 高级选项 */
 .advanced-options {
-  background: #f8f9fa;
+  background: var(--color-bg-hover);
   padding: 14px;
   border-radius: 8px;
   margin-bottom: 14px;
@@ -769,7 +773,7 @@ const close = () => {
   display: block;
   font-size: 13px;
   font-weight: 500;
-  color: #555;
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
@@ -785,12 +789,12 @@ const close = () => {
   flex-direction: column;
   align-items: center;
   padding: 8px 6px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   text-align: center;
   transition: all 0.2s;
-  background: white;
+  background: var(--color-surface);
   gap: 2px;
 }
 
@@ -820,20 +824,20 @@ const close = () => {
 .strength-label {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   line-height: 1.2;
 }
 
 .strength-desc {
   font-size: 10px;
-  color: #999;
+  color: var(--color-text-disabled);
   line-height: 1.2;
 }
 
 .hard-hint {
   display: block;
   font-size: 11px;
-  color: #999;
+  color: var(--color-text-disabled);
   margin-top: 6px;
   font-style: italic;
 }
@@ -841,7 +845,7 @@ const close = () => {
 /* 距离选择 */
 .distance-select {
   padding: 6px 10px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 6px;
   font-size: 13px;
   outline: none;
@@ -849,38 +853,38 @@ const close = () => {
 }
 
 .distance-select:focus {
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .distance-hint {
   font-size: 11px;
-  color: #999;
+  color: var(--color-text-disabled);
   margin-left: 8px;
 }
 
 /* 冲突警告 */
 .conflict-warning {
-  background: #fff3cd;
-  border: 1px solid #ffc107;
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning);
   border-radius: 6px;
   padding: 10px 12px;
   margin-bottom: 12px;
   font-size: 13px;
-  color: #856404;
+  color: var(--color-warning-hover);
 }
 
 /* 添加按钮 */
 .add-relation-btn {
   width: 100%;
   padding: 11px;
-  color: white;
+  color: var(--color-surface);
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
   transition: all 0.2s;
-  background: #ccc;
+  background: var(--color-text-disabled);
 }
 
 .add-relation-btn:hover:not(:disabled) {
@@ -889,7 +893,7 @@ const close = () => {
 }
 
 .add-relation-btn:disabled {
-  background: #ccc !important;
+  background: var(--color-text-disabled) !important;
   cursor: not-allowed;
   transform: none !important;
 }
@@ -897,7 +901,7 @@ const close = () => {
 /* ==================== Modal Footer ==================== */
 .modal-footer {
   padding: 14px 24px;
-  border-top: 2px solid #e0e0e0;
+  border-top: 2px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -905,13 +909,13 @@ const close = () => {
 
 .footer-stats {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-disabled);
 }
 
 .btn-secondary {
   padding: 9px 18px;
-  background: #f0f0f0;
-  color: #333;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -921,7 +925,7 @@ const close = () => {
 }
 
 .btn-secondary:hover {
-  background: #e0e0e0;
+  background: var(--color-border);
 }
 
 /* ==================== 响应式 ==================== */

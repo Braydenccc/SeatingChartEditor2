@@ -608,13 +608,13 @@ onUnmounted(() => {
 .seat-item {
   width: 100%;
   height: 80px;
-  border: 2px solid #d0d7dc;
+  border: 2px solid var(--color-border);
   contain: layout style;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
+  background: var(--color-surface);
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
   position: relative;
   overflow: hidden;
@@ -636,12 +636,12 @@ onUnmounted(() => {
 
 .seat-item.clickable:not(.selection-selected):hover {
   border-color: var(--color-primary);
-  box-shadow: 0 2px 8px rgba(35, 88, 123, 0.2);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 20%, transparent);
   transform: translateY(-2px);
 }
 
 .seat-item.selection-selected.clickable:hover {
-  border-color: #0ea5e9;
+  border-color: var(--color-info);
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
   transform: none;
 }
@@ -658,44 +658,44 @@ onUnmounted(() => {
 
 .seat-item.dragging {
   background: transparent !important;
-  border-color: #d0d7dc !important;
+  border-color: var(--color-border) !important;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .seat-item.dragging.is-anchor {
   background: transparent !important;
-  border-color: #d0d7dc !important;
+  border-color: var(--color-border) !important;
 }
 
 .seat-item.selection-dragging {
   background: transparent !important;
-  border-color: #d0d7dc !important;
+  border-color: var(--color-border) !important;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .seat-item.drag-over {
-  background: rgba(35, 88, 123, 0.1);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 20%, transparent);
   animation: pulse-primary 1s infinite;
 }
 
 /* 空置座位样式 */
 .seat-item.empty {
-  background: #f5f5f5;
-  border-color: #bbb;
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
 }
 
 .seat-item.empty .empty-indicator {
   background: rgba(255, 255, 255, 0.9);
   padding: 6px 12px;
   border-radius: 6px;
-  border: 1px solid #999;
+  border: 1px solid var(--color-border-dark);
 }
 
 .empty-text {
   font-size: 13px;
-  color: #666;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
@@ -807,7 +807,7 @@ onUnmounted(() => {
 .student-name {
   font-size: 20px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   text-align: center;
   word-break: break-all;
   line-height: 1.3;
@@ -825,23 +825,23 @@ onUnmounted(() => {
 
 .seat-placeholder {
   font-size: 13px;
-  color: #999;
+  color: var(--color-text-disabled);
   font-weight: 400;
 }
 
 /* 交换模式下第一个选中的座位 */
 .seat-item.selected {
-  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.3);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent);
   transform: scale(1.05);
   transition: all 0.2s ease;
-  border-color: #ff9800;
+  border-color: var(--color-warning);
   border-width: 3px;
 }
 
 /* 撤销/重做高亮效果 - 灰色显示 */
 .seat-item.undo-highlighted {
-  background: #f0f0f0 !important;
-  border-color: #999 !important;
+  background: var(--color-bg-secondary) !important;
+  border-color: var(--color-border-dark) !important;
   opacity: 0.6;
   transition: all 0.3s ease;
   animation: undo-pulse 2s ease-in-out forwards;
@@ -849,18 +849,18 @@ onUnmounted(() => {
 
 .seat-item.undo-highlighted .student-name,
 .seat-item.undo-highlighted .student-number {
-  color: #666 !important;
+  color: var(--color-text-secondary) !important;
 }
 
 @keyframes undo-pulse {
   0% {
-    background: #e8e8e8;
-    border-color: #999;
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-dark);
     transform: scale(1);
   }
   50% {
-    background: #f5f5f5;
-    border-color: #bbb;
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border);
     transform: scale(0.98);
   }
   100% {
@@ -873,16 +873,16 @@ onUnmounted(() => {
 
 /* 选区高亮 */
 .seat-item.zone-highlight {
-  background: var(--zone-color, #E0E0E0);
-  border-color: var(--zone-color, #E0E0E0);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--zone-color, #E0E0E0) 50%, transparent);
+  background: var(--zone-color, var(--color-border));
+  border-color: var(--zone-color, var(--color-border));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--zone-color, var(--color-border)) 50%, transparent);
 }
 
 /* 选区选中 */
 .seat-item.selection-selected {
-  border-color: #0ea5e9;
+  border-color: var(--color-info);
   border-width: 2.5px;
-  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.3), 0 4px 12px rgba(35, 88, 123, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent), 0 4px 12px color-mix(in srgb, var(--color-primary) 20%, transparent);
   background: rgba(14, 165, 233, 0.06);
   transform: scale(1.05);
   z-index: 10;

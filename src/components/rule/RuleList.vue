@@ -4,7 +4,7 @@
     <!-- 搜索与筛选工具栏 -->
     <div class="rule-toolbar">
       <div class="search-box">
-        <Search :size="15" color="#94a3b8" stroke-width="2.5" />
+        <Search :size="15" color="var(--color-text-disabled)" stroke-width="2.5" />
         <input v-model="searchQuery" type="text" placeholder="搜索规则、学生、备注..." />
         <button v-if="searchQuery" class="clear-search" @click="searchQuery = ''" aria-label="清空搜索">
           <X :size="12" />
@@ -74,7 +74,7 @@
 
     <!-- 空状态 -->
     <div v-if="filteredRules.length === 0" class="empty-state">
-      <ClipboardList :size="40" color="#cbd5e1" stroke-width="1.5" />
+      <ClipboardList :size="40" color="var(--color-border-strong)" stroke-width="1.5" />
       <p>{{ filterPriority === 'all' ? '暂无规则，请在上方添加' : '该优先级下没有规则' }}</p>
     </div>
 
@@ -423,18 +423,18 @@ defineExpose({ focusRule })
   flex-direction: column;
   gap: 12px;
   margin-bottom: 8px;
-  background: #f8fafc;
+  background: var(--color-bg-secondary);
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #eef2f6;
+  border: 1px solid var(--color-border-light);
 }
 
 .batch-toolbar {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 8px 10px;
 }
@@ -444,7 +444,7 @@ defineExpose({ focusRule })
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #334155;
+  color: var(--color-text-primary);
   user-select: none;
 }
 
@@ -457,15 +457,15 @@ defineExpose({ focusRule })
 
 .batch-count {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-weight: 600;
   margin-right: 2px;
 }
 
 .batch-btn {
-  border: 1px solid #dbe3ea;
-  background: #fff;
-  color: #334155;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
@@ -474,7 +474,7 @@ defineExpose({ focusRule })
 }
 
 .batch-btn:hover {
-  border-color: #94a3b8;
+  border-color: var(--color-text-disabled);
 }
 
 .batch-btn:disabled {
@@ -483,27 +483,27 @@ defineExpose({ focusRule })
 }
 
 .batch-btn.required {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background: #fff1f2;
+  color: var(--color-danger);
+  border-color: var(--color-danger-text);
+  background: var(--color-danger-bg);
 }
 
 .batch-btn.prefer {
-  color: #b45309;
-  border-color: #fde68a;
-  background: #fffbeb;
+  color: var(--color-warning);
+  border-color: var(--color-warning-text);
+  background: var(--color-warning-bg);
 }
 
 .batch-btn.optional {
-  color: #475569;
-  border-color: #e2e8f0;
-  background: #f8fafc;
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+  background: var(--color-bg-secondary);
 }
 
 .batch-btn.danger {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background: #fef2f2;
+  color: var(--color-danger);
+  border-color: var(--color-danger-text);
+  background: var(--color-danger-bg);
 }
 
 .search-box {
@@ -521,7 +521,7 @@ defineExpose({ focusRule })
   width: 100%;
   padding: 10px 36px;
   background: white;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--color-border);
   border-radius: 10px;
   font-size: 13px;
   outline: none;
@@ -530,7 +530,7 @@ defineExpose({ focusRule })
 
 .search-box input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .clear-search {
@@ -541,8 +541,8 @@ defineExpose({ focusRule })
   padding: 0;
   line-height: 0;
   border: none;
-  background: #e2e8f0;
-  color: #64748b;
+  background: var(--color-border);
+  color: var(--color-text-muted);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -564,7 +564,7 @@ defineExpose({ focusRule })
 
 .filter-tabs {
   display: flex;
-  background: #f1f5f9;
+  background: var(--color-bg-subtle);
   padding: 3px;
   border-radius: 10px;
   gap: 2px;
@@ -577,12 +577,12 @@ defineExpose({ focusRule })
   background: transparent;
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.filter-tab:hover { color: #1e293b; }
+.filter-tab:hover { color: var(--color-text-primary); }
 .filter-tab.active {
   background: white;
   color: var(--color-primary);
@@ -601,23 +601,23 @@ defineExpose({ focusRule })
   align-items: center;
   justify-content: center;
   background: white;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--color-border);
   border-radius: 8px;
-  color: #64748b;
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .action-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #1e293b;
+  background: var(--color-bg-subtle);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
 }
 
 .action-btn.danger:hover {
-  border-color: #fca5a5;
-  color: #ef4444;
-  background: #fef2f2;
+  border-color: var(--color-danger-text);
+  color: var(--color-danger-text);
+  background: var(--color-danger-bg);
 }
 
 /* ==================== 冲突警告 ==================== */
@@ -626,11 +626,11 @@ defineExpose({ focusRule })
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
+  background: var(--color-warning-bg-light);
+  border: 1px solid var(--color-warning-light);
   border-radius: 8px;
   font-size: 13px;
-  color: #92400e;
+  color: var(--color-warning-hover);
 }
 
 .conflict-detail-btn {
@@ -638,7 +638,7 @@ defineExpose({ focusRule })
   background: none;
   border: none;
   font-size: 12px;
-  color: #d97706;
+  color: var(--color-warning-hover);
   cursor: pointer;
   text-decoration: underline;
   padding: 0;
@@ -649,9 +649,9 @@ defineExpose({ focusRule })
   flex-direction: column;
   gap: 4px;
   padding: 8px;
-  background: #fff7ed;
+  background: var(--color-warning-bg-light);
   border-radius: 8px;
-  border: 1px solid #fed7aa;
+  border: 1px solid var(--color-warning-light);
 }
 
 .conflict-item {
@@ -659,7 +659,7 @@ defineExpose({ focusRule })
   align-items: flex-start;
   gap: 8px;
   font-size: 12px;
-  color: #7c2d12;
+  color: var(--color-danger-hover);
   padding: 4px 6px;
 }
 
@@ -672,8 +672,8 @@ defineExpose({ focusRule })
   margin-top: 1px;
 }
 
-.conflict-type-badge.contradiction { background: #fee2e2; color: #dc2626; }
-.conflict-type-badge.infeasible { background: #fef9c3; color: #b45309; }
+.conflict-type-badge.contradiction { background: var(--color-danger-bg); color: var(--color-danger); }
+.conflict-type-badge.infeasible { background: var(--color-warning-bg); color: var(--color-warning); }
 
 /* ==================== 空状态 ==================== */
 .empty-state {
@@ -682,7 +682,7 @@ defineExpose({ focusRule })
   align-items: center;
   gap: 10px;
   padding: 32px 0;
-  color: #64748b; /* Darkened for readability */
+  color: var(--color-text-muted); /* Darkened for readability */
 }
 
 .empty-state p { margin: 0; font-size: 13px; }
@@ -696,7 +696,7 @@ defineExpose({ focusRule })
 
 .rule-item {
   border-radius: 12px;
-  border: 1px solid #eef2f6;
+  border: 1px solid var(--color-border-light);
   background: white;
   overflow: hidden;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -704,20 +704,20 @@ defineExpose({ focusRule })
 }
 
 .rule-item:hover { 
-  border-color: #cbd5e1;
+  border-color: var(--color-border-strong);
   box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
   transform: translateY(-1px);
 }
 
 .rule-item.disabled { opacity: 0.5; filter: grayscale(0.5); }
 
-.rule-item.required { border-left: 4px solid #ef4444; }
-.rule-item.prefer { border-left: 4px solid #f59e0b; }
-.rule-item.optional { border-left: 4px solid #94a3b8; }
+.rule-item.required { border-left: 4px solid var(--color-danger); }
+.rule-item.prefer { border-left: 4px solid var(--color-warning); }
+.rule-item.optional { border-left: 4px solid var(--color-text-disabled); }
 
-.rule-item.expanded { 
-  border-color: var(--color-primary); 
-  box-shadow: 0 8px 24px rgba(35, 88, 123, 0.12);
+.rule-item.expanded {
+  border-color: var(--color-primary);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary) 12%, transparent);
   transform: translateY(-2px);
 }
 
@@ -766,7 +766,7 @@ defineExpose({ focusRule })
 .toggle-knob {
   position: absolute;
   inset: 0;
-  background: #cbd5e1;
+  background: var(--color-border-strong);
   border-radius: 20px;
   transition: background 0.2s;
 }
@@ -784,7 +784,7 @@ defineExpose({ focusRule })
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
-.toggle-switch input:checked ~ .toggle-knob { background: #22c55e; }
+.toggle-switch input:checked ~ .toggle-knob { background: var(--color-success); }
 .toggle-switch input:checked ~ .toggle-knob::after { transform: translateX(14px); }
 
 .rule-text {
@@ -798,7 +798,7 @@ defineExpose({ focusRule })
 
 .rule-label {
   font-size: 13px;
-  color: #334155;
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -807,7 +807,7 @@ defineExpose({ focusRule })
 .rule-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
 .rule-chevron {
-  color: #94a3b8;
+  color: var(--color-text-disabled);
   transition: transform 0.2s;
   display: flex;
 }
@@ -815,9 +815,9 @@ defineExpose({ focusRule })
 
 /* ==================== 展开区 ==================== */
 .rule-detail {
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--color-bg-subtle);
   padding: 12px 16px;
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
 }
 
 .rule-detail-grid {
@@ -832,7 +832,7 @@ defineExpose({ focusRule })
 .detail-key {
   display: block;
   font-size: 10px;
-  color: #64748b; /* Darkened for readability */
+  color: var(--color-text-muted); /* Darkened for readability */
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -841,7 +841,7 @@ defineExpose({ focusRule })
 
 .detail-val {
   font-size: 13px;
-  color: #334155;
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
@@ -852,12 +852,12 @@ defineExpose({ focusRule })
   font-size: 11px;
   font-weight: 600;
 }
-.priority-chip.required { background: #fee2e2; color: #dc2626; }
-.priority-chip.prefer { background: #fef9c3; color: #b45309; }
-.priority-chip.optional { background: #f1f5f9; color: #475569; }
+.priority-chip.required { background: var(--color-danger-bg); color: var(--color-danger); }
+.priority-chip.prefer { background: var(--color-warning-bg); color: var(--color-warning-hover); }
+.priority-chip.optional { background: var(--color-bg-subtle); color: var(--color-text-secondary); }
 
 .guide-text {
-  color: #23587b;
+  color: var(--color-primary);
   font-style: italic;
   line-height: 1.5;
 }
@@ -868,8 +868,8 @@ defineExpose({ focusRule })
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
-  background: #fef2f2;
-  color: #ef4444;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
 }
 
 .logic-op-badge {
@@ -878,13 +878,13 @@ defineExpose({ focusRule })
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--color-info-bg);
+  color: var(--color-info);
 }
 
 .sub-rule-detail {
-  background: #f8fafc;
-  border-left: 3px solid #cbd5e1;
+  background: var(--color-bg-subtle);
+  border-left: 3px solid var(--color-border-strong);
   border-radius: 0 6px 6px 0;
   padding-left: 10px;
 } /* Darkened for readability */
@@ -893,35 +893,35 @@ defineExpose({ focusRule })
 
 .btn-edit {
   padding: 5px 14px;
-  border: 1.5px solid #93c5fd;
+  border: 1.5px solid var(--color-info-text);
   border-radius: 6px;
   background: white;
-  color: #1d4ed8;
+  color: var(--color-info);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
   margin-right: 8px;
 }
 
-.btn-edit:hover { background: #eff6ff; }
+.btn-edit:hover { background: var(--color-info-bg); }
 
 .btn-delete {
   padding: 5px 14px;
-  border: 1.5px solid #fca5a5;
+  border: 1.5px solid var(--color-danger-text);
   border-radius: 6px;
   background: white;
-  color: #dc2626;
+  color: var(--color-danger);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.btn-delete:hover { background: #fee2e2; }
+.btn-delete:hover { background: var(--color-danger-bg); }
 
 .btn-delete.confirming {
-  background: #dc2626;
+  background: var(--color-danger);
   color: white;
-  border-color: #dc2626;
+  border-color: var(--color-danger);
 }
 
 /* ==================== 动画 ==================== */

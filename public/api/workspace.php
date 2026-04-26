@@ -10,6 +10,68 @@ if (!class_exists('Database')) {
 const FILE_ID_BYTES = 16;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB 限制
 
+/**
+ * 验证工作区内容格式
+ * @param mixed $content 待验证的内容
+ * @return array ['valid' => bool, 'message' => string]
+ */
+function validateWorkspaceContent($content) {
+    // 必须是对象/数组
+    if (!is_array($content)) {
+        return ['valid' => false, 'message' => '工作区数据必须是 JSON 对象'];
+    }
+
+    // 必须包含核心字段
+    $requiredFields = ['students', 'seats', 'seatConfig'];
+    foreach ($requiredFields as $field) {
+        if (!isset($content[$field])) {
+            return ['valid' => false, 'message' => "缺少必需字段: {$field}"];
+        }
+    }
+
+    // 验证 students 是数组
+    if (!is_array($content['students'])) {
+        return ['valid' => false, 'message' => 'students 必须是数组'];
+    }
+
+    // 验证 seats 是数组
+    if (!is_array($content['seats'])) {
+        return ['valid' => false, 'message' => 'seats 必须是数组'];
+    }
+
+    // 验证 seatConfig 是对象
+    if (!is_array($content['seatConfig'])) {
+        return ['valid' => false, 'message' => 'seatConfig 必须是对象'];
+    }
+
+    // 验证 seatConfig 包含 groups
+    if (!isset($content['seatConfig']['groups']) || !is_array($content['seatConfig']['groups'])) {
+        return ['valid' => false, 'message' => 'seatConfig.groups 必须是数组'];
+    }
+
+    // 验证每个 student 的基本结构
+    foreach ($content['students'] as $student) {
+        if (!is_array($student)) {
+            return ['valid' => false, 'message' => '学生数据格式错误'];
+        }
+        if (!isset($student['id']) || !isset($student['name'])) {
+            return ['valid' => false, 'message' => '学生数据缺少必需字段 (id, name)'];
+        }
+    }
+
+    // 验证每个 seat 的基本结构
+    foreach ($content['seats'] as $seat) {
+        if (!is_array($seat)) {
+            return ['valid' => false, 'message' => '座位数据格式错误'];
+        }
+        if (!isset($seat['id'])) {
+            return ['valid' => false, 'message' => '座位数据缺少必需字段 (id)'];
+        }
+    }
+
+    return ['valid' => true, 'message' => ''];
+}
+
 $input = parseRequestInput();
 
 $action = $input['action'];
@@ -40,6 +102,12 @@ try {
 
         if (empty($content)) {
             respond(['success' => false, 'message' => '工作区内容不能为空']);
+        }
+
+        // 验证工作区内容格式
+        $validation = validateWorkspaceContent($content);
+        if (!$validation['valid']) {
+            respond(['success' => false, 'message' => '工作区格式无效: ' . $validation['message']]);
         }
 
         $fileId = isset($input['fileId']) && !empty($input['fileId']) ? $input['fileId'] : bin2hex(random_bytes(FILE_ID_BYTES));

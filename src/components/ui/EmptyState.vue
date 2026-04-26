@@ -47,25 +47,25 @@ const iconComponent = computed(() => {
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  color: #999;
+  color: var(--color-text-disabled);
 }
 
 .empty-icon {
   margin-bottom: 20px;
-  color: #ccc;
+  color: var(--color-text-disabled);
   opacity: 0.6;
 }
 
 .empty-text {
   font-size: 16px;
-  color: #666;
+  color: var(--color-text-secondary);
   margin: 0 0 8px 0;
   font-weight: 500;
 }
 
 .empty-hint {
   font-size: 14px;
-  color: #999;
+  color: var(--color-text-disabled);
   margin: 0;
   text-align: center;
 }

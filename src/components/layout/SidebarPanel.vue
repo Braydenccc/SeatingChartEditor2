@@ -787,7 +787,12 @@ const handleImportExcel = async (event) => {
     clearAllTags()
 
     // 预定义颜色列表
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788']
+    const colors = [
+      'var(--tag-color-1)', 'var(--tag-color-2)', 'var(--tag-color-3)',
+      'var(--tag-color-4)', 'var(--tag-color-5)', 'var(--tag-color-6)',
+      'var(--tag-color-7)', 'var(--tag-color-8)', 'var(--tag-color-9)',
+      'var(--tag-color-10)'
+    ]
 
     // 创建所有标签并建立名称到ID的映射
     const tagNameToId = {}
@@ -1584,7 +1589,7 @@ const formatLogTime = (timestamp) => {
 <style scoped>
 .sidebar-panel {
   width: 20%;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   color: var(--color-primary);
   display: flex;
   flex-direction: column;
@@ -1611,8 +1616,8 @@ const formatLogTime = (timestamp) => {
   align-items: stretch;
   width: 20%;
   height: 100%;
-  background: #e8eef2;
-  border-right: 1px solid #d0d7dc;
+  background: var(--color-bg-tertiary);
+  border-right: 1px solid var(--color-border);
 }
 
 .toolbar-info {
@@ -1635,9 +1640,9 @@ const formatLogTime = (timestamp) => {
   height: 25%;
   background: transparent;
   border: none;
-  border-bottom: 1px solid #d0d7dc;
+  border-bottom: 1px solid var(--color-border);
   cursor: pointer;
-  color: #5a7a8f;
+  color: var(--color-text-secondary);
   transition: all 0.3s ease;
   position: relative;
 }
@@ -1648,7 +1653,7 @@ const formatLogTime = (timestamp) => {
     flex: 1;
     height: 60px;
     border-bottom: none;
-    border-right: 1px solid #d0d7dc;
+    border-right: 1px solid var(--color-border);
     font-size: 14px;
   }
 
@@ -1674,7 +1679,7 @@ const formatLogTime = (timestamp) => {
 }
 
 .tab-button:hover {
-  background: rgba(35, 88, 123, 0.08);
+  background: var(--color-bg-hover);
   color: var(--color-primary);
 }
 
@@ -1711,7 +1716,7 @@ const formatLogTime = (timestamp) => {
 }
 
 .tab-button.active {
-  background: rgba(35, 88, 123, 0.12);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
   color: var(--color-primary);
   font-weight: 600;
 }
@@ -1722,11 +1727,11 @@ const formatLogTime = (timestamp) => {
 
 .tab-button:active {
   transform: scale(0.98);
-  background: rgba(35, 88, 123, 0.15);
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 
 .tab-button.active:active {
-  background: rgba(35, 88, 123, 0.2);
+  background: color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .tab-label {
@@ -1747,7 +1752,7 @@ const formatLogTime = (timestamp) => {
 
 .options-bar {
   width: 80%;
-  background: #ffffff;
+  background: var(--color-surface);
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
@@ -1764,16 +1769,16 @@ const formatLogTime = (timestamp) => {
 }
 
 .options-bar::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--scrollbar-track);
 }
 
 .options-bar::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 .options-bar::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--scrollbar-thumb-hover);
 }
 
 .option-content {
@@ -1842,7 +1847,7 @@ const formatLogTime = (timestamp) => {
 .tab-header {
   margin-bottom: 20px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #e8eef2;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .tab-header h3 {
@@ -1858,7 +1863,7 @@ const formatLogTime = (timestamp) => {
   gap: 16px;
   margin-bottom: 28px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .options-group:last-child {
@@ -1874,9 +1879,9 @@ const formatLogTime = (timestamp) => {
 .alignment-btn-simple {
   flex: 1;
   padding: 8px 12px;
-  border: 1px solid #ddd;
-  background: white;
-  color: #666;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
@@ -1885,14 +1890,14 @@ const formatLogTime = (timestamp) => {
 }
 
 .alignment-btn-simple:hover {
-  border-color: #23587b;
-  color: #23587b;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .alignment-btn-simple.active {
-  border-color: #23587b;
-  background: #23587b;
-  color: white;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-surface);
 }
 
 .option-button {
@@ -1902,23 +1907,23 @@ const formatLogTime = (timestamp) => {
   gap: 10px;
   width: 100%;
   padding: 14px 20px;
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-primary);
   transition: all 0.3s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .option-button:hover {
-  background: #ffffff;
+  background: var(--color-surface);
   border-color: var(--color-primary);
   color: var(--color-primary);
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(35, 88, 123, 0.2);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--color-primary) 20%, transparent);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -1928,8 +1933,8 @@ const formatLogTime = (timestamp) => {
 }
 
 .option-button.primary {
-  background: linear-gradient(135deg, #23587b 0%, #2d6a94 100%);
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   border-color: var(--color-primary);
   font-weight: 600;
 }
@@ -1939,8 +1944,8 @@ const formatLogTime = (timestamp) => {
 }
 
 .option-button.primary:hover {
-  background: linear-gradient(135deg, #1a4460 0%, #23587b 100%);
-  box-shadow: 0 8px 20px rgba(35, 88, 123, 0.3);
+  background: var(--color-primary-hover);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .option-button.primary:active {
@@ -1950,20 +1955,20 @@ const formatLogTime = (timestamp) => {
 
 .option-button.active {
   background: var(--color-primary);
-  color: white;
+  color: var(--color-text-inverse);
   border-color: var(--color-primary);
-  box-shadow: 0 3px 10px rgba(35, 88, 123, 0.3);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .option-button.active:hover {
-  background: #1a4460;
-  box-shadow: 0 4px 12px rgba(35, 88, 123, 0.4);
+  background: var(--color-primary-hover);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 40%, transparent);
 }
 
 .option-button.confirming {
-  background: #dc2626 !important;
-  color: white !important;
-  border-color: #dc2626 !important;
+  background: var(--color-danger) !important;
+  color: var(--color-text-inverse) !important;
+  border-color: var(--color-danger) !important;
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
 }
 
@@ -1975,23 +1980,27 @@ const formatLogTime = (timestamp) => {
 
 .input-group label {
   font-size: 13px;
-  color: #666;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .input-group input[type="number"] {
   padding: 10px 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
+  background: var(--color-input-bg);
+  color: var(--color-text-primary);
   transition: border-color 0.3s;
 }
 
 .input-group input[type="text"] {
   padding: 10px 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
+  background: var(--color-input-bg);
+  color: var(--color-text-primary);
   transition: border-color 0.3s;
 }
 
@@ -2006,16 +2015,16 @@ const formatLogTime = (timestamp) => {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  color: #555;
+  color: var(--color-text-primary);
   transition: background 0.2s;
 }
 
 .checkbox-label:hover {
-  background: #eef2f5;
+  background: var(--color-bg-hover);
 }
 
 .checkbox-label input[type="checkbox"] {
@@ -2031,9 +2040,9 @@ const formatLogTime = (timestamp) => {
   gap: 12px;
   margin-top: 12px;
   padding: 12px;
-  background: #fafbfc;
+  background: var(--color-bg-subtle);
   border-radius: 8px;
-  border: 1px solid #e8eef2;
+  border: 1px solid var(--color-border);
 }
 
 .tag-setting-item {
@@ -2041,9 +2050,9 @@ const formatLogTime = (timestamp) => {
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  background: white;
+  background: var(--color-surface);
   border-radius: 6px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
 }
 
 .tag-checkbox {
@@ -2052,7 +2061,7 @@ const formatLogTime = (timestamp) => {
   gap: 8px;
   cursor: pointer;
   font-size: 14px;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .tag-checkbox input[type="checkbox"] {
@@ -2063,7 +2072,7 @@ const formatLogTime = (timestamp) => {
 
 .tag-display-text-label {
   font-size: 14px;
-  color: #666;
+  color: var(--color-text-secondary);
   margin-top: 4px;
 }
 
@@ -2077,7 +2086,7 @@ const formatLogTime = (timestamp) => {
 
 .tag-text-input {
   padding: 8px 10px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   font-size: 13px;
   transition: border-color 0.3s;
@@ -2090,7 +2099,7 @@ const formatLogTime = (timestamp) => {
 }
 
 .tag-text-input::placeholder {
-  color: #999;
+  color: var(--color-text-disabled);
 }
 
 /* 间距设置网格 */
@@ -2119,13 +2128,13 @@ const formatLogTime = (timestamp) => {
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
   border-radius: 6px;
 }
 
 .color-mode-label {
   font-size: 14px;
-  color: #555;
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
@@ -2135,7 +2144,7 @@ const formatLogTime = (timestamp) => {
   gap: 4px;
   cursor: pointer;
   font-size: 14px;
-  color: #555;
+  color: var(--color-text-primary);
 }
 
 .radio-label input[type="radio"] {
@@ -2146,8 +2155,8 @@ const formatLogTime = (timestamp) => {
 
 /* 日志区域样式 */
 .log-area {
-  border-top: 1px solid #e0e0e0;
-  background: #fff;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
   display: flex;
   flex-direction: column;
   height: 200px;
@@ -2158,15 +2167,15 @@ const formatLogTime = (timestamp) => {
 /* 导出缩略图 */
 .preview-label {
   font-size: 12px;
-  color: #888;
+  color: var(--color-text-muted);
   margin: 0 0 6px 0;
 }
 
 .export-thumbnail-wrap {
-  background: #f5f5f5;
+  background: var(--color-bg-secondary);
   border-radius: 8px;
   padding: 10px;
-  border: 1px solid #e8eef2;
+  border: 1px solid var(--color-border);
   text-align: center;
 }
 
@@ -2196,8 +2205,8 @@ const formatLogTime = (timestamp) => {
   justify-content: space-between;
   align-items: center;
   padding: 10px 15px;
-  border-bottom: 1px solid #e0e0e0;
-  background: #f8f9fa;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
 }
 
 .log-title {
@@ -2208,17 +2217,17 @@ const formatLogTime = (timestamp) => {
 
 .log-clear-btn {
   padding: 4px 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
-  background: #fff;
-  color: #666;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.3s;
 }
 
 .log-clear-btn:hover {
-  background: #f5f5f5;
+  background: var(--color-bg-secondary);
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
@@ -2238,33 +2247,33 @@ const formatLogTime = (timestamp) => {
   font-size: 12px;
   line-height: 1.4;
   border-left: 3px solid transparent;
-  background: #f8f9fa;
+  background: var(--color-bg-secondary);
 }
 
 .log-time {
-  color: #999;
+  color: var(--color-text-disabled);
   font-family: monospace;
   flex-shrink: 0;
   font-size: 11px;
 }
 
 .log-message {
-  color: #333;
+  color: var(--color-text-primary);
   word-break: break-word;
 }
 
 .log-info {
-  border-left-color: #4ECDC4;
+  border-left-color: var(--color-info);
 }
 
 .log-success {
-  border-left-color: #52B788;
-  background: #f0f9f4;
+  border-left-color: var(--color-success);
+  background: var(--color-success-bg-light);
 }
 
 .log-warning {
-  border-left-color: #F7DC6F;
-  background: #fffbf0;
+  border-left-color: var(--color-warning);
+  background: var(--color-surface)bf0;
 }
 
 
@@ -2273,7 +2282,7 @@ const formatLogTime = (timestamp) => {
 
 .log-empty {
   text-align: center;
-  color: #999;
+  color: var(--color-text-disabled);
   padding: 20px;
   font-size: 13px;
 }
@@ -2475,7 +2484,7 @@ const formatLogTime = (timestamp) => {
     position: relative;
     z-index: 10;
     pointer-events: auto; /* 允许交互 */
-    background: #fff;
+    background: var(--color-surface);
     box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.12);
     flex-direction: row;
     align-items: center;
@@ -2484,7 +2493,7 @@ const formatLogTime = (timestamp) => {
     height: 56px;
     min-height: 56px;
     border-right: none;
-    border-top: 1px solid #e0e7ec;
+    border-top: 1px solid var(--color-border);
     padding: 0 6px;
     padding-bottom: env(safe-area-inset-bottom, 0);
     gap: 4px;
@@ -2516,7 +2525,7 @@ const formatLogTime = (timestamp) => {
     border-right: none;
     padding: 8px 4px;
     font-size: 11px;
-    color: #8a9caa;
+    color: var(--color-text-muted);
     background: transparent;
     position: relative;
   }
@@ -2528,13 +2537,13 @@ const formatLogTime = (timestamp) => {
   /* 仅在菜单展开时才显示为 active 状态 */
   .sidebar-panel.mobile-menu-open .tab-button.active {
     color: var(--color-primary);
-    background: rgba(35, 88, 123, 0.06);
+    background: color-mix(in srgb, var(--color-primary) 6%, transparent);
     font-weight: 600;
   }
 
   /* 当菜单未展开时，强制处于 active 状态的按钮恢复未选中时的视觉效果 */
   .sidebar-panel:not(.mobile-menu-open) .tab-button.active {
-    color: #8a9caa;
+    color: var(--color-text-muted);
     background: transparent;
     font-weight: 500;
   }
@@ -2545,7 +2554,7 @@ const formatLogTime = (timestamp) => {
   }
 
   .tab-button:hover {
-    background: rgba(35, 88, 123, 0.04);
+    background: color-mix(in srgb, var(--color-primary) 4%, transparent);
   }
 
   .tab-icon {
@@ -2563,7 +2572,7 @@ const formatLogTime = (timestamp) => {
     position: relative;
     z-index: 5;
     pointer-events: none; /* 关闭时不响应点击 */
-    background: #fff;
+    background: var(--color-surface);
     border-radius: 16px 16px 0 0;
     max-height: calc(70vh - 56px); /* 限制最大高度，减去 Tab 栏高度 */
     transform: translateY(100%);
@@ -2575,7 +2584,7 @@ const formatLogTime = (timestamp) => {
     overflow-y: scroll;
     scrollbar-gutter: stable;
     -webkit-overflow-scrolling: touch;
-    border-bottom: 1px solid #e0e7ec;
+    border-bottom: 1px solid var(--color-border);
   }
 
   .sidebar-panel.mobile-menu-open .options-bar {
@@ -2672,8 +2681,8 @@ const formatLogTime = (timestamp) => {
 
 /* ==================== 自动轮换示意图 ==================== */
 .shift-diagram {
-  background: #f0f4f8;
-  border: 1px solid #d8e4ee;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 10px;
   display: flex;
@@ -2703,10 +2712,10 @@ const formatLogTime = (timestamp) => {
   align-items: center;
   justify-content: center;
   padding: 6px 8px;
-  border: 1.5px solid #b0c8dc;
+  border: 1.5px solid var(--color-border);
   border-radius: 8px;
-  background: #fff;
-  color: #4a7a9b;
+  background: var(--color-surface);
+  color: var(--color-primary);
   cursor: pointer;
   font-size: 14px;
   font-weight: 700;
@@ -2718,24 +2727,24 @@ const formatLogTime = (timestamp) => {
 .diagram-dir-btn span {
   font-size: 10px;
   font-weight: 500;
-  color: #7a9ab0;
+  color: var(--color-text-secondary);
 }
 
 .diagram-dir-btn:hover {
-  background: #e8f0f7;
+  background: var(--color-bg-subtle);
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
 
 .diagram-dir-btn.active {
   background: var(--color-primary);
-  color: #fff !important;
-  border-color: #1a4460;
-  box-shadow: 0 2px 6px rgba(35,88,123,0.35);
+  color: var(--color-surface) !important;
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 35%, transparent);
 }
 
 .diagram-dir-btn.active span {
-  color: #ccdde8;
+  color: var(--color-text-disabled);
 }
 
 /* 中间：行方向按钮 + 格子 */
@@ -2757,10 +2766,10 @@ const formatLogTime = (timestamp) => {
 /* 左/右列偏移按钮 */
 .diagram-col-btn {
   padding: 4px 6px;
-  border: 1.5px solid #b0c8dc;
+  border: 1.5px solid var(--color-border);
   border-radius: 8px;
-  background: #fff;
-  color: #4a7a9b;
+  background: var(--color-surface);
+  color: var(--color-primary);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
@@ -2769,25 +2778,25 @@ const formatLogTime = (timestamp) => {
 }
 
 .diagram-col-btn:hover {
-  background: #e8f0f7;
+  background: var(--color-bg-subtle);
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
 
 .diagram-col-btn.active {
   background: var(--color-primary);
-  color: #fff;
-  border-color: #1a4460;
-  box-shadow: 0 2px 6px rgba(35,88,123,0.3);
+  color: var(--color-surface);
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .diagram-row-btn {
   width: 100%;
   padding: 4px 8px;
-  border: 1.5px solid #b0c8dc;
+  border: 1.5px solid var(--color-border);
   border-radius: 8px;
-  background: #fff;
-  color: #4a7a9b;
+  background: var(--color-surface);
+  color: var(--color-primary);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
@@ -2796,16 +2805,16 @@ const formatLogTime = (timestamp) => {
 }
 
 .diagram-row-btn:hover {
-  background: #e8f0f7;
+  background: var(--color-bg-subtle);
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
 
 .diagram-row-btn.active {
   background: var(--color-primary);
-  color: #fff;
-  border-color: #1a4460;
-  box-shadow: 0 2px 6px rgba(35,88,123,0.3);
+  color: var(--color-surface);
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 /* 9×9 格子容器 */
@@ -2824,23 +2833,23 @@ const formatLogTime = (timestamp) => {
 .diagram-cell-sm {
   width: 18px;
   height: 18px;
-  background: #dbe8f2;
-  border: 1px solid #b8d0e4;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
   border-radius: 3px;
   transition: background 0.15s, border-color 0.15s, transform 0.15s;
   box-sizing: border-box;
 }
 
 .diagram-cell-sm:hover {
-  background: #c2d8ed;
+  background: var(--color-bg-hover);
   border-color: var(--color-primary);
   transform: scale(1.15);
 }
 
 /* 当前位置（红色） */
 .diagram-cell-sm.cell-current {
-  background: #ef4444;
-  border-color: #b91c1c;
+  background: var(--color-danger-text);
+  border-color: var(--color-danger-border);
   border-radius: 50%;
   transform: scale(1.1);
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
@@ -2848,8 +2857,8 @@ const formatLogTime = (timestamp) => {
 
 /* 目标位置（绿色） */
 .diagram-cell-sm.cell-target {
-  background: #22c55e;
-  border-color: #15803d;
+  background: var(--color-success);
+  border-color: var(--color-success-border);
   border-radius: 50%;
   transform: scale(1.1);
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
@@ -2863,8 +2872,8 @@ const formatLogTime = (timestamp) => {
 
 /* 路径格子（同列无溢出时，起点到终点之间的格子） */
 .diagram-cell-sm.cell-path {
-  background: #a5d8ee;
-  border-color: #38bdf8;
+  background: var(--color-info-light);
+  border-color: var(--color-info);
   opacity: 0.75;
 }
 
@@ -2874,7 +2883,7 @@ const formatLogTime = (timestamp) => {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #5a7a8f;
+  color: var(--color-text-secondary);
   flex-wrap: wrap;
   padding: 2px 0;
 }
@@ -2888,17 +2897,17 @@ const formatLogTime = (timestamp) => {
 }
 
 .dot-red {
-  background: #ef4444;
+  background: var(--color-danger-text);
   box-shadow: 0 0 0 2px rgba(239,68,68,0.2);
 }
 
 .dot-green {
-  background: #22c55e;
+  background: var(--color-success);
   box-shadow: 0 0 0 2px rgba(34,197,94,0.2);
 }
 
 .diagram-status-hint {
-  color: #8aabb8;
+  color: var(--color-text-muted);
   font-style: italic;
 }
 
@@ -2918,17 +2927,17 @@ const formatLogTime = (timestamp) => {
 .input-group-compact label {
   font-size: 11px;
   font-weight: 600;
-  color: #5a7a8f;
+  color: var(--color-text-secondary);
 }
 
 .input-group-compact input {
   width: 100%;
   padding: 6px 8px;
-  border: 1.5px solid #cdd8e0;
+  border: 1.5px solid var(--color-border);
   border-radius: 6px;
   font-size: 13px;
   color: var(--color-primary);
-  background: #fff;
+  background: var(--color-surface);
   box-sizing: border-box;
   transition: border-color 0.2s;
 }
@@ -2948,7 +2957,7 @@ const formatLogTime = (timestamp) => {
 .shift-mode-tabs {
   display: flex;
   gap: 2px;
-  background: #e8eef2;
+  background: var(--color-bg-subtle);
   border-radius: 8px;
   padding: 2px;
 }
@@ -2958,7 +2967,7 @@ const formatLogTime = (timestamp) => {
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #5a7a8f;
+  color: var(--color-text-secondary);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -2967,8 +2976,8 @@ const formatLogTime = (timestamp) => {
 
 .shift-mode-tab.active {
   background: var(--color-primary);
-  color: #fff;
-  box-shadow: 0 2px 4px rgba(35,88,123,0.2);
+  color: var(--color-surface);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 /* ==================== 选区轮换面板 ==================== */
@@ -2988,7 +2997,7 @@ const formatLogTime = (timestamp) => {
 .zone-rot-add-btn {
   padding: 4px 10px;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-surface);
   border: none;
   border-radius: 6px;
   font-size: 12px;
@@ -2998,13 +3007,13 @@ const formatLogTime = (timestamp) => {
 }
 
 .zone-rot-add-btn:hover {
-  background: #1a4460;
+  background: var(--color-primary-dark);
   transform: translateY(-1px);
 }
 
 .zone-rot-empty {
   font-size: 12px;
-  color: #aaa;
+  color: var(--color-text-disabled);
   text-align: center;
   padding: 10px 0;
 }
@@ -3013,23 +3022,23 @@ const formatLogTime = (timestamp) => {
   display: flex;
   flex-direction: column;
   padding: 7px 10px;
-  border: 1.5px solid #e0e8ee;
+  border: 1.5px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   margin-bottom: 6px;
   transition: all 0.2s;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .zone-rot-item:hover {
   border-color: var(--color-primary);
-  background: #f0f6fa;
+  background: var(--color-bg-subtle);
 }
 
 .zone-rot-item.selected {
   border-color: var(--color-primary);
-  background: rgba(35, 88, 123, 0.08);
-  box-shadow: 0 0 0 2px rgba(35,88,123,0.15);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 
 .zone-rot-item-row {
@@ -3049,7 +3058,7 @@ const formatLogTime = (timestamp) => {
   flex: 1;
   font-size: 13px;
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3057,13 +3066,13 @@ const formatLogTime = (timestamp) => {
 
 .zone-rot-count {
   font-size: 11px;
-  color: #7a9ab0;
+  color: var(--color-text-secondary);
 }
 
 .zone-rot-del {
   background: none;
   border: none;
-  color: #bbb;
+  color: var(--color-text-disabled);
   cursor: pointer;
   font-size: 12px;
   padding: 0 2px;
@@ -3072,14 +3081,14 @@ const formatLogTime = (timestamp) => {
   flex-shrink: 0;
 }
 
-.zone-rot-del:hover { color: #e53e3e; }
+.zone-rot-del:hover { color: var(--color-danger); }
 
 /* 轮换组 */
 .zone-rot-group {
-  border: 1.5px solid #e0e8ee;
+  border: 1.5px solid var(--color-border);
   border-radius: 8px;
   margin-bottom: 8px;
-  background: #fafcfe;
+  background: var(--color-surface-secondary);
   overflow: hidden;
 }
 
@@ -3088,8 +3097,8 @@ const formatLogTime = (timestamp) => {
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  background: #f0f4f8;
-  border-bottom: 1px solid #e0e8ee;
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .zone-rot-type-badge {
@@ -3101,13 +3110,13 @@ const formatLogTime = (timestamp) => {
 }
 
 .zone-rot-type-badge.cycle {
-  background: rgba(35,88,123,0.15);
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
   color: var(--color-primary);
 }
 
 .zone-rot-type-badge.swap {
   background: rgba(249,115,22,0.15);
-  color: #c2410c;
+  color: var(--color-warning);
 }
 
 .zone-rot-group-zones {
@@ -3122,7 +3131,7 @@ const formatLogTime = (timestamp) => {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #555;
+  color: var(--color-text-primary);
 }
 
 .zone-rot-zone-label {
@@ -3131,7 +3140,7 @@ const formatLogTime = (timestamp) => {
 
 .zone-rot-arrow {
   font-size: 13px;
-  color: #7a9ab0;
+  color: var(--color-text-secondary);
   flex-shrink: 0;
 }
 
@@ -3142,11 +3151,11 @@ const formatLogTime = (timestamp) => {
 .zone-rot-select {
   width: 100%;
   padding: 5px 8px;
-  border: 1.5px dashed #b0c8dc;
+  border: 1.5px dashed var(--color-border);
   border-radius: 6px;
   font-size: 12px;
   color: var(--color-primary);
-  background: #fff;
+  background: var(--color-surface);
   cursor: pointer;
   outline: none;
   transition: border-color 0.2s;
@@ -3158,7 +3167,7 @@ const formatLogTime = (timestamp) => {
 
 .zone-rot-group-error {
   font-size: 11px;
-  color: #e53e3e;
+  color: var(--color-danger);
   padding: 3px 0;
 }
 
@@ -3167,10 +3176,10 @@ const formatLogTime = (timestamp) => {
   width: 100%;
   margin-top: 6px;
   padding: 5px;
-  border: 1.5px dashed #b0c8dc;
+  border: 1.5px dashed var(--color-border);
   border-radius: 6px;
   background: transparent;
-  color: #4a7a9b;
+  color: var(--color-primary);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -3181,14 +3190,14 @@ const formatLogTime = (timestamp) => {
 .zone-rot-add-zone-btn:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
-  background: #f0f6fa;
+  background: var(--color-bg-subtle);
 }
 
 /* 正在编辑（选座）的选区行高亮 */
 .zone-rot-group-zone-row.editing {
-  background: rgba(35,88,123,0.1);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
   border-radius: 6px;
-  outline: 2px solid rgba(35,88,123,0.3);
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 /* 编辑状态提示条 */
@@ -3198,8 +3207,8 @@ const formatLogTime = (timestamp) => {
   justify-content: space-between;
   gap: 8px;
   padding: 7px 10px;
-  background: rgba(35,88,123,0.1);
-  border: 1px solid rgba(35,88,123,0.25);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
   border-radius: 8px;
   font-size: 12px;
   color: var(--color-primary);
@@ -3209,7 +3218,7 @@ const formatLogTime = (timestamp) => {
 .zone-rot-hint-close {
   padding: 2px 8px;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-surface);
   border: none;
   border-radius: 5px;
   font-size: 11px;
@@ -3218,7 +3227,7 @@ const formatLogTime = (timestamp) => {
   flex-shrink: 0;
 }
 
-.zone-rot-hint-close:hover { background: #1a4460; }
+.zone-rot-hint-close:hover { background: var(--color-primary-dark); }
 
 /* 组 或 选区重命名 inline input */
 .zone-rot-name-input {
@@ -3227,14 +3236,14 @@ const formatLogTime = (timestamp) => {
   background: transparent;
   font-size: 13px;
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-primary);
   outline: none;
   padding: 0 2px;
   cursor: text;
   min-width: 0;
 }
 .zone-rot-name-input:focus {
-  background: #fff;
+  background: var(--color-surface);
   border-bottom: 1.5px solid var(--color-primary);
 }
 
@@ -3243,14 +3252,14 @@ const formatLogTime = (timestamp) => {
   border: none;
   background: transparent;
   font-size: 12px;
-  color: #444;
+  color: var(--color-text-primary);
   outline: none;
   padding: 0 2px;
   cursor: text;
   min-width: 0;
 }
 .zone-rot-zone-name-input:focus {
-  background: #fff;
+  background: var(--color-surface);
   border-bottom: 1px solid var(--color-primary);
 }
 
@@ -3268,8 +3277,8 @@ const formatLogTime = (timestamp) => {
 /* ==================== 智能排位快捷区 ==================== */
 /* ==================== 智能排位优化布局 ==================== */
 .assign-main-card {
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 16px;
@@ -3289,11 +3298,11 @@ const formatLogTime = (timestamp) => {
 
 .assign-card-section {
   padding: 10px;
-  border-bottom: 1px dashed #e2e8f0;
+  border-bottom: 1px dashed var(--color-border);
 }
 
 .precheck-section {
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
 }
 
 .precheck-header {
@@ -3305,9 +3314,9 @@ const formatLogTime = (timestamp) => {
 }
 
 .precheck-btn {
-  border: 1px solid #dbe3ea;
-  background: white;
-  color: #334155;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
@@ -3325,24 +3334,24 @@ const formatLogTime = (timestamp) => {
   flex-direction: column;
   gap: 6px;
   padding: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: white;
+  background: var(--color-surface);
 }
 
 .precheck-summary.risk-low {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
+  border-color: var(--color-success-bg);
+  background: var(--color-success-bg-light);
 }
 
 .precheck-summary.risk-medium {
-  border-color: #fde68a;
-  background: #fffbeb;
+  border-color: var(--color-warning-bg);
+  background: var(--color-surface)beb;
 }
 
 .precheck-summary.risk-high {
-  border-color: #fecaca;
-  background: #fef2f2;
+  border-color: var(--color-danger-bg);
+  background: var(--color-danger-bg-light);
 }
 
 .precheck-main-line {
@@ -3350,7 +3359,7 @@ const formatLogTime = (timestamp) => {
   flex-wrap: wrap;
   gap: 8px 12px;
   font-size: 12px;
-  color: #334155;
+  color: var(--color-text-primary);
 }
 
 .precheck-list {
@@ -3369,11 +3378,11 @@ const formatLogTime = (timestamp) => {
 /* .precheck-item icons use :size prop */
 
 .precheck-list.blocking {
-  color: #b91c1c;
+  color: var(--color-danger-text);
 }
 
 .precheck-list.warning {
-  color: #92400e;
+  color: var(--color-warning-text);
 }
 
 /* 算法选择器 */
@@ -3385,7 +3394,7 @@ const formatLogTime = (timestamp) => {
   display: block;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 10px;
@@ -3395,7 +3404,7 @@ const formatLogTime = (timestamp) => {
 
 .divider-line {
   height: 1px;
-  background: #f1f5f9;
+  background: var(--color-bg-subtle);
   margin: 10px 0;
 }
 
@@ -3405,7 +3414,7 @@ const formatLogTime = (timestamp) => {
 
 
 .assignment-settings {
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .assign-actions-grid {
@@ -3413,20 +3422,20 @@ const formatLogTime = (timestamp) => {
   grid-template-columns: 1fr 1.2fr;
   padding: 12px;
   gap: 10px;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .main-assign-btn {
   height: 40px !important;
   font-weight: 700 !important;
-  box-shadow: 0 4px 10px rgba(35, 88, 123, 0.12);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
 /* 规则快捷项修改 */
 .rule-shortcut-btn {
   height: 40px;
-  border: 1.5px solid #e2e8f0;
-  background: #f8fafc;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-bg-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3438,7 +3447,7 @@ const formatLogTime = (timestamp) => {
 }
 
 .rule-shortcut-btn:hover {
-  background: #fff;
+  background: var(--color-surface);
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
@@ -3446,16 +3455,16 @@ const formatLogTime = (timestamp) => {
 /* 复位进度条样式 (无渐变) */
 .assign-progress-section {
   margin-top: 4px;
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
   padding: 10px;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
 }
 
 .assign-progress-wrap {
   width: 100%;
   height: 6px;
-  background: #e2e8f0;
+  background: var(--color-border);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 8px;
@@ -3477,27 +3486,27 @@ const formatLogTime = (timestamp) => {
   display: flex;
   align-items: baseline;
   gap: 4px;
-  background: white;
+  background: var(--color-surface);
   padding: 2px 8px;
   border-radius: 6px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--color-border-light);
 }
 
 .stat-label {
   font-size: 10px;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-weight: 600;
 }
 
 .stat-value {
   font-size: 12px;
   font-weight: 700;
-  color: #334155;
+  color: var(--color-text-primary);
   font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
 }
 
 .score-perfect {
-  color: #16a34a;
+  color: var(--color-success-text);
 }
 
 /* 滑块相关控制逻辑补充 */
@@ -3513,7 +3522,7 @@ const formatLogTime = (timestamp) => {
   height: 5px;
   appearance: none;
   -webkit-appearance: none;
-  background: #cbd5e1;
+  background: var(--color-border-strong);
   border-radius: 10px;
 }
 
@@ -3531,7 +3540,7 @@ const formatLogTime = (timestamp) => {
   font-size: 11px;
   font-weight: 700;
   color: var(--color-primary);
-  background: rgba(35, 88, 123, 0.1);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
   padding: 2px 6px;
   border-radius: 4px;
   min-width: 32px;
@@ -3547,7 +3556,7 @@ const formatLogTime = (timestamp) => {
 
 .inline-row label {
   font-size: 12px;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
@@ -3560,26 +3569,26 @@ const formatLogTime = (timestamp) => {
   border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
-  color: #334155;
+  color: var(--color-text-primary);
   border: 1.5px solid transparent;
 }
 
 .last-sat-rate.sat-a {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #166534;
+  background: var(--color-success-bg-light);
+  border-color: var(--color-success-bg);
+  color: var(--color-success-dark);
 }
 
 .last-sat-rate.sat-b {
-  background: #fffbeb;
-  border-color: #fde68a;
-  color: #92400e;
+  background: var(--color-surface)beb;
+  border-color: var(--color-warning-bg);
+  color: var(--color-warning-text);
 }
 
 .last-sat-rate.sat-c {
-  background: #fef2f2;
-  border-color: #fecaca;
-  color: #991b1b;
+  background: var(--color-danger-bg-light);
+  border-color: var(--color-danger-bg);
+  color: var(--color-danger-dark);
 }
 
 .sat-icon { font-size: 14px; flex-shrink: 0; }

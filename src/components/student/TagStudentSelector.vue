@@ -94,7 +94,7 @@ const toggleStudent = (studentId) => {
 .selector-label {
   display: block;
   margin-bottom: 10px;
-  color: #555;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 500;
 }
@@ -104,19 +104,19 @@ const toggleStudent = (studentId) => {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #f7f9fa;
-  border: 2px solid #e0e0e0;
+  background: var(--color-bg-secondary);
+  border: 2px solid var(--color-border);
   border-radius: 6px;
   margin-bottom: 8px;
   transition: border-color 0.3s;
 }
 
 .search-box:focus-within {
-  border-color: #23587b;
+  border-color: var(--color-primary);
 }
 
 .search-icon {
-  color: #94a3b8;
+  color: var(--color-text-disabled);
   flex-shrink: 0;
 }
 
@@ -124,14 +124,14 @@ const toggleStudent = (studentId) => {
   border: none;
   background: transparent;
   font-size: 13px;
-  color: #333;
+  color: var(--color-text-primary);
   outline: none;
   width: 100%;
   font-family: inherit;
 }
 
 .search-input::placeholder {
-  color: #a0aec0;
+  color: var(--color-text-disabled);
 }
 
 .student-list {
@@ -139,7 +139,7 @@ const toggleStudent = (studentId) => {
   overflow-y: auto;
   border: 1px solid #e8eef2;
   border-radius: 6px;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .student-list::-webkit-scrollbar {
@@ -147,17 +147,17 @@ const toggleStudent = (studentId) => {
 }
 
 .student-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--scrollbar-track);
   border-radius: 3px;
 }
 
 .student-list::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 .student-list::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--scrollbar-thumb-hover);
 }
 
 .student-row {
@@ -167,7 +167,7 @@ const toggleStudent = (studentId) => {
   padding: 8px 12px;
   cursor: pointer;
   transition: background 0.15s ease;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-bg-subtle);
 }
 
 .student-row:last-child {
@@ -175,11 +175,11 @@ const toggleStudent = (studentId) => {
 }
 
 .student-row:hover {
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
 }
 
 .student-row.selected {
-  background: #f0f7fb;
+  background: var(--color-bg-subtle);
 }
 
 .checkbox-wrapper {
@@ -193,13 +193,13 @@ const toggleStudent = (studentId) => {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: #23587b;
+  accent-color: var(--color-primary);
 }
 
 .student-name {
   flex: 1;
   font-size: 13px;
-  color: #334155;
+  color: var(--color-text-primary);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -208,23 +208,23 @@ const toggleStudent = (studentId) => {
 
 .student-number {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--color-text-disabled);
   white-space: nowrap;
 }
 
 .empty-hint {
   text-align: center;
-  color: #94a3b8;
+  color: var(--color-text-disabled);
   font-size: 13px;
   padding: 16px;
-  border: 1px dashed #e2e8f0;
+  border: 1px dashed var(--color-border);
   border-radius: 6px;
 }
 
 .selector-footer {
   margin-top: 8px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   text-align: right;
 }
 </style>

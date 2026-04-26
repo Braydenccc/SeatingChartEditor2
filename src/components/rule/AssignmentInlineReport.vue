@@ -94,10 +94,10 @@ const gradeClass = computed(() => {
 
 const gradeColor = computed(() => {
   const pct = satPct.value
-  if (pct >= 95) return '#22c55e'
-  if (pct >= 75) return '#f59e0b'
-  if (pct >= 50) return '#f97316'
-  return '#ef4444'
+  if (pct >= 95) return 'var(--color-success)'
+  if (pct >= 75) return 'var(--color-warning)'
+  if (pct >= 50) return 'var(--color-warning-hover)'
+  return 'var(--color-danger-text)'
 })
 
 const gradeIconComponent = computed(() => {
@@ -113,9 +113,9 @@ const gradeIconComponent = computed(() => {
 <style scoped>
 .inline-report {
   margin-top: 16px;
-  background: white;
+  background: var(--color-surface);
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   box-shadow: 0 4px 12px rgba(0,0,0,0.03);
   overflow: hidden;
   display: flex;
@@ -127,14 +127,14 @@ const gradeIconComponent = computed(() => {
   align-items: center;
   gap: 12px;
   padding: 14px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.in-report-header.grade-a { background: #dcfce7; }
-.in-report-header.grade-b { background: #fef9c3; }
-.in-report-header.grade-c { background: #ffedd5; }
-.in-report-header.grade-d { background: #fee2e2; }
+.in-report-header.grade-a { background: var(--color-success-bg); }
+.in-report-header.grade-b { background: var(--color-warning-bg); }
+.in-report-header.grade-c { background: var(--color-warning-bg-light); }
+.in-report-header.grade-d { background: var(--color-danger-bg); }
 
 /* 评分环替换为图标+百分比标签 */
 .in-score-ring {
@@ -157,7 +157,7 @@ const gradeIconComponent = computed(() => {
 
 .in-report-meta {
   font-size: 11px;
-  color: #64748b;
+  color: var(--color-text-muted);
   margin-bottom: 2px;
 }
 
@@ -171,7 +171,7 @@ const gradeIconComponent = computed(() => {
 
 /* 主体内容 */
 .in-report-body {
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-bg-subtle);
 }
 .in-report-body:last-child {
   border-bottom: none;
@@ -180,14 +180,14 @@ const gradeIconComponent = computed(() => {
 .in-group-header {
   font-size: 12px;
   font-weight: 600;
-  color: #475569;
+  color: var(--color-text-secondary);
   padding: 10px 14px;
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
 }
 .in-group-header.fail-header {
-  background: #fef2f2;
-  color: #b91c1c;
-  border-bottom: 1px solid #fee2e2;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border-bottom: 1px solid var(--color-danger-bg);
 }
 
 .in-group-header.toggle-btn {
@@ -199,7 +199,7 @@ const gradeIconComponent = computed(() => {
   transition: background 0.15s;
 }
 .in-group-header.toggle-btn:hover {
-  background: #f1f5f9;
+  background: var(--color-bg-subtle);
 }
 /* .toggle-icon: replaced by ChevronDown component */
 
@@ -214,17 +214,17 @@ const gradeIconComponent = computed(() => {
   gap: 8px;
   padding: 10px 14px;
   font-size: 12px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--color-bg-subtle);
   transition: background 0.15s;
 }
 .in-rule-row:hover {
-  background: #f8fafc;
+  background: var(--color-bg-subtle);
 }
 .in-rule-row:first-child {
   border-top: none;
 }
 
-.in-rule-row.fail { background: white; }
+.in-rule-row.fail { background: var(--color-surface); }
 .in-rule-row.ok { }
 
 /* .in-row-icon: size controlled by :size prop */
@@ -236,12 +236,12 @@ const gradeIconComponent = computed(() => {
   gap: 6px;
 }
 
-.in-row-text { color: #334155; line-height: 1.4; }
+.in-row-text { color: var(--color-text-primary); line-height: 1.4; }
 
 .in-row-reason {
   font-size: 11px;
-  color: #dc2626;
-  background: #fee2e2;
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
   padding: 3px 8px;
   border-radius: 4px;
   align-self: flex-start;
@@ -255,9 +255,9 @@ const gradeIconComponent = computed(() => {
 }
 
 .in-action-btn {
-  border: 1px solid #cbd5e1;
-  background: white;
-  color: #334155;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
@@ -266,9 +266,9 @@ const gradeIconComponent = computed(() => {
 }
 
 .in-action-btn.primary {
-  border-color: #93c5fd;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--color-info-text);
+  background: var(--color-info-bg);
+  color: var(--color-info);
 }
 
 .in-no-rules-tip {
@@ -277,9 +277,9 @@ const gradeIconComponent = computed(() => {
   gap: 8px;
   padding: 14px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-text-muted);
   line-height: 1.4;
-  background: #f8fafc;
-  border-top: 1px solid #e2e8f0;
+  background: var(--color-bg-subtle);
+  border-top: 1px solid var(--color-border);
 }
 </style>
