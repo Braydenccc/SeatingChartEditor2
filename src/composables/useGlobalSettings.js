@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { safeStorageGet, safeStorageSet } from '@/utils/storage'
 
 // 默认设置结构
 const defaultSettings = {
@@ -13,12 +14,10 @@ const defaultSettings = {
     language: 'zh-CN',
     themeColor: '#23587b',
     defaultZoom: 100,
-    enableAnimations: true,
-    compactMode: false
+    enableAnimations: true
   },
   editor: {
     autoSaveInterval: 60000, // 1分钟
-    defaultFileFormat: '.sce',
     undoHistorySize: 50,
     dragSensitivity: 1.0,
     doubleClickAction: 'edit' // 'edit' 或 'assign'
@@ -29,36 +28,6 @@ const defaultSettings = {
 const settings = ref(JSON.parse(JSON.stringify(defaultSettings)))
 
 const STORAGE_KEY = 'sce-global-settings'
-
-/**
- * 安全读取 localStorage
- * @param {string} key - 存储键
- * @returns {string|null} 存储的值或 null
- */
-const safeStorageGet = (key) => {
-  try {
-    return localStorage.getItem(key)
-  } catch (error) {
-    console.warn(`Failed to read localStorage key "${key}":`, error)
-    return null
-  }
-}
-
-/**
- * 安全写入 localStorage
- * @param {string} key - 存储键
- * @param {string} value - 要存储的值
- * @returns {boolean} 是否成功写入
- */
-const safeStorageSet = (key, value) => {
-  try {
-    localStorage.setItem(key, value)
-    return true
-  } catch (error) {
-    console.warn(`Failed to write localStorage key "${key}":`, error)
-    return false
-  }
-}
 
 /**
  * 从 localStorage 加载设置
@@ -163,8 +132,17 @@ const resetSettings = (category) => {
   }
 }
 
+// 应用主题色到 CSS 变量
+const applyThemeColor = () => {
+  const themeColor = settings.value.ui.themeColor
+  if (themeColor) {
+    document.documentElement.style.setProperty('--color-primary', themeColor)
+  }
+}
+
 // 模块初始化时自动加载设置
 loadFromLocalStorage()
+applyThemeColor()
 
 export function useGlobalSettings() {
   return {
@@ -172,6 +150,7 @@ export function useGlobalSettings() {
     loadFromLocalStorage,
     saveToLocalStorage,
     updateSetting,
-    resetSettings
+    resetSettings,
+    applyThemeColor
   }
 }

@@ -40,7 +40,12 @@
                 <h2>{{ currentCategoryLabel }}</h2>
               </div>
               <div class="content-body">
-                <PlaceholderPanel :title="currentCategoryLabel" />
+                <component
+                  :is="currentComponent"
+                  v-if="currentComponent"
+                  :settings="activeTab === 'global' && activeCategory !== 'sync' ? currentSettings : undefined"
+                  @update:settings="(val) => activeTab === 'global' && activeCategory !== 'sync' && Object.assign(currentSettings, val)"
+                />
               </div>
             </div>
           </div>
@@ -68,7 +73,16 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Cloud, Palette, Edit, Info, Grid, RotateCw, Wand2, FileDown } from 'lucide-vue-next'
-import PlaceholderPanel from './panels/PlaceholderPanel.vue'
+import SyncPanel from './panels/SyncPanel.vue'
+import UIPanel from './panels/UIPanel.vue'
+import EditorPanel from './panels/EditorPanel.vue'
+import WorkspaceInfoPanel from './panels/WorkspaceInfoPanel.vue'
+import SeatConfigPanel from './panels/SeatConfigPanel.vue'
+import RotationPanel from './panels/RotationPanel.vue'
+import AssignmentPanel from './panels/AssignmentPanel.vue'
+import ExportPanel from './panels/ExportPanel.vue'
+import { useGlobalSettings } from '@/composables/useGlobalSettings'
+import { useLogger } from '@/composables/useLogger'
 
 const props = defineProps({
   visible: {
@@ -79,21 +93,24 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible', 'save'])
 
+const { settings, saveToLocalStorage, resetSettings, applyThemeColor } = useGlobalSettings()
+const { success, warning } = useLogger()
+
 const activeTab = ref('global')
 const activeCategory = ref('sync')
 
 const globalCategories = [
-  { id: 'sync', label: '云端同步', icon: Cloud },
-  { id: 'ui', label: '界面偏好', icon: Palette },
-  { id: 'editor', label: '编辑器行为', icon: Edit }
+  { id: 'sync', label: '云端同步', icon: Cloud, component: SyncPanel },
+  { id: 'ui', label: '界面偏好', icon: Palette, component: UIPanel },
+  { id: 'editor', label: '编辑器行为', icon: Edit, component: EditorPanel }
 ]
 
 const workspaceCategories = [
-  { id: 'info', label: '工作区信息', icon: Info },
-  { id: 'seat', label: '座位表配置', icon: Grid },
-  { id: 'rotation', label: '自动轮换', icon: RotateCw },
-  { id: 'assignment', label: '智能排位', icon: Wand2 },
-  { id: 'export', label: '导出配置', icon: FileDown }
+  { id: 'info', label: '工作区信息', icon: Info, component: WorkspaceInfoPanel },
+  { id: 'seat', label: '座位表配置', icon: Grid, component: SeatConfigPanel },
+  { id: 'rotation', label: '自动轮换', icon: RotateCw, component: RotationPanel },
+  { id: 'assignment', label: '智能排位', icon: Wand2, component: AssignmentPanel },
+  { id: 'export', label: '导出配置', icon: FileDown, component: ExportPanel }
 ]
 
 const currentCategories = computed(() => {
@@ -103,6 +120,23 @@ const currentCategories = computed(() => {
 const currentCategoryLabel = computed(() => {
   const category = currentCategories.value.find(c => c.id === activeCategory.value)
   return category ? category.label : ''
+})
+
+const currentComponent = computed(() => {
+  const category = currentCategories.value.find(c => c.id === activeCategory.value)
+  return category?.component || null
+})
+
+const currentSettings = computed(() => {
+  if (activeTab.value === 'global') {
+    const categoryMap = {
+      sync: settings.value.sync,
+      ui: settings.value.ui,
+      editor: settings.value.editor
+    }
+    return categoryMap[activeCategory.value] || {}
+  }
+  return {}
 })
 
 // Reset activeCategory when switching tabs
@@ -125,6 +159,19 @@ watch(() => props.visible, (newVal) => {
 })
 
 const handleSave = () => {
+  if (activeTab.value === 'global') {
+    const saved = saveToLocalStorage()
+    if (saved) {
+      // 应用主题色
+      applyThemeColor()
+      success('全局设置已保存')
+    } else {
+      warning('设置保存失败')
+    }
+  } else {
+    // 工作区设置保存（座位配置等会自动保存到工作区数据中）
+    success('工作区设置已保存')
+  }
   emit('save')
   emit('update:visible', false)
 }
@@ -134,7 +181,21 @@ const handleCancel = () => {
 }
 
 const handleReset = () => {
-  console.log('重置当前分类设置:', activeCategory.value)
+  if (activeTab.value === 'global') {
+    const categoryMap = {
+      sync: 'sync',
+      ui: 'ui',
+      editor: 'editor'
+    }
+    const category = categoryMap[activeCategory.value]
+    if (category) {
+      resetSettings(category)
+      success(`已重置 ${currentCategoryLabel.value}`)
+    }
+  } else {
+    // 工作区设置不支持重置（因为是工作区特定数据）
+    warning('工作区设置无法重置，请在各功能面板中单独操作')
+  }
 }
 </script>
 
@@ -155,10 +216,10 @@ const handleReset = () => {
 .settings-dialog {
   background: white;
   border-radius: 8px;
-  width: 900px;
-  height: 600px;
+  width: 95vw;
+  height: 92vh;
   max-width: 95vw;
-  max-height: 90vh;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
