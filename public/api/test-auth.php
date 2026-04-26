@@ -11,7 +11,7 @@ try {
         'php_version' => phpversion()
     ]);
 
-    require_once "public/api/common.php";
+    require_once "api/common.php";
 
     echo json_encode([
         'step' => 2,

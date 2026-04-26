@@ -1,6 +1,6 @@
 <?php
-require_once "public/api/common.php";
-require_once "public/api/file-permissions.php";
+require_once "api/common.php";
+require_once "api/file-permissions.php";
 header('Content-Type: application/json; charset=utf-8');
 
 if (!class_exists('Database')) {
