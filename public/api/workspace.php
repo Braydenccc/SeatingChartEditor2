@@ -218,7 +218,15 @@ try {
         ]);
 
     } elseif ($action === 'list') {
+        // 从权限表获取文件
         $fileIds = getUserAccessibleFiles($dbPermissions, $username);
+        
+        // 兼容旧数据：同时从用户文件列表获取文件
+        $userFilesKey = sanitizeDbKey($username . '_files');
+        $legacyFileIds = $dbUsers->get_array($userFilesKey);
+        if ($legacyFileIds && is_array($legacyFileIds)) {
+            $fileIds = array_unique(array_merge($fileIds ?: [], $legacyFileIds));
+        }
 
         $list = [];
         if ($fileIds && is_array($fileIds)) {
@@ -231,6 +239,15 @@ try {
 
                 $fileData = json_decode($fileRaw, true);
                 if (!$fileData || !isset($fileData['metadata'])) continue;
+
+                // 兼容旧数据：自动迁移权限记录
+                $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
+                if ($dbPermissions->get($permKey) === null) {
+                    // 检查文件作者是否是当前用户
+                    if (isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
+                        grantFilePermission($dbPermissions, $fileId, $username, 'owner');
+                    }
+                }
 
                 $list[] = [
                     'fileId' => $fileId,
@@ -258,11 +275,6 @@ try {
             respond(['success' => false, 'message' => '文件ID格式无效']);
         }
 
-        // 检查读权限
-        if (!hasFilePermission($dbPermissions, $fileId, $username, 'read')) {
-            respond(['success' => false, 'message' => '无权访问该文件'], 403);
-        }
-
         // 消毒文件 ID
         $sanitizedFileId = sanitizeDbKey($fileId);
 
@@ -274,6 +286,20 @@ try {
         $fileData = json_decode($fileRaw, true);
         if (!$fileData || !isset($fileData['metadata']) || !isset($fileData['content'])) {
              respond(['success' => false, 'message' => '文件格式损坏']);
+        }
+
+        // 检查读权限（兼容旧数据：如果没有权限记录，检查文件作者）
+        $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
+        if ($dbPermissions->get($permKey) === null) {
+            // 没有权限记录，检查文件作者
+            if (isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
+                // 自动迁移：创建权限记录
+                grantFilePermission($dbPermissions, $fileId, $username, 'owner');
+            } else {
+                respond(['success' => false, 'message' => '无权访问该文件'], 403);
+            }
+        } elseif (!hasFilePermission($dbPermissions, $fileId, $username, 'read')) {
+            respond(['success' => false, 'message' => '无权访问该文件'], 403);
         }
 
         respond([
@@ -291,15 +317,26 @@ try {
              respond(['success' => false, 'message' => '文件ID格式无效']);
          }
 
-         // 检查写权限
-         if (!hasFilePermission($dbPermissions, $fileId, $username, 'write')) {
-             respond(['success' => false, 'message' => '无权删除该文件'], 403);
-         }
-
          // 消毒文件 ID
          $sanitizedFileId = sanitizeDbKey($fileId);
 
          $fileRaw = $dbFiles->get($sanitizedFileId);
+         
+         // 检查写权限（兼容旧数据：如果没有权限记录，检查文件作者）
+         $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
+         if ($dbPermissions->get($permKey) === null) {
+             // 没有权限记录，检查文件作者
+             $fileData = $fileRaw ? json_decode($fileRaw, true) : null;
+             if ($fileData && isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
+                 // 自动迁移：创建权限记录
+                 grantFilePermission($dbPermissions, $fileId, $username, 'owner');
+             } else {
+                 respond(['success' => false, 'message' => '无权删除该文件'], 403);
+             }
+         } elseif (!hasFilePermission($dbPermissions, $fileId, $username, 'write')) {
+             respond(['success' => false, 'message' => '无权删除该文件'], 403);
+         }
+
          if ($fileRaw !== null) {
              $dbFiles->delete($sanitizedFileId);
 
