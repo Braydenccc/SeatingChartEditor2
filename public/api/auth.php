@@ -14,10 +14,20 @@ const TOKEN_EXPIRY_DAYS = 30;
 const TOKEN_EXPIRY_REMEMBER_ME = 90;
 
 // 生产环境强制 HTTPS，开发环境可通过环境变量禁用
+// 默认要求 HTTPS，只有明确设置 REQUIRE_HTTPS=false 才禁用
 function shouldRequireHttps() {
     static $cached = null;
     if ($cached === null) {
-        $cached = !function_exists('getenv') || getenv('REQUIRE_HTTPS') !== 'false';
+        // 默认为 true（要求 HTTPS）
+        $cached = true;
+
+        // 只有当环境变量明确设置为字符串 'false' 时才禁用
+        if (function_exists('getenv')) {
+            $envValue = getenv('REQUIRE_HTTPS');
+            if ($envValue === 'false' || $envValue === '0') {
+                $cached = false;
+            }
+        }
     }
     return $cached;
 }
@@ -122,9 +132,13 @@ function decryptPasswordFromTransport($encryptedPassword, $username) {
             return null;
         }
 
-        // 分离 IV (12 字节) 和密文
+        // 分离 IV (12 字节)、密文和 tag (16 字节)
         $iv = substr($combined, 0, 12);
-        $ciphertext = substr($combined, 12);
+        $ciphertextWithTag = substr($combined, 12);
+
+        // AES-GCM: tag 在密文末尾 16 字节
+        $tag = substr($ciphertextWithTag, -16);
+        $ciphertext = substr($ciphertextWithTag, 0, -16);
 
         // 派生密钥（与客户端相同的算法）
         $keyMaterial = "sce-auth-{$username}";
@@ -138,7 +152,7 @@ function decryptPasswordFromTransport($encryptedPassword, $username) {
             $key,
             OPENSSL_RAW_DATA,
             $iv,
-            substr($ciphertext, -16) // GCM tag 在密文末尾
+            $tag
         );
 
         return $decrypted !== false ? $decrypted : null;
