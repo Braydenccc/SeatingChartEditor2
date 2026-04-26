@@ -406,7 +406,14 @@ export function useSeatChart() {
 
   // 更新配置
   const updateConfig = (newConfig) => {
-    seatConfig.value = { ...seatConfig.value, ...newConfig }
+    // 只合并有效值（跳过 undefined 和 null）
+    const validConfig = {}
+    for (const [key, value] of Object.entries(newConfig)) {
+      if (value !== undefined && value !== null) {
+        validConfig[key] = value
+      }
+    }
+    seatConfig.value = { ...seatConfig.value, ...validConfig }
     ensureGroupsArray()
     initializeSeats()  // 重新初始化座位
     // 清理选区中已失效的座位引用

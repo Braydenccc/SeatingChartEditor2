@@ -193,7 +193,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   padding: 10px 16px;
   border-radius: 10px;
   margin-bottom: 8px;
-  border: 1px solid #eef2f5;
+  border: 1px solid var(--color-border-light);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
   transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
   position: relative;

@@ -76,14 +76,11 @@
 
     <!-- 学生编辑弹窗 -->
     <StudentEditDialog v-if="showStudentEditDialog" v-model:visible="showStudentEditDialog" :studentId="editingStudentId" />
-
-    <!-- 导出设置弹窗 -->
-    <ExportDialog v-if="showExportDialog" :visible="showExportDialog" @close="showExportDialog = false" @exported="onExported" />
   </div>
 </template>
 
 <script setup>
-import { computed, ref, defineAsyncComponent, onBeforeUnmount, onMounted, onUnmounted } from 'vue'
+import { computed, ref, defineAsyncComponent, onBeforeUnmount, onMounted, onUnmounted, watch } from 'vue'
 import { useWindowSize } from '@vueuse/core'
 import { Users, FileInput, FolderOpen, CloudDownload, CheckCircle, LogOut } from 'lucide-vue-next'
 import CandidateItem from './CandidateItem.vue'
@@ -106,10 +103,41 @@ const StudentRosterDialog = defineAsyncComponent(() => import('./StudentRosterDi
 const TagSettingsDialog = defineAsyncComponent(() => import('./TagSettingsDialog.vue'))
 const StudentEditDialog = defineAsyncComponent(() => import('./StudentEditDialog.vue'))
 
+const props = defineProps({
+  showRoster: {
+    type: Boolean,
+    default: false
+  },
+  showTagSettings: {
+    type: Boolean,
+    default: false
+  }
+})
+
+const emit = defineEmits(['update:show-roster', 'update:show-tag-settings'])
+
 const showRosterDialog = ref(false)
 const showTagSettingsDialog = ref(false)
 const showStudentEditDialog = ref(false)
 const editingStudentId = ref(null)
+
+// 监听 props 变化，同步到本地状态
+watch(() => props.showRoster, (val) => {
+  showRosterDialog.value = val
+})
+
+watch(() => props.showTagSettings, (val) => {
+  showTagSettingsDialog.value = val
+})
+
+// 监听本地状态变化，同步回父组件
+watch(showRosterDialog, (val) => {
+  emit('update:show-roster', val)
+})
+
+watch(showTagSettingsDialog, (val) => {
+  emit('update:show-tag-settings', val)
+})
 
 const { tags, addTag, clearAllTags } = useTagData()
 const { students, updateStudent, deleteStudent, clearAllStudents, addStudent } = useStudentData()
@@ -517,7 +545,7 @@ const handleDrop = (e) => {
 
 .empty-action-btn.primary {
   background: var(--color-primary);
-  color: var(--color-surface);
+  color: var(--color-text-inverse);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 25%, transparent);
 }
 
@@ -572,7 +600,7 @@ const handleDrop = (e) => {
   gap: 6px;
   padding: 8px 16px;
   background: var(--color-primary);
-  color: var(--color-surface);
+  color: var(--color-text-inverse);
   border: none;
   border-radius: 6px;
   cursor: pointer;

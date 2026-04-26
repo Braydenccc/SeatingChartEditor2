@@ -520,7 +520,7 @@ defineExpose({ focusRule })
 .search-box input {
   width: 100%;
   padding: 10px 36px;
-  background: white;
+  background: var(--color-input-bg);
   border: 1.5px solid var(--color-border);
   border-radius: 10px;
   font-size: 13px;
@@ -584,7 +584,7 @@ defineExpose({ focusRule })
 
 .filter-tab:hover { color: var(--color-text-primary); }
 .filter-tab.active {
-  background: white;
+  background: var(--color-surface);
   color: var(--color-primary);
   box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
@@ -600,7 +600,7 @@ defineExpose({ focusRule })
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
+  background: var(--color-surface);
   border: 1.5px solid var(--color-border);
   border-radius: 8px;
   color: var(--color-text-muted);
@@ -697,7 +697,7 @@ defineExpose({ focusRule })
 .rule-item {
   border-radius: 12px;
   border: 1px solid var(--color-border-light);
-  background: white;
+  background: var(--color-surface);
   overflow: hidden;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
@@ -778,7 +778,7 @@ defineExpose({ focusRule })
   left: 2px;
   width: 16px;
   height: 16px;
-  background: white;
+  background: var(--color-surface);
   border-radius: 50%;
   transition: transform 0.2s;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
@@ -895,7 +895,7 @@ defineExpose({ focusRule })
   padding: 5px 14px;
   border: 1.5px solid var(--color-info-text);
   border-radius: 6px;
-  background: white;
+  background: var(--color-surface);
   color: var(--color-info);
   font-size: 12px;
   cursor: pointer;
@@ -909,7 +909,7 @@ defineExpose({ focusRule })
   padding: 5px 14px;
   border: 1.5px solid var(--color-danger-text);
   border-radius: 6px;
-  background: white;
+  background: var(--color-surface);
   color: var(--color-danger);
   font-size: 12px;
   cursor: pointer;

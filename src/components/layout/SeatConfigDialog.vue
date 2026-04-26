@@ -178,6 +178,9 @@ watch(() => props.visible, (newVal) => {
   }
 })
 
+// 组件挂载时也初始化一次，确保数据正确
+initLocalConfig()
+
 function initLocalConfig() {
   const config = seatConfig.value
   localConfig.value.groupCount = config.groupCount
@@ -201,6 +204,11 @@ function initLocalConfig() {
 }
 
 const previewGroups = computed(() => {
+  // 如果 groups 为空，返回空数组（避免渲染错误）
+  if (!localConfig.value.groups || localConfig.value.groups.length === 0) {
+    return []
+  }
+
   return localConfig.value.groups.map((group, index) => ({
     ...group,
     index
@@ -216,10 +224,14 @@ const totalSeats = computed(() => {
 function addGroup() {
   if (localConfig.value.groupCount >= 10) return
   localConfig.value.groupCount++
-  localConfig.value.groups.push({
-    columns: uniformValue.value.columns,
-    rows: uniformValue.value.rows
-  })
+
+  // 确保 groups 数组长度与 groupCount 匹配
+  while (localConfig.value.groups.length < localConfig.value.groupCount) {
+    localConfig.value.groups.push({
+      columns: uniformValue.value.columns,
+      rows: uniformValue.value.rows
+    })
+  }
 }
 
 function removeGroup() {

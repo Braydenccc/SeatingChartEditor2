@@ -125,13 +125,13 @@ const handleDoubleClick = () => {
 .candidate-item {
   width: 120px;
   height: 80px;
-  border: 2px solid var(--color-primary, #23587b);
+  border: 2px solid var(--color-primary);
   contain: layout style;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg-selected, #e8f4f8);
+  background: var(--color-bg-selected);
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
   position: relative;
   overflow: hidden;
@@ -141,10 +141,8 @@ const handleDoubleClick = () => {
 }
 
 .candidate-item:hover {
-  background: linear-gradient(135deg, #e8f4f8 0%, #d4e9f2 100%);
-  border-left: 4px solid var(--color-primary);
+  background: linear-gradient(135deg, var(--color-bg-selected) 0%, color-mix(in srgb, var(--color-primary) 15%, var(--color-bg-card)) 100%);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 20%, transparent);
-  transform: translateX(4px);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -201,8 +199,8 @@ const handleDoubleClick = () => {
 .student-number {
   font-size: 12px;
   font-weight: 700;
-  color: var(--color-primary, #23587b);
-  background: white;
+  color: var(--color-primary);
+  background: var(--color-surface);
   padding: 2px 10px;
   border-radius: 6px;
   min-width: 40px;
@@ -215,8 +213,8 @@ const handleDoubleClick = () => {
   right: 4px;
   font-size: 9px;
   font-weight: 600;
-  color: var(--color-primary, #23587b);
-  background: rgba(255, 255, 255, 0.95);
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-surface) 95%, var(--color-primary));
   padding: 1px 5px;
   border-radius: 3px;
   line-height: 1.2;

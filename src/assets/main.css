@@ -42,24 +42,28 @@
   --color-danger-text: #ef4444;
   --color-danger-bg: #fef2f2;
   --color-danger-bg-light: #fef2f2;
+  --color-danger-dark: #c62828;
 
   --color-success: #059669;
   --color-success-hover: #047857;
   --color-success-text: #10b981;
   --color-success-bg: #d1fae5;
   --color-success-bg-light: #f0fdf4;
+  --color-success-dark: #047857;
 
   --color-warning: #f59e0b;
   --color-warning-hover: #d97706;
   --color-warning-text: #f59e0b;
   --color-warning-bg: #fef3c7;
   --color-warning-bg-light: #fffbeb;
+  --color-warning-dark: #b45309;
 
   --color-info: #1d4ed8;
   --color-info-hover: #1e40af;
   --color-info-text: #3b82f6;
   --color-info-bg: #eff6ff;
   --color-info-bg-light: #dbeafe;
+  --color-info-dark: #1e40af;
 
   /* 特殊颜色 */
   --color-error-bg-light: #fef2f2;
@@ -90,6 +94,11 @@
   --scrollbar-thumb: #cbd5e1;
   --scrollbar-thumb-hover: #94a3b8;
 
+  /* 编辑模式指示色 */
+  --color-mode-swap: #f59e0b;
+  --color-mode-empty: #8b5cf6;
+  --color-mode-zone: #06b6d4;
+
   /* 标签调色板 */
   --tag-color-1: #FF6B6B;
   --tag-color-2: #4ECDC4;
@@ -112,32 +121,32 @@
   --color-primary-dark: #3a8eef;
   --color-primary-hover: #3a8eef;
 
-  /* 背景色 */
+  /* 背景色 - 优化层级区分度 */
   --color-surface: #1e293b;
   --color-surface-rgb: 30, 41, 59;
-  --color-bg-selected: #334155;
-  --color-bg-card: #0f172a;
-  --color-bg-subtle: #0f172a;
-  --color-bg-soft: #1e293b;
-  --color-bg-hover: #334155;
+  --color-bg-selected: #2a3f5c;
+  --color-bg-card: #111827;
+  --color-bg-subtle: #151d2e;
+  --color-bg-soft: #253347;
+  --color-bg-hover: #2a3f5c;
   --color-bg-overlay: rgba(0, 0, 0, 0.7);
 
-  /* 文字颜色 */
+  /* 文字颜色 - 提升禁用文字对比度 */
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #cbd5e1;
   --color-text-muted: #94a3b8;
-  --color-text-disabled: #64748b;
-  --color-text-inverse: #0f172a;
+  --color-text-disabled: #7b8fa3;
+  --color-text-inverse: #ffffff;
 
-  /* 边框颜色 */
-  --color-border: #334155;
-  --color-border-strong: #475569;
-  --color-border-hover: #475569;
-  --color-border-light: #1e293b;
-  --color-border-dark: #64748b;
+  /* 边框颜色 - 提升可见度 */
+  --color-border: #3d4f63;
+  --color-border-strong: #536578;
+  --color-border-hover: #536578;
+  --color-border-light: #253347;
+  --color-border-dark: #7b8fa3;
 
   /* 次要背景色 */
-  --color-bg-secondary: #0f172a;
+  --color-bg-secondary: #151d2e;
 
   /* 状态颜色 */
   --color-danger: #f87171;
@@ -145,24 +154,28 @@
   --color-danger-text: #fca5a5;
   --color-danger-bg: #450a0a;
   --color-danger-bg-light: #450a0a;
+  --color-danger-dark: #dc2626;
 
   --color-success: #34d399;
   --color-success-hover: #10b981;
   --color-success-text: #6ee7b7;
   --color-success-bg: #064e3b;
   --color-success-bg-light: #022c22;
+  --color-success-dark: #059669;
 
   --color-warning: #fbbf24;
   --color-warning-hover: #f59e0b;
   --color-warning-text: #fcd34d;
   --color-warning-bg: #78350f;
   --color-warning-bg-light: #451a03;
+  --color-warning-dark: #d97706;
 
   --color-info: #60a5fa;
   --color-info-hover: #3b82f6;
   --color-info-text: #93c5fd;
   --color-info-bg: #1e3a8a;
   --color-info-bg-light: #1e40af;
+  --color-info-dark: #2563eb;
 
   /* 特殊颜色 */
   --color-error-bg-light: #450a0a;
@@ -178,20 +191,25 @@
   --shadow-primary: rgba(74, 158, 255, 0.4);
 
   /* 特定组件颜色 */
-  --color-header-bg: #0f172a;
-  --color-sidebar-bg: #0f172a;
+  --color-header-bg: #111827;
+  --color-sidebar-bg: #111827;
   --color-dialog-bg: #1e293b;
-  --color-input-bg: #0f172a;
-  --color-input-border: #334155;
-  --color-button-secondary-bg: #334155;
+  --color-input-bg: #151d2e;
+  --color-input-border: #3d4f63;
+  --color-button-secondary-bg: #2a3f5c;
   --color-button-secondary-text: #cbd5e1;
   --color-tag-bg: #1e3a8a;
   --color-tag-text: #93c5fd;
 
   /* 滚动条颜色 */
-  --scrollbar-track: #0f172a;
+  --scrollbar-track: #111827;
   --scrollbar-thumb: #475569;
   --scrollbar-thumb-hover: #64748b;
+
+  /* 编辑模式指示色 */
+  --color-mode-swap: #f59e0b;
+  --color-mode-empty: #8b5cf6;
+  --color-mode-zone: #06b6d4;
 
   /* 标签调色板（深色模式调整亮度） */
   --tag-color-1: #ff8a8a;
@@ -210,6 +228,110 @@
 :root[data-theme="custom"] {
   /* 颜色由 JS 动态设置 */
 }
+
+/* 系统深色模式回退（当用户选择"跟随浏览器"且浏览器为深色时生效） */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    /* 继承 [data-theme="dark"] 的所有变量 */
+    --color-primary: #4a9eff;
+    --color-primary-rgb: 74, 158, 255;
+    --color-primary-light: #6bb0ff;
+    --color-primary-dark: #3a8eef;
+    --color-primary-hover: #3a8eef;
+
+    --color-surface: #1e293b;
+    --color-surface-rgb: 30, 41, 59;
+    --color-bg-selected: #2a3f5c;
+    --color-bg-card: #111827;
+    --color-bg-subtle: #151d2e;
+    --color-bg-soft: #253347;
+    --color-bg-hover: #2a3f5c;
+    --color-bg-overlay: rgba(0, 0, 0, 0.7);
+
+    --color-text-primary: #f1f5f9;
+    --color-text-secondary: #cbd5e1;
+    --color-text-muted: #94a3b8;
+    --color-text-disabled: #7b8fa3;
+    --color-text-inverse: #ffffff;
+
+    --color-border: #3d4f63;
+    --color-border-strong: #536578;
+    --color-border-hover: #536578;
+    --color-border-light: #253347;
+    --color-border-dark: #7b8fa3;
+
+    --color-bg-secondary: #151d2e;
+
+    --color-danger: #f87171;
+    --color-danger-hover: #ef4444;
+    --color-danger-text: #fca5a5;
+    --color-danger-bg: #450a0a;
+    --color-danger-bg-light: #450a0a;
+    --color-danger-dark: #dc2626;
+
+    --color-success: #34d399;
+    --color-success-hover: #10b981;
+    --color-success-text: #6ee7b7;
+    --color-success-bg: #064e3b;
+    --color-success-bg-light: #022c22;
+    --color-success-dark: #059669;
+
+    --color-warning: #fbbf24;
+    --color-warning-hover: #f59e0b;
+    --color-warning-text: #fcd34d;
+    --color-warning-bg: #78350f;
+    --color-warning-bg-light: #451a03;
+    --color-warning-dark: #d97706;
+
+    --color-info: #60a5fa;
+    --color-info-hover: #3b82f6;
+    --color-info-text: #93c5fd;
+    --color-info-bg: #1e3a8a;
+    --color-info-bg-light: #1e40af;
+    --color-info-dark: #2563eb;
+
+    --color-error-bg-light: #450a0a;
+    --color-link: #60a5fa;
+    --color-link-hover: #93c5fd;
+    --color-accent: #818cf8;
+    --color-warning-light: #92400e;
+
+    --shadow-sm: rgba(0, 0, 0, 0.3);
+    --shadow-md: rgba(0, 0, 0, 0.4);
+    --shadow-lg: rgba(0, 0, 0, 0.6);
+    --shadow-primary: rgba(74, 158, 255, 0.4);
+
+    --color-header-bg: #111827;
+    --color-sidebar-bg: #111827;
+    --color-dialog-bg: #1e293b;
+    --color-input-bg: #151d2e;
+    --color-input-border: #3d4f63;
+    --color-button-secondary-bg: #2a3f5c;
+    --color-button-secondary-text: #cbd5e1;
+    --color-tag-bg: #1e3a8a;
+    --color-tag-text: #93c5fd;
+
+    --scrollbar-track: #111827;
+    --scrollbar-thumb: #475569;
+    --scrollbar-thumb-hover: #64748b;
+
+    --color-mode-swap: #f59e0b;
+    --color-mode-empty: #8b5cf6;
+    --color-mode-zone: #06b6d4;
+
+    --tag-color-1: #ff8a8a;
+    --tag-color-2: #6eddd4;
+    --tag-color-3: #64c7e1;
+    --tag-color-4: #ffb89a;
+    --tag-color-5: #b8e8d8;
+    --tag-color-6: #f9e87f;
+    --tag-color-7: #cbafde;
+    --tag-color-8: #a5d1f2;
+    --tag-color-9: #fac759;
+    --tag-color-10: #72c7a8;
+  }
+}
+
 
 .ui-icon {
   width: 1em;

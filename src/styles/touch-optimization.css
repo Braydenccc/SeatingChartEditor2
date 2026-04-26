@@ -4,8 +4,6 @@
 @media (hover: none) and (pointer: coarse) {
   button,
   a,
-  input[type="checkbox"],
-  input[type="radio"],
   .clickable,
   [role="button"] {
     min-height: 44px;
@@ -100,7 +98,7 @@
   /* 拖拽目标高亮增强 */
   .drag-over {
     border-width: 4px !important;
-    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.3) !important;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-info) 30%, transparent) !important;
   }
 }
 
@@ -171,7 +169,7 @@
   a:focus-visible,
   input:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(35, 88, 123, 0.3);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent);
   }
 }
 
@@ -206,13 +204,6 @@
   /* 增加表单元素间距 */
   .form-group + .form-group {
     margin-top: 20px;
-  }
-
-  /* 复选框和单选框增大 */
-  input[type="checkbox"],
-  input[type="radio"] {
-    width: 24px;
-    height: 24px;
   }
 }
 

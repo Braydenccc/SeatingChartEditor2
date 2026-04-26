@@ -311,7 +311,7 @@ const deleteTagHandler = (tagId, tagName) => {
 .global-setting {
   margin-bottom: 24px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #e8eef2;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .display-mode-section {
@@ -544,7 +544,7 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-name {
-  color: color-mix(in srgb, var(--tag-color) 80%, #1a1a1a);
+  color: color-mix(in srgb, var(--tag-color) 80%, var(--color-text-primary));
   font-weight: 600;
   font-size: 13px;
   padding: 0 10px;
@@ -554,7 +554,7 @@ const deleteTagHandler = (tagId, tagName) => {
 }
 
 .tag-count {
-  color: color-mix(in srgb, var(--tag-color) 85%, #1a1a1a);
+  color: color-mix(in srgb, var(--tag-color) 85%, var(--color-text-primary));
   font-size: 12px;
   font-weight: 700;
   padding: 0 7px;
@@ -600,7 +600,7 @@ const deleteTagHandler = (tagId, tagName) => {
   cursor: pointer;
   font-size: 14px;
   transition: all 0.15s ease;
-  color: color-mix(in srgb, var(--tag-color) 60%, #666);
+  color: color-mix(in srgb, var(--tag-color) 60%, var(--color-text-muted));
   line-height: 1;
 }
 
@@ -611,7 +611,7 @@ const deleteTagHandler = (tagId, tagName) => {
 
 .tag-action-btn:hover {
   background: color-mix(in srgb, var(--tag-color) 25%, transparent);
-  color: color-mix(in srgb, var(--tag-color) 90%, #000);
+  color: color-mix(in srgb, var(--tag-color) 90%, var(--color-text-primary));
 }
 
 .tag-action-btn.delete:hover {

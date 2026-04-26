@@ -1349,10 +1349,10 @@ onBeforeUnmount(() => {
 }
 .btn.secondary { background: var(--color-bg-secondary); color: var(--color-text-secondary); }
 .btn.secondary:hover { background: var(--color-border); }
-.btn.primary { background: var(--color-primary); color: var(--color-surface); }
+.btn.primary { background: var(--color-primary); color: var(--color-text-inverse); }
 .btn.primary:hover { background: var(--color-primary-hover); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-primary) 30%, transparent); }
-.btn.excel { background: var(--color-success); color: var(--color-surface); }
-.btn.excel:hover { background: var(--color-success-hover); box-shadow: 0 3px 10px rgba(29,107,58,0.3); }
+.btn.excel { background: var(--color-success); color: var(--color-text-inverse); }
+.btn.excel:hover { background: var(--color-success-hover); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-success) 30%, transparent); }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ── 响应式 ── */

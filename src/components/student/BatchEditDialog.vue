@@ -228,7 +228,7 @@ const close = () => {
 }
 
 .batch-edit-dialog {
-  background: var(--color-surface, #ffffff);
+  background: var(--color-surface);
   width: 90%;
   max-width: 560px;
   max-height: 85vh;
@@ -250,13 +250,13 @@ const close = () => {
   align-items: center;
   gap: 12px;
   padding: 16px 20px;
-  background: var(--color-bg-subtle, #f8f9fa);
-  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .dialog-header h3 {
   margin: 0;
-  color: var(--color-primary, #23587b);
+  color: var(--color-primary);
   font-size: 18px;
 }
 
@@ -306,7 +306,7 @@ const close = () => {
   justify-content: space-between;
   padding: 12px 20px;
   background: var(--color-surface);
-  border-bottom: 1px solid #e8eef2;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .section-header h4 {
@@ -335,7 +335,7 @@ const close = () => {
   padding: 10px 14px;
   border-radius: 10px;
   margin-bottom: 8px;
-  border: 1px solid #eef2f5;
+  border: 1px solid var(--color-border-light);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
   transition: all 0.2s ease;
 }
@@ -454,7 +454,7 @@ const close = () => {
 
 .tags-section {
   background: var(--color-surface);
-  border-top: 1px solid #e8eef2;
+  border-top: 1px solid var(--color-border);
 }
 
 .tags-grid {
@@ -470,7 +470,7 @@ const close = () => {
   gap: 6px;
   padding: 6px 12px;
   background: var(--color-bg-secondary);
-  border: 1px solid #e0e4e8;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   font-size: 12px;

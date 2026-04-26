@@ -1,43 +1,48 @@
 <template>
   <header class="app-header">
     <div class="header-left">
-        <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
-          <div class="user-info" @click="toggleDropdown">
-          <Cloud v-if="authType === 'webdav'" :size="20" stroke-width="2" :title="'WebDAV 模式'" />
-          <User v-else :size="20" stroke-width="2" :title="'普通账号'" />
-          <span class="welcome-text">{{ currentUser?.username }}</span>
+      <h1 class="header-text">BraydenSCE V2</h1>
+
+      <!-- 用户菜单 -->
+      <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
+        <button class="header-btn user-btn" @click="toggleDropdown">
+          <Cloud v-if="authType === 'webdav'" :size="18" stroke-width="2" />
+          <User v-else :size="18" stroke-width="2" />
+          <span class="btn-text">{{ currentUser?.username }}</span>
           <span class="dropdown-icon">▼</span>
-        </div>
+        </button>
+
         <Transition name="fade-slide">
           <div v-if="showDropdown" class="user-dropdown">
             <button class="dropdown-item" @click="openWorkspaceManagement">
-              <FolderOpen :size="15" stroke-width="2" /> 工作区管理
+              <FolderOpen :size="16" stroke-width="2" />
+              <span>工作区管理</span>
             </button>
 
             <button v-if="!hasRetiehe" class="dropdown-item" @click="emit('open-login', 'login'); showDropdown = false">
-              <LogIn :size="15" stroke-width="2" /> 登录 SCE 账号
+              <LogIn :size="16" stroke-width="2" />
+              <span>登录 SCE 账号</span>
             </button>
-            
+
             <div class="dropdown-divider"></div>
-            
-            <button class="dropdown-item text-danger" @click="handleLogout('all')">
-              {{ hasRetiehe ? '退出 SCE 账号' : '退出 WebDAV' }}
+
+            <button class="dropdown-item danger" @click="handleLogout('all')">
+              <span>{{ hasRetiehe ? '退出 SCE 账号' : '退出 WebDAV' }}</span>
             </button>
           </div>
         </Transition>
       </div>
-      <button v-else class="auth-btn login-btn" @click="emit('open-login')">
-        <Cloud :size="15" stroke-width="2" />登录
+
+      <!-- 登录按钮 -->
+      <button v-else class="header-btn login-btn" @click="emit('open-login')">
+        <Cloud :size="18" stroke-width="2" />
+        <span class="btn-text">登录</span>
       </button>
 
-      <!-- 统一设置按钮 -->
-      <button
-        class="settings-button"
-        @click="openUnifiedSettings"
-        title="统一设置"
-      >
-        <Settings :size="20" stroke-width="2" />
-        <span>设置</span>
+      <!-- 设置按钮 -->
+      <button class="header-btn" @click="openUnifiedSettings" title="统一设置">
+        <Settings :size="18" stroke-width="2" />
+        <span class="btn-text">设置</span>
       </button>
 
       <!-- 主题切换 -->
@@ -50,21 +55,15 @@
           @click="switchTheme(mode.value)"
           :title="mode.label"
         >
-          <component :is="mode.icon" :size="15" stroke-width="2" />
+          <component :is="mode.icon" :size="16" stroke-width="2" />
           <Transition name="theme-label">
             <span v-if="currentColorScheme === mode.value" class="theme-label">{{ mode.label }}</span>
           </Transition>
         </button>
       </div>
+    </div>
 
-      <h1 class="header-text">BraydenSCE V2</h1>
-    </div>
-    <div class="header-right">
-      <p class="header-subtitle">座位表编辑器 开发版本 <a href="https://afdian.com/a/brayden" target="_blank">byccc</a> 由<a href="https://host.retiehe.com/" target="_blank">热铁盒网页托管</a>提供服务</p>
-      <a href="https://github.com/Braydenccc/SeatingCrartEditor2" target="_blank" class="github-link" title="Source Code">
-        <Github :size="26" stroke-width="1.8" />
-      </a>
-    </div>
+    <div class="header-right"></div>
 
     <UnifiedSettingsDialog
       v-if="showUnifiedSettings"
@@ -154,7 +153,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* ===== 基础布局 ===== */
 .app-header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -164,28 +165,83 @@ onBeforeUnmount(() => {
   color: white;
   padding: 0 30px;
   box-shadow: var(--shadow-md);
+  gap: 20px;
 }
 
 .header-left {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 24px;
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
+  gap: 16px;
+  flex-shrink: 0;
 }
 
+.header-right {
+  flex-shrink: 0;
+}
+
+.header-text {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+/* ===== 统一按钮样式 ===== */
+.header-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.header-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.header-btn:active {
+  transform: scale(0.98);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 登录按钮特殊样式 */
+.login-btn {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ===== 用户菜单 ===== */
 .user-menu-container {
   position: relative;
 }
 
-.dropdown-icon {
+.user-btn .dropdown-icon {
   font-size: 10px;
-  margin-left: 4px;
-  transition: transform 0.3s;
+  margin-left: 2px;
+  transition: transform 0.25s;
 }
 
-.user-info:hover .dropdown-icon {
+.user-btn:hover .dropdown-icon {
   transform: translateY(2px);
 }
 
@@ -196,15 +252,16 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
-  min-width: 140px;
+  min-width: 160px;
   z-index: 100;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--color-border);
 }
 
 .dropdown-item {
   display: flex;
   align-items: center;
+  gap: 10px;
   width: 100%;
   padding: 12px 16px;
   border: none;
@@ -214,17 +271,20 @@ onBeforeUnmount(() => {
   color: var(--color-text-primary);
   cursor: pointer;
   transition: background 0.2s;
-  gap: 8px;
 }
-
-/* .item-icon: size controlled by :size prop */
 
 .dropdown-item:hover {
   background: var(--color-bg-subtle);
 }
 
-.dropdown-item.text-danger {
+.dropdown-item.danger {
   color: var(--color-danger);
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
 }
 
 .fade-slide-enter-active,
@@ -235,191 +295,47 @@ onBeforeUnmount(() => {
 .fade-slide-enter-from,
 .fade-slide-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-8px);
 }
 
-.dropdown-group {
-  padding: 12px 16px;
-  background: var(--color-bg-hover);
-}
-
-.group-title {
-  font-size: 12px;
-  color: var(--color-text-muted);
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-
-.radio-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--color-text-primary);
-  margin-bottom: 6px;
-  cursor: pointer;
-}
-
-.radio-label:last-child {
-  margin-bottom: 0;
-}
-
-.disabled-text {
-  color: var(--color-text-disabled);
-}
-
-.dropdown-divider {
-  height: 1px;
-  background: var(--color-border);
-  margin: 4px 0;
-}
-
-.header-text {
-  margin: 0;
-  font-size: 32px;
-  font-weight: 600;
-  letter-spacing: 1px;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(4px);
-  padding: 8px 16px;
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.user-info:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.user-info:active {
-  transform: scale(0.98);
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.user-avatar {
-  flex-shrink: 0;
-}
-
-.welcome-text {
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.auth-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  color: white;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.auth-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.8);
-  transform: translateY(-1px);
-}
-
-.auth-btn:active {
-  transform: scale(0.96);
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.login-btn {
-  background: rgba(255, 255, 255, 0.2);
-  font-weight: 500;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.login-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.settings-button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 24px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.settings-button:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.settings-button:active {
-  transform: scale(0.98);
-  background: rgba(255, 255, 255, 0.2);
-}
-
-/* .btn-icon: size controlled by :size prop */
-
-/* 主题切换器 */
+/* ===== 主题切换器 ===== */
 .theme-switcher {
   display: flex;
   align-items: center;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  padding: 3px;
+  border-radius: 24px;
+  padding: 4px;
   gap: 2px;
   border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
 }
 
 .theme-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 5px 8px;
+  gap: 6px;
+  padding: 6px 10px;
   border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.6);
-  border-radius: 16px;
+  border-radius: 20px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
 }
 
 .theme-btn:hover {
   color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .theme-btn.active {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.2);
   color: white;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .theme-label {
@@ -427,19 +343,15 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-.theme-label-enter-active {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
+.theme-label-enter-active,
 .theme-label-leave-active {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .theme-label-enter-from,
 .theme-label-leave-to {
   opacity: 0;
   max-width: 0;
-  margin-left: 0;
 }
 
 .theme-label-enter-to,
@@ -448,70 +360,10 @@ onBeforeUnmount(() => {
   max-width: 60px;
 }
 
-.header-right {
-  display: flex;
-  align-items: flex-end;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.header-subtitle {
-  margin: 0;
-  font-size: 20px;
-  opacity: 0.9;
-  font-weight: 300;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex-shrink: 1;
-  min-width: 0;
-}
-
-.header-subtitle a {
-  color: white;
-  text-decoration: underline;
-}
-
-.github-link {
-  display: flex;
-  color: var(--color-text-inverse);
-  transition: opacity 0.2s, transform 0.2s;
-  flex-shrink: 0;
-}
-
-/* .github-icon: size controlled by :size prop */
-
-.github-link:hover {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
+/* ===== 响应式 - 中等屏幕 ===== */
 @media (max-width: 1366px) and (min-width: 1025px) {
   .app-header {
-    padding: 0 18px;
-  }
-
-  .header-left {
-    gap: 14px;
-  }
-
-  .header-text {
-    font-size: 24px;
-  }
-
-  .header-subtitle {
-    font-size: 15px;
-  }
-
-  .user-info {
-    padding: 6px 12px;
-  }
-}
-
-/* 小高度屏幕优化 */
-@media (max-height: 820px) and (min-width: 1025px) {
-  .app-header {
-    padding: 0 16px;
+    padding: 0 20px;
   }
 
   .header-left {
@@ -519,19 +371,35 @@ onBeforeUnmount(() => {
   }
 
   .header-text {
-    font-size: 22px;
+    font-size: 26px;
   }
 
-  .header-subtitle {
-    font-size: 14px;
-  }
-
-  .user-info {
-    padding: 5px 10px;
+  .header-btn {
+    padding: 6px 14px;
+    font-size: 13px;
   }
 }
 
-/* 响应式设计 - 平板 */
+/* ===== 响应式 - 小高度屏幕 ===== */
+@media (max-height: 820px) and (min-width: 1025px) {
+  .app-header {
+    padding: 0 18px;
+  }
+
+  .header-left {
+    gap: 10px;
+  }
+
+  .header-text {
+    font-size: 24px;
+  }
+
+  .header-btn {
+    padding: 6px 12px;
+  }
+}
+
+/* ===== 响应式 - 平板 ===== */
 @media (max-width: 1024px) {
   .app-header {
     padding: 0 20px;
@@ -541,142 +409,97 @@ onBeforeUnmount(() => {
   .header-text {
     font-size: 28px;
   }
-
-  .header-subtitle {
-    font-size: 16px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
-  }
 }
 
-/* 响应式设计 - 移动设备 */
+/* ===== 响应式 - 移动设备 ===== */
 @media (max-width: 768px) {
   .app-header {
-    flex-direction: row;
-    position: relative;
-    justify-content: center; /* Center the h1 */
-    align-items: center;
+    height: 52px;
+    padding: 0;
     gap: 0;
-    height: 48px;
-    padding: 0 16px 0 0; /* remove left padding so the button can touch the edge */
-  }
-
-  .header-left {
-    position: static; /* Let absolute children position to app-header */
-  }
-
-  .header-text {
-    font-size: 18px;
-    letter-spacing: 0.5px;
-    margin: 0;
-  }
-
-  .user-menu-container, .login-btn {
-    position: absolute;
-    left: 0;
-    top: 0;
-    height: 100%; /* Fuse with header bar */
-    z-index: 100;
-  }
-
-  .user-info {
-    position: static;
     display: flex;
     align-items: center;
-    justify-content: center;
-    height: 100%;
-    margin: 0;
-    transform: none; /* remove translateY */
-    border-radius: 0; /* drop rounded corners */
-    background: var(--color-primary-dark); /* Solid color to fuse with title bar, replacing transparency */
-    backdrop-filter: none;
-    border: none;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 0 16px;
   }
 
-  .settings-button {
-    position: absolute;
-    right: 0;
-    top: 0;
+  /* 左侧按钮区 */
+  .header-left {
     height: 100%;
-    border-radius: 0;
-    background: var(--color-primary-dark);
-    border: none;
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 0 16px;
-    gap: 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0;
   }
 
-  .settings-button span {
+  .header-left .header-text {
     display: none;
   }
 
-  .settings-button:hover {
-    transform: none;
-    background: var(--color-primary-darker);
+  /* 右侧标题区 - 移动端保留 */
+  .header-right {
+    flex: 1;
+    max-width: none;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 12px;
+    min-width: 0;
   }
 
-  .settings-button:active {
-    transform: none;
+  .header-right::before {
+    content: 'BraydenSCE V2';
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
   }
 
-  .theme-switcher {
-    display: none;
+  /* 按钮方块样式 */
+  .user-menu-container,
+  .login-btn,
+  .header-btn {
+    height: 100%;
+    flex-shrink: 0;
   }
 
-  .login-btn {
+  .header-btn {
+    height: 100%;
     border-radius: 0;
-    margin: 0;
-    transform: none;
-    background: var(--color-primary-dark);
+    background: transparent;
     border: none;
     border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0 14px;
+    box-shadow: none;
   }
 
-  .user-info:hover, .login-btn:hover {
+  .header-btn:hover {
     transform: none;
-    background: var(--color-primary-darker);
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .header-btn:active {
+    transform: none;
+  }
+
+  .btn-text {
+    font-size: 13px;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .user-btn .dropdown-icon {
+    display: none;
   }
 
   .user-dropdown {
-    top: 100%; /* attach directly below header */
+    top: 100%;
     left: 0;
     border-radius: 0 0 12px 12px;
     z-index: 1000;
   }
 
-  .user-avatar {
-    display: none;
-  }
-  
-  .welcome-text {
-    font-size: 13px;
-    max-width: 60px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .auth-btn {
-    padding: 0 16px;
-    font-size: 13px;
-  }
-  
-  .btn-icon {
-    display: none;
-  }
-
-  .header-right {
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-  }
-
-  .header-subtitle {
+  .theme-switcher {
     display: none;
   }
 }

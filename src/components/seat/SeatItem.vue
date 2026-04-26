@@ -629,7 +629,6 @@ onUnmounted(() => {
 }
 
 .seat-item:not(.dragging):hover {
-  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
 }
@@ -637,12 +636,11 @@ onUnmounted(() => {
 .seat-item.clickable:not(.selection-selected):hover {
   border-color: var(--color-primary);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 20%, transparent);
-  transform: translateY(-2px);
 }
 
 .seat-item.selection-selected.clickable:hover {
   border-color: var(--color-info);
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-info) 20%, transparent);
   transform: none;
 }
 
@@ -687,7 +685,7 @@ onUnmounted(() => {
 }
 
 .seat-item.empty .empty-indicator {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-surface);
   padding: 6px 12px;
   border-radius: 6px;
   border: 1px solid var(--color-border-dark);
@@ -783,7 +781,7 @@ onUnmounted(() => {
   font-size: 12px;
   font-weight: 700;
   color: var(--color-primary);
-  background: white;
+  background: var(--color-surface);
   padding: 2px 10px;
   border-radius: 6px;
   min-width: 40px;
@@ -797,7 +795,7 @@ onUnmounted(() => {
   font-size: 9px;
   font-weight: 600;
   color: var(--color-primary);
-  background: rgba(255, 255, 255, 0.95);
+  background: color-mix(in srgb, var(--color-surface) 95%, var(--color-primary));
   padding: 1px 5px;
   border-radius: 3px;
   line-height: 1.2;
@@ -883,20 +881,20 @@ onUnmounted(() => {
   border-color: var(--color-info);
   border-width: 2.5px;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent), 0 4px 12px color-mix(in srgb, var(--color-primary) 20%, transparent);
-  background: rgba(14, 165, 233, 0.06);
+  background: color-mix(in srgb, var(--color-info) 6%, var(--color-bg-card));
   transform: scale(1.05);
   z-index: 10;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .seat-item.selection-selected.occupied {
-  background: color-mix(in srgb, rgba(14, 165, 233, 0.12) 50%, var(--color-bg-selected));
+  background: color-mix(in srgb, color-mix(in srgb, var(--color-info) 12%, var(--color-bg-card)) 50%, var(--color-bg-selected));
 }
 
 /* 拖拽吸附幽灵 */
 .seat-item.drag-ghost {
-  box-shadow: inset 0 0 0 2px rgba(14, 165, 233, 0.3);
-  background: rgba(14, 165, 233, 0.08);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-info) 30%, transparent);
+  background: color-mix(in srgb, var(--color-info) 8%, var(--color-bg-card));
   position: relative;
 }
 
@@ -904,13 +902,13 @@ onUnmounted(() => {
   content: '';
   position: absolute;
   inset: -3px;
-  border: 2px dashed #0ea5e9;
+  border: 2px dashed var(--color-info);
   border-radius: 10px;
   pointer-events: none;
 }
 
 .seat-item.zone-highlight.occupied {
-  background: color-mix(in srgb, var(--zone-color, #E0E0E0) 40%, var(--color-bg-selected));
+  background: color-mix(in srgb, var(--zone-color, var(--color-border-strong)) 40%, var(--color-bg-selected));
 }
 
 @media (max-width: 1366px) and (min-width: 1025px) {

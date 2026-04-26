@@ -293,7 +293,7 @@ const close = () => {
 
 .student-count-input.error {
   border-color: var(--color-danger);
-  background-color: #ffebee;
+  background-color: var(--color-danger-bg);
   color: var(--color-danger);
 }
 

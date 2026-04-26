@@ -1,5 +1,6 @@
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { safeStorageGet, safeStorageSet } from '@/utils/storage'
+import { hexToRgb as utilHexToRgb } from '@/utils/colorContrast'
 
 // 默认设置结构
 const defaultSettings = {
@@ -172,9 +173,8 @@ const applyColorScheme = () => {
   const root = document.documentElement
 
   if (colorMode === 'simple') {
-    // 简单模式：应用深浅色方案
     if (colorScheme === 'auto') {
-      // 跟随浏览器
+      // 跟随浏览器：移除 data-theme，让 CSS @media (prefers-color-scheme) 生效
       root.removeAttribute('data-theme')
     } else {
       // 强制深色或浅色
@@ -244,12 +244,10 @@ const applyThemeColor = () => {
   void root.offsetHeight
 }
 
-// 辅助函数：hex 转 rgb
+// 辅助函数：hex 转 rgb（使用工具函数）
 const hexToRgb = (hex) => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  return result
-    ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
-    : '255, 255, 255'
+  const rgb = utilHexToRgb(hex)
+  return rgb ? `${rgb.r}, ${rgb.g}, ${rgb.b}` : '255, 255, 255'
 }
 
 /**

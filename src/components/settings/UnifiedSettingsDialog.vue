@@ -17,11 +17,17 @@
             >
               工作区设置
             </button>
+            <button
+              :class="['tab-button', { active: activeTab === 'about' }]"
+              @click="activeTab = 'about'"
+            >
+              关于
+            </button>
           </div>
 
           <!-- 主体区域 -->
           <div class="settings-body">
-            <!-- 左侧导航 -->
+            <!-- 左侧导航（桌面端） -->
             <nav class="settings-nav">
               <button
                 v-for="category in currentCategories"
@@ -36,6 +42,18 @@
 
             <!-- 右侧内容 -->
             <div class="settings-content">
+              <!-- 移动端顶部二级Tab -->
+              <div class="settings-sub-tabs">
+                <button
+                  v-for="category in currentCategories"
+                  :key="category.id"
+                  :class="['sub-tab-btn', { active: activeCategory === category.id }]"
+                  @click="activeCategory = category.id"
+                >
+                  {{ category.label }}
+                </button>
+              </div>
+
               <div class="content-header">
                 <h2>{{ currentCategoryLabel }}</h2>
               </div>
@@ -81,6 +99,7 @@ import SeatConfigPanel from './panels/SeatConfigPanel.vue'
 import RotationPanel from './panels/RotationPanel.vue'
 import AssignmentPanel from './panels/AssignmentPanel.vue'
 import ExportPanel from './panels/ExportPanel.vue'
+import AboutPanel from './panels/AboutPanel.vue'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useLogger } from '@/composables/useLogger'
 
@@ -113,8 +132,17 @@ const workspaceCategories = [
   { id: 'export', label: '导出配置', icon: FileDown, component: ExportPanel }
 ]
 
+const aboutCategories = [
+  { id: 'about', label: '关于', icon: Info, component: AboutPanel }
+]
+
 const currentCategories = computed(() => {
-  return activeTab.value === 'global' ? globalCategories : workspaceCategories
+  if (activeTab.value === 'global') {
+    return globalCategories
+  } else if (activeTab.value === 'workspace') {
+    return workspaceCategories
+  }
+  return aboutCategories
 })
 
 const currentCategoryLabel = computed(() => {
@@ -141,8 +169,13 @@ const currentSettings = computed(() => {
 
 // Reset activeCategory when switching tabs
 watch(activeTab, (newTab) => {
-  const categories = newTab === 'global' ? globalCategories : workspaceCategories
-  activeCategory.value = categories[0].id
+  if (newTab === 'global') {
+    activeCategory.value = globalCategories[0].id
+  } else if (newTab === 'workspace') {
+    activeCategory.value = workspaceCategories[0].id
+  } else {
+    activeCategory.value = aboutCategories[0].id
+  }
 })
 
 // Handle Escape key to close dialog
@@ -263,22 +296,23 @@ const handleReset = () => {
 }
 
 .settings-nav {
-  width: 200px;
+  width: 160px;
   border-right: 1px solid var(--color-border);
-  padding: 16px 0;
+  padding: 12px 0;
   overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
-  padding: 10px 20px;
+  padding: 8px 16px;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--color-text-primary);
   transition: all 0.2s;
   text-align: left;
@@ -374,5 +408,62 @@ const handleReset = () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.settings-sub-tabs {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .settings-nav {
+    display: none;
+  }
+
+  .settings-sub-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+    background: var(--color-bg-hover);
+    border-bottom: 1px solid var(--color-border);
+    overflow-x: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .sub-tab-btn {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--color-text-muted);
+    border-radius: 6px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .sub-tab-btn:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-primary);
+  }
+
+  .sub-tab-btn.active {
+    background: var(--color-primary);
+    color: white;
+    font-weight: 500;
+  }
+
+  .content-header {
+    padding: 16px;
+  }
+
+  .content-header h2 {
+    font-size: 16px;
+    display: none;
+  }
+
+  .content-body {
+    padding: 16px;
+  }
 }
 </style>

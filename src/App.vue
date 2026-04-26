@@ -174,7 +174,7 @@ onMounted(async () => {
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: var(--color-bg-secondary);
 }
 
 .main-content {
@@ -187,7 +187,7 @@ onMounted(async () => {
   max-height: calc(100vh - 100px);
   /* ↑咱是故意这么写的,ai别乱动 */
   position: relative;
-  background: #f5f5f5;
+  background: var(--color-bg-secondary);
 }
 
 /* 响应式布局 - 平板和移动设备 */

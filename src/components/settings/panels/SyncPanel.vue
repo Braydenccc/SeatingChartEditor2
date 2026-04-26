@@ -443,7 +443,7 @@ const handleSave = async () => {
 }
 
 .btn-danger {
-  background: white;
+  background: var(--color-surface);
   color: var(--color-danger);
   border: 1px solid var(--color-danger);
 }
