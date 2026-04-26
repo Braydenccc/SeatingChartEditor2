@@ -97,7 +97,10 @@ async function handleAuthRequest(req, res, body) {
             // file not exists, use empty db
         }
 
-        const { action, username, password } = input
+        const { action, username, encryptedPassword, password: plainPassword } = input
+        // 本地开发环境：支持加密密码传输，但直接使用（跳过解密）
+        // 因为前端会加密密码，而本地 mock 不需要真正的解密
+        const password = plainPassword || encryptedPassword
 
         if (action === 'register') {
             if (!username || !password) {

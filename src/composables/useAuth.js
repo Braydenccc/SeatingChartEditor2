@@ -185,10 +185,35 @@ export function useAuth() {
     })
     const callAuthApi = async (action, username, password) => {
         try {
-            // 加密密码用于传输（额外的安全层）
-            const encryptedPassword = await encryptPasswordForTransport(password, username)
-            if (!encryptedPassword) {
-                return { success: false, message: '密码加密失败，请重试' }
+            // 检查是否在本地开发环境（localhost 或 127.0.0.1）
+            const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+            
+            // 本地开发环境：直接发送明文密码（mock 插件会处理）
+            // 生产环境：加密密码传输
+            let requestBody
+            
+            if (isLocalDev) {
+                const csrfToken = getOrCreateCsrfToken()
+                requestBody = {
+                    action,
+                    username,
+                    password, // 本地开发直接发送明文密码
+                    _csrf: csrfToken
+                }
+            } else {
+                // 加密密码用于传输（额外的安全层）
+                const encryptedPassword = await encryptPasswordForTransport(password, username)
+                if (!encryptedPassword) {
+                    return { success: false, message: '密码加密失败，请重试' }
+                }
+
+                const csrfToken = getOrCreateCsrfToken()
+                requestBody = {
+                    action,
+                    username,
+                    encryptedPassword,
+                    _csrf: csrfToken
+                }
             }
 
             const csrfToken = getOrCreateCsrfToken()
@@ -199,12 +224,7 @@ export function useAuth() {
                     'Content-Type': 'application/json',
                     'X-CSRF-Token': csrfToken
                 },
-                body: JSON.stringify({
-                    action,
-                    username,
-                    encryptedPassword,
-                    _csrf: csrfToken
-                })
+                body: JSON.stringify(requestBody)
             })
 
             if (!response.ok) {
