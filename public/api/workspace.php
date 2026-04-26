@@ -12,6 +12,9 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB 限制
 
 /**
  * 验证工作区内容格式
+ * 支持新旧两种数据结构：
+ * - 旧版：顶层 seats, seatConfig
+ * - 新版：layout.seats, layout.config
  * @param mixed $content 待验证的内容
  * @return array ['valid' => bool, 'message' => string]
  */
@@ -21,12 +24,9 @@ function validateWorkspaceContent($content) {
         return ['valid' => false, 'message' => '工作区数据必须是 JSON 对象'];
     }
 
-    // 必须包含核心字段
-    $requiredFields = ['students', 'seats', 'seatConfig'];
-    foreach ($requiredFields as $field) {
-        if (!isset($content[$field])) {
-            return ['valid' => false, 'message' => "缺少必需字段: {$field}"];
-        }
+    // 必须包含 students 字段
+    if (!isset($content['students'])) {
+        return ['valid' => false, 'message' => '缺少必需字段: students'];
     }
 
     // 验证 students 是数组
@@ -34,19 +34,75 @@ function validateWorkspaceContent($content) {
         return ['valid' => false, 'message' => 'students 必须是数组'];
     }
 
-    // 验证 seats 是数组
-    if (!is_array($content['seats'])) {
-        return ['valid' => false, 'message' => 'seats 必须是数组'];
-    }
+    // 检测数据结构版本
+    $isNewFormat = isset($content['layout']) && is_array($content['layout']);
 
-    // 验证 seatConfig 是对象
-    if (!is_array($content['seatConfig'])) {
-        return ['valid' => false, 'message' => 'seatConfig 必须是对象'];
-    }
+    if ($isNewFormat) {
+        // 新版格式：layout.seats 和 layout.config
+        if (!isset($content['layout']['seats'])) {
+            return ['valid' => false, 'message' => '缺少必需字段: layout.seats'];
+        }
+        if (!isset($content['layout']['config'])) {
+            return ['valid' => false, 'message' => '缺少必需字段: layout.config'];
+        }
 
-    // 验证 seatConfig 包含 groups
-    if (!isset($content['seatConfig']['groups']) || !is_array($content['seatConfig']['groups'])) {
-        return ['valid' => false, 'message' => 'seatConfig.groups 必须是数组'];
+        // 验证 layout.seats 是数组
+        if (!is_array($content['layout']['seats'])) {
+            return ['valid' => false, 'message' => 'layout.seats 必须是数组'];
+        }
+
+        // 验证 layout.config 是对象
+        if (!is_array($content['layout']['config'])) {
+            return ['valid' => false, 'message' => 'layout.config 必须是对象'];
+        }
+
+        // 验证 layout.config 包含 groups（可选，如果没有会由前端迁移补充）
+        if (isset($content['layout']['config']['groups']) && !is_array($content['layout']['config']['groups'])) {
+            return ['valid' => false, 'message' => 'layout.config.groups 必须是数组'];
+        }
+
+        // 验证每个 seat 的基本结构
+        foreach ($content['layout']['seats'] as $seat) {
+            if (!is_array($seat)) {
+                return ['valid' => false, 'message' => '座位数据格式错误'];
+            }
+            if (!isset($seat['id'])) {
+                return ['valid' => false, 'message' => '座位数据缺少必需字段 (id)'];
+            }
+        }
+    } else {
+        // 旧版格式：顶层 seats 和 seatConfig
+        if (!isset($content['seats'])) {
+            return ['valid' => false, 'message' => '缺少必需字段: seats'];
+        }
+        if (!isset($content['seatConfig'])) {
+            return ['valid' => false, 'message' => '缺少必需字段: seatConfig'];
+        }
+
+        // 验证 seats 是数组
+        if (!is_array($content['seats'])) {
+            return ['valid' => false, 'message' => 'seats 必须是数组'];
+        }
+
+        // 验证 seatConfig 是对象
+        if (!is_array($content['seatConfig'])) {
+            return ['valid' => false, 'message' => 'seatConfig 必须是对象'];
+        }
+
+        // 验证 seatConfig 包含 groups（可选）
+        if (isset($content['seatConfig']['groups']) && !is_array($content['seatConfig']['groups'])) {
+            return ['valid' => false, 'message' => 'seatConfig.groups 必须是数组'];
+        }
+
+        // 验证每个 seat 的基本结构
+        foreach ($content['seats'] as $seat) {
+            if (!is_array($seat)) {
+                return ['valid' => false, 'message' => '座位数据格式错误'];
+            }
+            if (!isset($seat['id'])) {
+                return ['valid' => false, 'message' => '座位数据缺少必需字段 (id)'];
+            }
+        }
     }
 
     // 验证每个 student 的基本结构
@@ -56,16 +112,6 @@ function validateWorkspaceContent($content) {
         }
         if (!isset($student['id']) || !isset($student['name'])) {
             return ['valid' => false, 'message' => '学生数据缺少必需字段 (id, name)'];
-        }
-    }
-
-    // 验证每个 seat 的基本结构
-    foreach ($content['seats'] as $seat) {
-        if (!is_array($seat)) {
-            return ['valid' => false, 'message' => '座位数据格式错误'];
-        }
-        if (!isset($seat['id'])) {
-            return ['valid' => false, 'message' => '座位数据缺少必需字段 (id)'];
         }
     }
 
