@@ -12,8 +12,15 @@ const RATE_LIMIT_WINDOW = 300;
 const MAX_ATTEMPTS = 5;
 const TOKEN_EXPIRY_DAYS = 30;
 const TOKEN_EXPIRY_REMEMBER_ME = 90;
+
 // 生产环境强制 HTTPS，开发环境可通过环境变量禁用
-const REQUIRE_HTTPS = function_exists('getenv') && getenv('REQUIRE_HTTPS') !== 'false';
+function shouldRequireHttps() {
+    static $cached = null;
+    if ($cached === null) {
+        $cached = !function_exists('getenv') || getenv('REQUIRE_HTTPS') !== 'false';
+    }
+    return $cached;
+}
 
 function logSecurityEvent($event, $username, $details = []) {
     try {
@@ -33,7 +40,7 @@ function logSecurityEvent($event, $username, $details = []) {
 }
 
 function ensureHttps() {
-    if (!REQUIRE_HTTPS) {
+    if (!shouldRequireHttps()) {
         return;
     }
 
