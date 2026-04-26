@@ -82,6 +82,22 @@ function ensureHttps() {
         $isHttps = true;
     }
 
+    // 6. 检查 Origin 头（前端 fetch 请求会携带）
+    if (!$isHttps && isset($_SERVER['HTTP_ORIGIN'])) {
+        $origin = $_SERVER['HTTP_ORIGIN'];
+        if (strpos($origin, 'https://') === 0) {
+            $isHttps = true;
+        }
+    }
+
+    // 7. 检查 Referer 头
+    if (!$isHttps && isset($_SERVER['HTTP_REFERER'])) {
+        $referer = $_SERVER['HTTP_REFERER'];
+        if (strpos($referer, 'https://') === 0) {
+            $isHttps = true;
+        }
+    }
+
     if (!$isHttps) {
         respond(['success' => false, 'message' => '必须使用 HTTPS 连接'], 403);
     }
