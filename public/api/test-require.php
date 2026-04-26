@@ -10,7 +10,7 @@ try {
     $result['file_exists'] = file_exists('api/common.php');
     $result['cwd'] = getcwd();
 
-    require_once "api/common.php";
+    require_once "public/api/common.php";
 
     $result['step'] = 'after_require';
     $result['respond_exists'] = function_exists('respond');

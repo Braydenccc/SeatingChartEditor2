@@ -1,7 +1,7 @@
 <?php
 // 使用 Retinbox 平台规范：从网站根目录开始的绝对路径（省略开头的 /）
 // auth.php 位于 api/ 目录下，所以需要引用同目录的 common.php
-require_once "api/common.php";
+require_once "public/api/common.php";
 header('Content-Type: application/json; charset=utf-8');
 
 if (!class_exists('Database')) {
