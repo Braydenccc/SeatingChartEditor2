@@ -21,13 +21,17 @@ import { useWorkspace } from '@/composables/useWorkspace'
 import { useLogger } from '@/composables/useLogger'
 import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
+import { useGlobalSettings } from '@/composables/useGlobalSettings'
+import { useAutoSave } from '@/composables/useAutoSave'
 
 const { isLoginDialogVisible, initAuth, isLoggedIn } = useAuth()
 const { loadWorkspaceFromCloud } = useCloudWorkspace()
 const { applyWorkspaceData, getLastWorkspace } = useWorkspace()
 const { success, warning } = useLogger()
-const { undo, redo, canUndo, canRedo } = useUndo()
+const { undo, redo, canUndo, canRedo, setMaxHistory } = useUndo()
 const { showCloudDialog, cloudDialogMode, handleCloudSuccess } = useCloudWorkspaceDialog()
+const { settings, applyThemeColor, applyColorScheme } = useGlobalSettings()
+const { startAutoSave, stopAutoSave } = useAutoSave()
 
 const loginDialogInitialTab = ref('login')
 const handleOpenLogin = (tab = 'login') => {
@@ -38,7 +42,27 @@ const handleOpenLogin = (tab = 'login') => {
 // Restore auth state from cookies on app startup
 initAuth()
 
+// 应用全局设置
 onMounted(async () => {
+  // 应用颜色方案（深浅色模式）
+  applyColorScheme()
+
+  // 应用主题色
+  applyThemeColor()
+
+  // 应用撤销历史大小
+  if (settings.value.editor.undoHistorySize) {
+    setMaxHistory(settings.value.editor.undoHistorySize)
+  }
+
+  // 应用动画设置
+  if (settings.value.ui.enableAnimations !== undefined) {
+    document.documentElement.classList.toggle('disable-animations', !settings.value.ui.enableAnimations)
+  }
+
+  // 启动自动保存
+  startAutoSave()
+
   const lastWs = getLastWorkspace()
 
   // 全局键盘快捷键：撤销 (Ctrl+Z) / 重做 (Ctrl+Y)

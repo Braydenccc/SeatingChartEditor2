@@ -1,12 +1,14 @@
 import { ref, unref, onUnmounted } from 'vue'
 import { onLongPress, useEventListener } from '@vueuse/core'
 import { useEditMode } from '@/composables/useEditMode'
+import { useGlobalSettings } from '@/composables/useGlobalSettings'
 
 export function useStudentDragging(studentRef, studentDataProp, options = {}) {
   const { onStartDrag, onEndDrag } = options
   const isStudentDragging = ref(false)
   const lastPointerWasTouch = ref(false)
   const { currentMode, EditMode } = useEditMode()
+  const { settings } = useGlobalSettings()
 
   // 触摸拖拽激活条件
   const canTouchDrag = () => {

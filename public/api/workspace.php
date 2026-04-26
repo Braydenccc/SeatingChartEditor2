@@ -1,5 +1,6 @@
 <?php
 require_once "api/common.php";
+require_once "api/file-permissions.php";
 header('Content-Type: application/json; charset=utf-8');
 
 if (!class_exists('Database')) {
@@ -7,6 +8,7 @@ if (!class_exists('Database')) {
 }
 
 const FILE_ID_BYTES = 16;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB 限制
 
 $input = parseRequestInput();
 
@@ -24,6 +26,7 @@ if (!isValidUsername($username) || !$token) {
 
 $dbUsers = new Database("users");
 $dbFiles = new Database("scefiles");
+$dbPermissions = new Database("file_permissions");
 $sessionDb = new Database("users_sessions");
 
 if (!isAuthorized($sessionDb, $username, $token)) {
@@ -45,7 +48,26 @@ try {
             respond(['success' => false, 'message' => '文件ID格式无效']);
         }
 
+        // 消毒文件 ID 用作数据库键名
+        $sanitizedFileId = sanitizeDbKey($fileId);
+
+        // 检查权限（通过权限表，避免冗余的文件读取）
+        $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
+        $existingPerm = $dbPermissions->get($permKey);
+
+        if ($existingPerm !== null) {
+            if (!hasFilePermission($dbPermissions, $fileId, $username, 'write')) {
+                respond(['success' => false, 'message' => '无权限修改此文件'], 403);
+            }
+        } else {
+            createFilePermission($dbPermissions, $fileId, $username, 'owner');
+        }
+
+        // 检查文件大小
         $contentSize = is_string($content) ? strlen($content) : strlen(json_encode($content));
+        if ($contentSize > MAX_FILE_SIZE) {
+            respond(['success' => false, 'message' => '文件大小超过限制（最大 5MB）']);
+        }
 
         $metadata = [
             'author' => $username,
@@ -59,9 +81,10 @@ try {
             'content' => $content
         ];
 
-        $dbFiles->set($fileId, json_encode($fileData));
+        $dbFiles->set($sanitizedFileId, json_encode($fileData));
 
-        $userFilesKey = $username . '_files';
+        // 消毒用户文件列表键名
+        $userFilesKey = sanitizeDbKey($username . '_files');
         $existingFiles = $dbUsers->get_array($userFilesKey);
         if ($existingFiles === null) {
              $existingFiles = [];
@@ -81,24 +104,24 @@ try {
         ]);
 
     } elseif ($action === 'list') {
-        $userFilesKey = $username . '_files';
-        $fileIds = $dbUsers->get_array($userFilesKey);
+        $fileIds = getUserAccessibleFiles($dbPermissions, $username);
 
         $list = [];
         if ($fileIds && is_array($fileIds)) {
             foreach ($fileIds as $fileId) {
-                $fileRaw = $dbFiles->get($fileId);
-                if ($fileRaw !== null) {
-                    $fileData = json_decode($fileRaw, true);
-                    if ($fileData && isset($fileData['metadata'])) {
-                        if ($fileData['metadata']['author'] === $username) {
-                            $list[] = [
-                                'fileId' => $fileId,
-                                'metadata' => $fileData['metadata']
-                            ];
-                        }
-                    }
-                }
+                if (!isValidFileId($fileId)) continue;
+
+                $sanitizedFileId = sanitizeDbKey($fileId);
+                $fileRaw = $dbFiles->get($sanitizedFileId);
+                if (!$fileRaw) continue;
+
+                $fileData = json_decode($fileRaw, true);
+                if (!$fileData || !isset($fileData['metadata'])) continue;
+
+                $list[] = [
+                    'fileId' => $fileId,
+                    'metadata' => $fileData['metadata']
+                ];
             }
         }
 
@@ -121,7 +144,15 @@ try {
             respond(['success' => false, 'message' => '文件ID格式无效']);
         }
 
-        $fileRaw = $dbFiles->get($fileId);
+        // 检查读权限
+        if (!hasFilePermission($dbPermissions, $fileId, $username, 'read')) {
+            respond(['success' => false, 'message' => '无权访问该文件'], 403);
+        }
+
+        // 消毒文件 ID
+        $sanitizedFileId = sanitizeDbKey($fileId);
+
+        $fileRaw = $dbFiles->get($sanitizedFileId);
         if ($fileRaw === null) {
             respond(['success' => false, 'message' => '文件不存在或已被删除']);
         }
@@ -129,10 +160,6 @@ try {
         $fileData = json_decode($fileRaw, true);
         if (!$fileData || !isset($fileData['metadata']) || !isset($fileData['content'])) {
              respond(['success' => false, 'message' => '文件格式损坏']);
-        }
-
-        if ($fileData['metadata']['author'] !== $username) {
-            respond(['success' => false, 'message' => '无权访问该文件']);
         }
 
         respond([
@@ -150,22 +177,33 @@ try {
              respond(['success' => false, 'message' => '文件ID格式无效']);
          }
 
-         $fileRaw = $dbFiles->get($fileId);
+         // 检查写权限
+         if (!hasFilePermission($dbPermissions, $fileId, $username, 'write')) {
+             respond(['success' => false, 'message' => '无权删除该文件'], 403);
+         }
+
+         // 消毒文件 ID
+         $sanitizedFileId = sanitizeDbKey($fileId);
+
+         $fileRaw = $dbFiles->get($sanitizedFileId);
          if ($fileRaw !== null) {
-             $fileData = json_decode($fileRaw, true);
-             if ($fileData && isset($fileData['metadata']) && $fileData['metadata']['author'] === $username) {
-                 $dbFiles->delete($fileId);
+             $dbFiles->delete($sanitizedFileId);
 
-                 $userFilesKey = $username . '_files';
-                 $dbUsers->delete($userFilesKey, $fileId);
+             // 消毒用户文件列表键名
+             $userFilesKey = sanitizeDbKey($username . '_files');
+             $dbUsers->delete($userFilesKey, $fileId);
 
-                  respond(['success' => true, 'message' => '文件已删除']);
-              } else {
-                  respond(['success' => false, 'message' => '无权删除该文件或文件损坏']);
-              }
+             // 删除权限记录
+             revokeFilePermission($dbPermissions, $fileId, $username);
+
+             respond(['success' => true, 'message' => '文件已删除']);
           } else {
-              $userFilesKey = $username . '_files';
+              // 消毒用户文件列表键名
+              $userFilesKey = sanitizeDbKey($username . '_files');
               $dbUsers->delete($userFilesKey, $fileId);
+
+              // 删除权限记录
+              revokeFilePermission($dbPermissions, $fileId, $username);
 
               respond(['success' => true, 'message' => '文件已被移除']);
           }

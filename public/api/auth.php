@@ -12,7 +12,8 @@ const RATE_LIMIT_WINDOW = 300;
 const MAX_ATTEMPTS = 5;
 const TOKEN_EXPIRY_DAYS = 30;
 const TOKEN_EXPIRY_REMEMBER_ME = 90;
-const REQUIRE_HTTPS = false;
+// 生产环境强制 HTTPS，开发环境可通过环境变量禁用
+const REQUIRE_HTTPS = getenv('REQUIRE_HTTPS') !== 'false';
 
 function logSecurityEvent($event, $username, $details = []) {
     try {
@@ -104,8 +105,12 @@ function issueSessionToken($sessionDb, $username, $rememberMe = false) {
     $token = bin2hex(random_bytes(32));
     $expiryDays = $rememberMe ? TOKEN_EXPIRY_REMEMBER_ME : TOKEN_EXPIRY_DAYS;
     $expiry = time() + ($expiryDays * 86400);
-    $sessionData = json_encode(['token' => $token, 'expiry' => $expiry]);
+
+    // 存储 Token 的 SHA-256 哈希而非明文
+    $tokenHash = hash('sha256', $token);
+    $sessionData = json_encode(['tokenHash' => $tokenHash, 'expiry' => $expiry]);
     $sessionDb->set($username, $sessionData);
+
     return $token;
 }
 
@@ -216,14 +221,10 @@ try {
         respond(['success' => true, 'data' => $settings]);
     }
 } catch (Exception $e) {
-    // 在测试环境显示详细错误信息，生产环境隐藏
-    $host = $_SERVER['HTTP_HOST'] ?? '';
-    $isTestEnv = strpos($host, 'test') !== false || strpos($host, 'localhost') !== false;
-    $message = $isTestEnv
-        ? 'Internal Server Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine()
-        : 'Internal Server Error';
-
+    // 记录详细错误到日志，但不暴露给客户端
     error_log("Auth API Exception: " . $e->getMessage() . "\n" . $e->getTraceAsString());
-    respond(['success' => false, 'message' => $message], 500);
+
+    // 所有环境统一返回通用错误信息
+    respond(['success' => false, 'message' => 'Internal Server Error'], 500);
 }
 ?>

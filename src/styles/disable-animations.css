@@ -1,0 +1,9 @@
+/* 禁用动画的全局样式 */
+.disable-animations *,
+.disable-animations *::before,
+.disable-animations *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}

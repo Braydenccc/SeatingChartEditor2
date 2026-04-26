@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import { useSeatChart } from './useSeatChart'
 import { useLogger } from './useLogger'
 
-const MAX_HISTORY = 50
+let MAX_HISTORY = 50
 
 const undoStack = ref([])
 const redoStack = ref([])
@@ -240,6 +240,17 @@ export function useUndo() {
     clearHistory()
   }
 
+  // 设置最大历史记录数
+  const setMaxHistory = (size) => {
+    if (size && size >= 10 && size <= 100) {
+      MAX_HISTORY = size
+      // 如果当前历史超过新限制，裁剪
+      while (undoStack.value.length > MAX_HISTORY) {
+        undoStack.value.shift()
+      }
+    }
+  }
+
   return {
     undoStack,
     redoStack,
@@ -256,6 +267,7 @@ export function useUndo() {
     clear,
     createSnapshot,
     highlightedSeats,
-    isHighlighted
+    isHighlighted,
+    setMaxHistory
   }
 }

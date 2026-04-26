@@ -97,7 +97,8 @@
                 @toggle-empty="handleToggleEmpty" @clear-seat="handleClearSeat" @swap-seat="handleSwapSeat"
                 @drag-start-seat="handleDragStartSeat"
                 @drag-enter-seat="handleDragEnterSeat"
-                @drag-end-seat="handleDragEndSeat" />
+                @drag-end-seat="handleDragEndSeat"
+                @edit-student="handleEditStudent" />
             </div>
           </div>
         </div>
@@ -162,6 +163,12 @@
       :studentIds="batchEditStudentIds"
     />
 
+    <!-- 学生编辑弹窗 -->
+    <StudentEditDialog
+      v-model:visible="showStudentEditDialog"
+      :studentId="editingStudentId"
+    />
+
     <!-- 浮动拖拽预览 -->
     <Teleport to="body">
       <div v-show="dragPreviewState.isActive" ref="dragPreviewRef" class="drag-preview-overlay">
@@ -181,6 +188,7 @@ import { Minus, Plus, Edit2, UserMinus, Shuffle, UserPlus, X, ArrowLeftRight, Un
 import SeatItem from './SeatItem.vue'
 import SelectionToolbar from './SelectionToolbar.vue'
 import BatchEditDialog from '@/components/student/BatchEditDialog.vue'
+import StudentEditDialog from '@/components/student/StudentEditDialog.vue'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useEditMode } from '@/composables/useEditMode'
 import { useStudentData } from '@/composables/useStudentData'
@@ -790,6 +798,10 @@ const showSelToolbar = computed(() => selectedCount.value >= 1 && !dragPreviewSt
 const showBatchEditDialog = ref(false)
 const batchEditStudentIds = ref([])
 
+// 学生编辑弹窗
+const showStudentEditDialog = ref(false)
+const editingStudentId = ref(null)
+
 // 判断选区是否已满（所有选中的座位都有学生）
 const isSelectionFull = computed(() => {
   if (selectedCount.value === 0) return false
@@ -895,7 +907,13 @@ const handleSelEdit = () => {
   showBatchEditDialog.value = true
 }
 
-// ==================== 初始化 ====================
+// 处理双击编辑学生
+const handleEditStudent = (studentId) => {
+  editingStudentId.value = studentId
+  showStudentEditDialog.value = true
+}
+
+// ====================  初始化 ====================
 onMounted(() => {
   initializeSeats()
   registerViewport(viewportRef.value, chartRef.value)

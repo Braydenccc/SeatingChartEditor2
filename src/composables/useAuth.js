@@ -1,4 +1,6 @@
 import { ref, computed } from 'vue'
+import { safeStorageGet as storageGet, safeStorageSet as storageSet, safeStorageRemove as storageRemove } from '@/utils/storage'
+import { encrypt, decrypt } from '@/utils/crypto'
 
 const currentUser = ref(null)
 const token = ref(null)
@@ -11,33 +13,19 @@ const backupMode = ref(false)
 
 const COOKIE_EXPIRY_DAYS = 7
 
+// 包装存储函数以支持认证相关数据的 sessionStorage 优先策略
 const safeStorageGet = (key) => {
-    try {
-        return localStorage.getItem(key)
-    } catch (error) {
-        console.warn(`Failed to read localStorage key "${key}":`, error)
-        return null
-    }
+    const isAuthKey = key.includes('auth') || key.includes('token')
+    return storageGet(key, isAuthKey)
 }
 
 const safeStorageSet = (key, value) => {
-    try {
-        localStorage.setItem(key, value)
-        return true
-    } catch (error) {
-        console.warn(`Failed to write localStorage key "${key}":`, error)
-        return false
-    }
+    const isAuthKey = key.includes('auth') || key.includes('token')
+    return storageSet(key, value, isAuthKey)
 }
 
 const safeStorageRemove = (key) => {
-    try {
-        localStorage.removeItem(key)
-        return true
-    } catch (error) {
-        console.warn(`Failed to remove localStorage key "${key}":`, error)
-        return false
-    }
+    return storageRemove(key, true)
 }
 
 const generateFallbackToken = (byteLength = 24) => {
@@ -97,7 +85,7 @@ const getOrCreateCsrfToken = () => {
 export { getOrCreateCsrfToken }
 
 // Initialize from cookies
-const initAuth = () => {
+const initAuth = async () => {
     const savedUser = getCookie('sce_user')
     const savedToken = getCookie('sce_token')
     if (savedUser && savedToken) {
@@ -115,12 +103,23 @@ const initAuth = () => {
             eraseCookie('sce_token')
         }
     }
-    
+
     // 初始化 WebDAV 访客配置
     const savedWebdav = getCookie('sce_webdav_config')
     if (savedWebdav) {
         try {
             const config = JSON.parse(savedWebdav)
+
+            // 如果有加密的密码，尝试解密
+            if (config.encryptedPassword) {
+                const userKey = token.value || null // 使用 SCE token 或通用密钥
+                const decryptedPassword = await decrypt(config.encryptedPassword, userKey)
+                if (decryptedPassword) {
+                    config.password = decryptedPassword
+                    delete config.encryptedPassword
+                }
+            }
+
             webdavConfig.value = config
             if (!currentUser.value) {
                 currentUser.value = { username: config.username }
@@ -309,19 +308,39 @@ export function useAuth() {
         }
     }
 
-    const setWebdavLogin = (config) => {
+    const setWebdavLogin = async (config, rememberPassword = false) => {
         authType.value = 'webdav'
-        webdavConfig.value = config
+
+        webdavConfig.value = config // 内存中保留完整配置（含密码）
+
         // currentUser.value shouldn't be overridden if already logged into retiehe
         if (!currentUser.value) {
             currentUser.value = { username: config.username }
         }
-        const configJson = JSON.stringify(config)
-        if (getCookie('sce_webdav_config') !== configJson) {
-            setCookie('sce_webdav_config', configJson)
+
+        // 准备存储的配置
+        const safeConfig = {
+            url: config.url,
+            username: config.username,
+            path: config.path
+        }
+
+        // 如果用户选择记住密码，则加密存储
+        if (rememberPassword && config.password) {
+            const userKey = token.value || null // 使用 SCE token 或通用密钥
+            const encryptedPassword = await encrypt(config.password, userKey)
+            if (encryptedPassword) {
+                safeConfig.encryptedPassword = encryptedPassword
+            }
+        }
+
+        // Cookie 中存储配置（可能包含加密密码）
+        const safeConfigJson = JSON.stringify(safeConfig)
+        if (getCookie('sce_webdav_config') !== safeConfigJson) {
+            setCookie('sce_webdav_config', safeConfigJson)
         }
         safeStorageSet('sce_auth_type', 'webdav')
-        
+
         // Remove old local item if any
         safeStorageRemove('sce_webdav_config')
     }

@@ -12,7 +12,9 @@
     'undo-highlighted': undoHighlighted,
     'selection-selected': isInSelection,
     'drag-ghost': isGhost
-  }" :style="zoneHighlightStyle" :data-seat-id="seat.id" :draggable="isDraggable" @click="handleClick"
+  }" :style="zoneHighlightStyle" :data-seat-id="seat.id" :draggable="isDraggable"
+    @click="handleClick"
+    @dblclick="handleDoubleClick"
     @dragstart="handleDragStart" @dragend="handleDragEnd" @dragover.prevent="handleDragOverSeat"
     @dragenter.prevent="handleDragEnter" @dragleave="handleDragLeave" @drop.prevent="handleDrop"
     @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd"
@@ -74,6 +76,7 @@ import { useUndo } from '@/composables/useUndo'
 import { useDragState } from '@/composables/useDragState'
 import { useSelection } from '@/composables/useSelection'
 import { useDragPreview } from '@/composables/useDragPreview'
+import { useGlobalSettings } from '@/composables/useGlobalSettings'
 
 const props = defineProps({
   seat: {
@@ -86,7 +89,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['assign-student', 'toggle-empty', 'clear-seat', 'swap-seat', 'toggle-zone-seat', 'drag-start-seat', 'drag-enter-seat', 'drag-end-seat'])
+const emit = defineEmits(['assign-student', 'toggle-empty', 'clear-seat', 'swap-seat', 'toggle-zone-seat', 'drag-start-seat', 'drag-enter-seat', 'drag-end-seat', 'edit-student'])
 
 const { students, selectedStudentId } = useStudentData()
 const { currentMode, firstSelectedSeat, EditMode } = useEditMode()
@@ -97,6 +100,7 @@ const { isHighlighted } = useUndo()
 const { startDragFromSeat, endDragFromSeat, startTouchDragFromSeat, endTouchDragFromSeat } = useDragState()
 const { selectedSeatIds, selectedSeatsArray, isDraggingSelection, startDraggingSelection, endDraggingSelection, isSelectionMode, toggleSeatInSelection } = useSelection()
 const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
+const { settings } = useGlobalSettings()
 
 const isDragOver = ref(false)
 const isDragging = ref(false)
@@ -261,6 +265,21 @@ const handleClick = () => {
         toggleSeatInEditingZone(props.seat.id)
       }
       break
+  }
+}
+
+// 双击处理
+const handleDoubleClick = () => {
+  if (!hasStudent.value) return
+
+  const doubleClickAction = settings.value.editor.doubleClickAction
+
+  if (doubleClickAction === 'edit') {
+    // 编辑学生信息
+    emit('edit-student', studentInfo.value.id)
+  } else if (doubleClickAction === 'random') {
+    // 随机移出 - 将学生从座位移除到候选区
+    emit('clear-seat', props.seat.id)
   }
 }
 

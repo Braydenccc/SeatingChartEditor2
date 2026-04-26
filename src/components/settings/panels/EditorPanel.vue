@@ -5,7 +5,17 @@
       <p class="section-desc">配置编辑器的默认行为</p>
 
       <div class="setting-item">
-        <label class="setting-label">自动保存间隔（秒）</label>
+        <div class="setting-row">
+          <label class="setting-label">自动保存间隔（秒）</label>
+          <button
+            class="reset-btn"
+            @click="resetAutoSaveInterval"
+            :disabled="isDefaultAutoSaveInterval"
+            title="恢复默认自动保存间隔"
+          >
+            <RotateCcw :size="16" />
+          </button>
+        </div>
         <input
           v-model.number="autoSaveSeconds"
           type="number"
@@ -19,7 +29,17 @@
       </div>
 
       <div class="setting-item">
-        <label class="setting-label">撤销历史大小</label>
+        <div class="setting-row">
+          <label class="setting-label">撤销历史大小</label>
+          <button
+            class="reset-btn"
+            @click="resetUndoHistorySize"
+            :disabled="isDefaultUndoHistorySize"
+            title="恢复默认撤销历史大小"
+          >
+            <RotateCcw :size="16" />
+          </button>
+        </div>
         <input
           v-model.number="localSettings.undoHistorySize"
           type="number"
@@ -31,7 +51,17 @@
       </div>
 
       <div class="setting-item">
-        <label class="setting-label">拖拽灵敏度</label>
+        <div class="setting-row">
+          <label class="setting-label">拖拽灵敏度</label>
+          <button
+            class="reset-btn"
+            @click="resetDragSensitivity"
+            :disabled="isDefaultDragSensitivity"
+            title="恢复默认拖拽灵敏度"
+          >
+            <RotateCcw :size="16" />
+          </button>
+        </div>
         <input
           v-model.number="localSettings.dragSensitivity"
           type="range"
@@ -44,11 +74,22 @@
       </div>
 
       <div class="setting-item">
-        <label class="setting-label">双击座位行为</label>
+        <div class="setting-row">
+          <label class="setting-label">双击学生行为</label>
+          <button
+            class="reset-btn"
+            @click="resetDoubleClickAction"
+            :disabled="isDefaultDoubleClickAction"
+            title="恢复默认双击行为"
+          >
+            <RotateCcw :size="16" />
+          </button>
+        </div>
         <select v-model="localSettings.doubleClickAction" class="setting-select">
-          <option value="edit">编辑学生信息</option>
-          <option value="assign">快速分配</option>
+          <option value="edit">编辑该学生信息</option>
+          <option value="random">随机移入/移出</option>
         </select>
+        <span class="hint-text">对座位表和学生候选区均有效</span>
       </div>
     </div>
   </div>
@@ -56,6 +97,8 @@
 
 <script setup>
 import { computed } from 'vue'
+import { RotateCcw } from 'lucide-vue-next'
+import { useGlobalSettings } from '@/composables/useGlobalSettings'
 
 const props = defineProps({
   settings: {
@@ -65,6 +108,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:settings'])
+
+const { defaultSettings } = useGlobalSettings()
 
 const localSettings = computed({
   get: () => props.settings,
@@ -84,6 +129,40 @@ const validateAutoSave = () => {
   } else if (autoSaveSeconds.value > 600) {
     autoSaveSeconds.value = 600
   }
+}
+
+// 判断是否为默认值
+const isDefaultAutoSaveInterval = computed(() =>
+  localSettings.value.autoSaveInterval === defaultSettings.editor.autoSaveInterval
+)
+
+const isDefaultUndoHistorySize = computed(() =>
+  localSettings.value.undoHistorySize === defaultSettings.editor.undoHistorySize
+)
+
+const isDefaultDragSensitivity = computed(() =>
+  localSettings.value.dragSensitivity === defaultSettings.editor.dragSensitivity
+)
+
+const isDefaultDoubleClickAction = computed(() =>
+  localSettings.value.doubleClickAction === defaultSettings.editor.doubleClickAction
+)
+
+// 重置单个设置项
+const resetAutoSaveInterval = () => {
+  localSettings.value.autoSaveInterval = defaultSettings.editor.autoSaveInterval
+}
+
+const resetUndoHistorySize = () => {
+  localSettings.value.undoHistorySize = defaultSettings.editor.undoHistorySize
+}
+
+const resetDragSensitivity = () => {
+  localSettings.value.dragSensitivity = defaultSettings.editor.dragSensitivity
+}
+
+const resetDoubleClickAction = () => {
+  localSettings.value.doubleClickAction = defaultSettings.editor.doubleClickAction
 }
 </script>
 
@@ -113,12 +192,43 @@ const validateAutoSave = () => {
   margin-bottom: 20px;
 }
 
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
 .setting-label {
   display: block;
   font-size: 14px;
   font-weight: 500;
   color: #334155;
-  margin-bottom: 8px;
+  margin-bottom: 0;
+}
+
+.reset-btn {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reset-btn:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #23587b;
+  color: #23587b;
+}
+
+.reset-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .setting-input,

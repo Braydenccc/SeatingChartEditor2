@@ -10,6 +10,7 @@
           v-for="student in unassignedStudents"
           :key="student.id"
           :student="student"
+          @edit-student="handleEditStudent"
         />
       </TransitionGroup>
 
@@ -73,6 +74,9 @@
     <StudentRosterDialog v-if="showRosterDialog" v-model:visible="showRosterDialog" />
     <TagSettingsDialog v-if="showTagSettingsDialog" v-model:visible="showTagSettingsDialog" />
 
+    <!-- 学生编辑弹窗 -->
+    <StudentEditDialog v-if="showStudentEditDialog" v-model:visible="showStudentEditDialog" :studentId="editingStudentId" />
+
     <!-- 导出设置弹窗 -->
     <ExportDialog v-if="showExportDialog" :visible="showExportDialog" @close="showExportDialog = false" @exported="onExported" />
   </div>
@@ -100,9 +104,12 @@ import { useResizablePanel } from '@/composables/useResizablePanel'
 
 const StudentRosterDialog = defineAsyncComponent(() => import('./StudentRosterDialog.vue'))
 const TagSettingsDialog = defineAsyncComponent(() => import('./TagSettingsDialog.vue'))
+const StudentEditDialog = defineAsyncComponent(() => import('./StudentEditDialog.vue'))
 
 const showRosterDialog = ref(false)
 const showTagSettingsDialog = ref(false)
+const showStudentEditDialog = ref(false)
+const editingStudentId = ref(null)
 
 const { tags, addTag, clearAllTags } = useTagData()
 const { students, updateStudent, deleteStudent, clearAllStudents, addStudent } = useStudentData()
@@ -127,6 +134,12 @@ const isHeightConstrained = computed(() => {
   const effectiveHeight = getEffectiveHeight(unassignedStudents.value.length)
   return effectiveHeight < 200 // 高度小于 200px 时隐藏操作按钮
 })
+
+// 处理双击编辑学生
+const handleEditStudent = (studentId) => {
+  editingStudentId.value = studentId
+  showStudentEditDialog.value = true
+}
 
 const excelInput = ref(null)
 const workspaceInput = ref(null)

@@ -1,5 +1,6 @@
 import './assets/main.css'
 import './styles/touch-optimization.css'
+import './styles/disable-animations.css'
 
 import { createApp } from 'vue'
 import App from './App.vue'
@@ -11,15 +12,30 @@ const renderFatalError = (error) => {
   if (!appRoot) return
 
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-  appRoot.innerHTML = `
-    <div class="fatal-error-screen">
-      <div class="fatal-error-card">
-        <h1>应用启动失败</h1>
-        <p>请截图这段信息反馈给开发者：</p>
-        <pre>${message}</pre>
-      </div>
-    </div>
-  `
+
+  // 使用 DOM API 创建元素，避免 innerHTML XSS 风险
+  const errorScreen = document.createElement('div')
+  errorScreen.className = 'fatal-error-screen'
+
+  const errorCard = document.createElement('div')
+  errorCard.className = 'fatal-error-card'
+
+  const title = document.createElement('h1')
+  title.textContent = '应用启动失败'
+
+  const description = document.createElement('p')
+  description.textContent = '请截图这段信息反馈给开发者：'
+
+  const pre = document.createElement('pre')
+  pre.textContent = message
+
+  errorCard.appendChild(title)
+  errorCard.appendChild(description)
+  errorCard.appendChild(pre)
+  errorScreen.appendChild(errorCard)
+
+  appRoot.textContent = ''
+  appRoot.appendChild(errorScreen)
 }
 
 app.config.errorHandler = (error) => {

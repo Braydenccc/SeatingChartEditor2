@@ -25,7 +25,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    host: "0.0.0.0"
+    host: process.env.VITE_HOST || "127.0.0.1",  // 默认仅本地访问，如需局域网访问使用 VITE_HOST=0.0.0.0
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block',
+      'Referrer-Policy': 'no-referrer'
+    }
   },
   build: {
     rollupOptions: {

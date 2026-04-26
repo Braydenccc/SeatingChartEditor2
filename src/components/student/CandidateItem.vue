@@ -2,6 +2,7 @@
   <div class="candidate-item" :class="{ dragging: isStudentDragging }"
     ref="itemRef" :draggable="canHtmlDrag()"
     @dragstart="handleDragStart" @dragend="handleDragEnd"
+    @dblclick="handleDoubleClick"
     @contextmenu.prevent @pointerdown="handlePointerDown">
     <div class="student-display" :class="{ 'bottom-tag-mode': tagDisplayMode === 'bottom' }">
       <div class="student-name">{{ student.name || '未命名' }}</div>
@@ -44,6 +45,9 @@
 import { computed, ref } from 'vue'
 import { useStudentDragging } from '@/composables/useStudentDragging'
 import { useTagData } from '@/composables/useTagData'
+import { useSeatChart } from '@/composables/useSeatChart'
+import { useGlobalSettings } from '@/composables/useGlobalSettings'
+import { useLogger } from '@/composables/useLogger'
 
 const props = defineProps({
   student: {
@@ -52,8 +56,13 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['edit-student'])
+
 const itemRef = ref(null)
 const { tags, showTagsInSeatChart, tagDisplayMode } = useTagData()
+const { getEmptySeats, assignStudent } = useSeatChart()
+const { settings } = useGlobalSettings()
+const { success, warning } = useLogger()
 
 const allVisibleTags = computed(() => {
   if (!showTagsInSeatChart.value) return []
@@ -83,6 +92,33 @@ const {
   handleDragStart,
   handleDragEnd
 } = useStudentDragging(itemRef, computed(() => props.student))
+
+// 双击处理
+const handleDoubleClick = () => {
+  const doubleClickAction = settings.value.editor.doubleClickAction
+
+  if (doubleClickAction === 'edit') {
+    // 编辑学生信息 - 触发编辑事件
+    emit('edit-student', props.student.id)
+  } else if (doubleClickAction === 'random') {
+    // 随机移入 - 将学生随机分配到空座位
+    const emptySeats = getEmptySeats()
+    if (emptySeats.length === 0) {
+      warning('没有可用的空座位')
+      return
+    }
+
+    // 随机选择一个空座位
+    const randomIndex = Math.floor(Math.random() * emptySeats.length)
+    const randomSeat = emptySeats[randomIndex]
+
+    // 分配学生到该座位
+    const success_result = assignStudent(randomSeat.id, props.student.id)
+    if (success_result) {
+      success(`${props.student.name} 已随机分配到座位`)
+    }
+  }
+}
 </script>
 
 <style scoped>

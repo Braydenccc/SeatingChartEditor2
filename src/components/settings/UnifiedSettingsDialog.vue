@@ -93,7 +93,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible', 'save'])
 
-const { settings, saveToLocalStorage, resetSettings, applyThemeColor } = useGlobalSettings()
+const { settings, saveToLocalStorage, resetSettings, applyThemeColor, applyColorScheme } = useGlobalSettings()
 const { success, warning } = useLogger()
 
 const activeTab = ref('global')
@@ -162,7 +162,8 @@ const handleSave = () => {
   if (activeTab.value === 'global') {
     const saved = saveToLocalStorage()
     if (saved) {
-      // 应用主题色
+      // 应用颜色方案和主题色
+      applyColorScheme()
       applyThemeColor()
       success('全局设置已保存')
     } else {

@@ -357,6 +357,7 @@ import { useStudentData } from '@/composables/useStudentData'
 import { useAuth } from '@/composables/useAuth'
 import { useWebDav } from '@/composables/useWebDav'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
+import { escapeHtmlWithBreaks } from '@/utils/xss'
 
 const props = defineProps({ visible: { type: Boolean, default: false } })
 const emit = defineEmits(['close', 'exported'])
@@ -587,26 +588,26 @@ const excelPreviewHtml = computed(() => {
   // 辅助：渲染富文本
   const renderRichText = (richParts, baseStyle = {}) => {
     if (!richParts || !Array.isArray(richParts)) return ''
-    
+
     let html = ''
     richParts.forEach(part => {
       let partStyle = ''
       const font = part.s?.font || {}
-      
+
       if (font.bold) partStyle += 'font-weight:bold;'
       if (font.italic) partStyle += 'font-style:italic;'
       if (font.sz) partStyle += `font-size:${Math.round(font.sz * 1.33)}px;`
       if (font.color?.rgb) partStyle += `color:#${font.color.rgb};`
-      
-      const text = String(part.t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')
-      
+
+      const text = escapeHtmlWithBreaks(part.t || '')
+
       if (partStyle) {
         html += `<span style="${partStyle}">${text}</span>`
       } else {
         html += text
       }
     })
-    
+
     return html
   }
 
@@ -693,7 +694,7 @@ const excelPreviewHtml = computed(() => {
           v = renderRichText(cell.r, cell.s)
         } else {
           v = cell.v !== undefined && cell.v !== null ? String(cell.v) : ''
-          v = v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')
+          v = escapeHtmlWithBreaks(v)
         }
       }
       

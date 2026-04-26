@@ -44,9 +44,18 @@ function parseArgs() {
 function getHeaders() {
   const apiKey = process.env.RTH_API_KEY;
   if (!apiKey) {
-    console.error('Missing environment variable: RTH_API_KEY');
+    console.error('错误: 未设置 RTH_API_KEY 环境变量');
     process.exit(1);
   }
+
+  // 验证 API Key 格式（UUID）
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(apiKey)) {
+    console.error('错误: RTH_API_KEY 格式无效（应为 UUID 格式）');
+    console.error('示例: 12345678-1234-1234-1234-123456789abc');
+    process.exit(1);
+  }
+
   return {
     Authorization: `Bearer ${apiKey}`,
     'User-Agent': USER_AGENT,

@@ -43,13 +43,22 @@
             </div>
             <div class="form-group">
               <label>密码</label>
-              <input 
-                type="password" 
-                v-model="webdavPass" 
-                placeholder="请输入WebDAV密码/Token" 
-                required 
+              <input
+                type="password"
+                v-model="webdavPass"
+                placeholder="请输入WebDAV密码/Token"
+                required
                 autocomplete="new-password"
               />
+            </div>
+            <div class="form-group checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="rememberWebdavPassword" />
+                <span>记住密码（加密存储到浏览器）</span>
+              </label>
+              <div class="checkbox-hint">
+                密码将使用 AES-GCM 加密后存储在浏览器中。注意：此功能无法防止 XSS 攻击获取密钥。
+              </div>
             </div>
           </template>
           
@@ -138,6 +147,7 @@ const password = ref('')
 const webdavUrl = ref('')
 const webdavUser = ref('')
 const webdavPass = ref('')
+const rememberWebdavPassword = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -183,8 +193,8 @@ const handleSubmit = async () => {
       }
       // 验证连接并创建 sce_data 文件夹
       await mkcol(config, 'sce_data')
-      
-      setWebdavLogin(config)
+
+      setWebdavLogin(config, rememberWebdavPassword.value)
       successMessage.value = 'WebDAV 连接并初始化成功'
       setTimeout(() => {
         close()
@@ -416,5 +426,38 @@ const handleSubmit = async () => {
 .requirement.met::before {
   content: '✓ ';
   font-weight: bold;
+}
+
+.checkbox-group {
+  margin-bottom: 16px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: normal;
+  margin-bottom: 6px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.checkbox-label span {
+  color: #475569;
+  font-size: 14px;
+}
+
+.checkbox-hint {
+  font-size: 12px;
+  color: #f59e0b;
+  background: #fffbeb;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border-left: 3px solid #f59e0b;
+  line-height: 1.4;
 }
 </style>

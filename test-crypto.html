@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加密工具测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        input {
+            padding: 8px;
+            width: 300px;
+            margin: 5px;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebDAV 密码加密工具测试</h1>
+
+    <div class="test-section">
+        <h2>测试 1: 基本加密/解密</h2>
+        <button onclick="testBasicEncryption()">运行测试</button>
+        <div id="test1-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>测试 2: 使用用户密钥加密</h2>
+        <button onclick="testUserKeyEncryption()">运行测试</button>
+        <div id="test2-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>测试 3: 交互式测试</h2>
+        <div>
+            <input type="text" id="password-input" placeholder="输入密码">
+            <input type="text" id="key-input" placeholder="用户密钥（可选）">
+        </div>
+        <div>
+            <button onclick="testEncrypt()">加密</button>
+            <button onclick="testDecrypt()">解密</button>
+        </div>
+        <div id="test3-result"></div>
+    </div>
+
+    <script type="module">
+        import { encrypt, decrypt } from './src/utils/crypto.js';
+
+        window.encrypt = encrypt;
+        window.decrypt = decrypt;
+
+        window.testBasicEncryption = async function() {
+            const result = document.getElementById('test1-result');
+            result.innerHTML = '<p>测试中...</p>';
+
+            try {
+                const password = 'test-password-123';
+
+                // 加密
+                const encrypted = await encrypt(password);
+                console.log('Encrypted:', encrypted);
+
+                if (!encrypted) {
+                    throw new Error('加密失败');
+                }
+
+                // 解密
+                const decrypted = await decrypt(encrypted);
+                console.log('Decrypted:', decrypted);
+
+                if (decrypted === password) {
+                    result.innerHTML = `
+                        <p class="success">✓ 测试通过</p>
+                        <p>原始密码: ${password}</p>
+                        <p>加密结果: <code>${encrypted}</code></p>
+                        <p>解密结果: ${decrypted}</p>
+                    `;
+                } else {
+                    throw new Error(`解密结果不匹配: ${decrypted}`);
+                }
+            } catch (error) {
+                result.innerHTML = `<p class="error">✗ 测试失败: ${error.message}</p>`;
+                console.error(error);
+            }
+        };
+
+        window.testUserKeyEncryption = async function() {
+            const result = document.getElementById('test2-result');
+            result.innerHTML = '<p>测试中...</p>';
+
+            try {
+                const password = 'my-webdav-password';
+                const userKey = 'user-token-abc123';
+
+                // 使用用户密钥加密
+                const encrypted = await encrypt(password, userKey);
+                console.log('Encrypted with user key:', encrypted);
+
+                if (!encrypted) {
+                    throw new Error('加密失败');
+                }
+
+                // 使用相同密钥解密
+                const decrypted = await decrypt(encrypted, userKey);
+                console.log('Decrypted with user key:', decrypted);
+
+                if (decrypted === password) {
+                    result.innerHTML = `
+                        <p class="success">✓ 测试通过</p>
+                        <p>原始密码: ${password}</p>
+                        <p>用户密钥: ${userKey}</p>
+                        <p>加密结果: <code>${encrypted}</code></p>
+                        <p>解密结果: ${decrypted}</p>
+                    `;
+                } else {
+                    throw new Error(`解密结果不匹配: ${decrypted}`);
+                }
+
+                // 测试使用错误密钥解密
+                const wrongDecrypted = await decrypt(encrypted, 'wrong-key');
+                if (wrongDecrypted === null) {
+                    result.innerHTML += '<p class="success">✓ 使用错误密钥解密失败（符合预期）</p>';
+                } else {
+                    result.innerHTML += '<p class="error">✗ 使用错误密钥解密成功（不符合预期）</p>';
+                }
+            } catch (error) {
+                result.innerHTML = `<p class="error">✗ 测试失败: ${error.message}</p>`;
+                console.error(error);
+            }
+        };
+
+        let lastEncrypted = '';
+
+        window.testEncrypt = async function() {
+            const result = document.getElementById('test3-result');
+            const password = document.getElementById('password-input').value;
+            const userKey = document.getElementById('key-input').value || null;
+
+            if (!password) {
+                result.innerHTML = '<p class="error">请输入密码</p>';
+                return;
+            }
+
+            try {
+                const encrypted = await encrypt(password, userKey);
+                lastEncrypted = encrypted;
+
+                result.innerHTML = `
+                    <p class="success">✓ 加密成功</p>
+                    <p>加密结果:</p>
+                    <pre>${encrypted}</pre>
+                `;
+            } catch (error) {
+                result.innerHTML = `<p class="error">✗ 加密失败: ${error.message}</p>`;
+            }
+        };
+
+        window.testDecrypt = async function() {
+            const result = document.getElementById('test3-result');
+            const userKey = document.getElementById('key-input').value || null;
+
+            if (!lastEncrypted) {
+                result.innerHTML = '<p class="error">请先加密一个密码</p>';
+                return;
+            }
+
+            try {
+                const decrypted = await decrypt(lastEncrypted, userKey);
+
+                if (decrypted) {
+                    result.innerHTML = `
+                        <p class="success">✓ 解密成功</p>
+                        <p>解密结果: ${decrypted}</p>
+                    `;
+                } else {
+                    result.innerHTML = '<p class="error">✗ 解密失败（可能是密钥不匹配）</p>';
+                }
+            } catch (error) {
+                result.innerHTML = `<p class="error">✗ 解密失败: ${error.message}</p>`;
+            }
+        };
+    </script>
+</body>
+</html>

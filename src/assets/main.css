@@ -1,36 +1,166 @@
 @import './base.css';
 
+/* 浅色模式（默认） */
 :root {
+  /* 主色调 */
   --color-primary: #23587b;
   --color-primary-rgb: 35, 88, 123;
   --color-primary-light: #2d6a94;
   --color-primary-dark: #1a4460;
-  --color-surface: #fff;
+  --color-primary-hover: #1d4763;
+
+  /* 背景色 */
+  --color-surface: #ffffff;
   --color-surface-rgb: 255, 255, 255;
   --color-bg-selected: #e8f4f8;
   --color-bg-card: #fafbfc;
-  --color-danger: #f44336;
-  --color-danger-hover: #d32f2f;
+  --color-bg-subtle: #f8fafc;
+  --color-bg-soft: #f1f5f9;
+  --color-bg-hover: #f8f9fa;
+  --color-bg-overlay: rgba(0, 0, 0, 0.5);
+
+  /* 文字颜色 */
   --color-text-primary: #334155;
   --color-text-secondary: #475569;
   --color-text-muted: #64748b;
+  --color-text-disabled: #94a3b8;
+  --color-text-inverse: #ffffff;
+
+  /* 边框颜色 */
   --color-border: #e2e8f0;
   --color-border-strong: #cbd5e1;
-  --color-bg-subtle: #f8fafc;
-  --color-bg-soft: #f1f5f9;
-  --color-info: #1d4ed8;
-  --color-info-bg: #eff6ff;
-  --color-success: #059669;
-  --color-success-bg: #d1fae5;
-  --color-success-bg-light: #f0fdf4;
-  --color-warning-bg-light: #fffbeb;
+  --color-border-hover: #cbd5e1;
+  --color-border-light: #f1f5f9;
+
+  /* 状态颜色 */
+  --color-danger: #f44336;
+  --color-danger-hover: #d32f2f;
   --color-danger-text: #ef4444;
   --color-danger-bg: #fef2f2;
-  --color-error-bg-light: #fef2f2;
+  --color-danger-bg-light: #fef2f2;
 
+  --color-success: #059669;
+  --color-success-hover: #047857;
+  --color-success-text: #10b981;
+  --color-success-bg: #d1fae5;
+  --color-success-bg-light: #f0fdf4;
+
+  --color-warning: #f59e0b;
+  --color-warning-hover: #d97706;
+  --color-warning-text: #f59e0b;
+  --color-warning-bg: #fef3c7;
+  --color-warning-bg-light: #fffbeb;
+
+  --color-info: #1d4ed8;
+  --color-info-hover: #1e40af;
+  --color-info-text: #3b82f6;
+  --color-info-bg: #eff6ff;
+  --color-info-bg-light: #dbeafe;
+
+  /* 特殊颜色 */
+  --color-error-bg-light: #fef2f2;
+  --color-link: #2563eb;
+  --color-link-hover: #1d4ed8;
+
+  /* 阴影 */
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
   --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.25);
+
+  /* 特定组件颜色 */
+  --color-header-bg: #ffffff;
+  --color-sidebar-bg: #fafbfc;
+  --color-dialog-bg: #ffffff;
+  --color-input-bg: #ffffff;
+  --color-input-border: #e2e8f0;
+  --color-button-secondary-bg: #ffffff;
+  --color-button-secondary-text: #64748b;
+  --color-tag-bg: #e0e7ff;
+  --color-tag-text: #4338ca;
+}
+
+/* 深色模式 */
+:root[data-theme="dark"] {
+  /* 主色调 */
+  --color-primary: #4a9eff;
+  --color-primary-rgb: 74, 158, 255;
+  --color-primary-light: #6bb0ff;
+  --color-primary-dark: #3a8eef;
+  --color-primary-hover: #3a8eef;
+
+  /* 背景色 */
+  --color-surface: #1e293b;
+  --color-surface-rgb: 30, 41, 59;
+  --color-bg-selected: #334155;
+  --color-bg-card: #0f172a;
+  --color-bg-subtle: #0f172a;
+  --color-bg-soft: #1e293b;
+  --color-bg-hover: #334155;
+  --color-bg-overlay: rgba(0, 0, 0, 0.7);
+
+  /* 文字颜色 */
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-disabled: #64748b;
+  --color-text-inverse: #0f172a;
+
+  /* 边框颜色 */
+  --color-border: #334155;
+  --color-border-strong: #475569;
+  --color-border-hover: #475569;
+  --color-border-light: #1e293b;
+
+  /* 状态颜色 */
+  --color-danger: #f87171;
+  --color-danger-hover: #ef4444;
+  --color-danger-text: #fca5a5;
+  --color-danger-bg: #450a0a;
+  --color-danger-bg-light: #450a0a;
+
+  --color-success: #34d399;
+  --color-success-hover: #10b981;
+  --color-success-text: #6ee7b7;
+  --color-success-bg: #064e3b;
+  --color-success-bg-light: #022c22;
+
+  --color-warning: #fbbf24;
+  --color-warning-hover: #f59e0b;
+  --color-warning-text: #fcd34d;
+  --color-warning-bg: #78350f;
+  --color-warning-bg-light: #451a03;
+
+  --color-info: #60a5fa;
+  --color-info-hover: #3b82f6;
+  --color-info-text: #93c5fd;
+  --color-info-bg: #1e3a8a;
+  --color-info-bg-light: #1e40af;
+
+  /* 特殊颜色 */
+  --color-error-bg-light: #450a0a;
+  --color-link: #60a5fa;
+  --color-link-hover: #93c5fd;
+
+  /* 阴影 */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.6);
+
+  /* 特定组件颜色 */
+  --color-header-bg: #0f172a;
+  --color-sidebar-bg: #0f172a;
+  --color-dialog-bg: #1e293b;
+  --color-input-bg: #0f172a;
+  --color-input-border: #334155;
+  --color-button-secondary-bg: #334155;
+  --color-button-secondary-text: #cbd5e1;
+  --color-tag-bg: #1e3a8a;
+  --color-tag-text: #93c5fd;
+}
+
+/* 定制模式（通过 JS 动态设置 CSS 变量） */
+:root[data-theme="custom"] {
+  /* 颜色由 JS 动态设置 */
 }
 
 .ui-icon {
@@ -66,22 +196,22 @@ body,
   justify-content: center;
   padding: 24px;
   box-sizing: border-box;
-  background: #f5f5f5;
+  background: var(--color-bg-soft);
 }
 
 .fatal-error-card {
   width: min(720px, 100%);
   padding: 20px;
   border-radius: 12px;
-  background: #ffffff;
-  color: #334155;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-md);
 }
 
 .fatal-error-card h1 {
   margin: 0 0 12px;
   font-size: 20px;
-  color: #dc2626;
+  color: var(--color-danger);
 }
 
 .fatal-error-card p {
@@ -92,8 +222,8 @@ body,
   margin: 0;
   padding: 12px;
   border-radius: 8px;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -101,9 +231,14 @@ body,
 a,
 .green {
   text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
+  color: var(--color-link);
   transition: 0.4s;
   padding: 3px;
+}
+
+a:hover,
+.green:hover {
+  color: var(--color-link-hover);
 }
 
 /* 全局响应式优化 */
@@ -130,7 +265,7 @@ a,
   /* 优化触摸反馈 */
   button:active,
   .clickable:active {
-    background-color: rgba(35, 88, 123, 0.1);
+    background-color: var(--color-bg-hover);
     transition: background-color 0.1s ease;
   }
 
@@ -149,8 +284,8 @@ a,
 
 /* 全局动画 */
 @keyframes pulse-primary {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(35, 88, 123, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(35, 88, 123, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--color-primary-rgb), 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(var(--color-primary-rgb), 0); }
 }
 
 @keyframes float {

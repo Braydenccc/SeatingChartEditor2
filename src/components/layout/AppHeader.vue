@@ -10,12 +10,6 @@
         </div>
         <Transition name="fade-slide">
           <div v-if="showDropdown" class="user-dropdown">
-            <!-- Sync Service Settings entry -->
-            <button v-if="hasRetiehe" class="dropdown-item" @click="openSyncSettings">
-              <RefreshCw :size="15" stroke-width="2" /> 同步设置
-            </button>
-            <div class="dropdown-divider" v-if="hasRetiehe"></div>
-
             <button class="dropdown-item" @click="openWorkspaceManagement">
               <FolderOpen :size="15" stroke-width="2" /> 工作区管理
             </button>
@@ -55,12 +49,6 @@
       </a>
     </div>
 
-    <SyncSettingsDialog
-      v-if="showSyncSettings"
-      :visible="showSyncSettings"
-      @update:visible="showSyncSettings = $event"
-    />
-
     <UnifiedSettingsDialog
       v-if="showUnifiedSettings"
       :visible="showUnifiedSettings"
@@ -72,12 +60,11 @@
 
 <script setup>
 import { onMounted, ref, onBeforeUnmount, computed, defineAsyncComponent } from 'vue'
-import { Cloud, FolderOpen, Github, LogIn, RefreshCw, Settings, User } from 'lucide-vue-next'
+import { Cloud, FolderOpen, Github, LogIn, Settings, User } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 
-const SyncSettingsDialog = defineAsyncComponent(() => import('../auth/SyncSettingsDialog.vue'))
 const UnifiedSettingsDialog = defineAsyncComponent(() => import('../settings/UnifiedSettingsDialog.vue'))
 
 const emit = defineEmits(['open-login'])
@@ -87,7 +74,6 @@ const { openCloudDialog } = useCloudWorkspaceDialog()
 const { saveToLocalStorage } = useGlobalSettings()
 
 const showDropdown = ref(false)
-const showSyncSettings = ref(false)
 const showUnifiedSettings = ref(false)
 const menuContainer = ref(null)
 
@@ -100,11 +86,6 @@ const toggleDropdown = () => {
 
 const openWorkspaceManagement = () => {
   openCloudDialog('load')
-  showDropdown.value = false
-}
-
-const openSyncSettings = () => {
-  showSyncSettings.value = true
   showDropdown.value = false
 }
 
@@ -135,8 +116,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeDropdownOnOutsideClick)
-  showUnifiedSettings.value = false  // Ensure dialog cleanup
-  showSyncSettings.value = false     // Same for SyncSettingsDialog
+  showUnifiedSettings.value = false
 })
 </script>
 

@@ -55,7 +55,8 @@ function isAuthorized($sessionDb, $username, $token) {
     }
 
     $data = json_decode($savedData, true);
-    if (!is_array($data) || !isset($data['token']) || !isset($data['expiry'])) {
+    // 兼容旧格式（token）和新格式（tokenHash）
+    if (!is_array($data) || (!isset($data['token']) && !isset($data['tokenHash'])) || !isset($data['expiry'])) {
         return false;
     }
 
@@ -64,6 +65,13 @@ function isAuthorized($sessionDb, $username, $token) {
         return false;
     }
 
+    // 新格式：比对 Token 的 SHA-256 哈希
+    if (isset($data['tokenHash'])) {
+        $tokenHash = hash('sha256', $token);
+        return hash_equals($data['tokenHash'], $tokenHash);
+    }
+
+    // 旧格式：比对明文 Token（向后兼容）
     return hash_equals($data['token'], $token);
 }
 
@@ -92,6 +100,14 @@ function getClientIp() {
 }
 
 function parseRequestInput() {
+    // 仅接受 POST 请求，拒绝 GET 请求以防止 CSRF 绕过
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        respond([
+            'success' => false,
+            'message' => 'Only POST requests are allowed'
+        ], 405);
+    }
+
     // 优先解析 JSON 请求体（前端使用 Content-Type: application/json）
     $rawInput = file_get_contents('php://input');
     $input = json_decode($rawInput, true);
@@ -99,11 +115,6 @@ function parseRequestInput() {
     // 回退到 $_POST（表单提交）
     if (!$input && !empty($_POST)) {
         $input = $_POST;
-    }
-
-    // 回退到 $_GET（URL 参数）
-    if ((!$input || !isset($input['action'])) && !empty($_GET) && isset($_GET['action'])) {
-        $input = $_GET;
     }
 
     if (!$input || !isset($input['action'])) {
