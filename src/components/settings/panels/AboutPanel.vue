@@ -156,7 +156,7 @@ import { Github, Heart, Cloud } from 'lucide-vue-next'
 .tech-tag {
   padding: 4px 10px;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-text-inverse);
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;

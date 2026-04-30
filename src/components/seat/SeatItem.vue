@@ -23,8 +23,8 @@
       <span class="empty-text">空置</span>
     </div>
     <template v-else-if="hasStudent">
-      <div class="student-display" :class="{ 'bottom-tag-mode': tagDisplayMode === 'bottom' }">
-        <div class="student-name">{{ studentInfo.name || '未命名' }}</div>
+      <div class="student-display" :class="{ 'bottom-tag-mode': tagDisplayMode === 'bottom', 'name-hidden': !showStudentName, 'number-hidden': !showStudentNumber, 'large-name': largeNameMode, 'large-number': largeNumberMode }">
+        <div v-if="showStudentName" class="student-name">{{ studentInfo.name || '未命名' }}</div>
         <!-- 颜色点模式：显示所有标签，用实心/空心区分 -->
         <div v-if="hasTags && tagDisplayMode === 'dot'" class="student-tags">
           <span v-for="tag in allVisibleTags" :key="tag.id"
@@ -34,10 +34,10 @@
           </span>
         </div>
         <!-- 座位下部文字模式：学号绝对定位到右上角 -->
-        <div v-if="tagDisplayMode === 'bottom'" class="student-number-corner">
+        <div v-if="showStudentNumber && tagDisplayMode === 'bottom'" class="student-number-corner">
           {{ studentInfo.studentNumber || '-' }}
         </div>
-        <div v-else class="student-number">{{ studentInfo.studentNumber || '-' }}</div>
+        <div v-else-if="showStudentNumber" class="student-number">{{ studentInfo.studentNumber || '-' }}</div>
         <!-- 座位下部文字模式：只显示学生拥有的标签 -->
         <div v-if="hasTags && tagDisplayMode === 'bottom'" class="student-tags-text">
           <span v-for="tag in studentTags" :key="tag.id"
@@ -101,6 +101,12 @@ const { startDragFromSeat, endDragFromSeat, startTouchDragFromSeat, endTouchDrag
 const { selectedSeatIds, selectedSeatsArray, isDraggingSelection, startDraggingSelection, endDraggingSelection, isSelectionMode, toggleSeatInSelection } = useSelection()
 const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
 const { settings } = useGlobalSettings()
+
+const showStudentName = computed(() => settings.value.ui.showStudentName !== false)
+const showStudentNumber = computed(() => settings.value.ui.showStudentNumber !== false)
+const hasHiddenElement = computed(() => !showStudentName.value || !showStudentNumber.value)
+const largeNameMode = computed(() => showStudentName.value && hasHiddenElement.value && settings.value.ui.largeNameMode)
+const largeNumberMode = computed(() => showStudentNumber.value && hasHiddenElement.value && settings.value.ui.largeNumberMode)
 
 const isDragOver = ref(false)
 const isDragging = ref(false)
@@ -713,6 +719,32 @@ onUnmounted(() => {
   width: 100%;
 }
 
+.student-display.name-hidden.number-hidden {
+  justify-content: center;
+}
+
+.student-display.name-hidden:not(.number-hidden) .student-number {
+  font-size: 16px;
+}
+
+.student-display.large-name .student-name {
+  font-size: 28px;
+}
+
+.student-display.large-number .student-number {
+  font-size: 18px;
+  padding: 4px 14px;
+}
+
+.student-display.large-number .student-number-corner {
+  font-size: 12px;
+  padding: 2px 7px;
+}
+
+.student-display.bottom-tag-mode {
+  gap: 2px;
+}
+
 .student-tags {
   display: flex;
   gap: 3px;
@@ -747,7 +779,7 @@ onUnmounted(() => {
 .tag-text-item {
   font-size: 9px;
   font-weight: 600;
-  color: white;
+  color: var(--color-text-inverse);
   padding: 1px 4px;
   border-radius: 3px;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
@@ -769,7 +801,7 @@ onUnmounted(() => {
 .corner-tag-item {
   font-size: 8px;
   font-weight: 600;
-  color: white;
+  color: var(--color-text-inverse);
   padding: 1px 4px;
   border-radius: 3px;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
@@ -838,16 +870,14 @@ onUnmounted(() => {
 
 /* 撤销/重做高亮效果 - 灰色显示 */
 .seat-item.undo-highlighted {
-  background: var(--color-bg-secondary) !important;
-  border-color: var(--color-border-dark) !important;
-  opacity: 0.6;
+  border-color: var(--color-border-dark);
   transition: all 0.3s ease;
   animation: undo-pulse 2s ease-in-out forwards;
 }
 
 .seat-item.undo-highlighted .student-name,
 .seat-item.undo-highlighted .student-number {
-  color: var(--color-text-secondary) !important;
+  animation: undo-text-fade 2s ease-in-out forwards;
 }
 
 @keyframes undo-pulse {
@@ -855,17 +885,31 @@ onUnmounted(() => {
     background: var(--color-bg-hover);
     border-color: var(--color-border-dark);
     transform: scale(1);
+    opacity: 1;
   }
-  50% {
+  15% {
     background: var(--color-bg-secondary);
     border-color: var(--color-border);
     transform: scale(0.98);
+    opacity: 0.6;
   }
   100% {
     background: inherit;
     border-color: inherit;
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+@keyframes undo-text-fade {
+  0% {
+    color: var(--color-text-secondary);
+  }
+  15% {
+    color: var(--color-text-secondary);
+  }
+  100% {
+    color: inherit;
   }
 }
 
@@ -933,6 +977,14 @@ onUnmounted(() => {
     padding: 1px 8px;
   }
 
+  .student-display.large-name .student-name {
+    font-size: 20px;
+  }
+
+  .student-display.large-number .student-number {
+    font-size: 14px;
+  }
+
   .student-number-corner {
     font-size: 8px;
     padding: 1px 4px;
@@ -984,6 +1036,14 @@ onUnmounted(() => {
     font-size: 10px;
     min-width: 32px;
     padding: 1px 7px;
+  }
+
+  .student-display.large-name .student-name {
+    font-size: 18px;
+  }
+
+  .student-display.large-number .student-number {
+    font-size: 13px;
   }
 
   .student-number-corner {
@@ -1045,6 +1105,14 @@ onUnmounted(() => {
   .student-number {
     font-size: 11px;
     padding: 2px 6px;
+  }
+
+  .student-display.large-name .student-name {
+    font-size: 16px;
+  }
+
+  .student-display.large-number .student-number {
+    font-size: 14px;
   }
 
   .student-number-corner {

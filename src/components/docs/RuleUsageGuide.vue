@@ -305,7 +305,7 @@
   padding: 10px 12px;
   background: var(--color-info-bg);
   border-radius: 8px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--color-border);
   font-size: 12px;
   color: var(--color-info);
   line-height: 1.5;

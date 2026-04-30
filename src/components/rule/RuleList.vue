@@ -920,7 +920,7 @@ defineExpose({ focusRule })
 
 .btn-delete.confirming {
   background: var(--color-danger);
-  color: white;
+  color: var(--color-text-inverse);
   border-color: var(--color-danger);
 }
 

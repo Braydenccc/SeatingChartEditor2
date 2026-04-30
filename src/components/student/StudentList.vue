@@ -147,7 +147,7 @@ const { loadWorkspace, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
 const { isLoggedIn, isLoginDialogVisible } = useAuth()
 const { importFromExcel, downloadTemplate } = useExcelData()
 const { isTouchDraggingFromSeat } = useDragState()
-const { recordClear } = useUndo()
+const { recordBatch, createSnapshot } = useUndo()
 const { width: windowWidth } = useWindowSize()
 const { openCloudLoad } = useCloudWorkspaceDialog()
 const { userHeight, getEffectiveHeight } = useResizablePanel()
@@ -313,20 +313,18 @@ const handleDrop = (e) => {
   try {
     const data = JSON.parse(raw)
     if (data.type === 'seat' && data.studentId != null) {
-      // 检查是否是选区批量移出
       if (data.selectedSeatIds && data.selectedSeatIds.length > 1) {
-        // 批量移出选中的座位
+        const beforeSnapshot = createSnapshot()
         data.selectedSeatIds.forEach(seatId => {
           const studentId = getStudentAtSeat(seatId)
           if (studentId !== null) {
-            recordClear(seatId, studentId)
-            clearSeat(seatId)
+            clearSeat(seatId, false)
           }
         })
+        const afterSnapshot = createSnapshot()
+        recordBatch(beforeSnapshot, afterSnapshot)
         success(`已将 ${data.selectedSeatIds.length} 名学生移回候选列表`)
       } else {
-        // 单个座位移出
-        recordClear(data.seatId, data.studentId)
         clearSeat(data.seatId)
         success('已将学生移回候选列表')
       }

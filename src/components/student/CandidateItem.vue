@@ -1,11 +1,12 @@
 <template>
-  <div class="candidate-item" :class="{ dragging: isStudentDragging }"
+  <div class="candidate-item" :class="{ dragging: isStudentDragging, selected: isSelected }"
     ref="itemRef" :draggable="canHtmlDrag()"
+    @click="handleClick"
     @dragstart="handleDragStart" @dragend="handleDragEnd"
     @dblclick="handleDoubleClick"
     @contextmenu.prevent @pointerdown="handlePointerDown">
-    <div class="student-display" :class="{ 'bottom-tag-mode': tagDisplayMode === 'bottom' }">
-      <div class="student-name">{{ student.name || '未命名' }}</div>
+    <div class="student-display" :class="{ 'bottom-tag-mode': tagDisplayMode === 'bottom', 'name-hidden': !showStudentName, 'number-hidden': !showStudentNumber, 'large-name': largeNameMode, 'large-number': largeNumberMode }">
+      <div v-if="showStudentName" class="student-name">{{ student.name || '未命名' }}</div>
       <!-- 颜色点模式：显示所有标签，用实心/空心区分 -->
       <div v-if="hasTags && tagDisplayMode === 'dot'" class="student-tags">
         <span v-for="tag in allVisibleTags" :key="tag.id"
@@ -15,10 +16,10 @@
         </span>
       </div>
       <!-- 座位下部文字模式：学号绝对定位到右上角 -->
-      <div v-if="tagDisplayMode === 'bottom'" class="student-number-corner">
+      <div v-if="showStudentNumber && tagDisplayMode === 'bottom'" class="student-number-corner">
         {{ student.studentNumber || '-' }}
       </div>
-      <div v-else class="student-number">{{ student.studentNumber || '-' }}</div>
+      <div v-else-if="showStudentNumber" class="student-number">{{ student.studentNumber || '-' }}</div>
       <!-- 座位下部文字模式：只显示学生拥有的标签 -->
       <div v-if="hasTags && tagDisplayMode === 'bottom'" class="student-tags-text">
         <span v-for="tag in studentTags" :key="tag.id"
@@ -46,6 +47,8 @@ import { computed, ref } from 'vue'
 import { useStudentDragging } from '@/composables/useStudentDragging'
 import { useTagData } from '@/composables/useTagData'
 import { useSeatChart } from '@/composables/useSeatChart'
+import { useStudentData } from '@/composables/useStudentData'
+import { useEditMode } from '@/composables/useEditMode'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useLogger } from '@/composables/useLogger'
 
@@ -61,8 +64,18 @@ const emit = defineEmits(['edit-student'])
 const itemRef = ref(null)
 const { tags, showTagsInSeatChart, tagDisplayMode } = useTagData()
 const { getEmptySeats, assignStudent } = useSeatChart()
+const { selectedStudentId, selectStudent, clearSelection } = useStudentData()
+const { currentMode, setMode, EditMode } = useEditMode()
 const { settings } = useGlobalSettings()
 const { success, warning } = useLogger()
+
+const isSelected = computed(() => selectedStudentId.value === props.student.id)
+
+const showStudentName = computed(() => settings.value.ui.showStudentName !== false)
+const showStudentNumber = computed(() => settings.value.ui.showStudentNumber !== false)
+const hasHiddenElement = computed(() => !showStudentName.value || !showStudentNumber.value)
+const largeNameMode = computed(() => showStudentName.value && hasHiddenElement.value && settings.value.ui.largeNameMode)
+const largeNumberMode = computed(() => showStudentNumber.value && hasHiddenElement.value && settings.value.ui.largeNumberMode)
 
 const allVisibleTags = computed(() => {
   if (!showTagsInSeatChart.value) return []
@@ -92,6 +105,17 @@ const {
   handleDragStart,
   handleDragEnd
 } = useStudentDragging(itemRef, computed(() => props.student))
+
+const handleClick = () => {
+  if (isSelected.value) {
+    clearSelection()
+    return
+  }
+  if (currentMode.value !== EditMode.NORMAL) {
+    setMode(EditMode.NORMAL)
+  }
+  selectStudent(props.student.id)
+}
 
 // 双击处理
 const handleDoubleClick = () => {
@@ -159,6 +183,12 @@ const handleDoubleClick = () => {
   transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
+.candidate-item.selected {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg-card));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
 .student-display {
   display: flex;
   flex-direction: column;
@@ -172,6 +202,23 @@ const handleDoubleClick = () => {
 
 .student-display.bottom-tag-mode {
   gap: 2px;
+}
+
+.student-display.name-hidden.number-hidden {
+  justify-content: center;
+}
+
+.student-display.name-hidden:not(.number-hidden) .student-number {
+  font-size: 14px;
+}
+
+.student-display.large-name .student-name {
+  font-size: 20px;
+}
+
+.student-display.large-number .student-number {
+  font-size: 16px;
+  padding: 4px 14px;
 }
 
 .student-tags {
@@ -243,7 +290,7 @@ const handleDoubleClick = () => {
 .tag-text-item {
   font-size: 9px;
   font-weight: 600;
-  color: white;
+  color: var(--color-text-inverse);
   padding: 1px 4px;
   border-radius: 3px;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
@@ -265,7 +312,7 @@ const handleDoubleClick = () => {
 .corner-tag-item {
   font-size: 8px;
   font-weight: 600;
-  color: white;
+  color: var(--color-text-inverse);
   padding: 1px 4px;
   border-radius: 3px;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);

@@ -524,6 +524,7 @@ const AssignmentInlineReport = defineAsyncComponent(() => import('../rule/Assign
 import { useAuth } from '@/composables/useAuth'
 import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
+import { useAutoSave } from '@/composables/useAutoSave'
 
 const { activeTab, mobileMenuOpen, setActiveTab, closeMobileMenu } = useSidebar()
 const { seatConfig, updateConfig, clearAllSeats, seats, shiftSeats, getAvailableSeats } = useSeatChart()
@@ -543,6 +544,7 @@ const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom(
 const { zones } = useZoneData()
 const { recordBatch, createSnapshot } = useUndo()
 const { openCloudLoad, openCloudSave } = useCloudWorkspaceDialog()
+const { markSaved } = useAutoSave()
 const showSeatConfigDialog = ref(false)
 const totalSeats = computed(() => {
   const config = seatConfig.value
@@ -724,6 +726,7 @@ const onExported = (payload) => {
 const handleSaveWorkspace = () => {
   const isSuccess = saveWorkspace()
   if (isSuccess) {
+    markSaved()
     success('工作区已成功保存到本地！')
   } else {
     error('工作区保存到本地失败，请查看控制台了解详情')
@@ -2273,12 +2276,12 @@ const formatLogTime = (timestamp) => {
 
 .log-warning {
   border-left-color: var(--color-warning);
-  background: var(--color-surface)bf0;
 }
 
-
-
-
+.log-error {
+  border-left-color: var(--color-danger);
+  background: var(--color-danger-bg-light);
+}
 
 .log-empty {
   text-align: center;
@@ -2434,7 +2437,7 @@ const formatLogTime = (timestamp) => {
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--color-bg-overlay);
     z-index: 998;
     backdrop-filter: blur(2px);
   }

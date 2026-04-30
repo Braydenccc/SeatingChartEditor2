@@ -8,25 +8,13 @@
           <input type="checkbox" v-model="localShowTagsInSeatChart" />
           <span class="checkbox-text">在座位表中显示标签</span>
         </label>
-        <div class="display-mode-section" :class="{ disabled: !localShowTagsInSeatChart }">
-          <label class="mode-label">显示模式:</label>
-          <div class="mode-options">
-            <label class="mode-option" :class="{ active: localTagDisplayMode === 'dot' }">
-              <input type="radio" v-model="localTagDisplayMode" value="dot" :disabled="!localShowTagsInSeatChart" />
-              <span class="mode-icon dot-icon"></span>
-              <span class="mode-text">颜色点</span>
-            </label>
-            <label class="mode-option" :class="{ active: localTagDisplayMode === 'corner' }">
-              <input type="radio" v-model="localTagDisplayMode" value="corner" :disabled="!localShowTagsInSeatChart" />
-              <span class="mode-icon corner-icon"></span>
-              <span class="mode-text">右上角文字</span>
-            </label>
-            <label class="mode-option" :class="{ active: localTagDisplayMode === 'bottom' }">
-              <input type="radio" v-model="localTagDisplayMode" value="bottom" :disabled="!localShowTagsInSeatChart" />
-              <span class="mode-icon bottom-icon"></span>
-              <span class="mode-text">座位下部文字</span>
-            </label>
-          </div>
+        <div class="display-mode-redirect">
+          <span class="redirect-label">显示模式已移至</span>
+          <button class="redirect-btn" @click="goToDisplayModeSettings">
+            <Settings :size="14" stroke-width="2" />
+            设置 - 界面偏好
+            <ChevronRight :size="14" stroke-width="2" />
+          </button>
         </div>
       </div>
       
@@ -98,13 +86,14 @@
 
 <script setup>
 import { ref, watch, nextTick, computed } from 'vue'
-import { Pencil, X, Plus } from 'lucide-vue-next'
+import { Pencil, X, Plus, Settings, ChevronRight } from 'lucide-vue-next'
 import TagStudentSelector from './TagStudentSelector.vue'
 import { getNextColor } from '@/constants/tagColors'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
+import { useSettingsDialog } from '@/composables/useSettingsDialog'
 
 const props = defineProps({
   visible: {
@@ -115,17 +104,17 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible'])
 
-const { tags, showTagsInSeatChart, tagDisplayMode, addTag, editTag, deleteTag, setShowTagsInSeatChart, setTagDisplayMode } = useTagData()
+const { tags, showTagsInSeatChart, addTag, editTag, deleteTag, setShowTagsInSeatChart } = useTagData()
 const { students, addTagToStudents, removeTagFromStudent, removeTagFromStudents } = useStudentData()
 const { requestConfirm, isPending } = useConfirmAction()
 const { warning, info, success } = useLogger()
+const { openSettings } = useSettingsDialog()
 
 const getTagStudentCount = (tagId) => {
   return students.value.filter(s => s.tags.includes(tagId)).length
 }
 
 const localShowTagsInSeatChart = ref(true)
-const localTagDisplayMode = ref('dot')
 const tagDialogVisible = ref(false)
 const isEditing = ref(false)
 const currentTag = ref({ id: null, name: '', color: '#23587b' })
@@ -135,7 +124,6 @@ const selectedStudentIds = ref([])
 watch(() => props.visible, (val) => {
   if (val) {
     localShowTagsInSeatChart.value = showTagsInSeatChart.value
-    localTagDisplayMode.value = tagDisplayMode.value
   }
 })
 
@@ -143,12 +131,13 @@ watch(localShowTagsInSeatChart, (val) => {
   setShowTagsInSeatChart(val)
 })
 
-watch(localTagDisplayMode, (val) => {
-  setTagDisplayMode(val)
-})
-
 const close = () => {
   emit('update:visible', false)
+}
+
+const goToDisplayModeSettings = () => {
+  close()
+  openSettings('global', 'ui')
 }
 
 const showAddDialog = () => {
@@ -255,7 +244,7 @@ const deleteTagHandler = (tagId, tagName) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-bg-overlay);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -314,138 +303,37 @@ const deleteTagHandler = (tagId, tagName) => {
   border-bottom: 1px solid var(--color-border);
 }
 
-.display-mode-section {
-  margin-top: 16px;
+.display-mode-redirect {
+  margin-top: 12px;
   padding-left: 26px;
-}
-
-.display-mode-section.disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.mode-label {
-  display: block;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin-bottom: 8px;
-}
-
-.mode-options {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mode-option {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--color-bg-secondary);
+  gap: 6px;
+}
+
+.redirect-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.redirect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--color-bg-subtle);
   border: 1px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
+  font-size: 13px;
+  color: var(--color-primary);
+  font-weight: 500;
   transition: all 0.2s ease;
 }
 
-.mode-option:hover {
-  background: var(--color-bg-subtle);
-  border-color: var(--color-border);
-}
-
-.mode-option.active {
+.redirect-btn:hover {
   background: var(--color-bg-selected);
   border-color: var(--color-primary);
-}
-
-.mode-option input[type="radio"] {
-  width: 14px;
-  height: 14px;
-  cursor: pointer;
-}
-
-.mode-icon {
-  width: 48px;
-  height: 36px;
-  border-radius: 4px;
-  position: relative;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mode-icon::before {
-  content: '张三';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-}
-
-.bottom-icon::before {
-  top: 40%;
-}
-
-.dot-icon::after {
-  content: '';
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 16px;
-  height: 4px;
-  display: flex;
-  gap: 2px;
-  justify-content: center;
-}
-
-.dot-icon::after {
-  background:
-    radial-gradient(circle, var(--color-danger) 1.5px, transparent 1.5px) 0 0,
-    radial-gradient(circle, var(--color-primary) 1.5px, transparent 1.5px) 6px 0,
-    radial-gradient(circle, #f39c12 1.5px, transparent 1.5px) 12px 0;
-  background-size: 4px 4px, 4px 4px, 4px 4px;
-  background-repeat: no-repeat;
-}
-
-.corner-icon::after {
-  content: 'A';
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--color-surface);
-  background: var(--color-danger);
-  padding: 1px 4px;
-  border-radius: 2px;
-  line-height: 1.2;
-}
-
-.bottom-icon::after {
-  content: 'A';
-  position: absolute;
-  bottom: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 8px;
-  font-weight: 700;
-  color: var(--color-surface);
-  background: var(--color-danger);
-  padding: 1px 5px;
-  border-radius: 2px;
-  line-height: 1.2;
-}
-
-.mode-text {
-  font-size: 13px;
-  color: var(--color-text-primary);
 }
 
 .checkbox-label {

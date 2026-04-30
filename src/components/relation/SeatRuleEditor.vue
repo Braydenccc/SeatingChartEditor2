@@ -209,7 +209,7 @@ const close = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-bg-overlay);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
@@ -219,11 +219,11 @@ const close = () => {
 }
 
 .modal-container {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--color-dialog-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 16px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--color-border);
   width: 95%;
   max-width: 900px;
   max-height: 90vh;
@@ -275,7 +275,7 @@ const close = () => {
   display: flex;
   gap: 12px;
   border-bottom: 1px solid var(--color-border-light);
-  background: rgba(248, 250, 252, 0.5);
+  background: var(--color-bg-subtle);
   padding: 0 24px;
   flex-shrink: 0;
 }
@@ -315,7 +315,7 @@ const close = () => {
 
 .tab-badge {
   background: var(--color-primary);
-  color: white;
+  color: var(--color-text-inverse);
   border-radius: 10px;
   padding: 1px 7px;
   font-size: 11px;
@@ -566,7 +566,7 @@ const close = () => {
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  color: white;
+  color: var(--color-text-inverse);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -803,13 +803,13 @@ const close = () => {
 }
 
 .strength-option.active {
-  color: white;
+  color: var(--color-text-inverse);
   border-color: transparent;
 }
 
 .strength-option.active .strength-label,
 .strength-option.active .strength-desc {
-  color: white;
+  color: var(--color-text-inverse);
 }
 
 .strength-option.disabled {

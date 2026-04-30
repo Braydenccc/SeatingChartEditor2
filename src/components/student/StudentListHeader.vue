@@ -55,6 +55,7 @@ import { useStudentData } from '@/composables/useStudentData'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useEditMode } from '@/composables/useEditMode'
 import { useLogger } from '@/composables/useLogger'
+import { useUndo } from '@/composables/useUndo'
 
 const ExportDialog = defineAsyncComponent(() => import('../layout/ExportPreview.vue'))
 
@@ -71,6 +72,7 @@ const { students } = useStudentData()
 const { findSeatByStudent, getEmptySeats, assignStudent } = useSeatChart()
 const { currentMode, setMode, EditMode, clearFirstSelectedSeat } = useEditMode()
 const { success, warning } = useLogger()
+const { recordBatch, createSnapshot } = useUndo()
 
 const showExportDialog = ref(false)
 const lastExportUrl = ref('')
@@ -133,10 +135,13 @@ const handleRandomAssign = () => {
   }
 
   let assignedCount = 0
+  const beforeSnapshot = createSnapshot()
   for (let i = 0; i < candidates.length && i < shuffledSeats.length; i++) {
-    assignStudent(shuffledSeats[i].id, candidates[i].id)
+    assignStudent(shuffledSeats[i].id, candidates[i].id, false)
     assignedCount++
   }
+  const afterSnapshot = createSnapshot()
+  recordBatch(beforeSnapshot, afterSnapshot)
 
   success(`已随机入座 ${assignedCount} 名学生！`)
   emit('random-assign')

@@ -137,7 +137,7 @@ const toggleStudent = (studentId) => {
 .student-list {
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid #e8eef2;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   background: var(--color-surface);
 }

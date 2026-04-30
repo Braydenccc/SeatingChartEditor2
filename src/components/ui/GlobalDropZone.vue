@@ -16,13 +16,11 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useDragState } from '@/composables/useDragState'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useStudentData } from '@/composables/useStudentData'
-import { useUndo } from '@/composables/useUndo'
 import { useLogger } from '@/composables/useLogger'
 
 const { isDraggingFromSeat } = useDragState()
-const { clearSeat, getStudentAtSeat } = useSeatChart()
+const { clearSeat } = useSeatChart()
 const { clearSelection, students } = useStudentData()
-const { recordClear } = useUndo()
 const { success } = useLogger()
 
 const isDragOver = ref(false)
@@ -53,8 +51,6 @@ const handleDrop = (e) => {
   try {
     const data = JSON.parse(raw)
     if (data.type === 'seat' && data.seatId) {
-      const studentId = getStudentAtSeat(data.seatId)
-      recordClear(data.seatId, studentId)
       clearSeat(data.seatId)
       clearSelection()
       success('已将学生移出座位')

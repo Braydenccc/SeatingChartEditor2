@@ -102,16 +102,13 @@ import ExportPanel from './panels/ExportPanel.vue'
 import AboutPanel from './panels/AboutPanel.vue'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useLogger } from '@/composables/useLogger'
+import { useSettingsDialog } from '@/composables/useSettingsDialog'
 
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false
-  }
-})
+const props = defineProps({})
 
-const emit = defineEmits(['update:visible', 'save'])
+const emit = defineEmits(['save'])
 
+const { visible, initialTab, initialCategory, closeSettings } = useSettingsDialog()
 const { settings, saveToLocalStorage, resetSettings, applyThemeColor, applyColorScheme } = useGlobalSettings()
 const { success, warning } = useLogger()
 
@@ -183,8 +180,10 @@ const handleKeydown = (e) => {
   if (e.key === 'Escape') handleCancel()
 }
 
-watch(() => props.visible, (newVal) => {
+watch(visible, (newVal) => {
   if (newVal) {
+    activeTab.value = initialTab.value
+    activeCategory.value = initialCategory.value
     document.addEventListener('keydown', handleKeydown)
   } else {
     document.removeEventListener('keydown', handleKeydown)
@@ -207,11 +206,11 @@ const handleSave = () => {
     success('工作区设置已保存')
   }
   emit('save')
-  emit('update:visible', false)
+  closeSettings()
 }
 
 const handleCancel = () => {
-  emit('update:visible', false)
+  closeSettings()
 }
 
 const handleReset = () => {
@@ -382,7 +381,7 @@ const handleReset = () => {
 
 .btn-primary {
   background: var(--color-primary);
-  color: white;
+  color: var(--color-text-inverse);
 }
 
 .btn-primary:hover {
@@ -449,7 +448,7 @@ const handleReset = () => {
 
   .sub-tab-btn.active {
     background: var(--color-primary);
-    color: white;
+    color: var(--color-text-inverse);
     font-weight: 500;
   }
 

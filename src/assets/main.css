@@ -131,11 +131,11 @@
   --color-bg-hover: #2a3f5c;
   --color-bg-overlay: rgba(0, 0, 0, 0.7);
 
-  /* 文字颜色 - 提升禁用文字对比度 */
+  /* 文字颜色 - 优化深色模式可读性 */
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #cbd5e1;
-  --color-text-muted: #94a3b8;
-  --color-text-disabled: #7b8fa3;
+  --color-text-muted: #a0aec0;
+  --color-text-disabled: #8899aa;
   --color-text-inverse: #ffffff;
 
   /* 边框颜色 - 提升可见度 */
@@ -143,7 +143,7 @@
   --color-border-strong: #536578;
   --color-border-hover: #536578;
   --color-border-light: #253347;
-  --color-border-dark: #7b8fa3;
+  --color-border-dark: #8899aa;
 
   /* 次要背景色 */
   --color-bg-secondary: #151d2e;
@@ -250,15 +250,15 @@
 
     --color-text-primary: #f1f5f9;
     --color-text-secondary: #cbd5e1;
-    --color-text-muted: #94a3b8;
-    --color-text-disabled: #7b8fa3;
+    --color-text-muted: #a0aec0;
+    --color-text-disabled: #8899aa;
     --color-text-inverse: #ffffff;
 
     --color-border: #3d4f63;
     --color-border-strong: #536578;
     --color-border-hover: #536578;
     --color-border-light: #253347;
-    --color-border-dark: #7b8fa3;
+    --color-border-dark: #8899aa;
 
     --color-bg-secondary: #151d2e;
 

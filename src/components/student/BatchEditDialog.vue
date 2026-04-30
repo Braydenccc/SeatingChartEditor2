@@ -220,7 +220,7 @@ const close = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -434,7 +434,7 @@ const close = () => {
 .tag-badge {
   font-size: 10px;
   font-weight: 600;
-  color: white;
+  color: var(--color-text-inverse);
   padding: 2px 6px;
   border-radius: 4px;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
