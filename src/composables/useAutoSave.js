@@ -4,29 +4,30 @@ import { useWorkspace } from './useWorkspace'
 import { useLogger } from './useLogger'
 
 let autoSaveTimer = null
+let lastSavedJson = null
 
 export function useAutoSave() {
   const { settings } = useGlobalSettings()
   const { getWorkspaceJson } = useWorkspace()
-  const { info } = useLogger()
+  const { error } = useLogger()
 
   const isAutoSaveEnabled = ref(false)
   const lastSaveTime = ref(null)
 
-  // 执行自动保存
   const performAutoSave = () => {
     try {
       const json = getWorkspaceJson()
       if (!json) return
 
-      // 保存到 localStorage 作为自动保存备份
+      if (lastSavedJson !== null && json === lastSavedJson) return
+
       localStorage.setItem('sce-autosave-backup', json)
       localStorage.setItem('sce-autosave-time', new Date().toISOString())
 
+      lastSavedJson = json
       lastSaveTime.value = new Date()
-      info('已自动保存')
-    } catch (error) {
-      console.error('Auto save failed:', error)
+    } catch (err) {
+      error('自动保存失败: ' + (err.message || err))
     }
   }
 
@@ -79,7 +80,10 @@ export function useAutoSave() {
     return null
   }
 
-  // 清除自动保存备份
+  const markSaved = () => {
+    lastSavedJson = getWorkspaceJson()
+  }
+
   const clearAutoSaveBackup = () => {
     localStorage.removeItem('sce-autosave-backup')
     localStorage.removeItem('sce-autosave-time')
@@ -91,6 +95,7 @@ export function useAutoSave() {
     startAutoSave,
     stopAutoSave,
     performAutoSave,
+    markSaved,
     getAutoSaveBackup,
     clearAutoSaveBackup
   }

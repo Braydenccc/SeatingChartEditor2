@@ -49,7 +49,11 @@ const defaultSettings = {
       infoHover: '#1e40af'
     },
     defaultZoom: 100,
-    enableAnimations: true
+    enableAnimations: true,
+    showStudentName: true,
+    showStudentNumber: true,
+    largeNameMode: false,
+    largeNumberMode: false
   },
   editor: {
     autoSaveInterval: 60000, // 1分钟

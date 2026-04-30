@@ -71,14 +71,14 @@ onMounted(async () => {
 
     if (isCtrl && e.key === 'z' && !e.shiftKey) {
       e.preventDefault()
-      if (canUndo()) {
+      if (canUndo.value) {
         undo()
       }
     }
 
     if (isCtrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
       e.preventDefault()
-      if (canRedo()) {
+      if (canRedo.value) {
         redo()
       }
     }

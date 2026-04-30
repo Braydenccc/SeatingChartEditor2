@@ -77,7 +77,12 @@ export function useUndo() {
       case 'redo_wrapper':
       case 'undo_wrapper':
         if (command.snapshot) {
-          command.snapshot.forEach(s => affected.push(s.id))
+          command.snapshot.forEach(s => {
+            const current = seats.value.find(seat => seat.id === s.id)
+            if (current && (current.studentId !== s.studentId || current.isEmpty !== s.isEmpty)) {
+              affected.push(s.id)
+            }
+          })
         }
         break
     }

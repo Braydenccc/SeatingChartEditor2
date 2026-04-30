@@ -323,7 +323,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
 .tag-text-item {
   font-size: 9px;
   font-weight: 600;
-  color: white;
+  color: var(--color-text-inverse);
   padding: 1px 4px;
   border-radius: 3px;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);

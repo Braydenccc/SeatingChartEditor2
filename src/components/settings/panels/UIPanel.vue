@@ -641,6 +641,87 @@
           </button>
         </div>
       </div>
+
+      <div class="setting-item">
+        <div class="setting-row">
+          <label class="setting-label">标签显示模式</label>
+        </div>
+        <div class="tag-mode-options">
+          <label class="tag-mode-option" :class="{ active: localTagDisplayMode === 'dot' }">
+            <input type="radio" v-model="localTagDisplayMode" value="dot" />
+            <span class="mode-icon dot-icon"></span>
+            <span class="mode-text">颜色点</span>
+          </label>
+          <label class="tag-mode-option" :class="{ active: localTagDisplayMode === 'corner' }">
+            <input type="radio" v-model="localTagDisplayMode" value="corner" />
+            <span class="mode-icon corner-icon"></span>
+            <span class="mode-text">右上角文字</span>
+          </label>
+          <label class="tag-mode-option" :class="{ active: localTagDisplayMode === 'bottom' }">
+            <input type="radio" v-model="localTagDisplayMode" value="bottom" />
+            <span class="mode-icon bottom-icon"></span>
+            <span class="mode-text">座位下部文字</span>
+          </label>
+        </div>
+        <span class="hint-text">控制标签在座位表中的显示方式</span>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-row">
+          <label class="setting-label">座位表元素显示</label>
+        </div>
+        <div class="element-toggles">
+          <div class="element-toggle-group">
+            <label class="toggle-item">
+              <input
+                v-model="localSettings.showStudentName"
+                type="checkbox"
+                class="setting-checkbox"
+              />
+              <span>姓名</span>
+            </label>
+            <label class="toggle-item sub-toggle" :class="{ disabled: !canEnableLargeName }">
+              <input
+                v-model="localSettings.largeNameMode"
+                type="checkbox"
+                class="setting-checkbox"
+                :disabled="!canEnableLargeName"
+              />
+              <span>大字号</span>
+            </label>
+          </div>
+          <div class="element-toggle-group">
+            <label class="toggle-item">
+              <input
+                v-model="localSettings.showStudentNumber"
+                type="checkbox"
+                class="setting-checkbox"
+              />
+              <span>学号</span>
+            </label>
+            <label class="toggle-item sub-toggle" :class="{ disabled: !canEnableLargeNumber }">
+              <input
+                v-model="localSettings.largeNumberMode"
+                type="checkbox"
+                class="setting-checkbox"
+                :disabled="!canEnableLargeNumber"
+              />
+              <span>大字号</span>
+            </label>
+          </div>
+          <div class="element-toggle-group">
+            <label class="toggle-item">
+              <input
+                v-model="localShowTags"
+                type="checkbox"
+                class="setting-checkbox"
+              />
+              <span>标签</span>
+            </label>
+          </div>
+        </div>
+        <span class="hint-text">隐藏至少一个元素后可启用对应的大字号模式</span>
+      </div>
     </div>
   </div>
 </template>
@@ -649,6 +730,7 @@
 import { computed, watch } from 'vue'
 import { RotateCcw, Sun, Moon, Monitor } from 'lucide-vue-next'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
+import { useTagData } from '@/composables/useTagData'
 import { checkColorCombination } from '@/utils/colorContrast'
 
 const props = defineProps({
@@ -661,10 +743,40 @@ const props = defineProps({
 const emit = defineEmits(['update:settings'])
 
 const { defaultSettings, applyThemeColor, applyColorScheme } = useGlobalSettings()
+const { tagDisplayMode, setTagDisplayMode, showTagsInSeatChart, setShowTagsInSeatChart } = useTagData()
 
 const localSettings = computed({
-  get: () => props.settings,
+  get: () => props.settings || {},
   set: (value) => emit('update:settings', value)
+})
+
+const localTagDisplayMode = computed({
+  get: () => tagDisplayMode.value,
+  set: (val) => setTagDisplayMode(val)
+})
+const localShowTags = computed({
+  get: () => showTagsInSeatChart.value,
+  set: (val) => setShowTagsInSeatChart(val)
+})
+
+const hasHiddenElement = computed(() => {
+  return !localSettings.value.showStudentName || !localSettings.value.showStudentNumber || !localShowTags.value
+})
+
+const canEnableLargeName = computed(() => {
+  return hasHiddenElement.value && localSettings.value.showStudentName
+})
+
+const canEnableLargeNumber = computed(() => {
+  return hasHiddenElement.value && localSettings.value.showStudentNumber
+})
+
+watch(canEnableLargeName, (val) => {
+  if (!val) localSettings.value.largeNameMode = false
+})
+
+watch(canEnableLargeNumber, (val) => {
+  if (!val) localSettings.value.largeNumberMode = false
 })
 
 // 判断是否为默认值
@@ -1034,5 +1146,157 @@ watch(() => localSettings.value.customColors, () => {
   background: var(--color-bg-hover);
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+
+.tag-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tag-mode-option:hover {
+  background: var(--color-bg-soft);
+  border-color: var(--color-border-strong);
+}
+
+.tag-mode-option.active {
+  background: var(--color-bg-selected);
+  border-color: var(--color-primary);
+}
+
+.tag-mode-option input[type="radio"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.mode-icon {
+  width: 48px;
+  height: 36px;
+  border-radius: 4px;
+  position: relative;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-icon::before {
+  content: '张三';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.bottom-icon::before {
+  top: 40%;
+}
+
+.dot-icon::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 4px;
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  background:
+    radial-gradient(circle, var(--color-danger) 1.5px, transparent 1.5px) 0 0,
+    radial-gradient(circle, var(--color-primary) 1.5px, transparent 1.5px) 6px 0,
+    radial-gradient(circle, var(--color-warning) 1.5px, transparent 1.5px) 12px 0;
+  background-size: 4px 4px, 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+
+.corner-icon::after {
+  content: 'A';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-surface);
+  background: var(--color-danger);
+  padding: 1px 4px;
+  border-radius: 2px;
+  line-height: 1.2;
+}
+
+.bottom-icon::after {
+  content: 'A';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--color-surface);
+  background: var(--color-danger);
+  padding: 1px 5px;
+  border-radius: 2px;
+  line-height: 1.2;
+}
+
+.mode-text {
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.element-toggles {
+  display: flex;
+  gap: 16px;
+}
+
+.element-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+.toggle-item.sub-toggle {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding-left: 4px;
+  border-left: 1px solid var(--color-border);
+}
+
+.toggle-item.sub-toggle.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toggle-item .setting-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
 }
 </style>

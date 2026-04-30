@@ -67,8 +67,6 @@
 
     <UnifiedSettingsDialog
       v-if="showUnifiedSettings"
-      :visible="showUnifiedSettings"
-      @update:visible="showUnifiedSettings = $event"
       @save="handleSaveSettings"
     />
   </header>
@@ -80,6 +78,7 @@ import { Cloud, FolderOpen, Github, LogIn, Monitor, Moon, Settings, Sun, User } 
 import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
+import { useSettingsDialog } from '@/composables/useSettingsDialog'
 
 const UnifiedSettingsDialog = defineAsyncComponent(() => import('../settings/UnifiedSettingsDialog.vue'))
 
@@ -88,9 +87,9 @@ const emit = defineEmits(['open-login'])
 const { currentUser, webdavConfig, isLoggedIn, logout, authType, initAuth } = useAuth()
 const { openCloudDialog } = useCloudWorkspaceDialog()
 const { settings, saveToLocalStorage, applyColorScheme, applyThemeColor } = useGlobalSettings()
+const { visible: showUnifiedSettings, openSettings, closeSettings } = useSettingsDialog()
 
 const showDropdown = ref(false)
-const showUnifiedSettings = ref(false)
 const menuContainer = ref(null)
 
 const hasRetiehe = computed(() => !!currentUser.value)
@@ -122,7 +121,7 @@ const openWorkspaceManagement = () => {
 }
 
 const openUnifiedSettings = () => {
-  showUnifiedSettings.value = true
+  openSettings()
   showDropdown.value = false
 }
 
@@ -148,7 +147,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeDropdownOnOutsideClick)
-  showUnifiedSettings.value = false
+  closeSettings()
 })
 </script>
 
@@ -162,7 +161,7 @@ onBeforeUnmount(() => {
   width: 100%;
   background: var(--color-primary);
   height: 100px;
-  color: white;
+  color: var(--color-text-inverse);
   padding: 0 30px;
   box-shadow: var(--shadow-md);
   gap: 20px;
@@ -196,7 +195,7 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  color: var(--color-text-inverse);
   padding: 8px 16px;
   border-radius: 24px;
   font-size: 14px;
@@ -334,7 +333,7 @@ onBeforeUnmount(() => {
 
 .theme-btn.active {
   background: rgba(255, 255, 255, 0.2);
-  color: white;
+  color: var(--color-text-inverse);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 

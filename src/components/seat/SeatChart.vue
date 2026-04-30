@@ -232,7 +232,7 @@ const {
 const { firstSelectedSeat, setFirstSelectedSeat, clearFirstSelectedSeat } = useEditMode()
 const { clearSelection: clearStudentSelection, students } = useStudentData()
 const { scale, panX, panY, zoomIn, zoomOut, setScale, setPan, MIN_SCALE, MAX_SCALE, registerViewport, fitToViewport } = useZoom()
-const { recordAssign, recordClear, recordSwap, recordToggleEmpty, recordBatch, createSnapshot, canUndo, canRedo, undo, redo } = useUndo()
+const { recordAssign, recordBatch, createSnapshot, canUndo, canRedo, undo, redo } = useUndo()
 const { isDraggingFromSeat: globalIsDraggingFromSeat } = useDragState()
 const {
   clearSelection: clearSeatSelection,
@@ -624,7 +624,6 @@ const handleDrop = (e) => {
         }
         clearSeatSelection()
       } else if (data.seatId !== targetSeatId) {
-        recordSwap(data.seatId, targetSeatId)
         swapSeats(data.seatId, targetSeatId)
         endDragPreview([targetSeatId])
         clearSeatSelection()
@@ -655,8 +654,6 @@ const handleToolbarDrop = (e) => {
   try {
     const data = JSON.parse(raw)
     if (data.type === 'seat' && data.seatId) {
-      const studentId = getStudentAtSeat(data.seatId)
-      recordClear(data.seatId, studentId)
       clearSeat(data.seatId)
       clearSeatSelection()
     }
@@ -724,8 +721,6 @@ const handleTouchSeatDrop = (e) => {
     }
     clearSeatSelection()
   } else if (sourceSeatId !== targetSeatId) {
-    // 单个座位交换
-    recordSwap(sourceSeatId, targetSeatId)
     swapSeats(sourceSeatId, targetSeatId)
   }
 }
@@ -739,19 +734,17 @@ const handleTouchSeatToList = (e) => {
   const { seatId, isSelection, selectedSeatIds } = e.detail
 
   if (isSelection && selectedSeatIds && selectedSeatIds.length > 1) {
-    // 选区整体移出
+    const beforeSnapshot = createSnapshot()
     selectedSeatIds.forEach(sid => {
       const studentId = getStudentAtSeat(sid)
       if (studentId !== null) {
-        recordClear(sid, studentId)
-        clearSeat(sid)
+        clearSeat(sid, false)
       }
     })
+    const afterSnapshot = createSnapshot()
+    recordBatch(beforeSnapshot, afterSnapshot)
     clearSeatSelection()
   } else {
-    // 单个座位移出
-    const studentId = getStudentAtSeat(seatId)
-    recordClear(seatId, studentId)
     clearSeat(seatId)
   }
 }
@@ -840,13 +833,15 @@ watch([selectedSeatsArray, scale, panX, panY], () => {
 }, { deep: true })
 
 const handleSelClear = () => {
+  const beforeSnapshot = createSnapshot()
   for (const seatId of selectedSeatsArray.value) {
     const studentId = getStudentAtSeat(seatId)
     if (studentId) {
-      recordClear(seatId, studentId)
-      clearSeat(seatId)
+      clearSeat(seatId, false)
     }
   }
+  const afterSnapshot = createSnapshot()
+  recordBatch(beforeSnapshot, afterSnapshot)
   clearSeatSelection()
 }
 
@@ -855,20 +850,23 @@ const handleSelShuffle = () => {
   const studentIds = ids.map(id => getStudentAtSeat(id)).filter(Boolean)
   if (studentIds.length < 2) return
 
+  const beforeSnapshot = createSnapshot()
+
   if (ids.length === 2) {
     const [seatA, seatB] = ids
     const studentA = getStudentAtSeat(seatA)
     const studentB = getStudentAtSeat(seatB)
     if (studentA && studentB) {
-      recordSwap(seatA, seatB)
-      swapSeats(seatA, seatB)
+      swapSeats(seatA, seatB, false)
     } else if (studentA || studentB) {
       const fromSeat = studentA ? seatA : seatB
       const toSeat = studentA ? seatB : seatA
       const studentId = studentA || studentB
-      clearSeat(fromSeat)
-      assignStudent(toSeat, studentId)
+      clearSeat(fromSeat, false)
+      assignStudent(toSeat, studentId, false)
     }
+    const afterSnapshot = createSnapshot()
+    recordBatch(beforeSnapshot, afterSnapshot)
     return
   }
 
@@ -878,11 +876,13 @@ const handleSelShuffle = () => {
   }
   const occupiedIds = ids.filter(id => getStudentAtSeat(id))
   for (const seatId of occupiedIds) {
-    clearSeat(seatId)
+    clearSeat(seatId, false)
   }
   for (let i = 0; i < occupiedIds.length; i++) {
-    assignStudent(occupiedIds[i], studentIds[i])
+    assignStudent(occupiedIds[i], studentIds[i], false)
   }
+  const afterSnapshot = createSnapshot()
+  recordBatch(beforeSnapshot, afterSnapshot)
 }
 
 const handleSelAssign = () => {
@@ -892,10 +892,12 @@ const handleSelAssign = () => {
   if (emptyIds.length === 0 || unassigned.length === 0) return
   const shuffled = [...unassigned].sort(() => Math.random() - 0.5)
   const count = Math.min(emptyIds.length, shuffled.length)
+  const beforeSnapshot = createSnapshot()
   for (let i = 0; i < count; i++) {
-    assignStudent(emptyIds[i], shuffled[i].id)
-    recordAssign(emptyIds[i], shuffled[i].id, null)
+    assignStudent(emptyIds[i], shuffled[i].id, false)
   }
+  const afterSnapshot = createSnapshot()
+  recordBatch(beforeSnapshot, afterSnapshot)
   clearSeatSelection()
 }
 
@@ -1000,40 +1002,33 @@ const handleAssignStudent = (seatId, studentId) => {
   const existingSeat = findSeatByStudent(studentId)
   const previousSeatId = existingSeat ? existingSeat.id : null
   if (existingSeat) {
-    clearSeat(existingSeat.id)
+    clearSeat(existingSeat.id, false)
   }
-  assignStudent(seatId, studentId)
+  assignStudent(seatId, studentId, false)
   clearStudentSelection()
   recordAssign(seatId, studentId, previousSeatId)
 }
 
 // 处理切换空置状态
 const handleToggleEmpty = (seatId) => {
-  recordToggleEmpty(seatId)
   toggleEmpty(seatId)
 }
 
 // 处理清空座位
 const handleClearSeat = (seatId) => {
-  const studentId = getStudentAtSeat(seatId)
-  recordClear(seatId, studentId)
   clearSeat(seatId)
 }
 
 // 处理交换座位
 const handleSwapSeat = (seatId, sourceSeatId = null) => {
   if (sourceSeatId) {
-    // 拖拽交换模式：直接交换两个座位
-    recordSwap(sourceSeatId, seatId)
     swapSeats(sourceSeatId, seatId)
   } else {
-    // 点击交换模式：依次选择两个座位
     if (!firstSelectedSeat.value) {
       setFirstSelectedSeat(seatId)
     } else if (firstSelectedSeat.value === seatId) {
       clearFirstSelectedSeat()
     } else {
-      recordSwap(firstSelectedSeat.value, seatId)
       swapSeats(firstSelectedSeat.value, seatId)
       clearFirstSelectedSeat()
     }

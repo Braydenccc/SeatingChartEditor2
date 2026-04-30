@@ -316,7 +316,7 @@
         <div class="dialog-footer">
           <button class="btn secondary" @click="$emit('close')">关闭</button>
           <template v-if="activeTab === 'image'">
-            <button v-if="authType === 'webdav'" class="btn primary" style="background:#0ea5e9;" :disabled="isGenerating || isUploading" @click="handleCloudExportImage">
+            <button v-if="authType === 'webdav'" class="btn primary btn-info" :disabled="isGenerating || isUploading" @click="handleCloudExportImage">
               <Loader2 v-if="isUploading" :size="14" stroke-width="2" class="spin-icon" />
               <CloudUpload v-else :size="14" stroke-width="2" />
               {{ isUploading ? '上传中...' : '保存至云盘' }}
@@ -328,7 +328,7 @@
             </button>
           </template>
           <template v-if="activeTab === 'excel'">
-            <button v-if="authType === 'webdav'" class="btn excel" style="background:var(--color-success);" :disabled="isExcelDownloading || isUploading" @click="handleCloudExportExcel">
+            <button v-if="authType === 'webdav'" class="btn excel" :disabled="isExcelDownloading || isUploading" @click="handleCloudExportExcel">
               <Loader2 v-if="isUploading" :size="14" stroke-width="2" class="spin-icon" />
               <CloudUpload v-else :size="14" stroke-width="2" />
               {{ isUploading ? '上传中...' : '保存至云盘' }}
@@ -640,7 +640,7 @@ const excelPreviewHtml = computed(() => {
 
   // 4. 开始构建 HTML 表格（含 Excel 式的外层标号 A, B, 1, 2）
   let html = `<div style="font-family:Calibri,'Microsoft YaHei',sans-serif;display:flex;flex-direction:column;width:max-content;border:1px solid var(--color-border-strong);background:var(--color-surface);">`
-  html += `<div style="overflow:auto;background:#e6e6e6;max-height:65vh;">`
+  html += `<div style="overflow:auto;background:var(--color-bg-soft);max-height:65vh;">`
   html += `<table style="border-collapse:collapse;font-family:inherit;margin:0;table-layout:fixed;">`
 
   // `<colgroup>` 精确设置列宽
@@ -970,7 +970,7 @@ onBeforeUnmount(() => {
 .export-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--color-bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1117,7 +1117,7 @@ onBeforeUnmount(() => {
 .tag-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .tag-row {
   display: flex; flex-direction: column; gap: 4px; padding: 6px 8px;
-  background: var(--color-bg-subtle); border-radius: 6px; border: 1px solid #eee;
+  background: var(--color-bg-subtle); border-radius: 6px; border: 1px solid var(--color-border);
 }
 .tag-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0; }
 .tag-input {
@@ -1205,7 +1205,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
-  background-image: repeating-linear-gradient(45deg, var(--color-border-strong) 0, var(--color-border-strong) 1px, #f8f8f8 1px, #f8f8f8 5px);
+  background-image: repeating-linear-gradient(45deg, var(--color-border-strong) 0, var(--color-border-strong) 1px, var(--color-bg-soft) 1px, var(--color-bg-soft) 5px);
   background-size: 6px 6px;
   box-sizing: border-box;
 }
@@ -1351,6 +1351,8 @@ onBeforeUnmount(() => {
 .btn.secondary:hover { background: var(--color-border); }
 .btn.primary { background: var(--color-primary); color: var(--color-text-inverse); }
 .btn.primary:hover { background: var(--color-primary-hover); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-primary) 30%, transparent); }
+.btn.btn-info { background: var(--color-info); }
+.btn.btn-info:hover { background: var(--color-info-hover); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-info) 30%, transparent); }
 .btn.excel { background: var(--color-success); color: var(--color-text-inverse); }
 .btn.excel:hover { background: var(--color-success-hover); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-success) 30%, transparent); }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }

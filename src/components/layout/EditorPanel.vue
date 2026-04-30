@@ -104,7 +104,6 @@ const candidatePanelStyle = computed(() => {
   flex: 1;
   min-height: 0;
   background: var(--color-surface);
-  border-bottom: 2px solid var(--color-border);
   overflow: hidden;
   display: flex;
   flex-direction: column;

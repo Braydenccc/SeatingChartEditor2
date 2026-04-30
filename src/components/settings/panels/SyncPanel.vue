@@ -427,7 +427,7 @@ const handleSave = async () => {
 .btn-primary {
   flex: 1;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-text-inverse);
 }
 
 .btn-primary:hover:not(:disabled) {
