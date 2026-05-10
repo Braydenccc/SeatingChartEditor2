@@ -478,7 +478,6 @@ const handleDrop = (e) => {
   min-width: 48px;
   opacity: 0.5;
   color: var(--color-text-muted, #9ca3af);
-  animation: float 3s ease-in-out infinite;
 }
 
 .empty-icon svg {
