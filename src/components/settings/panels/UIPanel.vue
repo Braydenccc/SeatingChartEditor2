@@ -719,8 +719,18 @@
               <span>标签</span>
             </label>
           </div>
+          <div class="element-toggle-group">
+            <label class="toggle-item">
+              <input
+                v-model="localSettings.showEditorRowNumbers"
+                type="checkbox"
+                class="setting-checkbox"
+              />
+              <span>行号</span>
+            </label>
+          </div>
         </div>
-        <span class="hint-text">隐藏至少一个元素后可启用对应的大字号模式</span>
+        <span class="hint-text">行号会根据座位表配置中的讲台位置自动调整前后方向</span>
       </div>
     </div>
   </div>

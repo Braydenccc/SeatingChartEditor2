@@ -86,7 +86,25 @@
       @mousedown="handleMouseDown" @mousemove="handleMouseMove" @mouseup="handleMouseUp" @mouseleave="handleMouseUp"
       @touchstart="handleTouchStart" @touchmove.prevent="handleTouchMove" @touchend="handleTouchEnd"
       @dragover.prevent="handleDragOver" @drop.prevent="handleDrop" @contextmenu.prevent>
-      <div ref="chartRef" class="seat-chart" :class="seatConfig.podiumPosition === 'top' ? 'align-top' : 'align-bottom'" :style="chartTransformStyle">
+      <div
+        ref="chartRef"
+        class="seat-chart"
+        :class="seatConfig.podiumPosition === 'top' ? 'align-top' : 'align-bottom'"
+        :style="chartTransformStyle"
+      >
+        <div v-if="showEditorRowNumbers" class="seat-group row-number-group">
+          <div class="group-label row-number-label" aria-hidden="true">&nbsp;</div>
+          <div class="row-number-column" aria-label="行号">
+            <div
+              v-for="rowNumber in editorRowNumbers"
+              :key="rowNumber"
+              class="row-number-item"
+              :title="`第 ${rowNumber} 排`"
+            >
+              {{ rowNumber }}
+            </div>
+          </div>
+        </div>
         <div v-for="(group, groupIndex) in organizedSeats" :key="groupIndex" class="seat-group">
           <div class="group-label">第 {{ groupIndex + 1 }} 组</div>
           <div class="group-content">
@@ -199,7 +217,9 @@ import { useDragState } from '@/composables/useDragState'
 import { useSelection } from '@/composables/useSelection'
 import { useDragPreview } from '@/composables/useDragPreview'
 import { useLayoutConstants } from '@/composables/useLayoutConstants'
+import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { parseSeatId, generateSeatId } from '@/utils/seatHelpers'
+import { getRowNumber } from '@/utils/exportLayout'
 
 // 透明拖拽图片常量
 const TRANSPARENT_DRAG_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
@@ -1038,14 +1058,64 @@ const handleSwapSeat = (seatId, sourceSeatId = null) => {
 // ==================== 选区轮换 SVG 箭头 ====================
 const { rotGroups, editingZoneId, getZoneColor, parseSeatPos, PALETTE } = useZoneRotation()
 const { LAYOUT: L } = useLayoutConstants()
+const { settings } = useGlobalSettings()
+
+const showEditorRowNumbers = computed(() => settings.value.ui.showEditorRowNumbers !== false)
+
+const getColumnRowCount = (groupIndex, columnIndex) => {
+  const column = organizedSeats.value?.[groupIndex]?.[columnIndex] || []
+  if (column.length === 0) return 0
+  return Math.max(column.length, ...column.map(seat => seat.rowIndex + 1))
+}
+
+const editorRowCount = computed(() => {
+  const columnRowCounts = organizedSeats.value.flatMap(group => (
+    group.map(column => (
+      column.length === 0 ? 0 : Math.max(column.length, ...column.map(seat => seat.rowIndex + 1))
+    ))
+  ))
+
+  return Math.max(seatConfig.value.seatsPerColumn || 0, ...columnRowCounts)
+})
+
+const editorRowNumbers = computed(() => {
+  const rowCount = editorRowCount.value
+  return Array.from({ length: rowCount }, (_, rowIndex) => (
+    getRowNumber(rowIndex, rowCount, seatConfig.value.podiumPosition)
+  ))
+})
+
+const getGroupColumnCount = (groupIndex) => {
+  return seatConfig.value.groups?.[groupIndex]?.columns || seatConfig.value.columnsPerGroup
+}
+
+const getRowNumberSpace = () => {
+  return showEditorRowNumbers.value ? L.ROW_NUMBER_W + L.GROUP_GAP : 0
+}
+
+const getGroupWidth = (groupIndex) => {
+  const columnCount = getGroupColumnCount(groupIndex)
+  return columnCount * L.SEAT_W + Math.max(0, columnCount - 1) * L.COL_GAP
+}
+
+const getGroupLeft = (groupIndex) => {
+  let left = L.PAD_L + getRowNumberSpace()
+  for (let i = 0; i < groupIndex; i++) {
+    left += getGroupWidth(i) + L.GROUP_GAP
+  }
+  return left
+}
 
 const getSeatCenter = (seatId) => {
   const { g, c, r } = parseSeatPos(seatId)
-  const cpg = seatConfig.value.columnsPerGroup
-  const groupW = cpg * L.SEAT_W + (cpg - 1) * L.COL_GAP
+  const rowOffset = seatConfig.value.podiumPosition === 'bottom'
+    ? Math.max(0, editorRowCount.value - getColumnRowCount(g, c))
+    : 0
+  const seatOuterH = L.SEAT_H + L.SEAT_BORDER_W * 2
+
   return {
-    x: L.PAD_L + g * (groupW + L.GROUP_GAP) + c * (L.SEAT_W + L.COL_GAP) + L.SEAT_W / 2,
-    y: L.PAD_T + L.LABEL_H + r * (L.SEAT_H + L.ROW_GAP) + L.SEAT_H / 2
+    x: getGroupLeft(g) + c * (L.SEAT_W + L.COL_GAP) + L.SEAT_W / 2,
+    y: L.PAD_T + (rowOffset + r) * (seatOuterH + L.ROW_GAP) + seatOuterH / 2
   }
 }
 
@@ -1245,6 +1315,9 @@ const rectSelectStyle = computed(() => {
 }
 
 .seat-chart {
+  --seat-card-height: 80px;
+  --seat-card-border-width: 2px;
+  --seat-card-outer-height: calc(var(--seat-card-height) + var(--seat-card-border-width) * 2);
   display: inline-flex;
   justify-content: center;
   align-items: flex-start;
@@ -1287,6 +1360,41 @@ const rectSelectStyle = computed(() => {
   display: flex;
   gap: 16px;
   order: 0;
+}
+
+.seat-chart.align-top .group-content {
+  align-items: flex-start;
+}
+
+.seat-chart.align-bottom .group-content {
+  align-items: flex-end;
+}
+
+.row-number-group {
+  pointer-events: none;
+}
+
+.row-number-label {
+  visibility: hidden;
+}
+
+.row-number-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 32px;
+  order: 0;
+}
+
+.row-number-item {
+  height: var(--seat-card-outer-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-disabled);
+  font-size: 13px;
+  font-weight: 400;
+  box-sizing: border-box;
 }
 
 .seat-column {
@@ -1366,6 +1474,7 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
+    --seat-card-height: 68px;
     gap: 26px;
     padding: 22px 14px;
   }
@@ -1381,6 +1490,16 @@ const rectSelectStyle = computed(() => {
 
   .group-content {
     gap: 12px;
+  }
+
+  .row-number-column {
+    width: 30px;
+    gap: 9px;
+  }
+
+  .row-number-item {
+    font-size: 12px;
+    border-radius: 7px;
   }
 
   .seat-column {
@@ -1401,6 +1520,7 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
+    --seat-card-height: 64px;
     gap: 24px;
     padding: 18px 12px;
   }
@@ -1411,6 +1531,16 @@ const rectSelectStyle = computed(() => {
 
   .group-content {
     gap: 10px;
+  }
+
+  .row-number-column {
+    width: 28px;
+    gap: 8px;
+  }
+
+  .row-number-item {
+    font-size: 11px;
+    border-radius: 7px;
   }
 
   .seat-column {
@@ -1558,6 +1688,7 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
+    --seat-card-height: 70px;
     gap: 20px;
     padding: 20px 12px;
   }
@@ -1569,6 +1700,16 @@ const rectSelectStyle = computed(() => {
 
   .group-content {
     gap: 10px;
+  }
+
+  .row-number-column {
+    width: 28px;
+    gap: 8px;
+  }
+
+  .row-number-item {
+    font-size: 11px;
+    border-radius: 7px;
   }
 
   .seat-column {
@@ -1599,6 +1740,7 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
+    --seat-card-height: 55px;
     gap: 12px;
     padding: 14px 8px;
   }
@@ -1615,6 +1757,16 @@ const rectSelectStyle = computed(() => {
 
   .group-content {
     gap: 8px;
+  }
+
+  .row-number-column {
+    width: 24px;
+    gap: 6px;
+  }
+
+  .row-number-item {
+    font-size: 10px;
+    border-radius: 6px;
   }
 
   .seat-column {

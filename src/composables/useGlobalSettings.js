@@ -52,6 +52,7 @@ const defaultSettings = {
     enableAnimations: true,
     showStudentName: true,
     showStudentNumber: true,
+    showEditorRowNumbers: true,
     largeNameMode: false,
     largeNumberMode: false
   },
