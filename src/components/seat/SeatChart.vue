@@ -86,7 +86,7 @@
       @mousedown="handleMouseDown" @mousemove="handleMouseMove" @mouseup="handleMouseUp" @mouseleave="handleMouseUp"
       @touchstart="handleTouchStart" @touchmove.prevent="handleTouchMove" @touchend="handleTouchEnd"
       @dragover.prevent="handleDragOver" @drop.prevent="handleDrop" @contextmenu.prevent>
-      <div ref="chartRef" class="seat-chart" :class="seatConfig.seatAlignment === 'top' ? 'align-top' : 'align-bottom'" :style="chartTransformStyle">
+      <div ref="chartRef" class="seat-chart" :class="seatConfig.podiumPosition === 'top' ? 'align-top' : 'align-bottom'" :style="chartTransformStyle">
         <div v-for="(group, groupIndex) in organizedSeats" :key="groupIndex" class="seat-group">
           <div class="group-label">第 {{ groupIndex + 1 }} 组</div>
           <div class="group-content">

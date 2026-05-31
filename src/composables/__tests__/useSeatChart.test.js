@@ -23,6 +23,19 @@ describe('useSeatChart', () => {
 
   beforeEach(() => {
     seatChart = useSeatChart()
+    seatChart.updateConfig({
+      groupCount: 4,
+      columnsPerGroup: 2,
+      seatsPerColumn: 7,
+      groups: [
+        { columns: 2, rows: 7 },
+        { columns: 2, rows: 7 },
+        { columns: 2, rows: 7 },
+        { columns: 2, rows: 7 }
+      ],
+      shiftDistance: 4,
+      podiumPosition: 'bottom'
+    })
     seatChart.seats.value.forEach(seat => {
       seat.studentId = null
       seat.isEmpty = false
@@ -34,6 +47,8 @@ describe('useSeatChart', () => {
       expect(seatChart.seatConfig.value.groupCount).toBe(4)
       expect(seatChart.seatConfig.value.columnsPerGroup).toBe(2)
       expect(seatChart.seatConfig.value.seatsPerColumn).toBe(7)
+      expect(seatChart.seatConfig.value.podiumPosition).toBe('bottom')
+      expect(seatChart.seatConfig.value.seatAlignment).toBeUndefined()
     })
 
     it('should create correct number of seats', () => {
@@ -196,7 +211,7 @@ describe('useSeatChart', () => {
   })
 
   describe('isInRowRange', () => {
-    it('should correctly identify seats in row range with bottom alignment', () => {
+    it('should correctly identify seats in row range with bottom podium', () => {
       const result = seatChart.isInRowRange('seat-0-0-6', 1, 2)
       expect(result).toBe(true)
     })
@@ -204,6 +219,42 @@ describe('useSeatChart', () => {
     it('should return false for seats outside range', () => {
       const result = seatChart.isInRowRange('seat-0-0-0', 1, 2)
       expect(result).toBe(false)
+    })
+
+    it('should reverse row range when podium is at top', () => {
+      seatChart.updateConfig({ podiumPosition: 'top' })
+
+      expect(seatChart.isInRowRange('seat-0-0-0', 1, 2)).toBe(true)
+      expect(seatChart.isInRowRange('seat-0-0-6', 1, 2)).toBe(false)
+    })
+  })
+
+  describe('direction compatibility', () => {
+    it('should migrate legacy alignment to podiumPosition', () => {
+      seatChart.updateConfig({ alignment: 'top' })
+
+      expect(seatChart.seatConfig.value.podiumPosition).toBe('top')
+      expect(seatChart.seatConfig.value.alignment).toBeUndefined()
+      expect(seatChart.seatConfig.value.seatAlignment).toBeUndefined()
+    })
+
+    it('should migrate legacy seatAlignment to podiumPosition', () => {
+      seatChart.updateConfig({ seatAlignment: 'top' })
+
+      expect(seatChart.seatConfig.value.podiumPosition).toBe('top')
+      expect(seatChart.seatConfig.value.seatAlignment).toBeUndefined()
+    })
+
+    it('should use bottom podium as the front direction by default', () => {
+      expect(seatChart.isDirectlyBehind('seat-0-0-6', 'seat-0-0-5')).toBe(true)
+      expect(seatChart.isDirectlyBehind('seat-0-0-5', 'seat-0-0-6')).toBe(false)
+    })
+
+    it('should use top podium as the front direction when configured', () => {
+      seatChart.updateConfig({ podiumPosition: 'top' })
+
+      expect(seatChart.isDirectlyBehind('seat-0-0-0', 'seat-0-0-1')).toBe(true)
+      expect(seatChart.isDirectlyBehind('seat-0-0-1', 'seat-0-0-0')).toBe(false)
     })
   })
 

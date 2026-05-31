@@ -83,6 +83,5 @@ export const createMockSeatConfig = (overrides = {}) => ({
   ],
   shiftDistance: 4,
   podiumPosition: 'bottom',
-  seatAlignment: 'bottom',
   ...overrides
 })

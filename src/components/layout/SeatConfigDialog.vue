@@ -14,7 +14,7 @@
         </div>
 
         <div class="preview-container">
-          <div class="preview-seat-chart" :class="localConfig.seatAlignment === 'top' ? 'align-top' : 'align-bottom'">
+          <div class="preview-seat-chart" :class="localConfig.podiumPosition === 'top' ? 'align-top' : 'align-bottom'">
             <div v-for="(group, gIndex) in previewGroups" :key="gIndex" class="preview-group">
               <div class="preview-group-content">
                 <div v-for="cIndex in group.columns" :key="cIndex" class="preview-column">
@@ -22,7 +22,7 @@
                     v-for="rIndex in group.rows"
                     :key="rIndex"
                     class="preview-seat"
-                    :class="{ 'first-row': (localConfig.seatAlignment === 'bottom' && rIndex === group.rows) || (localConfig.seatAlignment === 'top' && rIndex === 1) }"
+                    :class="{ 'first-row': (localConfig.podiumPosition === 'bottom' && rIndex === group.rows) || (localConfig.podiumPosition === 'top' && rIndex === 1) }"
                   ></div>
                 </div>
               </div>
@@ -93,25 +93,6 @@
                 </button>
               </div>
             </div>
-            <div class="input-group">
-              <label>座位对齐方式</label>
-              <div class="alignment-buttons">
-                <button 
-                  class="alignment-btn" 
-                  :class="{ active: localConfig.seatAlignment === 'bottom' }"
-                  @click="localConfig.seatAlignment = 'bottom'"
-                >
-                  对齐底部
-                </button>
-                <button 
-                  class="alignment-btn" 
-                  :class="{ active: localConfig.seatAlignment === 'top' }"
-                  @click="localConfig.seatAlignment = 'top'"
-                >
-                  对齐顶部
-                </button>
-              </div>
-            </div>
           </div>
           <div class="quick-actions">
             <button class="quick-btn" @click="applyAllColumns">统一列数</button>
@@ -163,8 +144,7 @@ const { seatConfig, updateConfig } = useSeatChart()
 const localConfig = ref({
   groupCount: 4,
   groups: [],
-  podiumPosition: 'bottom',
-  seatAlignment: 'bottom'
+  podiumPosition: 'bottom'
 })
 
 const uniformValue = ref({
@@ -185,7 +165,6 @@ function initLocalConfig() {
   const config = seatConfig.value
   localConfig.value.groupCount = config.groupCount
   localConfig.value.podiumPosition = config.podiumPosition || 'bottom'
-  localConfig.value.seatAlignment = config.seatAlignment || 'bottom'
 
   // 重新创建 groups 数组以确保响应式更新
   const newGroups = []
@@ -294,8 +273,7 @@ function handleConfirm() {
   const newConfig = {
     groupCount: localConfig.value.groupCount,
     groups: localConfig.value.groups.map(g => ({ ...g })),
-    podiumPosition: localConfig.value.podiumPosition,
-    seatAlignment: localConfig.value.seatAlignment
+    podiumPosition: localConfig.value.podiumPosition
   }
   
   if (localConfig.value.groups.length > 0) {

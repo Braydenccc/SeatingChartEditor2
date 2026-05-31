@@ -16,8 +16,7 @@ const seatConfig = ref({
     { columns: 2, rows: 7 }
   ],
   shiftDistance: 4,
-  podiumPosition: 'bottom',   // 讲台位置：'top'（顶部）或 'bottom'（底部）
-  seatAlignment: 'bottom'      // 座位对齐方式：'top'（对齐顶部/后排）或 'bottom'（对齐底部/前排）
+  podiumPosition: 'bottom'    // 讲台位置：'top'（顶部）或 'bottom'（底部）
 })
 
 // 座位数据
@@ -58,6 +57,14 @@ function getGroupConfig(groupIndex) {
     columns: config.columnsPerGroup,
     rows: config.seatsPerColumn
   }
+}
+
+function normalizePodiumPosition(value) {
+  return value === 'top' ? 'top' : 'bottom'
+}
+
+function getPodiumPosition() {
+  return normalizePodiumPosition(seatConfig.value.podiumPosition)
 }
 
 // 从 seats.value（响应式代理）重建索引，确保 Map 持有代理对象
@@ -176,15 +183,10 @@ const organizedSeats = computed(() => {
     }
   }
 
-  // 每个桶按 rowIndex 排序，并根据 alignment 决定顺序
+  // 每个桶按 rowIndex 排序，渲染顺序始终保持物理坐标不变
   for (const group of groups) {
     for (const col of group) {
       col.sort((a, b) => a.rowIndex - b.rowIndex)
-      
-      // 如果对齐顶部，保持原样（rowIndex 0 在最上面）
-      // 如果对齐底部，保持原样（rowIndex 0 在最上面，rowIndex 大的在下面）
-      // 这里的顺序不需要改变，因为渲染时顺序已经是从上到下
-      // 视觉上的对齐通过 CSS 和 rowIndex 的含义来体现
     }
   }
 
@@ -409,11 +411,18 @@ export function useSeatChart() {
     // 只合并有效值（跳过 undefined 和 null）
     const validConfig = {}
     for (const [key, value] of Object.entries(newConfig)) {
-      if (value !== undefined && value !== null) {
+      if ((key === 'alignment' || key === 'seatAlignment') && value !== undefined && value !== null && validConfig.podiumPosition === undefined) {
+        validConfig.podiumPosition = normalizePodiumPosition(value)
+      } else if (key !== 'alignment' && key !== 'seatAlignment' && value !== undefined && value !== null) {
         validConfig[key] = value
       }
     }
+    if (validConfig.podiumPosition !== undefined) {
+      validConfig.podiumPosition = normalizePodiumPosition(validConfig.podiumPosition)
+    }
     seatConfig.value = { ...seatConfig.value, ...validConfig }
+    delete seatConfig.value.alignment
+    delete seatConfig.value.seatAlignment
     ensureGroupsArray()
     initializeSeats()  // 重新初始化座位
     // 清理选区中已失效的座位引用
@@ -570,9 +579,9 @@ export function useSeatChart() {
 
   /**
    * 判断座位是否在指定行范围内
-   * 根据 alignment 配置决定计数方向：
+   * 根据 podiumPosition 配置决定计数方向：
    * - 'bottom': 讲台在最下方，从下往上数（前排为 1，离讲台最近）
-   * - 'top': 对齐顶部/后排，从上往下数（后排为 1，离讲台最远）
+   * - 'top': 讲台在最上方，从上往下数（前排为 1，离讲台最近）
    * @param {string} seatId
    * @param {number} minRow - 最小排数（含），1-indexed
    * @param {number} maxRow - 最大排数（含），1-indexed
@@ -581,11 +590,11 @@ export function useSeatChart() {
     const { rowIndex, groupIndex } = parseSeatId(seatId)
     const groupConfig = getGroupConfig(groupIndex)
     const totalRows = groupConfig.rows
-    const { seatAlignment } = seatConfig.value
+    const podiumPosition = getPodiumPosition()
     
     let normalizedRow
-    if (seatAlignment === 'top') {
-      // 对齐顶部/后排：从上往下数，rowIndex 0 为第 1 排（后排）
+    if (podiumPosition === 'top') {
+      // 讲台在顶部：从上往下数，rowIndex 0 为第 1 排（前排）
       normalizedRow = rowIndex + 1
     } else {
       // 对齐底部/讲台：从下往上数，rowIndex 最大为第 1 排（前排）
@@ -643,9 +652,9 @@ export function useSeatChart() {
 
   /**
    * 判断 seatId1 是否在 seatId2 的视线前方（即 seatId1 遮挡 seatId2）
-   * 根据 alignment 配置决定"前方"的方向：
+   * 根据 podiumPosition 配置决定"前方"的方向：
    * - 'bottom': 讲台在下方，rowIndex 越大越靠前（离讲台近）
-   * - 'top': 对齐顶部，rowIndex 越小越靠前（离讲台远但在顶部）
+   * - 'top': 讲台在上方，rowIndex 越小越靠前（离讲台近）
    * @param {string} seatId1 - 遮挡者（在前方）
    * @param {string} seatId2 - 被遮挡者（在后方）
    * @param {number} tolerance - 0=仅正前方; 1=正前方±1列
@@ -653,15 +662,15 @@ export function useSeatChart() {
   const isDirectlyBehind = (seatId1, seatId2, tolerance = 0) => {
     const s1 = parseSeatId(seatId1)
     const s2 = parseSeatId(seatId2)
-    const { seatAlignment } = seatConfig.value
+    const podiumPosition = getPodiumPosition()
 
     // 遮挡者必须在同大组
     if (s1.groupIndex !== s2.groupIndex) return false
 
     // 根据对齐方式判断谁在前方
     let isInFront
-    if (seatAlignment === 'top') {
-      // 对齐顶部：rowIndex 越小越靠前（顶部）
+    if (podiumPosition === 'top') {
+      // 讲台在顶部：rowIndex 越小越靠前（离讲台近）
       isInFront = s1.rowIndex < s2.rowIndex
     } else {
       // 对齐底部/讲台：rowIndex 越大越靠前（离讲台近）

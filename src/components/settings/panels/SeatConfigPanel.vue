@@ -69,24 +69,6 @@
         </div>
       </div>
 
-      <div class="setting-item">
-        <label class="setting-label">座位对齐方式</label>
-        <div class="button-group">
-          <button
-            :class="['option-btn', { active: localConfig.seatAlignment === 'bottom' }]"
-            @click="localConfig.seatAlignment = 'bottom'"
-          >
-            对齐底部（前排）
-          </button>
-          <button
-            :class="['option-btn', { active: localConfig.seatAlignment === 'top' }]"
-            @click="localConfig.seatAlignment = 'top'"
-          >
-            对齐顶部（后排）
-          </button>
-        </div>
-      </div>
-
       <div class="warning-box">
         <AlertCircle :size="16" />
         <span>修改配置后需要点击底部"保存"按钮才会生效</span>

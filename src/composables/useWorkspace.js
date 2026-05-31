@@ -20,7 +20,7 @@ export function useWorkspace() {
   const { students, addStudent, updateStudent, clearAllStudents, syncStudentIdCounter } = useStudentData()
   const { tags, addTag, clearAllTags, showTagsInSeatChart, tagDisplayMode, setShowTagsInSeatChart, setTagDisplayMode } = useTagData()
   const { seatConfig, seats, updateConfig, clearAllSeats, batchUpdateSeats } = useSeatChart()
-  const { exportSettings, resetExportSettings } = useExportSettings()
+  const { exportSettings, resetExportSettings, applyExportSettings } = useExportSettings()
   const { zones, clearAllZones, addZone, updateZone, syncZoneIdCounter } = useZoneData()
   const { rules, clearAllRules, addRule } = useSeatRules()
   const { success, warning, error } = useLogger()
@@ -243,9 +243,7 @@ export function useWorkspace() {
 
         // 恢复导出设置
         if (workspace.exportSettings) {
-          Object.keys(workspace.exportSettings).forEach(k => {
-            exportSettings.value[k] = workspace.exportSettings[k]
-          })
+          applyExportSettings(workspace.exportSettings)
         }
 
         // 注意：旧版的 relations (人际关系) 已被废弃，我们不再从存档中恢复它们。
@@ -433,17 +431,22 @@ export function useWorkspace() {
       }
     }
 
-    // v2.x → v2.3：将单一的 alignment 配置拆分为 podiumPosition 和 seatAlignment
-    if (ws.layout?.config?.alignment && !ws.layout.config.podiumPosition) {
-      ws.layout.config.podiumPosition = ws.layout.config.alignment
-      ws.layout.config.seatAlignment = ws.layout.config.alignment
-      delete ws.layout.config.alignment
+    // v2.x → 当前：编辑器方向统一为 podiumPosition
+    if (ws.layout?.config) {
+      const config = ws.layout.config
+      if (!config.podiumPosition && config.seatAlignment) {
+        config.podiumPosition = config.seatAlignment
+      }
+      if (!config.podiumPosition && config.alignment) {
+        config.podiumPosition = config.alignment
+      }
+      delete config.alignment
+      delete config.seatAlignment
     }
 
     // 确保默认值
     if (ws.layout?.config) {
       if (!ws.layout.config.podiumPosition) ws.layout.config.podiumPosition = 'bottom'
-      if (!ws.layout.config.seatAlignment) ws.layout.config.seatAlignment = 'bottom'
     }
 
     // 确保默认值

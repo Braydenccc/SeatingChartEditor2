@@ -41,7 +41,8 @@
                 <label class="check-item"><input type="checkbox" v-model="exportSettings.showRowNumbers" /><span>显示行号</span></label>
                 <label class="check-item"><input type="checkbox" v-model="exportSettings.showGroupLabels" /><span>显示组号</span></label>
                 <label class="check-item"><input type="checkbox" v-model="exportSettings.showPodium" /><span>显示讲台</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.reverseOrder" /><span>翻转行序（讲台置顶）</span></label>
+                <label class="check-item"><input type="checkbox" v-model="exportSettings.flipVertical" /><span>上下翻转座位表</span></label>
+                <label class="check-item"><input type="checkbox" v-model="exportSettings.flipHorizontal" /><span>左右翻转座位表</span></label>
                 <div class="mode-row">
                   <span class="mode-label">模式:</span>
                   <label class="radio-item"><input type="radio" value="color" v-model="exportSettings.colorMode" /><span>彩色</span></label>
@@ -122,7 +123,8 @@
                 <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowRowNumbers" /><span>显示行号列</span></label>
                 <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowStudentId" /><span>格子内显示学号</span></label>
                 <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowPodium" /><span>显示讲台行</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelReverseOrder" /><span>翻转行序（讲台置顶）</span></label>
+                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelFlipVertical" /><span>上下翻转座位表</span></label>
+                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelFlipHorizontal" /><span>左右翻转座位表</span></label>
                 <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowGroupGap" /><span>保留大组间空列</span></label>
               </div>
 
@@ -459,7 +461,8 @@ watch(
     exportSettings.value.excelShowGroupLabels,
     exportSettings.value.excelShowTitle,
     exportSettings.value.excelShowPodium,
-    exportSettings.value.excelReverseOrder,
+    exportSettings.value.excelFlipVertical,
+    exportSettings.value.excelFlipHorizontal,
     exportSettings.value.excelShowGroupGap,
     exportSettings.value.excelColorMode,
     exportSettings.value.excelShowBorders,
@@ -883,7 +886,8 @@ watch(
     exportSettings.value.showRowNumbers,
     exportSettings.value.showGroupLabels,
     exportSettings.value.showPodium,
-    exportSettings.value.reverseOrder,
+    exportSettings.value.flipVertical,
+    exportSettings.value.flipHorizontal,
     exportSettings.value.colorMode,
     exportSettings.value.enableTagLabels,
     exportSettings.value.colGap,

@@ -34,7 +34,6 @@ export interface SeatConfig {
   groups: GroupConfig[]
   shiftDistance: number
   podiumPosition: 'top' | 'bottom'
-  seatAlignment: 'top' | 'bottom'
 }
 
 export interface GroupConfig {

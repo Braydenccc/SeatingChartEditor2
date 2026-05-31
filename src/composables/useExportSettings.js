@@ -7,7 +7,9 @@ const DEFAULT_EXPORT_SETTINGS = {
   showRowNumbers: true,
   showGroupLabels: true,
   showPodium: true,
-  reverseOrder: false,       // 翻转行序（讲台置顶）
+  flipHorizontal: false,     // 左右翻转导出视图
+  flipVertical: false,       // 上下翻转导出视图
+  reverseOrder: false,       // 旧字段：等价于 flipVertical
   enableTagLabels: true,
   colorMode: 'color', // 'color' | 'bw' | 'pureBw'
   // 间距设置
@@ -32,7 +34,9 @@ const DEFAULT_EXPORT_SETTINGS = {
   excelShowGroupLabels: true,    // 显示组号行
   excelShowTitle: true,          // 顶部标题行
   excelShowPodium: true,         // 讲台行
-  excelReverseOrder: false,      // 翻转行序（讲台置顶）
+  excelFlipHorizontal: false,    // 左右翻转 Excel 视图
+  excelFlipVertical: false,      // 上下翻转 Excel 视图
+  excelReverseOrder: false,      // 旧字段：等价于 excelFlipVertical
   excelShowGroupGap: true,       // 保留组间空列
   excelColorMode: 'color',       // 'color' | 'bw'
   excelShowBorders: true,        // 显示边框
@@ -89,8 +93,30 @@ const deepClone = (value) => {
   return JSON.parse(JSON.stringify(value))
 }
 
+const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key)
+
+export const normalizeExportSettings = (settings = {}) => {
+  const merged = { ...deepClone(DEFAULT_EXPORT_SETTINGS), ...settings }
+
+  if (!hasOwn(settings, 'flipVertical') && hasOwn(settings, 'reverseOrder')) {
+    merged.flipVertical = !!settings.reverseOrder
+  }
+  if (!hasOwn(settings, 'excelFlipVertical') && hasOwn(settings, 'excelReverseOrder')) {
+    merged.excelFlipVertical = !!settings.excelReverseOrder
+  }
+
+  merged.flipHorizontal = !!merged.flipHorizontal
+  merged.flipVertical = !!merged.flipVertical
+  merged.excelFlipHorizontal = !!merged.excelFlipHorizontal
+  merged.excelFlipVertical = !!merged.excelFlipVertical
+  merged.reverseOrder = merged.flipVertical
+  merged.excelReverseOrder = merged.excelFlipVertical
+
+  return merged
+}
+
 // 导出设置
-const exportSettings = ref(deepClone(DEFAULT_EXPORT_SETTINGS))
+const exportSettings = ref(normalizeExportSettings())
 
 export function useExportSettings() {
   // 更新标题
@@ -116,6 +142,24 @@ export function useExportSettings() {
   // 切换讲台显示
   const togglePodium = (enabled) => {
     exportSettings.value.showPodium = enabled
+  }
+
+  const setImageFlipHorizontal = (enabled) => {
+    exportSettings.value.flipHorizontal = !!enabled
+  }
+
+  const setImageFlipVertical = (enabled) => {
+    exportSettings.value.flipVertical = !!enabled
+    exportSettings.value.reverseOrder = !!enabled
+  }
+
+  const setExcelFlipHorizontal = (enabled) => {
+    exportSettings.value.excelFlipHorizontal = !!enabled
+  }
+
+  const setExcelFlipVertical = (enabled) => {
+    exportSettings.value.excelFlipVertical = !!enabled
+    exportSettings.value.excelReverseOrder = !!enabled
   }
 
   // 切换标签显示
@@ -145,9 +189,18 @@ export function useExportSettings() {
     })
   }
 
+  const applyExportSettings = (settings) => {
+    const normalized = normalizeExportSettings(settings || {})
+    normalized.tagSettings = {
+      ...(exportSettings.value.tagSettings || {}),
+      ...(normalized.tagSettings || {})
+    }
+    exportSettings.value = normalized
+  }
+
   // 重置导出设置为默认值（工作区切换时调用）
   const resetExportSettings = () => {
-    exportSettings.value = deepClone(DEFAULT_EXPORT_SETTINGS)
+    exportSettings.value = normalizeExportSettings()
   }
 
   return {
@@ -157,10 +210,15 @@ export function useExportSettings() {
     toggleRowNumbers,
     toggleGroupLabels,
     togglePodium,
+    setImageFlipHorizontal,
+    setImageFlipVertical,
+    setExcelFlipHorizontal,
+    setExcelFlipVertical,
     toggleTagLabels,
     toggleColorMode,
     updateTagSetting,
     initializeTagSettings,
+    applyExportSettings,
     resetExportSettings
   }
 }

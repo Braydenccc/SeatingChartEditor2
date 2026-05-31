@@ -30,7 +30,7 @@ export function useImageExport() {
 ## 4. 关键实现节点 (Implementation Details)
 - **A4 比例逼近推算**: 在 Canvas 初始化前，会计算出整个表到底有多宽（基于 `SEAT_WIDTH`, `GROUP_GAP`）。随后对比 A4 横纵向 (3508 / 2480) 的纸张长宽比。通过 `Math.min(availW / contentWidth, ...)` 计算出一个全局 `fitScale` 并使用 `ctx.scale()` 一次性缩放全体坐标系统，避免了繁琐的几何重算。
 - **黑白/灰度智能对比降级**: 学校打印机绝大部分是黑白的。代码使用 `luminance = 0.299*R + 0.587*G + 0.114*B` 将彩色名牌自动转为灰度，如果深灰，则字自动反相变成 `#ffffff` 白色，防止糊成一团。
-- **讲台反转陷阱**: 有些老师习惯看图讲台在自己眼前（排版在底部）；有些习惯贴黑板上（排版在顶部）。这是通过 `exportSettings.value.reverseOrder` 参数控制的，且它不仅影响渲染顺序，还影响行号 (`rowIndex`) 的左侧文本输出！
+- **导出翻转陷阱**: 导出菜单的 `flipVertical`/`excelFlipVertical` 与 `flipHorizontal`/`excelFlipHorizontal` 只改变导出视图，不修改编辑器座位数据。上下翻转会反转行显示顺序、讲台和组号位置；左右翻转会镜像大组和组内列，但组号仍保留真实编号。旧字段 `reverseOrder`/`excelReverseOrder` 仅作为加载兼容映射到上下翻转。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **内存溢出防御**: 导出 Canvas 很容易发生 iPhone 崩溃问题。务必注意文件里的一行核心防御代码：`MAX_CANVAS_PIXELS = 64 * 1024 * 1024 / 4` (约 64MB 上限)。如果拓展画布尺寸，千万不能拿 `seatCount` 无限延伸。

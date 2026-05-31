@@ -1,4 +1,5 @@
 import { shallowRef } from 'vue'
+import { getOrderedIndices, getRowNumber, getSourceRowIndex } from '@/utils/exportLayout'
 
 export const xlsxInstance = shallowRef(null)
 export const loadXlsx = async () => {
@@ -228,6 +229,8 @@ const defaultExcelConfig = {
     showGroupLabels: true,
     showTitle: true,
     showPodium: true,
+    flipHorizontal: false,
+    flipVertical: false,
     reverseOrder: false,
     showGroupGap: true,
     showTagTable: false,
@@ -285,6 +288,14 @@ const mergeExcelConfig = (base, override) => {
   for (const key of Object.keys(base)) {
     result[key] = { ...base[key], ...(override[key] || {}) }
   }
+  const overrideLayout = override.layout || {}
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(overrideLayout, key)
+  if (!hasOwn('flipVertical') && hasOwn('reverseOrder')) {
+    result.layout.flipVertical = !!overrideLayout.reverseOrder
+  }
+  result.layout.flipHorizontal = !!result.layout.flipHorizontal
+  result.layout.flipVertical = !!result.layout.flipVertical
+  result.layout.reverseOrder = result.layout.flipVertical
   return result
 }
 
@@ -298,6 +309,8 @@ const convertLegacyExcelOptions = (legacy) => {
       showGroupLabels: legacy.showGroupLabels,
       showTitle: legacy.showTitle,
       showPodium: legacy.showPodium,
+      flipHorizontal: legacy.flipHorizontal,
+      flipVertical: legacy.flipVertical !== undefined ? legacy.flipVertical : legacy.reverseOrder,
       reverseOrder: legacy.reverseOrder,
       showGroupGap: legacy.showGroupGap,
       showTagTable: legacy.showTagTable,
@@ -358,7 +371,9 @@ const buildExcelOptionsFromSettings = (es) => ({
     showGroupLabels: es.excelShowGroupLabels,
     showTitle: es.excelShowTitle,
     showPodium: es.excelShowPodium,
-    reverseOrder: es.excelReverseOrder,
+    flipHorizontal: es.excelFlipHorizontal,
+    flipVertical: es.excelFlipVertical,
+    reverseOrder: es.excelFlipVertical,
     showGroupGap: es.excelShowGroupGap,
     showTagTable: es.excelShowTagTable,
     tagTableNewSheet: es.excelTagTableNewSheet
@@ -561,11 +576,11 @@ const createExcelLayoutCalculator = (seatConfig, config) => {
   const groupStartCol = (g) => dataColOffset + g * (columnsPerGroup + groupGapCols)
   const totalCols = dataColOffset + groupCount * columnsPerGroup + (groupCount - 1) * groupGapCols
   const titleRowOffset = layout.showTitle ? 1 : 0
-  const podiumTopOffset = layout.reverseOrder && layout.showPodium ? 1 : 0
+  const podiumTopOffset = layout.flipVertical && layout.showPodium ? 1 : 0
   const groupLabelOffset = layout.showGroupLabels ? 1 : 0
   const headerRowOffset = titleRowOffset + podiumTopOffset + groupLabelOffset
   const podiumRows = layout.showPodium ? 1 : 0
-  const totalSeatRows = headerRowOffset + seatsPerColumn + (layout.reverseOrder ? 0 : podiumRows)
+  const totalSeatRows = headerRowOffset + seatsPerColumn + (layout.flipVertical ? 0 : podiumRows)
 
   const isTopEdge = (r) => r === 0
   const isBottomEdge = (r) => r === totalSeatRows - 1
@@ -840,7 +855,7 @@ export function useExcelData() {
       merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } })
     }
 
-    if (layout.showPodium && layout.reverseOrder) {
+    if (layout.showPodium && layout.flipVertical) {
       const pRow = titleRowOffset
       for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', styles.podium, 's', null, edgeBd(pRow, c))
       merges.push({ s: { r: pRow, c: 0 }, e: { r: pRow, c: totalCols - 1 } })
@@ -849,8 +864,10 @@ export function useExcelData() {
     if (layout.showGroupLabels) {
       const hRow = titleRowOffset + podiumTopOffset
       if (layout.showRowNumbers) setCell(hRow, 0, '', styles.header, 's', null, edgeBd(hRow, 0))
-      for (let g = 0; g < groupCount; g++) {
-        const sc = groupStartCol(g)
+      const visualGroupIndices = getOrderedIndices(groupCount, layout.flipHorizontal)
+      for (let visualG = 0; visualG < groupCount; visualG++) {
+        const g = visualGroupIndices[visualG]
+        const sc = groupStartCol(visualG)
         const groupLabel = precomputedGroupLabels[g]
         setCell(hRow, sc, `第 ${groupLabel} 组`, styles.header, 's', null, edgeBd(hRow, sc))
         for (let c = 1; c < columnsPerGroup; c++) setCell(hRow, sc + c, '', styles.header, 's', null, edgeBd(hRow, sc + c))
@@ -860,16 +877,19 @@ export function useExcelData() {
 
     for (let r = 0; r < seatsPerColumn; r++) {
       const eRow = headerRowOffset + r
-      const srcRow = layout.reverseOrder ? (seatsPerColumn - 1 - r) : r
-      const displayRow = seatsPerColumn - srcRow
+      const srcRow = getSourceRowIndex(r, seatsPerColumn, layout.flipVertical)
+      const displayRow = getRowNumber(srcRow, seatsPerColumn, seatConfig.podiumPosition)
       const rowLabel = formatIndex(displayRow, numbering.rowNumberScheme)
       if (layout.showRowNumbers) setCell(eRow, 0, `第${rowLabel}排`, styles.rowNum, 's', null, edgeBd(eRow, 0))
-      for (let g = 0; g < groupCount; g++) {
+      const visualGroupIndices = getOrderedIndices(groupCount, layout.flipHorizontal)
+      for (let visualG = 0; visualG < groupCount; visualG++) {
+        const g = visualGroupIndices[visualG]
         const groupLabel = precomputedGroupLabels[g]
         for (let c = 0; c < columnsPerGroup; c++) {
-          const eCol = groupStartCol(g) + c
-          const seat = organizedSeats[g]?.[c]?.[srcRow]
-          const serial = g * seatsPerGroup + c * seatsPerColumn + (r + 1)
+          const sourceCol = layout.flipHorizontal ? (columnsPerGroup - 1 - c) : c
+          const eCol = groupStartCol(visualG) + c
+          const seat = organizedSeats[g]?.[sourceCol]?.[srcRow]
+          const serial = g * seatsPerGroup + sourceCol * seatsPerColumn + (srcRow + 1)
           const serialLabel = formatIndex(serial, numbering.serialNumberScheme)
           if (!seat) {
             setCell(eRow, eCol, '', styles.seat, 's', null, edgeBd(eRow, eCol))
@@ -895,14 +915,14 @@ export function useExcelData() {
             setCell(eRow, eCol, '', styles.vacant, 's', null, edgeBd(eRow, eCol))
           }
         }
-        if (layout.showGroupGap && g < groupCount - 1) {
-          const gapCol = groupStartCol(g) + columnsPerGroup
+        if (layout.showGroupGap && visualG < groupCount - 1) {
+          const gapCol = groupStartCol(visualG) + columnsPerGroup
           setCell(eRow, gapCol, '', {}, 's', null, edgeBd(eRow, gapCol))
         }
       }
     }
 
-    if (layout.showPodium && !layout.reverseOrder) {
+    if (layout.showPodium && !layout.flipVertical) {
       const pRow = headerRowOffset + seatsPerColumn
       for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', styles.podium, 's', null, edgeBd(pRow, c))
       merges.push({ s: { r: pRow, c: 0 }, e: { r: pRow, c: totalCols - 1 } })
@@ -919,8 +939,8 @@ export function useExcelData() {
     ws['!rows'] = Array.from({ length: totalSeatRows }, (_, r) => {
       if (layout.showTitle && r === 0) return { hpt: 28 }
       if (layout.showGroupLabels && r === titleRowOffset + podiumTopOffset) return { hpt: 22 }
-      if (layout.reverseOrder && layout.showPodium && r === titleRowOffset) return { hpt: 22 }
-      if (!layout.reverseOrder && r === totalSeatRows - 1 && layout.showPodium) return { hpt: 22 }
+      if (layout.flipVertical && layout.showPodium && r === titleRowOffset) return { hpt: 22 }
+      if (!layout.flipVertical && r === totalSeatRows - 1 && layout.showPodium) return { hpt: 22 }
       return { hpt: sizing.seatRowHeight }
     })
 
