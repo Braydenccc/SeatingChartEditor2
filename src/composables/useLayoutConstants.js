@@ -7,6 +7,8 @@ const LAYOUT = {
   ROW_NUMBER_W: 32,
   GROUP_GAP: 40,
   LABEL_H: 47,
+  PODIUM_ROW_H: 84,
+  PODIUM_GAP: 18,
   PAD_L: 20,
   PAD_T: 30
 }

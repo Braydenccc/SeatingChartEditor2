@@ -3,7 +3,7 @@ import { useSeatChart } from './useSeatChart'
 import { useZoom } from './useZoom'
 import { useStudentData } from './useStudentData'
 import { useLayoutConstants } from './useLayoutConstants'
-import { parseSeatId, generateSeatId } from '@/utils/seatHelpers'
+import { parseSeatId, generateSeatId, isGuardSeatId } from '@/utils/seatHelpers'
 
 const { LAYOUT: L } = useLayoutConstants()
 
@@ -147,6 +147,24 @@ export function useDragPreview() {
 
   const previewItems = computed(() => {
     if (!state.isActive || !state.anchorSeatId) return []
+
+    if (isGuardSeatId(state.anchorSeatId)) {
+      const seat = getSeat(state.anchorSeatId)
+      const student = students.value.find(s => s.id === seat?.studentId)
+      return [{
+        seatId: state.anchorSeatId,
+        studentId: seat?.studentId ?? null,
+        studentName: student?.name || '',
+        isAnchor: true,
+        style: {
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: `${L.SEAT_W}px`,
+          height: `${L.SEAT_H}px`
+        }
+      }]
+    }
 
     const anchor = parseSeatId(state.anchorSeatId)
     const cpg = seatConfig.value.columnsPerGroup

@@ -34,7 +34,14 @@ describe('useSeatChart', () => {
         { columns: 2, rows: 7 }
       ],
       shiftDistance: 4,
-      podiumPosition: 'bottom'
+      podiumPosition: 'bottom',
+      guardSeats: {
+        enabled: true,
+        leftEnabled: true,
+        rightEnabled: true,
+        includeInAutoAssignment: false,
+        hideEmptyOnExport: true
+      }
     })
     seatChart.seats.value.forEach(seat => {
       seat.studentId = null
@@ -52,7 +59,7 @@ describe('useSeatChart', () => {
     })
 
     it('should create correct number of seats', () => {
-      const expectedSeats = 4 * 2 * 7
+      const expectedSeats = 4 * 2 * 7 + 2
       expect(seatChart.seats.value).toHaveLength(expectedSeats)
     })
 
@@ -84,15 +91,80 @@ describe('useSeatChart', () => {
       expect(seatChart.getStudentAtSeat(seatId)).toBe(null)
     })
 
-    it('should assign same student to different seat without clearing previous', () => {
+    it('should move same student to different seat', () => {
       const seat1 = 'seat-0-0-0'
       const seat2 = 'seat-0-0-1'
 
       seatChart.assignStudent(seat1, 1, false)
       seatChart.assignStudent(seat2, 1, false)
 
-      expect(seatChart.getStudentAtSeat(seat1)).toBe(1)
+      expect(seatChart.getStudentAtSeat(seat1)).toBe(null)
       expect(seatChart.getStudentAtSeat(seat2)).toBe(1)
+    })
+  })
+
+  describe('guard seats', () => {
+    it('should create guard seats with default enabled config', () => {
+      expect(seatChart.seatConfig.value.guardSeats).toEqual({
+        enabled: true,
+        leftEnabled: true,
+        rightEnabled: true,
+        includeInAutoAssignment: false,
+        hideEmptyOnExport: true
+      })
+      expect(seatChart.guardSeats.value.map(seat => seat.id)).toEqual(['guard-left', 'guard-right'])
+      expect(seatChart.visibleGuardSeats.value.map(seat => seat.guardSide)).toEqual(['left', 'right'])
+      expect(seatChart.organizedSeats.value.flat(Infinity).some(seat => seat.kind === 'guard')).toBe(false)
+    })
+
+    it('should respect left and right guard switches', () => {
+      seatChart.updateConfig({
+        guardSeats: {
+          enabled: true,
+          leftEnabled: false,
+          rightEnabled: true,
+          includeInAutoAssignment: false,
+          hideEmptyOnExport: true
+        }
+      })
+
+      expect(seatChart.visibleGuardSeats.value.map(seat => seat.id)).toEqual(['guard-right'])
+    })
+
+    it('should assign, clear, and swap guard seats manually', () => {
+      seatChart.assignStudent('guard-left', 1, false)
+      seatChart.assignStudent('seat-0-0-0', 2, false)
+      seatChart.swapSeats('guard-left', 'seat-0-0-0', false)
+
+      expect(seatChart.getStudentAtSeat('guard-left')).toBe(2)
+      expect(seatChart.getStudentAtSeat('seat-0-0-0')).toBe(1)
+
+      seatChart.clearSeat('guard-left', false)
+      expect(seatChart.getStudentAtSeat('guard-left')).toBe(null)
+    })
+
+    it('should move a student between regular and guard seats', () => {
+      seatChart.assignStudent('seat-0-0-0', 1, false)
+      seatChart.assignStudent('guard-left', 1, false)
+
+      expect(seatChart.getStudentAtSeat('seat-0-0-0')).toBe(null)
+      expect(seatChart.getStudentAtSeat('guard-left')).toBe(1)
+    })
+
+    it('should exclude guard seats from available seats unless requested', () => {
+      expect(seatChart.getAvailableSeats().some(seat => seat.kind === 'guard')).toBe(false)
+
+      seatChart.updateConfig({
+        guardSeats: {
+          enabled: true,
+          leftEnabled: true,
+          rightEnabled: true,
+          includeInAutoAssignment: true,
+          hideEmptyOnExport: true
+        }
+      })
+
+      expect(seatChart.getAvailableSeats(true).filter(seat => seat.kind === 'guard')).toHaveLength(2)
     })
   })
 

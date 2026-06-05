@@ -58,6 +58,8 @@ export function useWorkspace() {
           config: { ...seatConfig.value },
           seats: seats.value.map(s => ({
             id: s.id,
+            kind: s.kind || 'regular',
+            guardSide: s.guardSide,
             group: s.groupIndex,
             col: s.columnIndex,
             row: s.rowIndex,
@@ -225,9 +227,11 @@ export function useWorkspace() {
 
         if (workspace.layout && Array.isArray(workspace.layout.seats)) {
           const updates = workspace.layout.seats.map(sw => {
-            const match = seats.value.find(st =>
-              st.groupIndex === sw.group && st.columnIndex === sw.col && st.rowIndex === sw.row
-            )
+            const match = sw.kind === 'guard'
+              ? seats.value.find(st => st.id === sw.id || (st.kind === 'guard' && st.guardSide === sw.guardSide))
+              : seats.value.find(st =>
+                st.groupIndex === sw.group && st.columnIndex === sw.col && st.rowIndex === sw.row
+              )
             if (!match) return null
             return {
               seatId: match.id,
@@ -393,6 +397,8 @@ export function useWorkspace() {
         config: ws.seatConfig || {},
         seats: oldSeats.map(s => ({
           id: s.id,
+          kind: s.kind || 'regular',
+          guardSide: s.guardSide,
           group: s.groupIndex,
           col: s.columnIndex,
           row: s.rowIndex,
@@ -447,6 +453,13 @@ export function useWorkspace() {
     // 确保默认值
     if (ws.layout?.config) {
       if (!ws.layout.config.podiumPosition) ws.layout.config.podiumPosition = 'bottom'
+      ws.layout.config.guardSeats = {
+        enabled: ws.layout.config.guardSeats?.enabled !== false,
+        leftEnabled: ws.layout.config.guardSeats?.leftEnabled !== false,
+        rightEnabled: ws.layout.config.guardSeats?.rightEnabled !== false,
+        includeInAutoAssignment: ws.layout.config.guardSeats?.includeInAutoAssignment === true,
+        hideEmptyOnExport: ws.layout.config.guardSeats?.hideEmptyOnExport !== false
+      }
     }
 
     // 确保默认值

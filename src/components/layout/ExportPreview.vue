@@ -368,7 +368,7 @@ const { exportSettings, initializeTagSettings, updateTagSetting } = useExportSet
 const { exportToImage } = useImageExport()
 const { tags } = useTagData()
 const { exportSeatChartToExcel, exportSeatChartToExcelBuffer, generateSeatChartWorkbook, loadXlsx, xlsxInstance, buildExcelOptionsFromSettings } = useExcelData()
-const { organizedSeats, seatConfig } = useSeatChart()
+const { organizedSeats, seatConfig, visibleGuardSeats } = useSeatChart()
 const { students } = useStudentData()
 const { authType, webdavConfig } = useAuth()
 const { putFile } = useWebDav()
@@ -431,6 +431,11 @@ const esc = (str) => String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt
 
 const excelWorkbook = ref(null)
 
+const buildCurrentExcelOptions = () => ({
+  ...buildExcelOptionsFromSettings(exportSettings.value),
+  guardSeats: visibleGuardSeats.value
+})
+
 const updateExcelWorkbook = async () => {
   if (activeTab.value !== 'excel' || !props.visible) return
   
@@ -441,7 +446,7 @@ const updateExcelWorkbook = async () => {
       students.value,
       tags.value,
       seatConfig.value,
-      buildExcelOptionsFromSettings(exportSettings.value)
+      buildCurrentExcelOptions()
     )
     excelWorkbook.value = wb
   } catch (e) {
@@ -501,7 +506,13 @@ watch(
     exportSettings.value.excelSeatFillColor,
     exportSettings.value.excelEmptyFillColor,
     exportSettings.value.excelVacantFillColor,
-    exportSettings.value.excelTagHeaderFillColor
+    exportSettings.value.excelTagHeaderFillColor,
+    seatConfig.value.podiumPosition,
+    seatConfig.value.guardSeats?.enabled,
+    seatConfig.value.guardSeats?.leftEnabled,
+    seatConfig.value.guardSeats?.rightEnabled,
+    seatConfig.value.guardSeats?.hideEmptyOnExport,
+    visibleGuardSeats.value.map(seat => `${seat.id}:${seat.studentId ?? ''}`).join('|')
   ],
   () => {
     if (activeTab.value === 'excel' && props.visible) {
@@ -743,23 +754,33 @@ const syncTagSettings = () => {
   generatePreview()
 }
 
+const generatePreviewNow = async () => {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+
+  isGenerating.value = true
+  try {
+    const nextUrl = await exportToImage()
+    if (lastPreviewObjectUrl) {
+      URL.revokeObjectURL(lastPreviewObjectUrl)
+    }
+    lastPreviewObjectUrl = nextUrl
+    previewUrl.value = nextUrl
+  } catch {
+    previewUrl.value = ''
+  } finally {
+    isGenerating.value = false
+  }
+}
+
 // ── 图片预览（防抖）──
 const generatePreview = () => {
   if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(async () => {
-    isGenerating.value = true
-    try {
-      const nextUrl = await exportToImage()
-      if (lastPreviewObjectUrl) {
-        URL.revokeObjectURL(lastPreviewObjectUrl)
-      }
-      lastPreviewObjectUrl = nextUrl
-      previewUrl.value = nextUrl
-    } catch {
-      previewUrl.value = ''
-    } finally {
-      isGenerating.value = false
-    }
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null
+    generatePreviewNow()
   }, 300)
 }
 
@@ -804,7 +825,7 @@ const handleExcelDownload = async () => {
       students.value,
       tags.value,
       seatConfig.value,
-      buildExcelOptionsFromSettings(exportSettings.value)
+      buildCurrentExcelOptions()
     )
   } catch (e) {
     console.error('Excel 导出失败', e)
@@ -860,7 +881,7 @@ const handleCloudExportExcel = async () => {
       students.value,
       tags.value,
       seatConfig.value,
-      buildExcelOptionsFromSettings(exportSettings.value)
+      buildCurrentExcelOptions()
     )
     const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     const filename = `座位表_${ts}.xlsx`
@@ -904,6 +925,12 @@ watch(
     exportSettings.value.fontSizeTag,
     exportSettings.value.offsetYName,
     exportSettings.value.offsetYStudentId,
+    seatConfig.value.podiumPosition,
+    seatConfig.value.guardSeats?.enabled,
+    seatConfig.value.guardSeats?.leftEnabled,
+    seatConfig.value.guardSeats?.rightEnabled,
+    seatConfig.value.guardSeats?.hideEmptyOnExport,
+    visibleGuardSeats.value.map(seat => `${seat.id}:${seat.studentId ?? ''}`).join('|')
   ],
   () => { if (props.visible && activeTab.value === 'image') generatePreview() },
   { deep: true }
@@ -924,6 +951,10 @@ watch(() => props.visible, async (v) => {
   if (v) {
     initializeTagSettings(tags.value)
     initTagLocal()
+
+    if (activeTab.value === 'image') {
+      generatePreviewNow()
+    }
     
     if (authType.value === 'webdav') {
       const cloudSettings = await loadCloudSettings()
@@ -931,10 +962,8 @@ watch(() => props.visible, async (v) => {
         exportSettings.value.webdavExportDir = cloudSettings.webdavExportDir
       }
     }
-
-    if (activeTab.value === 'image') generatePreview()
   }
-})
+}, { immediate: true })
 
 watch(tags, () => {
   initializeTagSettings(tags.value)

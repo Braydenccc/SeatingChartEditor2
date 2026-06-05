@@ -71,9 +71,10 @@ describe('useAssignment - Randomness Tests', () => {
         studentData.addStudent()
       }
 
+      const availableSeats = seatChart.getAvailableSeats()
       const seatAssignmentCounts = {}
-      seatChart.seats.value.forEach(s => {
-        seatAssignmentCounts[s.id] = 0
+      availableSeats.forEach(seat => {
+        seatAssignmentCounts[seat.id] = 0
       })
 
       const runs = 100
@@ -81,9 +82,9 @@ describe('useAssignment - Randomness Tests', () => {
         seatChart.clearAllSeats()
         await assignment.runSmartAssignment({ useRules: false, iterations: 0 })
 
-        seatChart.seats.value.forEach(s => {
-          if (s.studentId) {
-            seatAssignmentCounts[s.id]++
+        availableSeats.forEach(seat => {
+          if (seat.studentId) {
+            seatAssignmentCounts[seat.id]++
           }
         })
       }
@@ -110,8 +111,9 @@ describe('useAssignment - Randomness Tests', () => {
       }
 
       const pairCounts = {}
+      const availableSeats = seatChart.getAvailableSeats()
       studentIds.forEach(sId => {
-        seatChart.seats.value.forEach(seat => {
+        availableSeats.forEach(seat => {
           pairCounts[`${sId}-${seat.id}`] = 0
         })
       })
@@ -121,7 +123,7 @@ describe('useAssignment - Randomness Tests', () => {
         seatChart.clearAllSeats()
         await assignment.runSmartAssignment({ useRules: false, iterations: 0 })
 
-        seatChart.seats.value.forEach(seat => {
+        availableSeats.forEach(seat => {
           if (seat.studentId) {
             pairCounts[`${seat.studentId}-${seat.id}`]++
           }

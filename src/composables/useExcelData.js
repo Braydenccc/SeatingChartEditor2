@@ -1,5 +1,5 @@
 import { shallowRef } from 'vue'
-import { getOrderedIndices, getRowNumber, getSourceRowIndex } from '@/utils/exportLayout'
+import { getEffectivePodiumPosition, getGuardSideForVisualSlot, getOrderedIndices, getRowNumber, getSourceRowIndex } from '@/utils/exportLayout'
 
 export const xlsxInstance = shallowRef(null)
 export const loadXlsx = async () => {
@@ -565,22 +565,55 @@ const createExcelStyleBuilder = (config) => {
 
 // ── Excel 布局计算器 ──
 
+const getRenderableGuardSeats = (seatConfig, options, layout = {}) => {
+  const config = seatConfig.guardSeats || {}
+  if (config.enabled === false) return { left: null, right: null }
+  const guardSeats = Array.isArray(options.guardSeats) ? options.guardSeats : []
+  const hideEmpty = config.hideEmptyOnExport !== false
+  const shouldRender = (seat, side) => {
+    if (!seat) return false
+    if (side === 'left' && config.leftEnabled === false) return false
+    if (side === 'right' && config.rightEnabled === false) return false
+    return !!seat.studentId || !hideEmpty
+  }
+  const visualPodiumSide = getEffectivePodiumPosition(seatConfig.podiumPosition, layout.flipVertical)
+  const leftSourceSide = getGuardSideForVisualSlot('left', visualPodiumSide)
+  const rightSourceSide = getGuardSideForVisualSlot('right', visualPodiumSide)
+  const left = guardSeats.find(seat => seat.guardSide === leftSourceSide) || null
+  const right = guardSeats.find(seat => seat.guardSide === rightSourceSide) || null
+  return {
+    left: shouldRender(left, leftSourceSide) ? left : null,
+    right: shouldRender(right, rightSourceSide) ? right : null
+  }
+}
+
 const createExcelLayoutCalculator = (seatConfig, config) => {
   const { layout, numbering } = config
   const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig
 
   const groupGapCols = layout.showGroupGap ? 1 : 0
+  const hasGuardSeatSlots = layout.showPodium && !!(config.guardSeats?.left || config.guardSeats?.right)
   const seatsPerGroup = columnsPerGroup * seatsPerColumn
   const precomputedGroupLabels = Array.from({ length: groupCount }, (_, i) => formatIndex(i + 1, numbering.groupNumberScheme))
-  const dataColOffset = layout.showRowNumbers ? 1 : 0
+  const seatTableCols = (layout.showRowNumbers ? 1 : 0) + groupCount * columnsPerGroup + (groupCount - 1) * groupGapCols
+  const extraGuardSlotCols = hasGuardSeatSlots ? Math.max(0, 3 - seatTableCols) : 0
+  const leadingGuardSlotCols = Math.ceil(extraGuardSlotCols / 2)
+  const trailingGuardSlotCols = extraGuardSlotCols - leadingGuardSlotCols
+  const dataColOffset = leadingGuardSlotCols + (layout.showRowNumbers ? 1 : 0)
+  const rowNumberCol = leadingGuardSlotCols
   const groupStartCol = (g) => dataColOffset + g * (columnsPerGroup + groupGapCols)
-  const totalCols = dataColOffset + groupCount * columnsPerGroup + (groupCount - 1) * groupGapCols
+  const totalCols = leadingGuardSlotCols + seatTableCols + trailingGuardSlotCols
+  const guardLeftCol = hasGuardSeatSlots ? 0 : null
+  const guardRightCol = hasGuardSeatSlots ? totalCols - 1 : null
+  const podiumStartCol = hasGuardSeatSlots ? 1 : 0
+  const podiumEndCol = hasGuardSeatSlots ? totalCols - 2 : totalCols - 1
   const titleRowOffset = layout.showTitle ? 1 : 0
-  const podiumTopOffset = layout.flipVertical && layout.showPodium ? 1 : 0
+  const visualPodiumSide = getEffectivePodiumPosition(seatConfig.podiumPosition, layout.flipVertical)
+  const podiumTopOffset = visualPodiumSide === 'top' && layout.showPodium ? 1 : 0
   const groupLabelOffset = layout.showGroupLabels ? 1 : 0
   const headerRowOffset = titleRowOffset + podiumTopOffset + groupLabelOffset
   const podiumRows = layout.showPodium ? 1 : 0
-  const totalSeatRows = headerRowOffset + seatsPerColumn + (layout.flipVertical ? 0 : podiumRows)
+  const totalSeatRows = headerRowOffset + seatsPerColumn + (visualPodiumSide === 'top' ? 0 : podiumRows)
 
   const isTopEdge = (r) => r === 0
   const isBottomEdge = (r) => r === totalSeatRows - 1
@@ -593,6 +626,12 @@ const createExcelLayoutCalculator = (seatConfig, config) => {
     seatsPerColumn,
     seatsPerGroup,
     precomputedGroupLabels,
+    hasGuardSeatSlots,
+    guardLeftCol,
+    guardRightCol,
+    podiumStartCol,
+    podiumEndCol,
+    rowNumberCol,
     dataColOffset,
     groupStartCol,
     totalCols,
@@ -601,6 +640,7 @@ const createExcelLayoutCalculator = (seatConfig, config) => {
     groupLabelOffset,
     headerRowOffset,
     podiumRows,
+    visualPodiumSide,
     totalSeatRows,
     groupGapCols,
     isTopEdge,
@@ -815,6 +855,7 @@ export function useExcelData() {
 
     const legacyConfig = convertLegacyExcelOptions(userOptions)
     const config = mergeExcelConfig(defaultExcelConfig, legacyConfig)
+    config.guardSeats = getRenderableGuardSeats(seatConfig, userOptions, config.layout)
     const { layout, sizing, content, numbering } = config
 
     const studentMap = new Map(students.map(s => [s.id, s]))
@@ -825,7 +866,9 @@ export function useExcelData() {
     const {
       groupCount, columnsPerGroup, seatsPerColumn, seatsPerGroup,
       precomputedGroupLabels, dataColOffset, groupStartCol, totalCols,
-      titleRowOffset, podiumTopOffset, headerRowOffset, totalSeatRows
+      titleRowOffset, podiumTopOffset, headerRowOffset, totalSeatRows,
+      hasGuardSeatSlots, guardLeftCol, guardRightCol, podiumStartCol, podiumEndCol,
+      rowNumberCol, visualPodiumSide
     } = layoutCalc
 
     const ws = {}
@@ -850,20 +893,69 @@ export function useExcelData() {
       ws[XLSX.utils.encode_cell({ r, c })] = cell
     }
 
+    const setSeatLikeCell = (r, c, seat, context, borderOverride = null) => {
+      if (!seat) {
+        setCell(r, c, '', styles.seat, 's', null, borderOverride)
+      } else if (seat.isEmpty) {
+        setCell(r, c, '空置', styles.empty, 's', null, borderOverride)
+      } else if (seat.studentId) {
+        const stu = studentMap.get(seat.studentId)
+        if (stu) {
+          const cellContent = formatCellContent(content.cellFormat, {
+            name: stu.name || '未命名',
+            studentId: layout.showStudentId ? (stu.studentNumber || '') : '',
+            rowLabel: context.rowLabel,
+            groupLabel: context.groupLabel,
+            serialLabel: context.serialLabel
+          })
+          const baseFont = { bold: true, sz: sizing.seatFontSize, color: { rgb: seatFontRgb } }
+          const richText = buildRichText(cellContent.richParts, baseFont)
+          setCell(r, c, cellContent.text, styles.seatName, 's', richText, borderOverride)
+        } else {
+          setCell(r, c, '', styles.seat, 's', null, borderOverride)
+        }
+      } else {
+        setCell(r, c, '', styles.vacant, 's', null, borderOverride)
+      }
+    }
+
     if (layout.showTitle) {
       for (let c = 0; c < totalCols; c++) setCell(0, c, c === 0 ? content.title : '', styles.title, 's', null, edgeBd(0, c))
       merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } })
     }
 
-    if (layout.showPodium && layout.flipVertical) {
-      const pRow = titleRowOffset
-      for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', styles.podium, 's', null, edgeBd(pRow, c))
-      merges.push({ s: { r: pRow, c: 0 }, e: { r: pRow, c: totalCols - 1 } })
+    const setPodiumRow = (pRow) => {
+      if (hasGuardSeatSlots && config.guardSeats.left) {
+        setSeatLikeCell(pRow, guardLeftCol, config.guardSeats.left, {
+          rowLabel: '',
+          groupLabel: '护法',
+          serialLabel: 'L'
+        }, edgeBd(pRow, guardLeftCol))
+      }
+      const podiumStart = podiumStartCol
+      const podiumEnd = podiumEndCol
+      for (let c = podiumStart; c <= podiumEnd; c++) {
+        setCell(pRow, c, c === podiumStart ? '讲台' : '', styles.podium, 's', null, edgeBd(pRow, c))
+      }
+      if (podiumEnd > podiumStart) {
+        merges.push({ s: { r: pRow, c: podiumStart }, e: { r: pRow, c: podiumEnd } })
+      }
+      if (hasGuardSeatSlots && config.guardSeats.right) {
+        setSeatLikeCell(pRow, guardRightCol, config.guardSeats.right, {
+          rowLabel: '',
+          groupLabel: '护法',
+          serialLabel: 'R'
+        }, edgeBd(pRow, guardRightCol))
+      }
+    }
+
+    if (layout.showPodium && visualPodiumSide === 'top') {
+      setPodiumRow(titleRowOffset)
     }
 
     if (layout.showGroupLabels) {
       const hRow = titleRowOffset + podiumTopOffset
-      if (layout.showRowNumbers) setCell(hRow, 0, '', styles.header, 's', null, edgeBd(hRow, 0))
+      if (layout.showRowNumbers) setCell(hRow, rowNumberCol, '', styles.header, 's', null, edgeBd(hRow, rowNumberCol))
       const visualGroupIndices = getOrderedIndices(groupCount, layout.flipHorizontal)
       for (let visualG = 0; visualG < groupCount; visualG++) {
         const g = visualGroupIndices[visualG]
@@ -880,7 +972,7 @@ export function useExcelData() {
       const srcRow = getSourceRowIndex(r, seatsPerColumn, layout.flipVertical)
       const displayRow = getRowNumber(srcRow, seatsPerColumn, seatConfig.podiumPosition)
       const rowLabel = formatIndex(displayRow, numbering.rowNumberScheme)
-      if (layout.showRowNumbers) setCell(eRow, 0, `第${rowLabel}排`, styles.rowNum, 's', null, edgeBd(eRow, 0))
+      if (layout.showRowNumbers) setCell(eRow, rowNumberCol, `第${rowLabel}排`, styles.rowNum, 's', null, edgeBd(eRow, rowNumberCol))
       const visualGroupIndices = getOrderedIndices(groupCount, layout.flipHorizontal)
       for (let visualG = 0; visualG < groupCount; visualG++) {
         const g = visualGroupIndices[visualG]
@@ -891,29 +983,7 @@ export function useExcelData() {
           const seat = organizedSeats[g]?.[sourceCol]?.[srcRow]
           const serial = g * seatsPerGroup + sourceCol * seatsPerColumn + (srcRow + 1)
           const serialLabel = formatIndex(serial, numbering.serialNumberScheme)
-          if (!seat) {
-            setCell(eRow, eCol, '', styles.seat, 's', null, edgeBd(eRow, eCol))
-          } else if (seat.isEmpty) {
-            setCell(eRow, eCol, '空置', styles.empty, 's', null, edgeBd(eRow, eCol))
-          } else if (seat.studentId) {
-            const stu = studentMap.get(seat.studentId)
-            if (stu) {
-              const cellContent = formatCellContent(content.cellFormat, {
-                name: stu.name || '未命名',
-                studentId: layout.showStudentId ? (stu.studentNumber || '') : '',
-                rowLabel,
-                groupLabel,
-                serialLabel
-              })
-              const baseFont = { bold: true, sz: sizing.seatFontSize, color: { rgb: seatFontRgb } }
-              const richText = buildRichText(cellContent.richParts, baseFont)
-              setCell(eRow, eCol, cellContent.text, styles.seatName, 's', richText, edgeBd(eRow, eCol))
-            } else {
-              setCell(eRow, eCol, '', styles.seat, 's', null, edgeBd(eRow, eCol))
-            }
-          } else {
-            setCell(eRow, eCol, '', styles.vacant, 's', null, edgeBd(eRow, eCol))
-          }
+          setSeatLikeCell(eRow, eCol, seat, { rowLabel, groupLabel, serialLabel }, edgeBd(eRow, eCol))
         }
         if (layout.showGroupGap && visualG < groupCount - 1) {
           const gapCol = groupStartCol(visualG) + columnsPerGroup
@@ -922,14 +992,13 @@ export function useExcelData() {
       }
     }
 
-    if (layout.showPodium && !layout.flipVertical) {
-      const pRow = headerRowOffset + seatsPerColumn
-      for (let c = 0; c < totalCols; c++) setCell(pRow, c, c === 0 ? '讲台' : '', styles.podium, 's', null, edgeBd(pRow, c))
-      merges.push({ s: { r: pRow, c: 0 }, e: { r: pRow, c: totalCols - 1 } })
+    if (layout.showPodium && visualPodiumSide === 'bottom') {
+      setPodiumRow(headerRowOffset + seatsPerColumn)
     }
 
     ws['!cols'] = Array.from({ length: totalCols }, (_, c) => {
-      if (layout.showRowNumbers && c === 0) return { wch: 7 }
+      if (hasGuardSeatSlots && (c === guardLeftCol || c === guardRightCol)) return { wch: sizing.cellWidth }
+      if (layout.showRowNumbers && c === rowNumberCol) return { wch: 7 }
       const baseC = c - dataColOffset
       if (layout.showGroupGap) {
         if (baseC % (columnsPerGroup + 1) === columnsPerGroup) return { wch: 2 }
@@ -939,8 +1008,8 @@ export function useExcelData() {
     ws['!rows'] = Array.from({ length: totalSeatRows }, (_, r) => {
       if (layout.showTitle && r === 0) return { hpt: 28 }
       if (layout.showGroupLabels && r === titleRowOffset + podiumTopOffset) return { hpt: 22 }
-      if (layout.flipVertical && layout.showPodium && r === titleRowOffset) return { hpt: 22 }
-      if (!layout.flipVertical && r === totalSeatRows - 1 && layout.showPodium) return { hpt: 22 }
+      if (visualPodiumSide === 'top' && layout.showPodium && r === titleRowOffset) return { hpt: config.guardSeats.left || config.guardSeats.right ? sizing.seatRowHeight : 22 }
+      if (visualPodiumSide === 'bottom' && r === totalSeatRows - 1 && layout.showPodium) return { hpt: config.guardSeats.left || config.guardSeats.right ? sizing.seatRowHeight : 22 }
       return { hpt: sizing.seatRowHeight }
     })
 

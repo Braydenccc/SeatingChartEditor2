@@ -1,7 +1,15 @@
 import { ref, computed } from 'vue'
 import { useZoneData } from './useZoneData'
 import { useUndo } from './useUndo'
-import { parseSeatId, generateSeatId } from '@/utils/seatHelpers'
+import { parseSeatId, generateSeatId, generateGuardSeatId, isGuardSeatId } from '@/utils/seatHelpers'
+
+const DEFAULT_GUARD_SEATS_CONFIG = {
+  enabled: true,
+  leftEnabled: true,
+  rightEnabled: true,
+  includeInAutoAssignment: false,
+  hideEmptyOnExport: true
+}
 
 // 座位表配置
 const seatConfig = ref({
@@ -16,7 +24,8 @@ const seatConfig = ref({
     { columns: 2, rows: 7 }
   ],
   shiftDistance: 4,
-  podiumPosition: 'bottom'    // 讲台位置：'top'（顶部）或 'bottom'（底部）
+  podiumPosition: 'bottom',    // 讲台位置：'top'（顶部）或 'bottom'（底部）
+  guardSeats: { ...DEFAULT_GUARD_SEATS_CONFIG }
 })
 
 // 座位数据
@@ -67,6 +76,42 @@ function getPodiumPosition() {
   return normalizePodiumPosition(seatConfig.value.podiumPosition)
 }
 
+function normalizeGuardSeatsConfig(config = {}) {
+  const source = config || {}
+  return {
+    ...DEFAULT_GUARD_SEATS_CONFIG,
+    ...source,
+    enabled: source.enabled !== false,
+    leftEnabled: source.leftEnabled !== false,
+    rightEnabled: source.rightEnabled !== false,
+    includeInAutoAssignment: source.includeInAutoAssignment === true,
+    hideEmptyOnExport: source.hideEmptyOnExport !== false
+  }
+}
+
+function ensureGuardSeatsConfig() {
+  const normalized = normalizeGuardSeatsConfig(seatConfig.value.guardSeats)
+  const current = seatConfig.value.guardSeats
+  const changed = !current || Object.keys(DEFAULT_GUARD_SEATS_CONFIG).some(key => current[key] !== normalized[key])
+  if (changed) {
+    seatConfig.value.guardSeats = normalized
+  }
+  return seatConfig.value.guardSeats
+}
+
+function createGuardSeat(side) {
+  return {
+    id: generateGuardSeatId(side),
+    groupIndex: -1,
+    columnIndex: side === 'left' ? -1 : 1,
+    rowIndex: -1,
+    studentId: null,
+    isEmpty: false,
+    kind: 'guard',
+    guardSide: side
+  }
+}
+
 // 从 seats.value（响应式代理）重建索引，确保 Map 持有代理对象
 function rebuildSeatMap() {
   const newMap = new Map()
@@ -91,6 +136,7 @@ const updateSeatState = (seatId, updates, recordUndo = true) => {
   if (updates.studentId !== undefined && updates.studentId !== null && updates.studentId !== before.studentId) {
     const previousSeat = seats.value.find(s => s.studentId === updates.studentId && s.id !== seatId)
     previousSeatId = previousSeat?.id || null
+    if (previousSeat) previousSeat.studentId = null
   }
 
   Object.assign(seat, updates)
@@ -141,6 +187,7 @@ function initializeSeats() {
   const newSeats = []
   const { groupCount } = seatConfig.value
   ensureGroupsArray()
+  ensureGuardSeatsConfig()
 
   for (let g = 0; g < groupCount; g++) {
     const groupConfig = getGroupConfig(g)
@@ -152,11 +199,14 @@ function initializeSeats() {
           columnIndex: c,
           rowIndex: r,
           studentId: null,
-          isEmpty: false
+          isEmpty: false,
+          kind: 'regular'
         })
       }
     }
   }
+
+  newSeats.push(createGuardSeat('left'), createGuardSeat('right'))
 
   seats.value = newSeats
   rebuildSeatMap()
@@ -178,6 +228,7 @@ const organizedSeats = computed(() => {
 
   // 单次遍历分桶
   for (const seat of seats.value) {
+    if (seat.kind === 'guard' || isGuardSeatId(seat.id)) continue
     if (groups[seat.groupIndex] && groups[seat.groupIndex][seat.columnIndex]) {
       groups[seat.groupIndex][seat.columnIndex].push(seat)
     }
@@ -193,6 +244,22 @@ const organizedSeats = computed(() => {
   return groups
 })
 
+const guardSeats = computed(() => {
+  ensureGuardSeatsConfig()
+  return ['left', 'right']
+    .map(side => seatMap.get(generateGuardSeatId(side)))
+    .filter(Boolean)
+})
+
+const visibleGuardSeats = computed(() => {
+  const config = ensureGuardSeatsConfig()
+  if (!config.enabled) return []
+  return guardSeats.value.filter(seat => (
+    (seat.guardSide === 'left' && config.leftEnabled) ||
+    (seat.guardSide === 'right' && config.rightEnabled)
+  ))
+})
+
 export function useSeatChart() {
   const { cleanupInvalidSeats } = useZoneData()
 
@@ -200,9 +267,10 @@ export function useSeatChart() {
   const assignStudent = (seatId, studentId, recordUndo = true) => {
     const seat = seatMap.get(seatId)
     if (seat && !seat.isEmpty) {
+      const previousSeat = seats.value.find(s => s.studentId === studentId && s.id !== seatId)
+      if (previousSeat) previousSeat.studentId = null
       if (recordUndo) {
         const { recordAssign } = useUndo()
-        const previousSeat = seats.value.find(s => s.studentId === studentId && s.id !== seatId)
         seat.studentId = studentId
         recordAssign(seatId, studentId, previousSeat?.id || null)
       } else {
@@ -217,6 +285,7 @@ export function useSeatChart() {
   const toggleEmpty = (seatId, recordUndo = true) => {
     const seat = seatMap.get(seatId)
     if (seat) {
+      if (seat.kind === 'guard' || isGuardSeatId(seat.id)) return
       if (recordUndo) {
         const { recordToggleEmpty } = useUndo()
         recordToggleEmpty(seatId)
@@ -414,7 +483,7 @@ export function useSeatChart() {
       if ((key === 'alignment' || key === 'seatAlignment') && value !== undefined && value !== null && validConfig.podiumPosition === undefined) {
         validConfig.podiumPosition = normalizePodiumPosition(value)
       } else if (key !== 'alignment' && key !== 'seatAlignment' && value !== undefined && value !== null) {
-        validConfig[key] = value
+        validConfig[key] = key === 'guardSeats' ? normalizeGuardSeatsConfig(value) : value
       }
     }
     if (validConfig.podiumPosition !== undefined) {
@@ -424,9 +493,10 @@ export function useSeatChart() {
     delete seatConfig.value.alignment
     delete seatConfig.value.seatAlignment
     ensureGroupsArray()
+    ensureGuardSeatsConfig()
     initializeSeats()  // 重新初始化座位
     // 清理选区中已失效的座位引用
-    cleanupInvalidSeats(seats.value.map(s => s.id))
+    cleanupInvalidSeats(seats.value.filter(s => s.kind !== 'guard').map(s => s.id))
   }
 
   // 获取座位上的学生ID
@@ -483,13 +553,20 @@ export function useSeatChart() {
   }
 
   // 获取所有可用座位(非空置)
-  const getAvailableSeats = () => {
-    return seats.value.filter(seat => !seat.isEmpty)
+  const getAvailableSeats = (includeGuardSeats = false) => {
+    const config = ensureGuardSeatsConfig()
+    return seats.value.filter(seat => {
+      if (seat.isEmpty) return false
+      if (seat.kind !== 'guard' && !isGuardSeatId(seat.id)) return true
+      return includeGuardSeats && config.enabled &&
+        ((seat.guardSide === 'left' && config.leftEnabled) ||
+          (seat.guardSide === 'right' && config.rightEnabled))
+    })
   }
 
   // 获取所有空座位(无学生且非空置)
-  const getEmptySeats = () => {
-    return seats.value.filter(seat => !seat.isEmpty && seat.studentId === null)
+  const getEmptySeats = (includeGuardSeats = false) => {
+    return getAvailableSeats(includeGuardSeats).filter(seat => seat.studentId === null)
   }
 
   // ==================== 座位距离与相邻性 ====================
@@ -726,6 +803,8 @@ export function useSeatChart() {
     seatConfig,
     seats,
     organizedSeats,
+    guardSeats,
+    visibleGuardSeats,
     initializeSeats,
     assignStudent,
     toggleEmpty,
@@ -765,6 +844,9 @@ export function useSeatChart() {
     hasSeat,
     getSeat,
     generateSeatId,
+    generateGuardSeatId,
+    isGuardSeatId,
+    normalizeGuardSeatsConfig,
     toGlobalCol,
     fromGlobalCol
   }

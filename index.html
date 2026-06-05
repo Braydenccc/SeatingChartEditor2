@@ -38,10 +38,11 @@
 
   <title>BSCEv2</title>
 
-  <!-- Preconnect and Preload Critical Fonts -->
+  <!-- Preconnect and Async Load Fonts -->
   <link rel="preconnect" href="https://fonts.proxy.ustclug.org">
   <link rel="preconnect" href="https://fonts-gstatic.proxy.ustclug.org" crossorigin>
-  <link href="https://fonts.proxy.ustclug.org/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preload" href="https://fonts.proxy.ustclug.org/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link href="https://fonts.proxy.ustclug.org/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 
   <!-- Critical Path CSS: 提升首次内容渲染 (FCP) 速度，消除白屏感 -->
   <style>
@@ -105,31 +106,51 @@
   <div id="app"></div>
   
   <script>
-    // 监听 Vue 挂载完成，隐藏 loading 占位符
-    function hideLoading() {
+    (function () {
+      // 监听 Vue 挂载完成，隐藏 loading 占位符
+      function hideLoading() {
+        const loading = document.getElementById('initial-loading')
+        if (loading) {
+          loading.style.display = 'none'
+        }
+      }
+
+      window.__SCE_HIDE_INITIAL_LOADING__ = hideLoading
+
+      function hideWhenAppHasContent() {
+        const app = document.getElementById('app')
+        if (app && app.children.length > 0) {
+          hideLoading()
+          return true
+        }
+        return false
+      }
+
       const loading = document.getElementById('initial-loading')
-      if (loading) {
-        loading.style.display = 'none'
-      }
-    }
-    
-    // 备份原来的 console.log，用于检测 Vue 挂载
-    // 或者使用 MutationObserver 监听 #app 的变化
-    const observer = new MutationObserver(function(mutations) {
       const app = document.getElementById('app')
-      if (app && app.children.length > 0) {
-        hideLoading()
-        observer.disconnect()
+      if (!loading || !app) {
+        return
       }
-    })
-    
-    const app = document.getElementById('app')
-    if (app) {
-      observer.observe(app, { childList: true, subtree: true })
-    }
-    
-    // 超时保护：5秒后强制隐藏 loading，避免无限等待
-    setTimeout(hideLoading, 5000)
+
+      if (hideWhenAppHasContent()) {
+        return
+      }
+
+      if ('MutationObserver' in window) {
+        const observer = new MutationObserver(function () {
+          if (hideWhenAppHasContent()) {
+            observer.disconnect()
+          }
+        })
+        observer.observe(app, { childList: true, subtree: true })
+      } else {
+        const timer = setInterval(function () {
+          if (hideWhenAppHasContent()) {
+            clearInterval(timer)
+          }
+        }, 100)
+      }
+    })()
   </script>
   <script type="module" src="/src/main.js"></script>
 </body>

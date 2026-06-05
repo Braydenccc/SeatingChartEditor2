@@ -2,10 +2,18 @@ import { useSeatChart } from './useSeatChart'
 import { useStudentData } from './useStudentData'
 import { useTagData } from './useTagData'
 import { useExportSettings } from './useExportSettings'
-import { createOrderedSeatGroups, getExportFlips, getVisualRowNumber } from '@/utils/exportLayout'
+import {
+  createOrderedSeatGroups,
+  getGuardSideForVisualSlot,
+  getCenteredPodiumLayout,
+  getEffectivePodiumPosition,
+  getExportFlips,
+  getImageExportVerticalLayout,
+  getVisualRowNumber
+} from '@/utils/exportLayout'
 
 export function useImageExport() {
-  const { seatConfig, organizedSeats } = useSeatChart()
+  const { seatConfig, organizedSeats, visibleGuardSeats } = useSeatChart()
   const { students } = useStudentData()
   const { tags } = useTagData()
   const { exportSettings } = useExportSettings()
@@ -88,22 +96,54 @@ export function useImageExport() {
         const TITLE_HEIGHT = exportSettings.value.showTitle ? 60 : 0
         const ROW_NUMBER_WIDTH = exportSettings.value.showRowNumbers ? 40 : 0
         const GROUP_LABEL_HEIGHT = exportSettings.value.showGroupLabels ? 50 : 0
-        const PODIUM_HEIGHT = exportSettings.value.showPodium ? 60 : 0
         const flips = getExportFlips(exportSettings.value)
+        const visualPodiumSide = getEffectivePodiumPosition(seatConfig.value.podiumPosition, flips.flipVertical)
+        const isPodiumTop = visualPodiumSide === 'top'
+        const guardConfig = seatConfig.value.guardSeats || {}
+        const hideEmptyGuardSeats = guardConfig.hideEmptyOnExport !== false
+        const shouldDrawGuardSeats = exportSettings.value.showPodium && guardConfig.enabled !== false
+        const leftGuardSide = getGuardSideForVisualSlot('left', visualPodiumSide)
+        const rightGuardSide = getGuardSideForVisualSlot('right', visualPodiumSide)
+        const guardSeatLeft = shouldDrawGuardSeats
+          ? visibleGuardSeats.value.find(seat => seat.guardSide === leftGuardSide && (seat.studentId || !hideEmptyGuardSeats))
+          : null
+        const guardSeatRight = shouldDrawGuardSeats
+          ? visibleGuardSeats.value.find(seat => seat.guardSide === rightGuardSide && (seat.studentId || !hideEmptyGuardSeats))
+          : null
+        const hasGuardSeatInExport = !!guardSeatLeft || !!guardSeatRight
+        const PODIUM_HEIGHT = exportSettings.value.showPodium ? (hasGuardSeatInExport ? SEAT_HEIGHT : 60) : 0
 
         // 计算内容尺寸
         const groupWidth = seatConfig.value.columnsPerGroup * SEAT_WIDTH +
           (seatConfig.value.columnsPerGroup - 1) * COL_GAP
-        const contentWidth = ROW_NUMBER_WIDTH * 2 +
+        const seatTableWidth = ROW_NUMBER_WIDTH * 2 +
           seatConfig.value.groupCount * groupWidth +
-          (seatConfig.value.groupCount - 1) * GROUP_GAP +
-          2 * PADDING
-        const contentHeight = TITLE_HEIGHT +
-          seatConfig.value.seatsPerColumn * SEAT_HEIGHT +
-          (seatConfig.value.seatsPerColumn - 1) * ROW_GAP +
-          GROUP_LABEL_HEIGHT +
-          PODIUM_HEIGHT +
-          2 * PADDING
+          (seatConfig.value.groupCount - 1) * GROUP_GAP
+        const podiumWidth = SEAT_WIDTH * 4 + COL_GAP * 3
+        const podiumLayout = getCenteredPodiumLayout({
+          seatTableWidth,
+          podiumWidth: exportSettings.value.showPodium ? podiumWidth : 0,
+          sideSeatWidth: SEAT_WIDTH,
+          gap: COL_GAP,
+          hasLeftSideSeat: !!guardSeatLeft,
+          hasRightSideSeat: !!guardSeatRight
+        })
+        const innerContentWidth = podiumLayout.innerContentWidth
+        const contentWidth = innerContentWidth + 2 * PADDING
+        const verticalLayout = getImageExportVerticalLayout({
+          titleHeight: TITLE_HEIGHT,
+          seatRowCount: seatConfig.value.seatsPerColumn,
+          seatHeight: SEAT_HEIGHT,
+          rowGap: ROW_GAP,
+          groupLabelHeight: GROUP_LABEL_HEIGHT,
+          podiumHeight: PODIUM_HEIGHT,
+          padding: PADDING,
+          showPodium: exportSettings.value.showPodium,
+          showGroupLabels: exportSettings.value.showGroupLabels,
+          isPodiumTop,
+          areGroupLabelsAboveSeats: flips.flipVertical
+        })
+        const contentHeight = verticalLayout.contentHeight
 
         // A4 尺寸 (300 DPI): 2480 × 3508
         const A4_SHORT = 2480
@@ -156,12 +196,9 @@ export function useImageExport() {
         }
 
         // 座位表起始位置
-        let seatStartY = PADDING + TITLE_HEIGHT
-        if (flips.flipVertical) {
-          if (exportSettings.value.showPodium) seatStartY += PODIUM_HEIGHT
-          if (exportSettings.value.showGroupLabels) seatStartY += GROUP_LABEL_HEIGHT
-        }
-        const seatStartX = PADDING + ROW_NUMBER_WIDTH
+        const seatStartY = verticalLayout.seatStartY
+        const tableLeft = PADDING + podiumLayout.seatTableLeft
+        const seatStartX = tableLeft + ROW_NUMBER_WIDTH
 
         // 绘制左右行号
         if (exportSettings.value.showRowNumbers) {
@@ -180,10 +217,10 @@ export function useImageExport() {
             )
 
             // 左侧行号
-            ctx.fillText(rowNumber.toString(), PADDING + ROW_NUMBER_WIDTH / 2, rowY)
+            ctx.fillText(rowNumber.toString(), tableLeft + ROW_NUMBER_WIDTH / 2, rowY)
 
             // 右侧行号
-            ctx.fillText(rowNumber.toString(), contentWidth - PADDING - ROW_NUMBER_WIDTH / 2, rowY)
+            ctx.fillText(rowNumber.toString(), tableLeft + seatTableWidth - ROW_NUMBER_WIDTH / 2, rowY)
           }
         }
 
@@ -225,23 +262,57 @@ export function useImageExport() {
         }
 
         // 绘制讲台（翻转时讲台在顶部，正序时在底部）
-        if (exportSettings.value.showPodium) {
-          const podiumY = flips.flipVertical
-            ? PADDING + TITLE_HEIGHT + 10  // 顶部，Title下方
-            : contentHeight - PADDING - PODIUM_HEIGHT + 10  // 底部
-          const podiumWidth = SEAT_WIDTH * 4 + COL_GAP * 3
-          const podiumX = (contentWidth - podiumWidth) / 2
+        if (exportSettings.value.showPodium && verticalLayout.podiumRowY !== null) {
+          const podiumRowY = verticalLayout.podiumRowY
+          const podiumBlockHeight = 40
+          const guardY = podiumRowY + (PODIUM_HEIGHT - SEAT_HEIGHT) / 2
+          const podiumY = podiumRowY + (PODIUM_HEIGHT - podiumBlockHeight) / 2
+          const podiumX = PADDING + podiumLayout.podiumLeft
+
+          if (guardSeatLeft) {
+            drawSeat(
+              ctx,
+              PADDING + podiumLayout.leftSideSeatLeft,
+              guardY,
+              SEAT_WIDTH,
+              SEAT_HEIGHT,
+              SEAT_RADIUS,
+              guardSeatLeft,
+              isBW,
+              isPureBW,
+              borderColor,
+              emptyBorderColor,
+              vacantBorderColor
+            )
+          }
 
           ctx.strokeStyle = primaryColor
           ctx.lineWidth = 3
-          drawRoundRect(ctx, podiumX, podiumY, podiumWidth, 40, 6)
+          drawRoundRect(ctx, podiumX, podiumY, podiumWidth, podiumBlockHeight, 6)
           ctx.stroke()
 
           ctx.fillStyle = primaryColor
           ctx.font = `bold ${exportSettings.value.fontSizePodium}px Microsoft YaHei, Arial, sans-serif`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          ctx.fillText('讲台', podiumX + podiumWidth / 2, podiumY + 20)
+          ctx.fillText('讲台', podiumX + podiumWidth / 2, podiumY + podiumBlockHeight / 2)
+
+          if (guardSeatRight) {
+            drawSeat(
+              ctx,
+              PADDING + podiumLayout.rightSideSeatLeft,
+              guardY,
+              SEAT_WIDTH,
+              SEAT_HEIGHT,
+              SEAT_RADIUS,
+              guardSeatRight,
+              isBW,
+              isPureBW,
+              borderColor,
+              emptyBorderColor,
+              vacantBorderColor
+            )
+          }
         }
 
         ctx.restore()

@@ -69,6 +69,34 @@
         </div>
       </div>
 
+      <div class="setting-item">
+        <label class="setting-label">左右护法</label>
+        <div class="guard-options">
+          <label class="check-item">
+            <input type="checkbox" v-model="guardConfig.enabled" />
+            <span>启用左右护法</span>
+          </label>
+          <div v-if="guardConfig.enabled" class="guard-sub-options">
+            <label class="check-item">
+              <input type="checkbox" v-model="guardConfig.leftEnabled" />
+              <span>左护法</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" v-model="guardConfig.rightEnabled" />
+              <span>右护法</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" v-model="guardConfig.includeInAutoAssignment" />
+              <span>参与智能排位</span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" v-model="guardConfig.hideEmptyOnExport" />
+              <span>导出时隐藏空护法位</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div class="warning-box">
         <AlertCircle :size="16" />
         <span>修改配置后需要点击底部"保存"按钮才会生效</span>
@@ -98,10 +126,19 @@ import { useSidebar } from '@/composables/useSidebar'
 
 const emit = defineEmits(['update:visible'])
 
-const { seatConfig, regenerateSeats } = useSeatChart()
+const { seatConfig, regenerateSeats, normalizeGuardSeatsConfig } = useSeatChart()
 const { setActiveTab } = useSidebar()
 
 const localConfig = computed(() => seatConfig.value)
+
+const guardConfig = computed(() => {
+  if (!localConfig.value.guardSeats) {
+    localConfig.value.guardSeats = normalizeGuardSeatsConfig()
+  } else {
+    Object.assign(localConfig.value.guardSeats, normalizeGuardSeatsConfig(localConfig.value.guardSeats))
+  }
+  return localConfig.value.guardSeats
+})
 
 // 监听配置变化，自动初始化 groups 数组
 watch(() => localConfig.value.groupCount, (newCount) => {
@@ -214,6 +251,28 @@ const openAdvancedConfig = () => {
   gap: 8px;
 }
 
+.guard-options,
+.guard-sub-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guard-sub-options {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
 .option-btn {
   flex: 1;
   padding: 10px 16px;
@@ -234,7 +293,7 @@ const openAdvancedConfig = () => {
 .option-btn.active {
   border-color: var(--color-primary);
   background: var(--color-info-bg);
-  color: var(--color-primary);
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 

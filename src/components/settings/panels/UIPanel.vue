@@ -1059,7 +1059,7 @@ watch(() => localSettings.value.customColors, () => {
 .scheme-radio:checked + .scheme-card {
   background: var(--color-bg-selected);
   border-color: var(--color-primary);
-  color: var(--color-primary);
+  color: var(--color-text-primary);
 }
 
 .custom-colors-section {
@@ -1184,6 +1184,7 @@ watch(() => localSettings.value.customColors, () => {
 .tag-mode-option.active {
   background: var(--color-bg-selected);
   border-color: var(--color-primary);
+  color: var(--color-text-primary);
 }
 
 .tag-mode-option input[type="radio"] {

@@ -279,11 +279,11 @@ const handleReset = () => {
 }
 
 .tab-button:hover {
-  color: var(--color-primary);
+  color: var(--color-text-primary);
 }
 
 .tab-button.active {
-  color: var(--color-primary);
+  color: var(--color-text-primary);
   border-bottom-color: var(--color-primary);
   font-weight: 500;
 }
@@ -319,12 +319,12 @@ const handleReset = () => {
 
 .nav-item:hover {
   background: var(--color-bg-hover);
-  color: var(--color-primary);
+  color: var(--color-text-primary);
 }
 
 .nav-item.active {
   background: var(--color-bg-selected);
-  color: var(--color-primary);
+  color: var(--color-text-primary);
   font-weight: 500;
   border-right: 3px solid var(--color-primary);
 }
@@ -443,7 +443,7 @@ const handleReset = () => {
 
   .sub-tab-btn:hover {
     background: var(--color-bg-hover);
-    color: var(--color-primary);
+    color: var(--color-text-primary);
   }
 
   .sub-tab-btn.active {

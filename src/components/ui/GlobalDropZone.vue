@@ -18,7 +18,7 @@ import { useSeatChart } from '@/composables/useSeatChart'
 import { useStudentData } from '@/composables/useStudentData'
 import { useLogger } from '@/composables/useLogger'
 
-const { isDraggingFromSeat } = useDragState()
+const { isDraggingFromSeat, endDragFromSeat } = useDragState()
 const { clearSeat } = useSeatChart()
 const { clearSelection, students } = useStudentData()
 const { success } = useLogger()
@@ -45,7 +45,7 @@ const handleDragLeave = (e) => {
 
 const handleDrop = (e) => {
   isDragOver.value = false
-  const raw = e.dataTransfer.getData('application/json')
+  const raw = getDragData(e)
   if (!raw) return
 
   try {
@@ -57,7 +57,13 @@ const handleDrop = (e) => {
     }
   } catch {
     // ignore
+  } finally {
+    endDragFromSeat()
   }
+}
+
+const getDragData = (e) => {
+  return e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain')
 }
 </script>
 

@@ -35,6 +35,16 @@ describe('useDragState', () => {
 
       expect(isDraggingFromSeat.value).toBe(false)
     })
+
+    it('should notify seat items to clean drag visuals', () => {
+      const { dragCleanupVersion, startDragFromSeat, endDragFromSeat } = useDragState()
+      const before = dragCleanupVersion.value
+
+      startDragFromSeat()
+      endDragFromSeat()
+
+      expect(dragCleanupVersion.value).toBe(before + 1)
+    })
   })
 
   describe('startTouchDragFromSeat', () => {

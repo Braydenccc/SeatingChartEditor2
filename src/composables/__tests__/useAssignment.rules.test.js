@@ -15,6 +15,26 @@ describe('useAssignment - Rule Combinations', () => {
     zoneData = useZoneData()
     assignment = useAssignment()
 
+    seatChart.updateConfig({
+      groupCount: 4,
+      columnsPerGroup: 2,
+      seatsPerColumn: 7,
+      groups: [
+        { columns: 2, rows: 7 },
+        { columns: 2, rows: 7 },
+        { columns: 2, rows: 7 },
+        { columns: 2, rows: 7 }
+      ],
+      shiftDistance: 4,
+      podiumPosition: 'bottom',
+      guardSeats: {
+        enabled: true,
+        leftEnabled: true,
+        rightEnabled: true,
+        includeInAutoAssignment: false,
+        hideEmptyOnExport: true
+      }
+    })
     studentData.clearAllStudents()
     seatChart.clearAllSeats()
     seatRules.clearAllRules()
@@ -22,6 +42,52 @@ describe('useAssignment - Rule Combinations', () => {
   })
 
   describe('Single Rule Effectiveness', () => {
+    it('should handle guard seats in auto assignment with coordinate-based rules', async () => {
+      seatChart.updateConfig({
+        groupCount: 1,
+        columnsPerGroup: 1,
+        seatsPerColumn: 1,
+        groups: [{ columns: 1, rows: 1 }],
+        guardSeats: {
+          enabled: true,
+          leftEnabled: true,
+          rightEnabled: true,
+          includeInAutoAssignment: true,
+          hideEmptyOnExport: true
+        }
+      })
+
+      const studentIds = []
+      for (let i = 0; i < 3; i++) {
+        studentIds.push(studentData.addStudent())
+      }
+
+      seatRules.addRule({
+        predicate: 'DISTRIBUTE_EVENLY',
+        priority: 'prefer',
+        enabled: true,
+        subjects: studentIds.map(id => ({ type: 'person', id })),
+        params: {}
+      })
+      seatRules.addRule({
+        predicate: 'DISTANCE_AT_LEAST',
+        priority: 'optional',
+        enabled: true,
+        subjects: [
+          { type: 'person', id: studentIds[0] },
+          { type: 'person', id: studentIds[1] }
+        ],
+        params: { distance: 2 }
+      })
+
+      const result = await assignment.runSmartAssignment({ useRules: true, iterations: 20 })
+
+      expect(result.success).toBe(true)
+      expect(result.message).not.toContain('NaN')
+      expect(seatChart.seats.value.filter(seat => seat.studentId !== null)).toHaveLength(3)
+      expect(seatChart.seats.value.filter(seat => seat.kind === 'guard' && seat.studentId !== null)).toHaveLength(2)
+    })
+
     it('should satisfy IN_ROW_RANGE rule', async () => {
       seatChart.updateConfig({
         groupCount: 1,

@@ -1,6 +1,6 @@
 import { ref, onUnmounted } from 'vue'
 import { safeStorageGet, safeStorageSet } from '@/utils/storage'
-import { hexToRgb as utilHexToRgb } from '@/utils/colorContrast'
+import { getContrastRatio, hexToRgb as utilHexToRgb } from '@/utils/colorContrast'
 
 // 默认设置结构
 const defaultSettings = {
@@ -68,6 +68,9 @@ const defaultSettings = {
 const settings = ref(JSON.parse(JSON.stringify(defaultSettings)))
 
 const STORAGE_KEY = 'sce-global-settings'
+const WHITE_RGB = { r: 255, g: 255, b: 255 }
+const BLACK_RGB = { r: 0, g: 0, b: 0 }
+const DARK_SURFACE_RGB = { r: 30, g: 41, b: 59 }
 
 /**
  * 从 localStorage 加载设置
@@ -194,6 +197,48 @@ const applyColorScheme = () => {
   void root.offsetHeight
 }
 
+const rgbToHex = ({ r, g, b }) => {
+  const toHex = (value) => Math.min(255, Math.max(0, Math.round(value))).toString(16).padStart(2, '0')
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+const mixRgb = (color, target, weight) => ({
+  r: color.r + (target.r - color.r) * weight,
+  g: color.g + (target.g - color.g) * weight,
+  b: color.b + (target.b - color.b) * weight
+})
+
+const mixHex = (color, target, weight) => {
+  const rgb = utilHexToRgb(color)
+  if (!rgb || !target) return color
+  return rgbToHex(mixRgb(rgb, target, weight))
+}
+
+const isDarkSimpleScheme = () => {
+  const { colorScheme } = settings.value.ui
+  if (colorScheme === 'dark') return true
+  if (colorScheme !== 'auto') return false
+
+  return typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
+const getReadableDarkPrimary = (color) => {
+  const rgb = utilHexToRgb(color)
+  if (!rgb || getContrastRatio(rgb, DARK_SURFACE_RGB) >= 4.5) return color
+
+  for (let weight = 0.1; weight <= 0.8; weight += 0.1) {
+    const candidateRgb = mixRgb(rgb, WHITE_RGB, weight)
+    if (getContrastRatio(candidateRgb, DARK_SURFACE_RGB) >= 4.5) {
+      const candidate = rgbToHex(candidateRgb)
+      return candidate
+    }
+  }
+
+  return rgbToHex(mixRgb(rgb, WHITE_RGB, 0.8))
+}
+
 // 应用主题色到 CSS 变量
 const applyThemeColor = () => {
   const { colorMode, themeColor, customColors } = settings.value.ui
@@ -202,8 +247,14 @@ const applyThemeColor = () => {
   if (colorMode === 'simple') {
     // 简单模式：只应用主题色
     if (themeColor) {
-      root.style.setProperty('--color-primary', themeColor)
-      root.style.setProperty('--color-primary-rgb', hexToRgb(themeColor))
+      const isDark = isDarkSimpleScheme()
+      const primary = isDark ? getReadableDarkPrimary(themeColor) : themeColor
+
+      root.style.setProperty('--color-primary', primary)
+      root.style.setProperty('--color-primary-rgb', hexToRgb(primary))
+      root.style.setProperty('--color-primary-light', mixHex(primary, WHITE_RGB, 0.18))
+      root.style.setProperty('--color-primary-dark', mixHex(primary, BLACK_RGB, isDark ? 0.08 : 0.24))
+      root.style.setProperty('--color-primary-hover', mixHex(primary, isDark ? WHITE_RGB : BLACK_RGB, isDark ? 0.12 : 0.18))
     }
   } else {
     // 定制模式：应用所有自定义颜色

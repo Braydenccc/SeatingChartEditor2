@@ -1,6 +1,7 @@
 <template>
   <div class="seat-item" :class="{
     empty: seat.isEmpty,
+    guard: isGuardSeat,
     occupied: hasStudent,
     selected: isFirstSelected,
     clickable: isClickable,
@@ -59,13 +60,13 @@
       </div>
     </template>
     <div v-else class="empty-seat">
-      <span class="seat-placeholder">空位</span>
+      <span class="seat-placeholder">{{ isGuardSeat ? guardSeatLabel : '空位' }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onUnmounted, shallowRef } from 'vue'
+import { computed, ref, onUnmounted, shallowRef, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useStudentData } from '@/composables/useStudentData'
 import { useEditMode } from '@/composables/useEditMode'
@@ -97,7 +98,7 @@ const { visibleZoneSeats, selectedZoneId, toggleSeatInZone } = useZoneData()
 const { editingZoneId, getRotZoneHighlights, toggleSeatInEditingZone } = useZoneRotation()
 const { tags, showTagsInSeatChart, tagDisplayMode } = useTagData()
 const { isHighlighted } = useUndo()
-const { startDragFromSeat, endDragFromSeat, startTouchDragFromSeat, endTouchDragFromSeat } = useDragState()
+const { dragCleanupVersion, startDragFromSeat, endDragFromSeat, startTouchDragFromSeat, endTouchDragFromSeat } = useDragState()
 const { selectedSeatIds, selectedSeatsArray, isDraggingSelection, startDraggingSelection, endDraggingSelection, isSelectionMode, toggleSeatInSelection } = useSelection()
 const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
 const { settings } = useGlobalSettings()
@@ -111,6 +112,7 @@ const largeNumberMode = computed(() => showStudentNumber.value && hasHiddenEleme
 const isDragOver = ref(false)
 const isDragging = ref(false)
 let dragEnterCount = 0
+let transparentDragImageEl = null
 
 // 响应式断点检测
 const isMobile = useMediaQuery('(max-width: 768px)')
@@ -134,6 +136,10 @@ let touchStartY = 0
 const lastPointerWasTouch = shallowRef(false)
 
 // ==================== 计算属性 ====================
+
+const isGuardSeat = computed(() => props.seat.kind === 'guard')
+
+const guardSeatLabel = computed(() => props.seat.guardSide === 'right' ? '右护法' : '左护法')
 
 const hasStudent = computed(() => {
   return props.seat.studentId !== null && !props.seat.isEmpty
@@ -185,15 +191,15 @@ const zoneHighlightStyle = computed(() => {
 
 const isClickable = computed(() => {
   // 手机端选择模式：所有座位都可点击
-  if (isMobile.value && isSelectionMode.value) return true
+  if (isMobile.value && isSelectionMode.value) return !isGuardSeat.value
 
   if (currentMode.value === EditMode.NORMAL) {
     return selectedStudentId.value !== null && !props.seat.isEmpty
   }
-  if (currentMode.value === EditMode.EMPTY_EDIT) return true
+  if (currentMode.value === EditMode.EMPTY_EDIT) return !isGuardSeat.value
   if (currentMode.value === EditMode.SWAP) return true
   if (currentMode.value === EditMode.CLEAR) return hasStudent.value
-  if (currentMode.value === EditMode.ZONE_EDIT) return true
+  if (currentMode.value === EditMode.ZONE_EDIT) return !isGuardSeat.value
   return false
 })
 
@@ -242,7 +248,7 @@ const handleClick = () => {
   if (!isClickable.value) return
 
   // 手机端选择模式：点击切换选中状态
-  if (isMobile.value && isSelectionMode.value) {
+  if (isMobile.value && isSelectionMode.value && !isGuardSeat.value) {
     toggleSeatInSelection(props.seat.id)
     return
   }
@@ -309,18 +315,34 @@ const handleDragStart = (e) => {
 
   emit('drag-start-seat', props.seat.id, isSelection)
 
-  e.dataTransfer.setData('application/json', JSON.stringify({
+  const dragData = JSON.stringify({
     type: 'seat',
     seatId: props.seat.id,
     studentId: props.seat.studentId,
     selectedSeatIds: selectionData
-  }))
+  })
+  e.dataTransfer.setData('application/json', dragData)
+  e.dataTransfer.setData('text/plain', dragData)
 
-  const emptyImg = new Image()
-  emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-  e.dataTransfer.setDragImage(emptyImg, 0, 0)
+  e.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0)
 
   startDragPreview(props.seat.id, selectionData, e.clientX, e.clientY)
+}
+
+const getTransparentDragImage = () => {
+  if (transparentDragImageEl) return transparentDragImageEl
+
+  const el = document.createElement('div')
+  el.style.position = 'fixed'
+  el.style.left = '-1px'
+  el.style.top = '-1px'
+  el.style.width = '1px'
+  el.style.height = '1px'
+  el.style.opacity = '0'
+  el.style.pointerEvents = 'none'
+  document.body.appendChild(el)
+  transparentDragImageEl = el
+  return el
 }
 
 const handleDragEnd = () => {
@@ -354,6 +376,12 @@ const handleDrop = () => {
   isDragOver.value = false
   dragEnterCount = 0
 }
+
+watch(dragCleanupVersion, () => {
+  isDragging.value = false
+  isDragOver.value = false
+  dragEnterCount = 0
+})
 
 // ==================== 触摸拖拽模拟 ====================
 
@@ -391,7 +419,7 @@ const handleTouchMove = (e) => {
   const dy = touch.clientY - touchStartY
   const moved = Math.abs(dx) > 5 || Math.abs(dy) > 5
 
-  if (isMobile.value && isSelectionMode.value && !touchDragActive && !touchSelectionActive && moved) {
+  if (!isGuardSeat.value && isMobile.value && isSelectionMode.value && !touchDragActive && !touchSelectionActive && moved) {
     if (touchDragTimer) {
       clearTimeout(touchDragTimer)
       touchDragTimer = null
@@ -707,6 +735,21 @@ onUnmounted(() => {
 .seat-item.occupied {
   background: var(--color-bg-selected);
   border-color: var(--color-primary);
+}
+
+.seat-item.guard {
+  border-style: dashed;
+  background: var(--color-bg-secondary);
+}
+
+.seat-item.guard.occupied {
+  border-style: solid;
+  background: var(--color-bg-selected);
+}
+
+.seat-item.guard .seat-placeholder {
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
 .student-display {

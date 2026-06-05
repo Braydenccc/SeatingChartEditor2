@@ -32,7 +32,9 @@ let currentReverse = new Map<SeatId, StudentId>() // 用于以 O(1) 交换两人
 - **聪明的首批种子 (`generateInitialSolution`)**: 没有让系统完全从零随机。算法第一步是一个针对 `RulePriority.REQUIRED` 规则的“贪心硬排”：它会自动扫描所有要求“必须在第1排”的人，起手就直接锁在第1排的空位上，这一步能瞬间节约 80% 的退火山头寻找时间。
 - **偏向变异 (`violatingStudents` list)**: 这是本项目最大的魔法。正常退火是随机抽 2 人换位置，但在 `useAssignment.js` 中，每次循环都会预先整理出一批**“正在犯规的人的名单”**。变异（抽人换座位）时，有 $70\%$ 的概率强制要求动的是有犯规在身的人！极大地抹平了无用功迭代。
 - **线程脱离避卡 (`setTimeout(0)`)**: JavaScript 是单线程的，死循环 5w 次计算会锁死标签页。本项目规定每隔 1000 次执行一次 `await new Promise(r => setTimeout(r, 0))`，向主 UI 框架注入呼吸孔，使画面进度条 `assignmentProgress.value` 可以持续滚动更新。
+- **护法位参与排位**: `getAvailableSeats()` 默认不返回左右护法位；只有 `seatConfig.guardSeats.includeInAutoAssignment === true` 时，智能排位才会把 `guard-left` / `guard-right` 纳入基础候选座位。护法位没有普通行列坐标：单人行/组/区域正向规则会视为不满足，负向规则视为不违规；同桌、同组、相邻排、最大距离等需要普通坐标才能满足的正向关系会视为不满足；分散/聚集这类整体坐标统计会跳过护法位，避免 `parseSeatId()` 读取出 `NaN`。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **禁止在循环中分配大对象**: 在 `runAnnealingLoop` 中，任何 `array.map()`，`filter()` 或 `{...foo}` 的克隆产生都会在一个回合中累积到 50,000 次以上。不要在内循环里添加复杂的内存开销，使用普通的 `let/for/...`。
 - **分数累减逻辑**: 增加对新规则的识别时，注意去找 `checkViolation` 和 `evaluateScore` 两个内部函数，按照惩罚系统 (`PENALTY_WEIGHTS.optional = 100`) 往下减分，如果违背程度更深（比如要求离3格远但现在贴一起），还要给叠加乘数扣分。
+- **特殊座位防护**: 所有直接调用 `parseSeatId()` 的新规则都必须先排除 `isGuardSeatId(seatId)`。护法位可以被分配学生、交换、撤销，但不能参与普通座位的距离、前后排、同桌、全局列等几何计算。

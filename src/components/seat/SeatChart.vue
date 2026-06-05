@@ -83,6 +83,7 @@
     </div>
 
     <div ref="viewportRef" class="seat-chart-viewport" :class="{ 'is-panning': isPanning }" @wheel.prevent="handleWheel"
+      @click.capture="handleViewportClickCapture"
       @mousedown="handleMouseDown" @mousemove="handleMouseMove" @mouseup="handleMouseUp" @mouseleave="handleMouseUp"
       @touchstart="handleTouchStart" @touchmove.prevent="handleTouchMove" @touchend="handleTouchEnd"
       @dragover.prevent="handleDragOver" @drop.prevent="handleDrop" @contextmenu.prevent>
@@ -92,31 +93,97 @@
         :class="seatConfig.podiumPosition === 'top' ? 'align-top' : 'align-bottom'"
         :style="chartTransformStyle"
       >
-        <div v-if="showEditorRowNumbers" class="seat-group row-number-group">
-          <div class="group-label row-number-label" aria-hidden="true">&nbsp;</div>
-          <div class="row-number-column" aria-label="行号">
-            <div
-              v-for="rowNumber in editorRowNumbers"
-              :key="rowNumber"
-              class="row-number-item"
-              :title="`第 ${rowNumber} 排`"
-            >
-              {{ rowNumber }}
+        <div class="seat-chart-body">
+          <div v-if="showEditorRowNumbers" class="seat-group row-number-group">
+            <div class="group-label row-number-label" aria-hidden="true">&nbsp;</div>
+            <div class="row-number-column" aria-label="行号">
+              <div
+                v-for="rowNumber in editorRowNumbers"
+                :key="rowNumber"
+                class="row-number-item"
+                :title="`第 ${rowNumber} 排`"
+              >
+                {{ rowNumber }}
+              </div>
             </div>
           </div>
-        </div>
-        <div v-for="(group, groupIndex) in organizedSeats" :key="groupIndex" class="seat-group">
-          <div class="group-label">第 {{ groupIndex + 1 }} 组</div>
-          <div class="group-content">
-            <div v-for="(column, columnIndex) in group" :key="columnIndex" class="seat-column">
-              <SeatItem v-for="seat in column" :key="seat.id" :seat="seat"
-                :is-drop-target="dropTargetSeatIds.has(seat.id)"
+          <div class="seat-chart-main">
+            <div v-if="seatConfig.podiumPosition === 'top'" class="podium-row">
+              <SeatItem
+                v-if="guardSeatLeft"
+                :seat="guardSeatLeft"
+                class="guard-seat-item"
                 @assign-student="handleAssignStudent"
-                @toggle-empty="handleToggleEmpty" @clear-seat="handleClearSeat" @swap-seat="handleSwapSeat"
+                @clear-seat="handleClearSeat"
+                @swap-seat="handleSwapSeat"
                 @drag-start-seat="handleDragStartSeat"
                 @drag-enter-seat="handleDragEnterSeat"
                 @drag-end-seat="handleDragEndSeat"
-                @edit-student="handleEditStudent" />
+                @edit-student="handleEditStudent"
+              />
+              <div v-else class="guard-seat-spacer" aria-hidden="true"></div>
+              <div class="podium-block">讲台</div>
+              <SeatItem
+                v-if="guardSeatRight"
+                :seat="guardSeatRight"
+                class="guard-seat-item"
+                @assign-student="handleAssignStudent"
+                @clear-seat="handleClearSeat"
+                @swap-seat="handleSwapSeat"
+                @drag-start-seat="handleDragStartSeat"
+                @drag-enter-seat="handleDragEnterSeat"
+                @drag-end-seat="handleDragEndSeat"
+                @edit-student="handleEditStudent"
+              />
+              <div v-else class="guard-seat-spacer" aria-hidden="true"></div>
+            </div>
+
+            <div class="seat-groups">
+              <div v-for="(group, groupIndex) in organizedSeats" :key="groupIndex" class="seat-group">
+                <div class="group-label">第 {{ groupIndex + 1 }} 组</div>
+                <div class="group-content">
+                  <div v-for="(column, columnIndex) in group" :key="columnIndex" class="seat-column">
+                    <SeatItem v-for="seat in column" :key="seat.id" :seat="seat"
+                      :is-drop-target="dropTargetSeatIds.has(seat.id)"
+                      @assign-student="handleAssignStudent"
+                      @toggle-empty="handleToggleEmpty" @clear-seat="handleClearSeat" @swap-seat="handleSwapSeat"
+                      @drag-start-seat="handleDragStartSeat"
+                      @drag-enter-seat="handleDragEnterSeat"
+                      @drag-end-seat="handleDragEndSeat"
+                      @edit-student="handleEditStudent" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="seatConfig.podiumPosition !== 'top'" class="podium-row">
+              <SeatItem
+                v-if="guardSeatLeft"
+                :seat="guardSeatLeft"
+                class="guard-seat-item"
+                @assign-student="handleAssignStudent"
+                @clear-seat="handleClearSeat"
+                @swap-seat="handleSwapSeat"
+                @drag-start-seat="handleDragStartSeat"
+                @drag-enter-seat="handleDragEnterSeat"
+                @drag-end-seat="handleDragEndSeat"
+                @edit-student="handleEditStudent"
+              />
+              <div v-else class="guard-seat-spacer" aria-hidden="true"></div>
+              <div class="podium-block">讲台</div>
+              <SeatItem
+                v-if="guardSeatRight"
+                :seat="guardSeatRight"
+                class="guard-seat-item"
+                @assign-student="handleAssignStudent"
+                @clear-seat="handleClearSeat"
+                @swap-seat="handleSwapSeat"
+                @drag-start-seat="handleDragStartSeat"
+                @drag-enter-seat="handleDragEnterSeat"
+                @drag-end-seat="handleDragEndSeat"
+                @edit-student="handleEditStudent"
+              />
+              <div v-else class="guard-seat-spacer" aria-hidden="true"></div>
             </div>
           </div>
         </div>
@@ -219,10 +286,7 @@ import { useDragPreview } from '@/composables/useDragPreview'
 import { useLayoutConstants } from '@/composables/useLayoutConstants'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { parseSeatId, generateSeatId } from '@/utils/seatHelpers'
-import { getRowNumber } from '@/utils/exportLayout'
-
-// 透明拖拽图片常量
-const TRANSPARENT_DRAG_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+import { getGuardSideForVisualSlot, getRowNumber } from '@/utils/exportLayout'
 
 // Fisher-Yates 洗牌算法
 const shuffleArray = (array) => {
@@ -237,6 +301,7 @@ const shuffleArray = (array) => {
 const {
   seatConfig,
   organizedSeats,
+  visibleGuardSeats,
   initializeSeats,
   assignStudent,
   toggleEmpty,
@@ -245,6 +310,8 @@ const {
   moveSelection,
   findSeatByStudent,
   getStudentAtSeat,
+  getSeat,
+  isGuardSeatId,
   toGlobalCol,
   fromGlobalCol
 } = useSeatChart()
@@ -253,7 +320,7 @@ const { firstSelectedSeat, setFirstSelectedSeat, clearFirstSelectedSeat } = useE
 const { clearSelection: clearStudentSelection, students } = useStudentData()
 const { scale, panX, panY, zoomIn, zoomOut, setScale, setPan, MIN_SCALE, MAX_SCALE, registerViewport, fitToViewport } = useZoom()
 const { recordAssign, recordBatch, createSnapshot, canUndo, canRedo, undo, redo } = useUndo()
-const { isDraggingFromSeat: globalIsDraggingFromSeat } = useDragState()
+const { isDraggingFromSeat: globalIsDraggingFromSeat, endDragFromSeat } = useDragState()
 const {
   clearSelection: clearSeatSelection,
   selectedSeatsArray,
@@ -286,6 +353,7 @@ const currentDragAnchorSeatId = ref(null)
 const currentDragTargetSeatId = ref(null)
 const dropTargetSeatIds = computed(() => {
   if (!currentDragTargetSeatId.value || !currentDragAnchorSeatId.value || selectedCount.value <= 1) return new Set()
+  if (isGuardSeatId(currentDragTargetSeatId.value) || isGuardSeatId(currentDragAnchorSeatId.value)) return new Set()
 
   const anchor = parseSeatId(currentDragAnchorSeatId.value)
   const target = parseSeatId(currentDragTargetSeatId.value)
@@ -339,6 +407,7 @@ let startPanX = 0
 let startPanY = 0
 let mouseMoved = false
 let panRafId = null
+let suppressNextClick = false
 
 // rAF 批量更新 pan（避免每次 mousemove 都触发 Vue 重新渲染）
 const schedulePanUpdate = (x, y) => {
@@ -393,9 +462,8 @@ const handleMouseDown = (e) => {
     return
   }
 
-  // 不拦截对座位等可交互元素的点击
-  // 只在空白区域或按住中键时启动拖拽
-  if (e.button === 1 || (e.button === 0 && !isInteractiveTarget(e.target))) {
+  // 空白区域、中键或无学生座位可启动视图平移
+  if (e.button === 1 || (e.button === 0 && canStartPanFromTarget(e.target))) {
     mouseDown = true
     mouseMoved = false
     startMouseX = e.clientX
@@ -458,9 +526,29 @@ const handleMouseUp = () => {
 
   if (mouseDown && mouseMoved) {
     flushPan(pendingPanX, pendingPanY)
+    suppressNextClick = true
   }
   mouseDown = false
   isPanning.value = false
+}
+
+const handleViewportClickCapture = (e) => {
+  if (!suppressNextClick) return
+  suppressNextClick = false
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+const isPannableEmptySeatTarget = (el) => {
+  if (isSelectionMode.value) return false
+  const seatEl = findSeatElement(el)
+  if (!seatEl?.dataset?.seatId) return false
+  const seat = getSeat(seatEl.dataset.seatId)
+  return Boolean(seat && seat.studentId === null)
+}
+
+const canStartPanFromTarget = (el) => {
+  return !isInteractiveTarget(el) || isPannableEmptySeatTarget(el)
 }
 
 // 判断是否为可交互元素（座位、按钮等）
@@ -485,6 +573,7 @@ let touchPanStartX = 0
 let touchPanStartY = 0
 let touchStartPanX = 0
 let touchStartPanY = 0
+let touchPanMoved = false
 let touchMode = '' // 'pan' | 'pinch' | ''
 let touchRafId = null
 
@@ -500,13 +589,16 @@ const handleTouchStart = (e) => {
     touchMode = 'pinch'
     lastTouchDistance = getTouchDistance(e.touches)
     lastTouchScale = scale.value
-  } else if (e.touches.length === 1 && !isInteractiveTarget(e.target)) {
-    // 单指拖拽平移（仅空白区域）
+  } else if (e.touches.length === 1 && canStartPanFromTarget(e.target)) {
+    // 单指拖拽平移（空白区域或无学生座位）
     touchMode = 'pan'
     touchPanStartX = e.touches[0].clientX
     touchPanStartY = e.touches[0].clientY
     touchStartPanX = panX.value
     touchStartPanY = panY.value
+    pendingPanX = touchStartPanX
+    pendingPanY = touchStartPanY
+    touchPanMoved = false
   }
 }
 
@@ -525,7 +617,10 @@ const handleTouchMove = (e) => {
     const dy = e.touches[0].clientY - touchPanStartY
     pendingPanX = touchStartPanX + dx
     pendingPanY = touchStartPanY + dy
-    isPanning.value = true
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      touchPanMoved = true
+      isPanning.value = true
+    }
     schedulePanUpdate(pendingPanX, pendingPanY)
   }
 }
@@ -533,10 +628,14 @@ const handleTouchMove = (e) => {
 const handleTouchEnd = () => {
   if (touchMode === 'pan') {
     flushPan(pendingPanX, pendingPanY)
+    if (touchPanMoved) {
+      suppressNextClick = true
+    }
   }
   if (touchRafId) { cancelAnimationFrame(touchRafId); touchRafId = null }
   touchMode = ''
   lastTouchDistance = 0
+  touchPanMoved = false
   isPanning.value = false
 }
 
@@ -592,7 +691,7 @@ const handleDragOver = (e) => {
 const handleDrop = (e) => {
   currentDragAnchorSeatId.value = null
   currentDragTargetSeatId.value = null
-  const raw = e.dataTransfer.getData('application/json')
+  const raw = getDragData(e)
   if (!raw) {
     endDragPreview()
     return
@@ -616,6 +715,11 @@ const handleDrop = (e) => {
       endDragPreview([targetSeatId])
     } else if (data.type === 'seat') {
       if (data.selectedSeatIds && data.selectedSeatIds.length > 1) {
+        if (isGuardSeatId(targetSeatId) || isGuardSeatId(data.seatId) || data.selectedSeatIds.some(isGuardSeatId)) {
+          endDragPreview()
+          clearSeatSelection()
+          return
+        }
         // 选区拖拽
         if (data.seatId !== targetSeatId) {
           const beforeSnapshot = createSnapshot()
@@ -655,6 +759,9 @@ const handleDrop = (e) => {
     }
   } catch {
     endDragPreview()
+  } finally {
+    endDragFromSeat()
+    endDragPreview()
   }
 }
 
@@ -668,7 +775,7 @@ const handleToolbarDragLeave = () => {
 }
 
 const handleToolbarDrop = (e) => {
-  const raw = e.dataTransfer.getData('application/json')
+  const raw = getDragData(e)
   if (!raw) return
 
   try {
@@ -693,6 +800,10 @@ const findSeatElement = (el) => {
   return null
 }
 
+const getDragData = (e) => {
+  return e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain')
+}
+
 // 矩形框选：选中矩形区域内的所有座位
 const selectSeatsInRect = () => {
   if (!viewportRef.value) return
@@ -710,6 +821,7 @@ const selectSeatsInRect = () => {
   const seatIdsToSelect = []
 
   seatElements.forEach(el => {
+    if (isGuardSeatId(el.dataset.seatId)) return
     const rect = el.getBoundingClientRect()
     const seatCenterX = rect.left + rect.width / 2
     const seatCenterY = rect.top + rect.height / 2
@@ -730,6 +842,10 @@ const handleTouchSeatDrop = (e) => {
   const { sourceSeatId, targetSeatId, isSelection, selectedSeatIds } = e.detail
 
   if (isSelection && selectedSeatIds && selectedSeatIds.length > 1) {
+    if (isGuardSeatId(sourceSeatId) || isGuardSeatId(targetSeatId) || selectedSeatIds.some(isGuardSeatId)) {
+      clearSeatSelection()
+      return
+    }
     // 选区拖拽：移动整个选区
     if (sourceSeatId !== targetSeatId) {
       const beforeSnapshot = createSnapshot()
@@ -776,14 +892,15 @@ const handleGlobalDragStart = (e) => {
   if (!seatEl) return
   const seatId = seatEl.dataset.seatId
   if (!seatId) return
-  const seat = organizedSeats.value.flat(Infinity).find(s => s.id === seatId)
+  const seat = getSeat(seatId)
   if (seat && seat.studentId !== null && !seat.isEmpty) {
     globalIsDraggingFromSeat.value = true
   }
 }
 
 const handleGlobalDragEnd = () => {
-  globalIsDraggingFromSeat.value = false
+  endDragFromSeat()
+  endDragPreview()
 }
 
 const handleGlobalDragOver = (e) => {
@@ -972,7 +1089,15 @@ onUnmounted(() => {
 
 // 配置变化时重新自适应
 watch(
-  () => [seatConfig.value.groupCount, seatConfig.value.columnsPerGroup, seatConfig.value.seatsPerColumn],
+  () => [
+    seatConfig.value.groupCount,
+    seatConfig.value.columnsPerGroup,
+    seatConfig.value.seatsPerColumn,
+    seatConfig.value.podiumPosition,
+    seatConfig.value.guardSeats?.enabled,
+    seatConfig.value.guardSeats?.leftEnabled,
+    seatConfig.value.guardSeats?.rightEnabled
+  ],
   () => {
     nextTick(() => {
       setTimeout(fitToViewport, 100)
@@ -1056,11 +1181,20 @@ const handleSwapSeat = (seatId, sourceSeatId = null) => {
 }
 
 // ==================== 选区轮换 SVG 箭头 ====================
-const { rotGroups, editingZoneId, getZoneColor, parseSeatPos, PALETTE } = useZoneRotation()
+const { rotGroups, editingZoneId, PALETTE } = useZoneRotation()
 const { LAYOUT: L } = useLayoutConstants()
 const { settings } = useGlobalSettings()
 
 const showEditorRowNumbers = computed(() => settings.value.ui.showEditorRowNumbers !== false)
+
+const getGuardSeatInVisualSlot = (visualSide) => {
+  const guardSide = getGuardSideForVisualSlot(visualSide, seatConfig.value.podiumPosition)
+  return visibleGuardSeats.value.find(seat => seat.guardSide === guardSide) || null
+}
+
+const guardSeatLeft = computed(() => getGuardSeatInVisualSlot('left'))
+
+const guardSeatRight = computed(() => getGuardSeatInVisualSlot('right'))
 
 const getColumnRowCount = (groupIndex, columnIndex) => {
   const column = organizedSeats.value?.[groupIndex]?.[columnIndex] || []
@@ -1093,6 +1227,10 @@ const getRowNumberSpace = () => {
   return showEditorRowNumbers.value ? L.ROW_NUMBER_W + L.GROUP_GAP : 0
 }
 
+const getPodiumTopOffset = () => {
+  return seatConfig.value.podiumPosition === 'top' ? L.PODIUM_ROW_H + L.PODIUM_GAP : 0
+}
+
 const getGroupWidth = (groupIndex) => {
   const columnCount = getGroupColumnCount(groupIndex)
   return columnCount * L.SEAT_W + Math.max(0, columnCount - 1) * L.COL_GAP
@@ -1107,7 +1245,15 @@ const getGroupLeft = (groupIndex) => {
 }
 
 const getSeatCenter = (seatId) => {
-  const { g, c, r } = parseSeatPos(seatId)
+  if (typeof seatId !== 'string') return null
+  const {
+    groupIndex: g,
+    columnIndex: c,
+    rowIndex: r
+  } = parseSeatId(seatId)
+  if (![g, c, r].every(Number.isInteger)) return null
+  if (!organizedSeats.value?.[g]?.[c]?.some(seat => seat.id === seatId)) return null
+
   const rowOffset = seatConfig.value.podiumPosition === 'bottom'
     ? Math.max(0, editorRowCount.value - getColumnRowCount(g, c))
     : 0
@@ -1115,15 +1261,23 @@ const getSeatCenter = (seatId) => {
 
   return {
     x: getGroupLeft(g) + c * (L.SEAT_W + L.COL_GAP) + L.SEAT_W / 2,
-    y: L.PAD_T + (rowOffset + r) * (seatOuterH + L.ROW_GAP) + seatOuterH / 2
+    y: L.PAD_T + getPodiumTopOffset() + (rowOffset + r) * (seatOuterH + L.ROW_GAP) + seatOuterH / 2
   }
 }
 
 const getZoneCentroid = (zone) => {
-  if (!zone.seatIds.length) return null
+  if (!zone.seatIds?.length) return null
   let sx = 0, sy = 0
-  zone.seatIds.forEach(sid => { const p = getSeatCenter(sid); sx += p.x; sy += p.y })
-  return { x: sx / zone.seatIds.length, y: sy / zone.seatIds.length }
+  let count = 0
+  zone.seatIds.forEach(sid => {
+    const p = getSeatCenter(sid)
+    if (!p) return
+    sx += p.x
+    sy += p.y
+    count++
+  })
+  if (count === 0) return null
+  return { x: sx / count, y: sy / count }
 }
 
 // 计算从 from 到 to 的调整端点（距圆心 R 处，留出箭头空间）
@@ -1315,13 +1469,15 @@ const rectSelectStyle = computed(() => {
 }
 
 .seat-chart {
+  --seat-card-width: 120px;
   --seat-card-height: 80px;
   --seat-card-border-width: 2px;
   --seat-card-outer-height: calc(var(--seat-card-height) + var(--seat-card-border-width) * 2);
+  --chart-main-gap: 18px;
+  --chart-group-gap: 40px;
+  --podium-row-height: 84px;
   display: inline-flex;
-  justify-content: center;
   align-items: flex-start;
-  gap: 40px;
   padding: 30px 20px;
   position: absolute;
   left: 50%;
@@ -1333,11 +1489,70 @@ const rectSelectStyle = computed(() => {
 }
 
 .seat-chart.align-top {
-  align-items: flex-start;
+  align-items: center;
 }
 
 .seat-chart.align-bottom {
-  align-items: flex-end;
+  align-items: center;
+}
+
+.seat-chart-body {
+  display: inline-flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--chart-group-gap);
+}
+
+.seat-chart-main {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--chart-main-gap);
+}
+
+.seat-groups {
+  display: inline-flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--chart-group-gap);
+}
+
+.podium-row {
+  display: grid;
+  grid-template-columns: var(--seat-card-width) minmax(220px, 320px) var(--seat-card-width);
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  min-height: var(--podium-row-height);
+  width: 100%;
+}
+
+.podium-block {
+  height: 48px;
+  border: 2px solid var(--color-primary);
+  border-radius: 8px;
+  color: var(--color-primary);
+  background: var(--color-surface);
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.guard-seat-item,
+.guard-seat-spacer {
+  width: var(--seat-card-width);
+}
+
+.guard-seat-item {
+  height: var(--seat-card-height);
+}
+
+.guard-seat-spacer {
+  height: var(--seat-card-outer-height);
+  visibility: hidden;
 }
 
 .seat-group {
@@ -1386,6 +1601,10 @@ const rectSelectStyle = computed(() => {
   order: 0;
 }
 
+.seat-chart.align-top .row-number-column {
+  margin-top: calc(var(--podium-row-height) + var(--chart-main-gap));
+}
+
 .row-number-item {
   height: var(--seat-card-outer-height);
   display: flex;
@@ -1401,7 +1620,7 @@ const rectSelectStyle = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 120px;
+  width: var(--seat-card-width);
 }
 
 /* ==================== 缩放控件 ==================== */
@@ -1474,9 +1693,16 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
+    --seat-card-width: 104px;
     --seat-card-height: 68px;
-    gap: 26px;
+    --chart-main-gap: 26px;
+    --chart-group-gap: 26px;
     padding: 22px 14px;
+  }
+
+  .podium-row {
+    grid-template-columns: var(--seat-card-width) minmax(200px, 280px) var(--seat-card-width);
+    gap: 16px;
   }
 
   .seat-group {
@@ -1503,7 +1729,6 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-column {
-    width: 104px;
     gap: 9px;
   }
 }
@@ -1520,9 +1745,16 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
+    --seat-card-width: 100px;
     --seat-card-height: 64px;
-    gap: 24px;
+    --chart-main-gap: 24px;
+    --chart-group-gap: 24px;
     padding: 18px 12px;
+  }
+
+  .podium-row {
+    grid-template-columns: var(--seat-card-width) minmax(180px, 260px) var(--seat-card-width);
+    gap: 14px;
   }
 
   .seat-group {
@@ -1544,7 +1776,6 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-column {
-    width: 100px;
     gap: 8px;
   }
 }
@@ -1688,9 +1919,16 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
+    --seat-card-width: 100px;
     --seat-card-height: 70px;
-    gap: 20px;
+    --chart-main-gap: 20px;
+    --chart-group-gap: 20px;
     padding: 20px 12px;
+  }
+
+  .podium-row {
+    grid-template-columns: var(--seat-card-width) minmax(180px, 260px) var(--seat-card-width);
+    gap: 12px;
   }
 
   .group-label {
@@ -1713,7 +1951,6 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-column {
-    width: 100px;
     gap: 8px;
   }
 
@@ -1740,9 +1977,21 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
+    --seat-card-width: 90px;
     --seat-card-height: 55px;
-    gap: 12px;
+    --chart-main-gap: 12px;
+    --chart-group-gap: 12px;
     padding: 14px 8px;
+  }
+
+  .podium-row {
+    grid-template-columns: var(--seat-card-width) minmax(150px, 220px) var(--seat-card-width);
+    gap: 8px;
+  }
+
+  .podium-block {
+    height: 40px;
+    font-size: 15px;
   }
 
   .group-label {
@@ -1770,7 +2019,6 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-column {
-    width: 90px;
     gap: 6px;
   }
 

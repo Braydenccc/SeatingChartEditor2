@@ -35,10 +35,12 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
     isStudentDragging.value = true
     if (onStartDrag) onStartDrag()
     e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('application/json', JSON.stringify({
+    const dragData = JSON.stringify({
       type: 'student',
       studentId: unref(studentDataProp).id
-    }))
+    })
+    e.dataTransfer.setData('application/json', dragData)
+    e.dataTransfer.setData('text/plain', dragData)
   }
 
   const handleDragEnd = () => {

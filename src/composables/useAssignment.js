@@ -13,7 +13,7 @@ import { useZoneData } from './useZoneData'
 import { useSeatRules } from './useSeatRules'
 import { useUndo } from './useUndo'
 import { PENALTY_WEIGHTS, RulePriority, PREDICATE_META } from '../constants/ruleTypes.js'
-import { parseSeatId } from '@/utils/seatHelpers'
+import { isGuardSeatId, parseSeatId } from '@/utils/seatHelpers'
 
 export function useAssignment() {
   const { students } = useStudentData()
@@ -72,6 +72,8 @@ export function useAssignment() {
   const getMaxRows = () => {
     return getMaxRowsFromConfig(seatConfig.value)
   }
+
+  const hasGuardSeat = (...seatIds) => seatIds.some(seatId => isGuardSeatId(seatId))
 
   // ==================== 随机工具 ====================
 
@@ -281,18 +283,23 @@ export function useAssignment() {
 
         switch (predicate) {
           case 'IN_ROW_RANGE':
+            if (hasGuardSeat(seatId)) return { violated: true }
             return { violated: !isInRowRange(seatId, params.minRow, params.maxRow) }
           case 'NOT_IN_COLUMN_TYPE':
+            if (hasGuardSeat(seatId)) return { violated: false }
             return { violated: isColumnType(seatId, params.columnType) }
           case 'IN_ZONE': {
+            if (hasGuardSeat(seatId)) return { violated: true }
             const zone = getZoneForSeat(seatId)
             return { violated: !zone || zone.id !== params.zoneId }
           }
           case 'NOT_IN_ZONE': {
+            if (hasGuardSeat(seatId)) return { violated: false }
             const zone = getZoneForSeat(seatId)
             return { violated: zone?.id === params.zoneId }
           }
           case 'IN_GROUP_RANGE':
+            if (hasGuardSeat(seatId)) return { violated: true }
             return { violated: !isInGroupRange(seatId, params.minGroup, params.maxGroup) }
           default:
             return { violated: false }
@@ -306,36 +313,44 @@ export function useAssignment() {
 
         switch (predicate) {
           case 'MUST_BE_SEATMATES':
+            if (hasGuardSeat(seatId1, seatId2)) return { violated: true }
             return { violated: !areDeskmates(seatId1, seatId2) }
           case 'MUST_NOT_BE_SEATMATES':
+            if (hasGuardSeat(seatId1, seatId2)) return { violated: false }
             return { violated: areDeskmates(seatId1, seatId2) }
           case 'DISTANCE_AT_MOST': {
+            if (hasGuardSeat(seatId1, seatId2)) return { violated: true, excess: params.distance }
             const dist = getSeatDistance(seatId1, seatId2)
             const violated = dist > params.distance
             const excess = violated ? dist - params.distance : 0
             return { violated, excess }
           }
           case 'DISTANCE_AT_LEAST': {
+            if (hasGuardSeat(seatId1, seatId2)) return { violated: false, excess: 0 }
             const dist = getSeatDistance(seatId1, seatId2)
             const violated = dist < params.distance
             const excess = violated ? params.distance - dist : 0
             return { violated, excess }
           }
           case 'NOT_BLOCK_VIEW': {
+            if (hasGuardSeat(seatId1, seatId2)) return { violated: false }
             const tolerance = params.tolerance ?? 0
             return { violated: isDirectlyBehind(seatId1, seatId2, tolerance) }
           }
           case 'MUST_BE_SAME_GROUP': {
+            if (hasGuardSeat(seatId1, seatId2)) return { violated: true }
             const p1 = parseSeatId(seatId1)
             const p2 = parseSeatId(seatId2)
             return { violated: p1.groupIndex !== p2.groupIndex }
           }
           case 'MUST_NOT_BE_SAME_GROUP': {
+            if (hasGuardSeat(seatId1, seatId2)) return { violated: false }
             const p1 = parseSeatId(seatId1)
             const p2 = parseSeatId(seatId2)
             return { violated: p1.groupIndex === p2.groupIndex }
           }
           case 'MUST_BE_ADJACENT_ROW':
+            if (hasGuardSeat(seatId1, seatId2)) return { violated: true }
             return { violated: !isAdjacentRow(seatId1, seatId2) }
           default:
             return { violated: false }
@@ -370,6 +385,7 @@ export function useAssignment() {
       for (const subj of expandedSubjects) {
         const seatId = assignment.get(subj.studentId)
         if (!seatId) continue
+        if (isGuardSeatId(seatId)) continue
         const parsed = parseSeatId(seatId)
         // 计算全局列号：跨大组的连续坐标（支持每大组不同列数）
         const globalCol = getGlobalColumn(parsed.groupIndex, parsed.columnIndex)
@@ -482,6 +498,7 @@ export function useAssignment() {
       for (const subj of expandedSubjects) {
         const seatId = assignment.get(subj.studentId)
         if (!seatId) continue
+        if (isGuardSeatId(seatId)) continue
         const key = params.scope === 'group'
           ? parseSeatId(seatId).groupIndex
           : (getZoneForSeat(seatId)?.id ?? 'none')
@@ -514,6 +531,7 @@ export function useAssignment() {
         if (subj.type !== 'single') continue
         const seatId = assignment.get(subj.studentId)
         if (!seatId) continue
+        if (isGuardSeatId(seatId)) continue
         const parsed = parseSeatId(seatId)
         // 计算全局列号：跨大组的连续坐标（支持每大组不同列数）
         const globalCol = getGlobalColumn(parsed.groupIndex, parsed.columnIndex)
@@ -555,6 +573,7 @@ export function useAssignment() {
         if (subj.type !== 'single') continue
         const seatId = assignment.get(subj.studentId)
         if (!seatId) continue
+        if (isGuardSeatId(seatId)) continue
         const key = params.scope === 'group' ? parseSeatId(seatId).groupIndex : (getZoneForSeat(seatId)?.id ?? 'none')
         positioned.push({ studentId: subj.studentId, key })
       }
@@ -1516,7 +1535,7 @@ export function useAssignment() {
 
     try {
       const studentList = students.value.map(s => ({ ...s }))
-      const availableSeats = getAvailableSeats()
+      const availableSeats = getAvailableSeats(seatConfig.value.guardSeats?.includeInAutoAssignment === true)
 
       if (studentList.length === 0) {
         isAssigning.value = false

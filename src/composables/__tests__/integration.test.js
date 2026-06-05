@@ -92,7 +92,7 @@ describe('Integration: Student and Seat Management', () => {
   })
 
   describe('edge cases', () => {
-    it('should handle assigning same student to multiple seats', () => {
+    it('should move same student to the latest assigned seat', () => {
       const studentId = studentData.addStudent()
       const seat1 = 'seat-0-0-0'
       const seat2 = 'seat-0-0-1'
@@ -100,7 +100,7 @@ describe('Integration: Student and Seat Management', () => {
       seatChart.assignStudent(seat1, studentId, false)
       seatChart.assignStudent(seat2, studentId, false)
 
-      expect(seatChart.getStudentAtSeat(seat1)).toBe(studentId)
+      expect(seatChart.getStudentAtSeat(seat1)).toBe(null)
       expect(seatChart.getStudentAtSeat(seat2)).toBe(studentId)
     })
 

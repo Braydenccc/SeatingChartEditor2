@@ -143,7 +143,7 @@ import { Github, Heart, Cloud } from 'lucide-vue-next'
 
 .link-item:hover {
   background: var(--color-bg-selected);
-  color: var(--color-primary);
+  color: var(--color-text-primary);
   transform: translateX(4px);
 }
 

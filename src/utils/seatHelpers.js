@@ -22,3 +22,14 @@ export function parseSeatId(seatId) {
 export function generateSeatId(groupIndex, columnIndex, rowIndex) {
   return `seat-${groupIndex}-${columnIndex}-${rowIndex}`
 }
+
+export const GUARD_SEAT_LEFT_ID = 'guard-left'
+export const GUARD_SEAT_RIGHT_ID = 'guard-right'
+
+export function generateGuardSeatId(side) {
+  return side === 'right' ? GUARD_SEAT_RIGHT_ID : GUARD_SEAT_LEFT_ID
+}
+
+export function isGuardSeatId(seatId) {
+  return seatId === GUARD_SEAT_LEFT_ID || seatId === GUARD_SEAT_RIGHT_ID
+}

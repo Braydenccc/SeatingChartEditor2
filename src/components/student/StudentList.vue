@@ -146,7 +146,7 @@ const { success, warning, error } = useLogger()
 const { loadWorkspace, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
 const { isLoggedIn, isLoginDialogVisible } = useAuth()
 const { importFromExcel, downloadTemplate } = useExcelData()
-const { isTouchDraggingFromSeat } = useDragState()
+const { isTouchDraggingFromSeat, endDragFromSeat } = useDragState()
 const { recordBatch, createSnapshot } = useUndo()
 const { width: windowWidth } = useWindowSize()
 const { openCloudLoad } = useCloudWorkspaceDialog()
@@ -307,7 +307,7 @@ const handleDragLeave = () => {
 
 const handleDrop = (e) => {
   isDragOver.value = false
-  const raw = e.dataTransfer.getData('application/json')
+  const raw = getDragData(e)
   if (!raw) return
 
   try {
@@ -331,7 +331,13 @@ const handleDrop = (e) => {
     }
   } catch {
     // ignore
+  } finally {
+    endDragFromSeat()
   }
+}
+
+const getDragData = (e) => {
+  return e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain')
 }
 </script>
 

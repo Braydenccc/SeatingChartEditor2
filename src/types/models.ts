@@ -24,6 +24,8 @@ export interface Seat {
   rowIndex: number
   studentId: number | null
   isEmpty: boolean
+  kind?: 'regular' | 'guard'
+  guardSide?: 'left' | 'right'
 }
 
 // 座位配置模型
@@ -34,11 +36,20 @@ export interface SeatConfig {
   groups: GroupConfig[]
   shiftDistance: number
   podiumPosition: 'top' | 'bottom'
+  guardSeats?: GuardSeatsConfig
 }
 
 export interface GroupConfig {
   columns: number
   rows: number
+}
+
+export interface GuardSeatsConfig {
+  enabled: boolean
+  leftEnabled: boolean
+  rightEnabled: boolean
+  includeInAutoAssignment: boolean
+  hideEmptyOnExport: boolean
 }
 
 // 选区数据模型
