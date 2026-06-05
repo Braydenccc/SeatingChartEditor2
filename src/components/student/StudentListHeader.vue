@@ -33,13 +33,9 @@
         <Shuffle :size="15" stroke-width="2.5" />
         <span>一键排入</span>
       </button>
-      <button class="icon-btn" title="标签设置" @click="emit('open-tag-settings')">
-        <Tag :size="15" stroke-width="2.5" />
-        <span>标签</span>
-      </button>
-      <button class="icon-btn" title="编辑名单" @click="emit('open-roster')">
+      <button class="icon-btn" title="名单与属性" @click="emit('open-roster')">
         <Users :size="15" stroke-width="2.5" />
-        <span>名单</span>
+        <span>名单与属性</span>
       </button>
     </div>
 
@@ -50,7 +46,7 @@
 
 <script setup>
 import { computed, ref, onBeforeUnmount, defineAsyncComponent } from 'vue'
-import { Shuffle, Users, Tag, X, FileOutput } from 'lucide-vue-next'
+import { Shuffle, Users, X, FileOutput } from 'lucide-vue-next'
 import { useStudentData } from '@/composables/useStudentData'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useEditMode } from '@/composables/useEditMode'
@@ -66,7 +62,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['open-tag-settings', 'open-roster', 'random-assign'])
+const emit = defineEmits(['open-roster', 'random-assign'])
 
 const { students } = useStudentData()
 const { findSeatByStudent, getEmptySeats, assignStudent } = useSeatChart()

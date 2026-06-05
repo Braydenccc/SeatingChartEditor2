@@ -2,17 +2,6 @@
   <div class="rule-builder">
     <h4 class="builder-title">{{ isEditing ? '编辑规则' : '添加新规则' }}</h4>
 
-    <div v-if="mode === 'quick'" class="quick-template-wrap">
-      <label class="seg-label">快捷场景</label>
-      <div class="quick-template-grid">
-        <button class="quick-template-btn" @click="applyQuickTemplate('front-row')">前排优先</button>
-        <button class="quick-template-btn" @click="applyQuickTemplate('avoid-window')">避开窗边</button>
-        <button class="quick-template-btn" @click="applyQuickTemplate('deskmates')">同桌绑定</button>
-        <button class="quick-template-btn" @click="applyQuickTemplate('spread-group')">分组分散</button>
-      </div>
-      <p class="quick-template-tip">提示：点击后可继续修改对象、参数和优先级。</p>
-    </div>
-
     <div class="sentence-builder">
       <!-- 对象集合（所有子规则共用） -->
       <div class="builder-segment">
@@ -21,11 +10,12 @@
           <div class="subject-slot">
             <div v-for="(entry, entryIndex) in sharedSubjects" :key="`s-${entryIndex}`" class="subject-row">
               <select v-model="entry.type" class="detail-select" @change="onEntryTypeChange(entry)">
+                <option value="all">全体</option>
                 <option value="person">个人</option>
                 <option value="tag">标签</option>
               </select>
 
-              <select v-model="entry.id" class="detail-select">
+              <select v-if="entry.type !== 'all'" v-model="entry.id" class="detail-select">
                 <option :value="null">{{ entry.type === 'person' ? '选择学生…' : '选择标签…' }}</option>
                 <option
                   v-for="opt in getEntryOptions(entry.type)"
@@ -121,6 +111,16 @@
                   </option>
                 </select>
                 <select
+                  v-else-if="param.type === 'attribute'"
+                  v-model="subRule.params[param.key]"
+                  class="detail-select"
+                >
+                  <option value="">选择数值属性…</option>
+                  <option v-for="opt in attributeOptions" :key="opt.id" :value="opt.id">
+                    {{ opt.label }}
+                  </option>
+                </select>
+                <select
                   v-else-if="param.type === 'zone'"
                   v-model="subRule.params[param.key]"
                   class="detail-select"
@@ -179,12 +179,13 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { X } from 'lucide-vue-next'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useZoneData } from '@/composables/useZoneData'
 import { useSeatRules } from '@/composables/useSeatRules'
+import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useLogger } from '@/composables/useLogger'
 import {
   RulePriority,
@@ -197,10 +198,6 @@ import {
 
 const emit = defineEmits(['added', 'cancel-edit'])
 const props = defineProps({
-  mode: {
-    type: String,
-    default: 'quick'
-  },
   editingRule: {
     type: Object,
     default: null
@@ -210,6 +207,7 @@ const props = defineProps({
 const { students } = useStudentData()
 const { tags } = useTagData()
 const { zones } = useZoneData()
+const { getAttributeOptions } = useStudentAttributes()
 const { addRule, updateRule, validateRule, renderRuleText } = useSeatRules()
 const { error } = useLogger()
 
@@ -217,7 +215,12 @@ const QUICK_TEMPLATE_KEYS = {
   FRONT_ROW: 'front-row',
   AVOID_WINDOW: 'avoid-window',
   DESKMATES: 'deskmates',
-  SPREAD_GROUP: 'spread-group'
+  AVOID_DESKMATES: 'avoid-deskmates',
+  KEEP_DISTANCE: 'keep-distance',
+  SPREAD_GROUP: 'spread-group',
+  HEIGHT_GRADIENT: 'height-gradient',
+  SCORE_BALANCE: 'score-balance',
+  SCORE_BANDS: 'score-bands'
 }
 
 // 新数据结构：支持多规则组合
@@ -288,7 +291,16 @@ const predicateGroups = [
     ]
   },
   {
-    label: 'B. 对象关系规则',
+    label: 'B. 数值参考规则',
+    predicates: [
+      'ATTRIBUTE_ROW_GRADIENT',
+      'ATTRIBUTE_GROUP_BALANCE',
+      'ATTRIBUTE_PAIR_DELTA',
+      'ATTRIBUTE_DISTRIBUTE_BANDS'
+    ]
+  },
+  {
+    label: 'C. 对象关系规则',
     predicates: [
       'MUST_BE_SEATMATES',
       'MUST_NOT_BE_SEATMATES',
@@ -311,6 +323,16 @@ const filteredPredicateGroups = computed(() => {
     }))
     .filter(group => group.predicates.length > 0)
 })
+
+const studentOptions = computed(() =>
+  students.value.map(s => ({ id: s.id, label: `${s.studentNumber || '-'} ${s.name || '未命名'}` }))
+)
+
+const tagOptions = computed(() =>
+  tags.value.map(t => ({ id: t.id, label: t.name }))
+)
+
+const attributeOptions = computed(() => getAttributeOptions())
 
 // 获取指定子规则的参数规格
 const getParamSpecs = (ruleIndex) => {
@@ -359,9 +381,14 @@ const currentRulePayload = computed(() => {
   }
 })
 
-const validationResult = computed(() => {
+const validationWarnings = ref([])
+const canAdd = ref(false)
+const previewText = ref('')
+let feedbackTimer = null
+
+const buildFeedbackState = () => {
   const firstPredicate = subRules.value[0]?.predicate
-  if (!firstPredicate) return { valid: false, warnings: [] }
+  if (!firstPredicate) return { valid: false, warnings: [], preview: '' }
 
   // 验证每条子规则
   const allWarnings = []
@@ -377,38 +404,52 @@ const validationResult = computed(() => {
     }
   }
 
+  let preview = ''
+  if (subRules.value.some(sr => sr.predicate)) {
+    try {
+      preview = renderRuleText({
+        id: 'preview',
+        ...currentRulePayload.value
+      })
+    } catch {
+      preview = ''
+    }
+  }
+
   return {
-    valid: allWarnings.length === 0 && firstPredicate,
-    warnings: allWarnings
+    valid: allWarnings.length === 0 && !!firstPredicate,
+    warnings: allWarnings,
+    preview
   }
-})
+}
 
-const validationWarnings = computed(() => validationResult.value.warnings)
-const canAdd = computed(() => {
-  return subRules.value.some(sr => sr.predicate) && validationResult.value.valid
-})
+const applyFeedbackState = () => {
+  const state = buildFeedbackState()
+  validationWarnings.value = state.warnings
+  canAdd.value = subRules.value.some(sr => sr.predicate) && state.valid
+  previewText.value = state.preview
+  return state
+}
 
-const previewText = computed(() => {
-  if (!subRules.value.some(sr => sr.predicate)) return ''
-  try {
-    return renderRuleText({
-      id: 'preview',
-      ...currentRulePayload.value
-    })
-  } catch {
-    return ''
-  }
-})
+const scheduleFeedbackUpdate = () => {
+  if (feedbackTimer) window.clearTimeout(feedbackTimer)
+  feedbackTimer = window.setTimeout(() => {
+    feedbackTimer = null
+    applyFeedbackState()
+  }, 120)
+}
 
 const getEntryOptions = (type) => {
-  if (type === 'person') {
-    return students.value.map(s => ({ id: s.id, label: `${s.studentNumber || '-'} ${s.name || '未命名'}` }))
-  }
-  return tags.value.map(t => ({ id: t.id, label: t.name }))
+  if (type === 'all') return []
+  if (type === 'person') return studentOptions.value
+  return tagOptions.value
 }
 
 const onEntryTypeChange = (entry) => {
   entry.id = null
+  if (entry.type === 'all') {
+    sharedSubjects.value = [{ type: 'all', id: null }]
+  }
 }
 
 // 切换子规则的 not 状态
@@ -468,6 +509,11 @@ const onPredicateChange = (ruleIndex) => {
 }
 
 const handleAdd = () => {
+  if (feedbackTimer) {
+    window.clearTimeout(feedbackTimer)
+    feedbackTimer = null
+  }
+  applyFeedbackState()
   if (!canAdd.value) return
   if (isEditing.value) {
     const updated = updateRule(props.editingRule.id, currentRulePayload.value)
@@ -540,28 +586,63 @@ const applyQuickTemplate = (key) => {
     [QUICK_TEMPLATE_KEYS.FRONT_ROW]: {
       priority: RulePriority.REQUIRED,
       predicate: 'IN_ROW_RANGE',
+      subjects: () => [{ type: 'person', id: null }],
       params: () => getDefaultParams('IN_ROW_RANGE')
     },
     [QUICK_TEMPLATE_KEYS.AVOID_WINDOW]: {
       priority: RulePriority.PREFER,
       predicate: 'NOT_IN_COLUMN_TYPE',
+      subjects: () => [{ type: 'person', id: null }],
       params: () => ({ ...getDefaultParams('NOT_IN_COLUMN_TYPE'), columnType: 'wall' })
     },
     [QUICK_TEMPLATE_KEYS.DESKMATES]: {
       priority: RulePriority.REQUIRED,
       predicate: 'MUST_BE_SEATMATES',
+      subjects: () => [{ type: 'person', id: null }, { type: 'person', id: null }],
       params: () => getDefaultParams('MUST_BE_SEATMATES')
+    },
+    [QUICK_TEMPLATE_KEYS.AVOID_DESKMATES]: {
+      priority: RulePriority.REQUIRED,
+      predicate: 'MUST_NOT_BE_SEATMATES',
+      subjects: () => [{ type: 'person', id: null }, { type: 'person', id: null }],
+      params: () => getDefaultParams('MUST_NOT_BE_SEATMATES')
+    },
+    [QUICK_TEMPLATE_KEYS.KEEP_DISTANCE]: {
+      priority: RulePriority.PREFER,
+      predicate: 'DISTANCE_AT_LEAST',
+      subjects: () => [{ type: 'person', id: null }, { type: 'person', id: null }],
+      params: () => ({ ...getDefaultParams('DISTANCE_AT_LEAST'), distance: 3 })
     },
     [QUICK_TEMPLATE_KEYS.SPREAD_GROUP]: {
       priority: RulePriority.PREFER,
       predicate: 'DISTRIBUTE_EVENLY',
-      params: () => ({ ...getDefaultParams('DISTRIBUTE_EVENLY'), scope: 'group' })
+      subjects: () => [{ type: 'tag', id: null }],
+      params: () => getDefaultParams('DISTRIBUTE_EVENLY')
+    },
+    [QUICK_TEMPLATE_KEYS.HEIGHT_GRADIENT]: {
+      priority: RulePriority.PREFER,
+      predicate: 'ATTRIBUTE_ROW_GRADIENT',
+      subjects: () => [{ type: 'all', id: null }],
+      params: () => ({ ...getDefaultParams('ATTRIBUTE_ROW_GRADIENT'), attributeId: 'height', direction: 'lowFront' })
+    },
+    [QUICK_TEMPLATE_KEYS.SCORE_BALANCE]: {
+      priority: RulePriority.PREFER,
+      predicate: 'ATTRIBUTE_GROUP_BALANCE',
+      subjects: () => [{ type: 'all', id: null }],
+      params: () => ({ ...getDefaultParams('ATTRIBUTE_GROUP_BALANCE'), attributeId: 'score', aggregate: 'average' })
+    },
+    [QUICK_TEMPLATE_KEYS.SCORE_BANDS]: {
+      priority: RulePriority.PREFER,
+      predicate: 'ATTRIBUTE_DISTRIBUTE_BANDS',
+      subjects: () => [{ type: 'all', id: null }],
+      params: () => ({ ...getDefaultParams('ATTRIBUTE_DISTRIBUTE_BANDS'), attributeId: 'score', bandCount: 3 })
     }
   }
 
   const tpl = quickTemplates[key]
   if (!tpl) return
   selectedPriority.value = tpl.priority
+  sharedSubjects.value = tpl.subjects ? tpl.subjects() : [{ type: 'person', id: null }]
 
   // 应用到第一条子规则
   if (subRules.value[0]) {
@@ -576,18 +657,32 @@ watch(
   () => props.editingRule?.id ?? null,
   () => {
     applyEditingRule(props.editingRule)
+    applyFeedbackState()
   },
   { immediate: true }
 )
+
+watch(
+  [sharedSubjects, subRules, selectedPriority, description, selectedLogicOperator],
+  scheduleFeedbackUpdate,
+  { deep: true }
+)
+
+onBeforeUnmount(() => {
+  if (feedbackTimer) {
+    window.clearTimeout(feedbackTimer)
+    feedbackTimer = null
+  }
+})
+
+defineExpose({
+  applyQuickTemplate
+})
 </script>
 
 <style scoped>
 .rule-builder { display: flex; flex-direction: column; gap: 14px; }
 .builder-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--color-primary); }
-.quick-template-wrap { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-subtle); }
-.quick-template-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.quick-template-btn { border: 1px solid var(--color-border-light); background: var(--color-surface); color: var(--color-text-primary); border-radius: 8px; padding: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
-.quick-template-tip { margin: 0; font-size: 12px; color: var(--color-text-muted); }
 .sentence-builder { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: var(--color-surface); border-radius: 12px; border: 1px solid var(--color-border-light); }
 .builder-segment { display: flex; flex-direction: column; gap: 8px; }
 .seg-label { font-size: 12px; color: var(--color-text-muted); font-weight: 600; }

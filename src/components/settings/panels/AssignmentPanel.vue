@@ -8,6 +8,8 @@
         <Info :size="16" />
         <div class="info-content">
           <span>当前规则数量：<strong>{{ ruleCount }}</strong></span>
+          <span>数值属性：<strong>{{ attributeCount }}</strong></span>
+          <span>缺失数值：<strong>{{ missingSummary.missingCount }}</strong></span>
         </div>
       </div>
 
@@ -27,8 +29,8 @@
             <Target :size="16" />
           </div>
           <div class="feature-content">
-            <span class="feature-title">多维约束满足</span>
-            <span class="feature-desc">同时满足吸引、排斥、位置偏好等规则</span>
+            <span class="feature-title">规则工作台</span>
+            <span class="feature-desc">集中管理对象、位置、关系和数值参考规则</span>
           </div>
         </div>
 
@@ -37,8 +39,8 @@
             <TrendingUp :size="16" />
           </div>
           <div class="feature-content">
-            <span class="feature-title">智能优化</span>
-            <span class="feature-desc">优先处理违规学生，快速收敛</span>
+            <span class="feature-title">数值参考</span>
+            <span class="feature-desc">支持身高梯度、成绩均衡和分层分散</span>
           </div>
         </div>
       </div>
@@ -47,9 +49,9 @@
         <p><strong>算法特性：</strong></p>
         <ul>
           <li>自动处理必需规则（REQUIRED 优先级）</li>
-          <li>支持区域标签约束和空座位避让</li>
+          <li>支持区域、标签、全体学生和数值属性约束</li>
           <li>动态温度调整，避免局部最优</li>
-          <li>实时进度显示，可随时中断</li>
+          <li>缺失数值会跳过对应规则，不阻断排位</li>
         </ul>
       </div>
 
@@ -68,14 +70,18 @@
 import { computed } from 'vue'
 import { Info, Zap, Target, TrendingUp, Wand2 } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
+import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useSidebar } from '@/composables/useSidebar'
 
 const emit = defineEmits(['update:visible'])
 
 const { rules } = useSeatRules()
+const { enabledAttributeDefinitions, getMissingValueSummary } = useStudentAttributes()
 const { setActiveTab } = useSidebar()
 
 const ruleCount = computed(() => rules.value?.length || 0)
+const attributeCount = computed(() => enabledAttributeDefinitions.value.length)
+const missingSummary = computed(() => getMissingValueSummary())
 
 const openRuleEditor = () => {
   setActiveTab(3) // 切换到侧边栏的"排位"标签
@@ -121,6 +127,12 @@ const openRuleEditor = () => {
 .info-content strong {
   font-weight: 600;
   color: var(--color-info);
+}
+
+.info-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .feature-list {

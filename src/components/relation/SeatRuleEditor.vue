@@ -25,48 +25,62 @@
       </div>
 
       <div class="modal-body">
-        <div class="mode-switch-bar">
-          <div class="mode-switch-left">
-            <button
-              class="mode-btn"
-              :class="{ active: editorMode === 'quick' }"
-              @click="editorMode = 'quick'"
-            >
-              快速模式
-            </button>
-            <button
-              class="mode-btn"
-              :class="{ active: editorMode === 'pro' }"
-              @click="editorMode = 'pro'"
-            >
-              专业模式
-            </button>
-          </div>
-          <span class="mode-hint">
-            {{ editorMode === 'quick' ? '推荐：按场景快速建规则' : '高级：按对象和参数精细控制' }}
-          </span>
-        </div>
-
         <!-- Tab 1: 规则总览 -->
-        <div v-show="activeTab === 'rules'" class="tab-content">
-          <RuleList
-            ref="ruleListRef"
-            :focus-rule-id="focusRuleId"
-            @export="handleExportRules"
-            @import="handleImportRules"
-            @edit="handleEditRule"
-          />
-          <div class="tab-divider"></div>
-          <RuleBuilder
-            :mode="editorMode"
-            :editing-rule="editingRule"
-            @added="onRuleAdded"
-            @cancel-edit="editingRuleId = ''"
-          />
+        <div v-if="activeTab === 'rules'" class="tab-content">
+          <div class="rule-workbench">
+            <section class="workbench-pane list-pane">
+              <RuleList
+                ref="ruleListRef"
+                :focus-rule-id="focusRuleId"
+                @export="handleExportRules"
+                @import="handleImportRules"
+                @edit="handleEditRule"
+              />
+            </section>
+            <section class="workbench-pane editor-pane">
+              <RuleBuilder
+                ref="ruleBuilderRef"
+                :editing-rule="editingRule"
+                @added="onRuleAdded"
+                @cancel-edit="editingRuleId = ''"
+              />
+            </section>
+            <aside class="workbench-pane quick-pane">
+              <div class="quick-panel">
+                <div class="quick-panel-head">
+                  <Wand2 :size="16" />
+                  <div>
+                    <h4>快捷方案</h4>
+                    <p>先选场景，再在中间补对象和参数</p>
+                  </div>
+                </div>
+                <div class="quick-sections">
+                  <section
+                    v-for="group in quickTemplateGroups"
+                    :key="group.title"
+                    class="quick-section"
+                  >
+                    <div class="quick-section-title">{{ group.title }}</div>
+                    <button
+                      v-for="option in group.options"
+                      :key="option.key"
+                      class="quick-option"
+                      @click="applyTemplate(option.key)"
+                    >
+                      <span class="quick-option-main">
+                        <span>{{ option.title }}</span>
+                      </span>
+                      <span class="quick-option-desc">{{ option.desc }}</span>
+                    </button>
+                  </section>
+                </div>
+              </div>
+            </aside>
+          </div>
         </div>
 
         <!-- Tab 2: 使用说明 -->
-        <div v-show="activeTab === 'personal'" class="tab-content">
+        <div v-if="activeTab === 'personal'" class="tab-content">
           <RuleUsageGuide>
             <template #action-button>
               <button class="tip-action-btn" @click="activeTab = 'rules'">去规则总览创建规则</button>
@@ -89,7 +103,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
-import { X, List, Users } from 'lucide-vue-next'
+import { X, List, Users, Wand2 } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useLogger } from '@/composables/useLogger'
 import RuleBuilder from '@/components/rule/RuleBuilder.vue'
@@ -116,10 +130,10 @@ const emit = defineEmits(['close'])
 const { rules, ruleCount, exportRules, importRules } = useSeatRules()
 const { success, warning, error } = useLogger()
 const ruleListRef = ref(null)
+const ruleBuilderRef = ref(null)
 
 // ==================== Tab 状态 ====================
 const activeTab = ref('rules')
-const editorMode = ref('quick')
 const editingRuleId = ref('')
 const editingRule = computed(() => {
   if (!editingRuleId.value) return null
@@ -129,6 +143,69 @@ const tabs = computed(() => [
   { key: 'rules', icon: List, label: '规则总览', badge: ruleCount.value > 0 ? ruleCount.value : null },
   { key: 'personal', icon: Users, label: '使用说明', badge: null }
 ])
+
+const quickTemplateGroups = [
+  {
+    title: '位置照顾',
+    options: [
+      {
+        key: 'front-row',
+        title: '前排优先',
+        desc: '给视力、听课或需要关注的学生限定前几排。'
+      },
+      {
+        key: 'avoid-window',
+        title: '避开窗边',
+        desc: '减少靠墙或窗边位置对特定学生的影响。'
+      }
+    ]
+  },
+  {
+    title: '同桌关系',
+    options: [
+      {
+        key: 'deskmates',
+        title: '安排同桌',
+        desc: '把两个指定学生绑定在同一张桌附近。'
+      },
+      {
+        key: 'avoid-deskmates',
+        title: '禁止同桌',
+        desc: '避免两个学生成为同桌，适合冲突或分心组合。'
+      },
+      {
+        key: 'keep-distance',
+        title: '保持距离',
+        desc: '让指定学生之间至少隔开一段座位距离。'
+      }
+    ]
+  },
+  {
+    title: '全班均衡',
+    options: [
+      {
+        key: 'spread-group',
+        title: '标签分散',
+        desc: '把同标签学生尽量分散，避免集中在同一区域。'
+      },
+      {
+        key: 'height-gradient',
+        title: '身高前后梯度',
+        desc: '按身高形成前后梯度，默认低值靠前。'
+      },
+      {
+        key: 'score-balance',
+        title: '成绩大组均衡',
+        desc: '让各大组平均成绩尽量接近。'
+      },
+      {
+        key: 'score-bands',
+        title: '成绩分层分散',
+        desc: '按成绩分层后均匀分到各组。'
+      }
+    ]
+  }
+]
 
 // 当弹窗打开时，跳转到 initialTab 指定的 Tab
 watch(() => props.visible, (visible) => {
@@ -185,6 +262,10 @@ const handleEditRule = (ruleId) => {
   editingRuleId.value = ruleId
 }
 
+const applyTemplate = (key) => {
+  ruleBuilderRef.value?.applyQuickTemplate?.(key)
+}
+
 // 当模态框关闭时重置 tab
 watch(() => props.visible, (visible) => {
   if (visible && props.focusRuleId) {
@@ -210,8 +291,6 @@ const close = () => {
   right: 0;
   bottom: 0;
   background: var(--color-bg-overlay);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -220,12 +299,10 @@ const close = () => {
 
 .modal-container {
   background: var(--color-dialog-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 16px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 48px var(--shadow-lg), 0 0 0 1px var(--color-border);
   width: 95%;
-  max-width: 900px;
+  max-width: 1200px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
@@ -233,7 +310,7 @@ const close = () => {
 
 /* Modal transition styles */
 .modal-enter-active {
-  transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
+  transition: opacity 0.2s ease;
 }
 
 .modal-enter-active .modal-container {
@@ -242,8 +319,6 @@ const close = () => {
 
 .modal-enter-from {
   opacity: 0;
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
 }
 
 .modal-enter-from .modal-container {
@@ -252,7 +327,7 @@ const close = () => {
 }
 
 .modal-leave-active {
-  transition: opacity 0.2s ease, backdrop-filter 0.2s ease;
+  transition: opacity 0.16s ease;
 }
 
 .modal-leave-active .modal-container {
@@ -261,8 +336,6 @@ const close = () => {
 
 .modal-leave-to {
   opacity: 0;
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
 }
 
 .modal-leave-to .modal-container {
@@ -329,67 +402,112 @@ const close = () => {
 
 /* ==================== Tab 内容 ==================== */
 .tab-content {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  min-height: 0;
 }
 
-.mode-switch-bar {
+.rule-workbench {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(380px, 1.2fr) minmax(260px, 0.85fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.workbench-pane {
+  min-width: 0;
+}
+
+.list-pane,
+.editor-pane {
+  max-height: calc(90vh - 210px);
+  overflow: auto;
+}
+
+.quick-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: visible;
+}
+
+.quick-panel {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  padding: 12px;
+}
+
+.quick-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--color-primary);
+  margin-bottom: 12px;
+}
+
+.quick-panel-head h4 {
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.quick-panel-head p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.quick-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.quick-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.quick-option {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  padding: 9px 10px;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.quick-option:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-subtle);
+  box-shadow: 0 2px 8px var(--shadow-sm);
+}
+
+.quick-option-main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 14px;
-  padding: 10px 12px;
-  min-height: 44px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-bg-subtle);
-}
-
-.mode-switch-left {
-  display: flex;
   gap: 8px;
-  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.mode-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  min-height: 30px;
-  padding: 0 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px var(--shadow-sm);
-}
-
-.mode-btn:hover {
-  border-color: var(--color-border-strong);
-  box-shadow: 0 2px 6px var(--shadow-md);
-}
-
-.mode-btn.active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-surface);
-  box-shadow: 0 2px 8px var(--shadow-primary);
-}
-
-.mode-hint {
-  font-size: 12px;
+.quick-option-desc {
   color: var(--color-text-muted);
-  line-height: 1.2;
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .tab-divider {
@@ -933,6 +1051,17 @@ const close = () => {
   .modal-container {
     width: 95%;
     max-height: 90vh;
+  }
+
+  .rule-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .list-pane,
+  .editor-pane,
+  .quick-pane {
+    max-height: none;
+    overflow: visible;
   }
 
   .modal-header {

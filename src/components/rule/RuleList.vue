@@ -57,12 +57,14 @@
       </div>
     </div>
 
-    <!-- 冲突警告 -->
-    <div v-if="conflicts.length > 0" class="conflict-banner">
+    <!-- 冲突检查 -->
+    <div class="conflict-banner" :class="{ idle: !hasScannedConflicts, clean: hasScannedConflicts && conflicts.length === 0 }">
       <AlertTriangle :size="16" />
-      发现 {{ conflicts.length }} 条逻辑冲突规则
-      <button class="conflict-detail-btn" @click="showConflicts = !showConflicts">
-        {{ showConflicts ? '收起' : '查看' }}
+      <template v-if="hasScannedConflicts && conflicts.length > 0">发现 {{ conflicts.length }} 条逻辑冲突规则</template>
+      <template v-else-if="hasScannedConflicts">未发现逻辑冲突</template>
+      <template v-else>正在检查逻辑冲突...</template>
+      <button v-if="conflicts.length > 0" class="conflict-detail-btn" @click="showConflicts = !showConflicts">
+        {{ showConflicts ? '收起' : '详情' }}
       </button>
     </div>
     <div v-if="showConflicts && conflicts.length > 0" class="conflict-list">
@@ -79,7 +81,7 @@
     </div>
 
     <!-- 规则列表 -->
-    <transition-group name="rule-list-anim" tag="div" class="rules-container">
+    <div class="rules-container">
         <div
           v-for="rule in filteredRules"
           :key="rule.id"
@@ -111,7 +113,7 @@
           </div>
 
           <div class="rule-text">
-            <span class="rule-label">{{ renderRuleText(rule) }}</span>
+            <span class="rule-label">{{ getRuleText(rule) }}</span>
           </div>
 
           <div class="rule-actions">
@@ -182,18 +184,19 @@
           </div>
         </transition>
       </div>
-    </transition-group>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { Search, X, FileOutput, FileInput, Trash2, AlertTriangle, ClipboardList, ChevronDown } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useLogger } from '@/composables/useLogger'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
+import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import {
   PRIORITY_COLORS,
   PRIORITY_ICONS,
@@ -216,6 +219,7 @@ const emit = defineEmits(['export', 'import', 'edit'])
 const { rules, renderRuleText, toggleRule, updateRule, deleteRule, clearAllRules, detectConflicts } = useSeatRules()
 const { students } = useStudentData()
 const { tags } = useTagData()
+const { attributeDefinitions, getAttributeById } = useStudentAttributes()
 const { requestConfirm, isConfirming } = useConfirmAction()
 const { info, success } = useLogger()
 
@@ -224,6 +228,7 @@ const filterPriority = ref('all')
 const expandedId = ref(null)
 const showConflicts = ref(false)
 const selectedRuleIds = ref([])
+const selectedRuleIdSet = computed(() => new Set(selectedRuleIds.value))
 
 const priorityTabs = [
   { key: 'all', label: '全部' },
@@ -232,14 +237,10 @@ const priorityTabs = [
   { key: 'optional', label: '可选' }
 ]
 
-const conflicts = computed(() => detectConflicts())
-
-const tabCounts = computed(() => ({
-  all: rules.value.length,
-  required: rules.value.filter(r => r.priority === 'required').length,
-  prefer: rules.value.filter(r => r.priority === 'prefer').length,
-  optional: rules.value.filter(r => r.priority === 'optional').length
-}))
+const conflicts = ref([])
+const hasScannedConflicts = ref(false)
+const ruleTextCache = new Map()
+let autoConflictScanTimer = null
 
 const filteredRules = computed(() => {
   let list = rules.value
@@ -249,7 +250,7 @@ const filteredRules = computed(() => {
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter(r => {
-      const text = renderRuleText(r).toLowerCase()
+      const text = getRuleText(r).toLowerCase()
       const desc = (r.description || '').toLowerCase()
       return text.includes(q) || desc.includes(q)
     })
@@ -260,11 +261,55 @@ const filteredRules = computed(() => {
 const filteredRuleIds = computed(() => filteredRules.value.map(r => r.id))
 const isAllFilteredSelected = computed(() => {
   if (filteredRuleIds.value.length === 0) return false
-  return filteredRuleIds.value.every(id => selectedRuleIds.value.includes(id))
+  return filteredRuleIds.value.every(id => selectedRuleIdSet.value.has(id))
 })
 const hasSelectedRules = computed(() => selectedRuleIds.value.length > 0)
 
-const isSelected = (ruleId) => selectedRuleIds.value.includes(ruleId)
+const studentNameMap = computed(() => {
+  const map = new Map()
+  for (const student of students.value) {
+    map.set(student.id, student.name || `学生#${student.id}`)
+  }
+  return map
+})
+
+const tagNameMap = computed(() => {
+  const map = new Map()
+  for (const tag of tags.value) {
+    map.set(tag.id, tag.name || `标签#${tag.id}`)
+  }
+  return map
+})
+
+const ruleTextDataVersion = computed(() => {
+  const studentVersion = students.value.map(s => `${s.id}:${s.name || ''}`).join('|')
+  const tagVersion = tags.value.map(t => `${t.id}:${t.name || ''}`).join('|')
+  const attributeVersion = attributeDefinitions.value
+    .map(attr => `${attr.id}:${attr.name || ''}:${attr.unit || ''}`)
+    .join('|')
+  return `${studentVersion}::${tagVersion}::${attributeVersion}`
+})
+
+const conflictScanVersion = computed(() => {
+  const ruleVersion = JSON.stringify(rules.value.map(rule => ({
+    id: rule.id,
+    enabled: rule.enabled,
+    priority: rule.priority,
+    predicate: rule.predicate,
+    params: rule.params,
+    subjects: rule.subjects,
+    not: rule.not,
+    logicOperator: rule.logicOperator,
+    subRules: rule.subRules
+  })))
+  const studentVersion = students.value
+    .map(student => `${student.id}:${(student.tags || []).join(',')}`)
+    .join('|')
+  const tagVersion = tags.value.map(tag => tag.id).join('|')
+  return `${ruleVersion}::${studentVersion}::${tagVersion}`
+})
+
+const isSelected = (ruleId) => selectedRuleIdSet.value.has(ruleId)
 
 const toggleSelectRule = (ruleId) => {
   if (selectedRuleIds.value.includes(ruleId)) {
@@ -289,11 +334,15 @@ const toggleExpand = (id) => {
 
 const handleToggle = (ruleId) => {
   toggleRule(ruleId)
+  hasScannedConflicts.value = false
 }
 
 const clearInvalidSelections = () => {
   const idSet = new Set(rules.value.map(r => r.id))
   selectedRuleIds.value = selectedRuleIds.value.filter(id => idSet.has(id))
+  for (const id of ruleTextCache.keys()) {
+    if (!idSet.has(id)) ruleTextCache.delete(id)
+  }
 }
 
 const handleBatchSetPriority = (priority) => {
@@ -302,6 +351,7 @@ const handleBatchSetPriority = (priority) => {
     updateRule(ruleId, { priority })
   })
   success(`已将 ${count} 条规则设为${PRIORITY_LABELS[priority]}`)
+  hasScannedConflicts.value = false
 }
 
 const handleBatchToggle = (enabled) => {
@@ -310,6 +360,7 @@ const handleBatchToggle = (enabled) => {
     updateRule(ruleId, { enabled })
   })
   success(`已${enabled ? '启用' : '停用'} ${count} 条规则`)
+  hasScannedConflicts.value = false
 }
 
 const handleBatchDelete = () => {
@@ -322,6 +373,7 @@ const handleBatchDelete = () => {
     expandedId.value = null
   }
   success(`已成功删除 ${count} 条规则`)
+  hasScannedConflicts.value = false
 }
 
 const getDeletingKey = (id) => `deleteRule-${id}`
@@ -349,7 +401,45 @@ const handleClearAll = () => {
     expandedId.value = null
     selectedRuleIds.value = []
     success(`已成功清空 ${count} 条规则`)
+    conflicts.value = []
+    hasScannedConflicts.value = false
   }
+}
+
+const runConflictScan = () => {
+  conflicts.value = detectConflicts()
+  hasScannedConflicts.value = true
+  if (conflicts.value.length === 0) {
+    showConflicts.value = false
+  }
+}
+
+const clearAutoConflictScanTimer = () => {
+  if (autoConflictScanTimer) {
+    window.clearTimeout(autoConflictScanTimer)
+    autoConflictScanTimer = null
+  }
+}
+
+const scheduleAutoConflictScan = () => {
+  clearAutoConflictScanTimer()
+  autoConflictScanTimer = window.setTimeout(() => {
+    autoConflictScanTimer = null
+    runConflictScan()
+  }, 120)
+}
+
+const getRuleSignature = (rule) => {
+  return `${rule.id}:${rule.updatedAt || rule.createdAt || 0}`
+}
+
+const getRuleText = (rule) => {
+  const signature = getRuleSignature(rule)
+  const cached = ruleTextCache.get(rule.id)
+  if (cached?.signature === signature) return cached.text
+  const text = renderRuleText(rule)
+  ruleTextCache.set(rule.id, { signature, text })
+  return text
 }
 
 const getParamLabel = (predicate, key) => {
@@ -362,6 +452,12 @@ const formatParamValue = (predicate, key, value) => {
   if (key === 'columnType') return COLUMN_TYPE_LABELS[value] ?? value
   if (key === 'scope') return SCOPE_LABELS[value] ?? value
   if (key === 'tolerance') return value === 0 ? '仅正后方' : '正后方±1列'
+  if (key === 'attributeId') {
+    const attribute = getAttributeById(value)
+    return attribute ? (attribute.unit ? `${attribute.name}（${attribute.unit}）` : attribute.name) : String(value)
+  }
+  if (key === 'direction') return value === 'highFront' ? '高值靠前' : '低值靠前'
+  if (key === 'aggregate') return value === 'sum' ? '合计值' : '平均值'
   return String(value)
 }
 
@@ -369,13 +465,12 @@ const formatSubjects = (subjects) => {
   if (!subjects?.length) return '-'
   return subjects.map(s => {
     if (s.type === 'person') {
-      const student = students.value.find(st => st.id === s.id)
-      return student?.name || `学生#${s.id}`
+      return studentNameMap.value.get(s.id) || `学生#${s.id}`
     }
     if (s.type === 'tag') {
-      const tag = tags.value.find(t => t.id === s.id)
-      return tag?.name || `标签#${s.id}`
+      return tagNameMap.value.get(s.id) || `标签#${s.id}`
     }
+    if (s.type === 'all') return '全体学生'
     return '-'
   }).join('、')
 }
@@ -405,7 +500,22 @@ watch(() => props.focusRuleId, (id) => {
   }
 })
 
-watch(rules, clearInvalidSelections, { deep: true })
+watch(
+  () => rules.value.map(r => r.id).join('|'),
+  clearInvalidSelections
+)
+
+watch(ruleTextDataVersion, () => {
+  ruleTextCache.clear()
+})
+
+watch(conflictScanVersion, () => {
+  scheduleAutoConflictScan()
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  clearAutoConflictScanTimer()
+})
 
 defineExpose({ focusRule })
 </script>
@@ -633,15 +743,30 @@ defineExpose({ focusRule })
   color: var(--color-warning-hover);
 }
 
+.conflict-banner.idle {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.conflict-banner.clean {
+  background: var(--color-success-bg);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
 .conflict-detail-btn {
-  margin-left: auto;
   background: none;
   border: none;
   font-size: 12px;
-  color: var(--color-warning-hover);
+  color: currentColor;
   cursor: pointer;
   text-decoration: underline;
   padding: 0;
+}
+
+.conflict-detail-btn:first-of-type {
+  margin-left: auto;
 }
 
 .conflict-list {
@@ -925,17 +1050,6 @@ defineExpose({ focusRule })
 }
 
 /* ==================== 动画 ==================== */
-.rule-list-anim-enter-active,
-.rule-list-anim-leave-active {
-  transition: all 0.25s ease;
-}
-
-.rule-list-anim-enter-from,
-.rule-list-anim-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
 .expand-enter-active,
 .expand-leave-active {
   transition: all 0.2s ease;

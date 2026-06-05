@@ -92,7 +92,7 @@
                 </span>
               </button>
               <div v-if="tags.length === 0" class="no-tags-available">
-                暂无标签，请先在编辑名单中创建标签
+                暂无标签，请先在名单与属性中创建标签
               </div>
             </div>
           </div>
@@ -103,10 +103,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Check } from 'lucide-vue-next'
 import { useStudentData } from '@/composables/useStudentData'
-import { useTagData, initializeTags } from '@/composables/useTagData'
+import { useTagData } from '@/composables/useTagData'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -114,10 +114,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:visible'])
-
-onMounted(() => {
-  initializeTags()
-})
 
 const { students, updateStudent, addTagToStudents, removeTagFromStudent } = useStudentData()
 const { tags } = useTagData()

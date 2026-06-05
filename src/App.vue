@@ -23,6 +23,7 @@ import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { initializeTags } from '@/composables/useTagData'
 
 const { isLoginDialogVisible, initAuth, isLoggedIn } = useAuth()
 const { loadWorkspaceFromCloud } = useCloudWorkspace()
@@ -44,6 +45,9 @@ initAuth()
 
 // 应用全局设置
 onMounted(async () => {
+  // 空白启动即视为新工作区，给新工作区准备默认标签；加载已有工作区时会按存档覆盖。
+  initializeTags()
+
   // 应用颜色方案（深浅色模式）
   applyColorScheme()
 
@@ -132,7 +136,6 @@ onMounted(async () => {
       import('./components/layout/ExportPreview.vue')
       import('./components/workspace/CloudWorkspaceDialog.vue')
       import('./components/student/StudentRosterDialog.vue')
-      import('./components/student/TagSettingsDialog.vue')
       // 预下载重型库（xlsx）
       import('xlsx-js-style')
     })

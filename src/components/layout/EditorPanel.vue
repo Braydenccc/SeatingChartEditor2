@@ -8,7 +8,6 @@
     <StudentListHeader
       v-if="!isMobile"
       :unassigned-count="unassignedCount"
-      @open-tag-settings="showTagSettingsDialog = true"
       @open-roster="showRosterDialog = true"
     />
 
@@ -20,14 +19,11 @@
       <StudentListHeader
         v-if="isMobile"
         :unassigned-count="unassignedCount"
-        @open-tag-settings="showTagSettingsDialog = true"
         @open-roster="showRosterDialog = true"
       />
 
       <StudentList
-        :show-tag-settings="showTagSettingsDialog"
         :show-roster="showRosterDialog"
-        @update:show-tag-settings="showTagSettingsDialog = $event"
         @update:show-roster="showRosterDialog = $event"
       />
     </div>
@@ -69,7 +65,6 @@ const { getEffectiveHeight } = useResizablePanel()
 const { width: windowWidth } = useWindowSize()
 
 const isMobile = computed(() => windowWidth.value <= 1024)
-const showTagSettingsDialog = ref(false)
 const showRosterDialog = ref(false)
 
 const unassignedCount = computed(() => {

@@ -44,6 +44,17 @@
           <div class="options-group">
             <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" style="display: none"
               @change="handleLoadWorkspace" />
+            <button
+              class="option-button"
+              :class="{ 'confirming': isConfirming('newWorkspace').value }"
+              @click="handleNewWorkspace"
+            >
+              <span class="btn-content">
+                <FilePlus :size="14" stroke-width="2" />
+                <span v-if="isConfirming('newWorkspace').value">再次点击确认新建</span>
+                <span v-else>新建工作区</span>
+              </span>
+            </button>
             <button class="option-button" @click="$refs.workspaceInput.click()">
               <span class="btn-content"><FolderOpen :size="14" stroke-width="2" />加载本地</span>
             </button>
@@ -63,10 +74,7 @@
           </div>
           <div class="options-group">
             <button class="option-button" @click="showRosterDialog = true">
-              <span class="btn-content"><Users :size="14" stroke-width="2" />编辑名单</span>
-            </button>
-            <button class="option-button" @click="showTagSettingsDialog = true">
-              <span class="btn-content"><Tag :size="14" stroke-width="2" />标签设置</span>
+              <span class="btn-content"><Users :size="14" stroke-width="2" />名单与属性</span>
             </button>
             <button class="option-button" @click="handleDownloadTemplate">
               <span class="btn-content"><Download :size="14" stroke-width="2" />下载名单模板</span>
@@ -324,11 +332,13 @@
                 <span v-if="ruleCount > 0" class="rule-badge">{{ ruleCount }}</span>
               </button>
               <button id="applyAssign" class="option-button primary main-assign-btn" 
-                :disabled="isAssigning || (precheckResult && !precheckResult.pass)" @click="handleRunAssignment">
+                :class="{ danger: isAssigning }"
+                :disabled="isAssignmentCancelRequested || (!isAssigning && precheckResult && !precheckResult.pass)" @click="handleRunAssignment">
                 <span class="btn-content">
-                  <Loader2 v-if="isAssigning" :size="14" stroke-width="2" class="spin-icon" />
+                  <Loader2 v-if="isAssignmentCancelRequested" :size="14" stroke-width="2" class="spin-icon" />
+                  <X v-else-if="isAssigning" :size="14" stroke-width="2" />
                   <Play v-else :size="14" stroke-width="2" />
-                  {{ isAssigning ? '执行中...' : (precheckResult && !precheckResult.pass ? '先修复阻断项' : '开始排位') }}
+                  {{ isAssignmentCancelRequested ? '正在中断...' : (isAssigning ? '中断排位' : (precheckResult && !precheckResult.pass ? '先修复阻断项' : '开始排位')) }}
                 </span>
               </button>
             </div>
@@ -476,11 +486,8 @@
     @close="showRuleEditor = false"
   />
 
-  <!-- 编辑名单弹窗 -->
+  <!-- 名单与属性弹窗 -->
   <StudentRosterDialog v-if="showRosterDialog" v-model:visible="showRosterDialog" />
-
-  <!-- 标签设置弹窗 -->
-  <TagSettingsDialog v-if="showTagSettingsDialog" v-model:visible="showTagSettingsDialog" />
 
   <!-- 座位表配置弹窗 -->
   <SeatConfigDialog
@@ -495,12 +502,11 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed, defineAsyncComponent } from 'vue'
-import { ArrowLeftRight, Check, CircleX, CloudDownload, CloudUpload, Download, Edit3, FileText, FolderOpen, LayoutGrid, ListFilter, Loader2, Minus, Plus, Play, RefreshCcw, Save, Scale, Settings, Settings2, Shuffle, Sliders, Tag, Trash2, FileInput, FileOutput, Users, X } from 'lucide-vue-next'
+import { ArrowLeftRight, Check, CircleX, CloudDownload, CloudUpload, Download, Edit3, FilePlus, FileText, FolderOpen, LayoutGrid, ListFilter, Loader2, Minus, Plus, Play, RefreshCcw, Save, Scale, Settings, Settings2, Shuffle, Sliders, Trash2, FileInput, FileOutput, Users, X } from 'lucide-vue-next'
 
 const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
 const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
 const StudentRosterDialog = defineAsyncComponent(() => import('../student/StudentRosterDialog.vue'))
-const TagSettingsDialog = defineAsyncComponent(() => import('../student/TagSettingsDialog.vue'))
 const SeatConfigDialog = defineAsyncComponent(() => import('./SeatConfigDialog.vue'))
 
 import { useSidebar } from '@/composables/useSidebar'
@@ -527,18 +533,18 @@ import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useAutoSave } from '@/composables/useAutoSave'
 
 const { activeTab, mobileMenuOpen, setActiveTab, closeMobileMenu } = useSidebar()
-const { seatConfig, updateConfig, clearAllSeats, seats, shiftSeats, getAvailableSeats } = useSeatChart()
+const { seatConfig, updateConfig, clearAllSeats, seats, shiftSeats, getAvailableSeats, isInRowRange, isColumnType } = useSeatChart()
 const { currentMode, setMode, toggleEmptyEditMode, EditMode } = useEditMode()
-const { isAssigning, assignmentProgress, assignmentIterationInfo, runSmartAssignment } = useAssignment()
+const { isAssigning, isAssignmentCancelRequested, assignmentProgress, assignmentIterationInfo, runSmartAssignment, cancelSmartAssignment } = useAssignment()
 const { tags, addTag, clearAllTags } = useTagData()
 const { students, addStudent, updateStudent, clearAllStudents } = useStudentData()
 const { exportSettings } = useExportSettings()
 const { exportToImage } = useImageExport()
 const { downloadTemplate, importFromExcel, exportToExcel } = useExcelData()
-const { saveWorkspace, loadWorkspace, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
+const { saveWorkspace, loadWorkspace, applyWorkspaceData, saveLastWorkspace, createNewWorkspace } = useWorkspace()
 const { logs, success, warning, error, clearLogs } = useLogger()
 const { requestConfirm, isConfirming } = useConfirmAction()
-const { rules, ruleCount, getActiveRules, getRulesForStudent, detectConflicts, renderRuleText } = useSeatRules()
+const { rules, ruleCount, getActiveRules, detectConflicts, renderRuleText } = useSeatRules()
 const { isLoggedIn, isLoginDialogVisible } = useAuth()
 const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom()
 const { zones } = useZoneData()
@@ -694,13 +700,9 @@ const precheckResult = ref(null)
 const workspaceInput = ref(null)
 const excelInput = ref(null)
 
-// 标签设置本地副本
-const tagSettingsLocal = ref({})
-
 // 导出弹窗状态
 const showExportDialog = ref(false)
 const showRosterDialog = ref(false)
-const showTagSettingsDialog = ref(false)
 const lastExportUrl = ref('')
 const isExporting = ref(false)
 let lastExportObjectUrl = ''
@@ -723,6 +725,28 @@ const onExported = (payload) => {
 }
 
 // 工作区管理 (本地)
+const handleNewWorkspace = () => {
+  const confirmed = requestConfirm('newWorkspace', () => {
+    const isSuccess = createNewWorkspace()
+    if (isSuccess) {
+      markSaved()
+      configForm.value = {
+        groupCount: 4,
+        columnsPerGroup: 2,
+        seatsPerColumn: 7,
+        shiftDistance: 4,
+        shiftColShift: 0,
+        shiftDirection: -1,
+        podiumPosition: 'bottom'
+      }
+    }
+  }, '再次点击确认新建')
+
+  if (!confirmed) {
+    warning('再次点击"新建工作区"按钮以确认清空当前工作区')
+  }
+}
+
 const handleSaveWorkspace = () => {
   const isSuccess = saveWorkspace()
   if (isSuccess) {
@@ -821,7 +845,8 @@ const handleImportExcel = async (event) => {
       updateStudent(newStudentId, {
         name: studentData.name,
         studentNumber: studentData.studentNumber,
-        tags: studentTags
+        tags: studentTags,
+        numericAttributes: studentData.numericAttributes || {}
       })
     })
 
@@ -864,9 +889,14 @@ const applySeatShift = () => {
 // 初始化时从 seatConfig 读取当前配置（只合并座位结构字段，保留轮换专属字段）
 onMounted(() => {
   configForm.value = { ...configForm.value, ...seatConfig.value }
+  scheduleAutoPrecheck()
 })
 
 onBeforeUnmount(() => {
+  if (autoPrecheckTimer) {
+    window.clearTimeout(autoPrecheckTimer)
+    autoPrecheckTimer = null
+  }
   if (lastExportObjectUrl) {
     URL.revokeObjectURL(lastExportObjectUrl)
     lastExportObjectUrl = ''
@@ -1015,7 +1045,10 @@ const toggleClearMode = () => {
 
 // 运行排位
 const handleRunAssignment = async () => {
-  if (isAssigning.value) return
+  if (isAssigning.value) {
+    if (cancelSmartAssignment()) warning('正在中断智能排位...')
+    return
+  }
 
   const gate = runAssignmentPrecheck({ silent: true })
   if (!gate.pass) {
@@ -1036,6 +1069,8 @@ const handleRunAssignment = async () => {
       if (result.message) success(result.message)
       lastAssignmentReport.value = result.report ?? null
       lastAssignmentDuration.value = result.duration ?? (Date.now() - startTime)
+    } else if (result.canceled) {
+      warning(result.message)
     } else {
       error(result.message)
     }
@@ -1052,15 +1087,24 @@ const precheckRiskText = computed(() => {
   return '高'
 })
 
-const detectDeskmateBindingConflicts = () => {
-  const activeRules = getActiveRules().filter(rule => rule.predicate === 'MUST_BE_SEATMATES')
-  if (activeRules.length === 0) {
-    return { count: 0, details: [] }
-  }
+const AUTO_PRECHECK_DELAY = 500
+let autoPrecheckTimer = null
 
-  const studentNameMap = new Map(students.value.map(student => [student.id, student.name || `学生#${student.id}`]))
+const buildPrecheckContext = () => {
+  const studentList = students.value
+  const activeRules = getActiveRules()
+  const includeGuardSeats = seatConfig.value.guardSeats?.includeInAutoAssignment === true
+  const availableSeats = getAvailableSeats(includeGuardSeats)
+  const availableSeatIds = new Set(availableSeats.map(seat => seat.id))
+  const seatList = seats.value || []
+  const config = seatConfig.value
+  const zoneList = zones.value || []
+  const seatById = new Map(seatList.map(seat => [seat.id, seat]))
+  const zoneById = new Map(zoneList.map(zone => [zone.id, zone]))
+  const studentNameMap = new Map(studentList.map(student => [student.id, student.name || `学生#${student.id}`]))
   const tagToStudentIds = new Map()
-  for (const student of students.value) {
+
+  for (const student of studentList) {
     for (const tagId of (student.tags || [])) {
       if (!tagToStudentIds.has(tagId)) tagToStudentIds.set(tagId, new Set())
       tagToStudentIds.get(tagId).add(student.id)
@@ -1070,6 +1114,10 @@ const detectDeskmateBindingConflicts = () => {
   const expandEntriesToStudentIds = (entries = []) => {
     const ids = new Set()
     for (const entry of entries) {
+      if (entry?.type === 'all') {
+        for (const student of studentList) ids.add(student.id)
+        continue
+      }
       if (!entry?.id) continue
       if (entry.type === 'person') {
         ids.add(entry.id)
@@ -1078,15 +1126,60 @@ const detectDeskmateBindingConflicts = () => {
       if (entry.type === 'tag') {
         const studentIds = tagToStudentIds.get(entry.id)
         if (!studentIds) continue
-        for (const studentId of studentIds) {
-          ids.add(studentId)
-        }
+        for (const studentId of studentIds) ids.add(studentId)
       }
     }
     return [...ids]
   }
 
-  const columnsPerGroup = Number(seatConfig.value?.columnsPerGroup || 0)
+  const rulesByStudentId = new Map(studentList.map(student => [student.id, []]))
+  const coveredStudentIds = new Set()
+  for (const rule of activeRules) {
+    const studentIds = expandEntriesToStudentIds(rule.subjects || [])
+    for (const studentId of studentIds) {
+      coveredStudentIds.add(studentId)
+      if (!rulesByStudentId.has(studentId)) rulesByStudentId.set(studentId, [])
+      rulesByStudentId.get(studentId).push(rule)
+    }
+  }
+
+  return {
+    studentList,
+    activeRules,
+    availableSeats,
+    availableSeatIds,
+    seatList,
+    config,
+    zoneList,
+    seatById,
+    zoneById,
+    studentNameMap,
+    expandEntriesToStudentIds,
+    rulesByStudentId,
+    coveredStudentIds,
+    isInRowRange,
+    isColumnType
+  }
+}
+
+const scheduleAutoPrecheck = () => {
+  precheckResult.value = null
+  if (autoPrecheckTimer) window.clearTimeout(autoPrecheckTimer)
+  autoPrecheckTimer = window.setTimeout(() => {
+    autoPrecheckTimer = null
+    runAssignmentPrecheck({ silent: true })
+  }, AUTO_PRECHECK_DELAY)
+}
+
+const isGuardSeatLike = (seat) => seat?.kind === 'guard' || String(seat?.id || '').startsWith('guard-')
+
+const detectDeskmateBindingConflicts = (ctx) => {
+  const activeRules = ctx.activeRules.filter(rule => rule.predicate === 'MUST_BE_SEATMATES')
+  if (activeRules.length === 0) {
+    return { count: 0, details: [] }
+  }
+
+  const columnsPerGroup = Number(ctx.config?.columnsPerGroup || 0)
   if (columnsPerGroup <= 1) {
     return {
       count: 1,
@@ -1099,7 +1192,7 @@ const detectDeskmateBindingConflicts = () => {
   const expandedPairs = []
 
   for (const rule of activeRules) {
-    const ids = expandEntriesToStudentIds(rule.subjects || [])
+    const ids = ctx.expandEntriesToStudentIds(rule.subjects || [])
     for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
         const a = ids[i]
@@ -1118,7 +1211,7 @@ const detectDeskmateBindingConflicts = () => {
 
   const details = []
   const seatsByGroupRow = new Map()
-  for (const seat of getAvailableSeats()) {
+  for (const seat of ctx.availableSeats) {
     const key = `${seat.groupIndex}:${seat.rowIndex}`
     if (!seatsByGroupRow.has(key)) seatsByGroupRow.set(key, 0)
     seatsByGroupRow.set(key, seatsByGroupRow.get(key) + 1)
@@ -1133,16 +1226,16 @@ const detectDeskmateBindingConflicts = () => {
   const maxDeskmatesPerStudent = columnsPerGroup - 1
   for (const [studentId, mates] of adjacency.entries()) {
     if (mates.size <= maxDeskmatesPerStudent) continue
-    const selfName = studentNameMap.get(studentId) || `学生#${studentId}`
-    const mateNames = [...mates].map(id => studentNameMap.get(id) || `学生#${id}`)
+    const selfName = ctx.studentNameMap.get(studentId) || `学生#${studentId}`
+    const mateNames = [...mates].map(id => ctx.studentNameMap.get(id) || `学生#${id}`)
     details.push(`同桌绑定冲突：${selfName} 绑定了 ${mateNames.join('、')}，超过当前列数可容纳上限（${maxDeskmatesPerStudent}）`)
   }
 
-  const forbidRules = getActiveRules().filter(rule => rule.predicate === 'MUST_NOT_BE_SEATMATES')
+  const forbidRules = ctx.activeRules.filter(rule => rule.predicate === 'MUST_NOT_BE_SEATMATES')
   if (forbidRules.length > 0 && expandedPairs.length > 0) {
     const forbidPairKeys = new Set()
     for (const rule of forbidRules) {
-      const ids = expandEntriesToStudentIds(rule.subjects || [])
+      const ids = ctx.expandEntriesToStudentIds(rule.subjects || [])
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           const a = ids[i]
@@ -1154,8 +1247,8 @@ const detectDeskmateBindingConflicts = () => {
     for (const [a, b] of expandedPairs) {
       const key = a < b ? `${a}:${b}` : `${b}:${a}`
       if (!forbidPairKeys.has(key)) continue
-      const aName = studentNameMap.get(a) || `学生#${a}`
-      const bName = studentNameMap.get(b) || `学生#${b}`
+      const aName = ctx.studentNameMap.get(a) || `学生#${a}`
+      const bName = ctx.studentNameMap.get(b) || `学生#${b}`
       details.push(`规则冲突：${aName} 与 ${bName} 同时存在“必须同桌”和“禁止同桌”`)
     }
   }
@@ -1163,43 +1256,19 @@ const detectDeskmateBindingConflicts = () => {
   return { count: details.length, details }
 }
 
-const detectSeatCapacityConflicts = () => {
+const detectSeatCapacityConflicts = (ctx) => {
   const details = []
-  const activeRules = getActiveRules()
-
-  const tagToStudentIds = new Map()
-  for (const student of students.value) {
-    for (const tagId of (student.tags || [])) {
-      if (!tagToStudentIds.has(tagId)) tagToStudentIds.set(tagId, new Set())
-      tagToStudentIds.get(tagId).add(student.id)
-    }
-  }
-
-  const expandEntriesToStudentIds = (entries = []) => {
-    const ids = new Set()
-    for (const entry of entries) {
-      if (!entry?.id) continue
-      if (entry.type === 'person') {
-        ids.add(entry.id)
-        continue
-      }
-      if (entry.type === 'tag') {
-        const studentIds = tagToStudentIds.get(entry.id)
-        if (!studentIds) continue
-        for (const studentId of studentIds) {
-          ids.add(studentId)
-        }
-      }
-    }
-    return [...ids]
-  }
+  const activeRules = ctx.activeRules
 
   const inZoneRules = activeRules.filter(r => r.predicate === 'IN_ZONE')
   for (const rule of inZoneRules) {
-    const studentIds = expandEntriesToStudentIds(rule.subjects || [])
-    const zone = zones.find(z => z.id === rule.params?.zoneId)
+    const studentIds = ctx.expandEntriesToStudentIds(rule.subjects || [])
+    const zone = ctx.zoneById.get(rule.params?.zoneId)
     if (!zone) continue
-    const zoneSeatCount = zone.seatIds.length
+    const zoneSeatCount = zone.seatIds.filter(seatId => {
+      const seat = ctx.seatById.get(seatId)
+      return seat && !isGuardSeatLike(seat) && ctx.availableSeatIds.has(seatId)
+    }).length
     if (studentIds.length > zoneSeatCount) {
       details.push(`选区容量不足：「${renderRuleText(rule)}」需要 ${studentIds.length} 个座位，但选区只有 ${zoneSeatCount} 个可用座位`)
     }
@@ -1207,13 +1276,11 @@ const detectSeatCapacityConflicts = () => {
 
   const inRowRangeRules = activeRules.filter(r => r.predicate === 'IN_ROW_RANGE')
   for (const rule of inRowRangeRules) {
-    const studentIds = expandEntriesToStudentIds(rule.subjects || [])
+    const studentIds = ctx.expandEntriesToStudentIds(rule.subjects || [])
     const { minRow, maxRow } = rule.params
-    const eligibleSeats = getAvailableSeats().filter(seat => {
-      const totalRows = seatConfig.seatsPerColumn
-      const rowFromPodium = totalRows - seat.rowIndex
-      return rowFromPodium >= minRow && rowFromPodium <= maxRow
-    })
+    const eligibleSeats = ctx.availableSeats.filter(seat =>
+      !isGuardSeatLike(seat) && ctx.isInRowRange(seat.id, minRow, maxRow)
+    )
     if (studentIds.length > eligibleSeats.length) {
       details.push(`排范围容量不足：「${renderRuleText(rule)}」需要 ${studentIds.length} 个座位，但指定排范围只有 ${eligibleSeats.length} 个可用座位`)
     }
@@ -1221,9 +1288,9 @@ const detectSeatCapacityConflicts = () => {
 
   const inGroupRangeRules = activeRules.filter(r => r.predicate === 'IN_GROUP_RANGE')
   for (const rule of inGroupRangeRules) {
-    const studentIds = expandEntriesToStudentIds(rule.subjects || [])
+    const studentIds = ctx.expandEntriesToStudentIds(rule.subjects || [])
     const { minGroup, maxGroup } = rule.params
-    const eligibleSeats = getAvailableSeats().filter(seat => {
+    const eligibleSeats = ctx.availableSeats.filter(seat => {
       const group1 = seat.groupIndex + 1
       return group1 >= minGroup && group1 <= maxGroup
     })
@@ -1235,32 +1302,27 @@ const detectSeatCapacityConflicts = () => {
   return { count: details.length, details }
 }
 
-const detectStudentFeasibilityConflicts = () => {
+const detectStudentFeasibilityConflicts = (ctx) => {
   const details = []
 
-  const tagToStudentIds = new Map()
-  for (const student of students.value) {
-    for (const tagId of (student.tags || [])) {
-      if (!tagToStudentIds.has(tagId)) tagToStudentIds.set(tagId, new Set())
-      tagToStudentIds.get(tagId).add(student.id)
-    }
-  }
-
-  for (const student of students.value) {
-    const studentRules = getRulesForStudent(student.id).filter(r => r.enabled)
-    let eligibleSeats = new Set(getAvailableSeats().map(s => s.id))
+  for (const student of ctx.studentList) {
+    const studentRules = ctx.rulesByStudentId.get(student.id) || []
+    let eligibleSeats = new Set(ctx.availableSeatIds)
 
     for (const rule of studentRules) {
       if (rule.not) continue
 
       if (rule.predicate === 'IN_ZONE') {
-        const zone = zones.find(z => z.id === rule.params?.zoneId)
+        const zone = ctx.zoneById.get(rule.params?.zoneId)
         if (zone) {
-          const zoneSeats = new Set(zone.seatIds)
+          const zoneSeats = new Set(zone.seatIds.filter(seatId => {
+            const seat = ctx.seatById.get(seatId)
+            return seat && !isGuardSeatLike(seat)
+          }))
           eligibleSeats = new Set([...eligibleSeats].filter(id => zoneSeats.has(id)))
         }
       } else if (rule.predicate === 'NOT_IN_ZONE') {
-        const zone = zones.find(z => z.id === rule.params?.zoneId)
+        const zone = ctx.zoneById.get(rule.params?.zoneId)
         if (zone) {
           const zoneSeats = new Set(zone.seatIds)
           eligibleSeats = new Set([...eligibleSeats].filter(id => !zoneSeats.has(id)))
@@ -1268,41 +1330,25 @@ const detectStudentFeasibilityConflicts = () => {
       } else if (rule.predicate === 'IN_ROW_RANGE') {
         const { minRow, maxRow } = rule.params
         eligibleSeats = new Set([...eligibleSeats].filter(id => {
-          const seat = seats.find(s => s.id === id)
-          if (!seat) return false
-          const totalRows = seatConfig.seatsPerColumn
-          const rowFromPodium = totalRows - seat.rowIndex
-          return rowFromPodium >= minRow && rowFromPodium <= maxRow
+          const seat = ctx.seatById.get(id)
+          if (!seat || isGuardSeatLike(seat)) return false
+          return ctx.isInRowRange(id, minRow, maxRow)
         }))
       } else if (rule.predicate === 'IN_GROUP_RANGE') {
         const { minGroup, maxGroup } = rule.params
         eligibleSeats = new Set([...eligibleSeats].filter(id => {
-          const seat = seats.find(s => s.id === id)
-          if (!seat) return false
+          const seat = ctx.seatById.get(id)
+          if (!seat || isGuardSeatLike(seat)) return false
           const group1 = seat.groupIndex + 1
           return group1 >= minGroup && group1 <= maxGroup
         }))
       } else if (rule.predicate === 'NOT_IN_COLUMN_TYPE') {
         const columnType = rule.params?.columnType
         eligibleSeats = new Set([...eligibleSeats].filter(id => {
-          const seat = seats.find(s => s.id === id)
+          const seat = ctx.seatById.get(id)
           if (!seat) return false
-          const { groupIndex, columnIndex } = seat
-          const { groupCount, columnsPerGroup } = seatConfig
-          const isFirstGroup = groupIndex === 0
-          const isLastGroup = groupIndex === groupCount - 1
-          const isFirstCol = columnIndex === 0
-          const isLastCol = columnIndex === columnsPerGroup - 1
-          const isWall = (isFirstGroup && isFirstCol) || (isLastGroup && isLastCol)
-          const isAisle = isFirstCol || isLastCol
-          let type = 'center'
-          if (isWall) type = 'wall'
-          else if (isAisle) type = 'aisle'
-          
-          if (columnType === 'edge') {
-            return type !== 'wall' && type !== 'aisle'
-          }
-          return type !== columnType
+          if (isGuardSeatLike(seat)) return true
+          return !ctx.isColumnType(id, columnType)
         }))
       }
     }
@@ -1369,48 +1415,21 @@ const calculateTheoreticalMinimumDistance = (studentCount, totalSeats) => {
   }
 }
 
-const detectDistributeEvenlyFeasibility = () => {
+const detectDistributeEvenlyFeasibility = (ctx) => {
   const details = []
-  const activeRules = getActiveRules()
-
-  const tagToStudentIds = new Map()
-  for (const student of students.value) {
-    for (const tagId of (student.tags || [])) {
-      if (!tagToStudentIds.has(tagId)) tagToStudentIds.set(tagId, new Set())
-      tagToStudentIds.get(tagId).add(student.id)
-    }
-  }
-
-  const expandEntriesToStudentIds = (entries = []) => {
-    const ids = new Set()
-    for (const entry of entries) {
-      if (!entry?.id) continue
-      if (entry.type === 'person') {
-        ids.add(entry.id)
-        continue
-      }
-      if (entry.type === 'tag') {
-        const studentIds = tagToStudentIds.get(entry.id)
-        if (!studentIds) continue
-        for (const studentId of studentIds) {
-          ids.add(studentId)
-        }
-      }
-    }
-    return [...ids]
-  }
+  const activeRules = ctx.activeRules
 
   const distributeRules = activeRules.filter(r => r.predicate === 'DISTRIBUTE_EVENLY')
   for (const rule of distributeRules) {
-    const studentIds = expandEntriesToStudentIds(rule.subjects || [])
+    const studentIds = ctx.expandEntriesToStudentIds(rule.subjects || [])
     if (studentIds.length <= 1) continue
 
-    const idealMinDistance = calculateIdealMinDistance(studentIds.length, seatConfig)
+    const idealMinDistance = calculateIdealMinDistance(studentIds.length, ctx.config)
 
-    const availableSeats = getAvailableSeats()
+    const availableSeats = ctx.availableSeats
     if (availableSeats.length === 0) continue
 
-    const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig
+    const { groupCount, columnsPerGroup, seatsPerColumn } = ctx.config
     const totalCols = groupCount * columnsPerGroup
     const totalRows = seatsPerColumn
     const totalSeats = totalCols * totalRows
@@ -1444,12 +1463,13 @@ const detectDistributeEvenlyFeasibility = () => {
 }
 
 const runAssignmentPrecheck = ({ silent = false } = {}) => {
-  const studentCount = students.value.length
-  const availableSeatCount = getAvailableSeats().length
-  const activeRuleCount = getActiveRules().length
+  const ctx = buildPrecheckContext()
+  const studentCount = ctx.studentList.length
+  const availableSeatCount = ctx.availableSeats.length
+  const activeRuleCount = ctx.activeRules.length
   
-  const zoneHelper = { zones }
-  const seatChartHelper = { seats, seatConfig }
+  const zoneHelper = { zones: ctx.zoneList }
+  const seatChartHelper = { seats: ctx.seatList, seatConfig: ctx.config }
   const conflictList = detectConflicts(zoneHelper, seatChartHelper)
   const conflictCount = conflictList.length
   const blockingReasons = []
@@ -1469,25 +1489,25 @@ const runAssignmentPrecheck = ({ silent = false } = {}) => {
     })
   }
 
-  const deskmateBindingConflict = detectDeskmateBindingConflicts()
+  const deskmateBindingConflict = detectDeskmateBindingConflicts(ctx)
   if (deskmateBindingConflict.count > 0) {
     blockingReasons.push(`存在 ${deskmateBindingConflict.count} 处同桌绑定冲突`)
     blockingReasons.push(...deskmateBindingConflict.details.slice(0, 5))
   }
 
-  const seatCapacityConflict = detectSeatCapacityConflicts()
+  const seatCapacityConflict = detectSeatCapacityConflicts(ctx)
   if (seatCapacityConflict.count > 0) {
     blockingReasons.push(`存在 ${seatCapacityConflict.count} 处座位容量冲突`)
     blockingReasons.push(...seatCapacityConflict.details.slice(0, 5))
   }
 
-  const studentFeasibilityConflict = detectStudentFeasibilityConflicts()
+  const studentFeasibilityConflict = detectStudentFeasibilityConflicts(ctx)
   if (studentFeasibilityConflict.count > 0) {
     blockingReasons.push(`存在 ${studentFeasibilityConflict.count} 处学生位置不可行问题`)
     blockingReasons.push(...studentFeasibilityConflict.details.slice(0, 5))
   }
 
-  const distributeEvenlyWarning = detectDistributeEvenlyFeasibility()
+  const distributeEvenlyWarning = detectDistributeEvenlyFeasibility(ctx)
   if (distributeEvenlyWarning.count > 0) {
     warnings.push(...distributeEvenlyWarning.details)
   }
@@ -1496,9 +1516,7 @@ const runAssignmentPrecheck = ({ silent = false } = {}) => {
     warnings.push('当前未启用规则，本次将接近随机排位')
   }
 
-  const coveredStudents = students.value.filter(s =>
-    getRulesForStudent(s.id).some(rule => rule.enabled !== false)
-  ).length
+  const coveredStudents = ctx.coveredStudentIds.size
   const coverageRate = studentCount > 0 ? Math.round((coveredStudents / studentCount) * 100) : 0
   const estimatedMs = Math.max(
     300,
@@ -1551,11 +1569,15 @@ const handleFocusRule = (item) => {
 
 
 watch(
-  [students, rules, () => assignConfig.value.maxIterations, seats],
-  () => {
-    runAssignmentPrecheck({ silent: true })
-  },
-  { deep: true }
+  [
+    () => students.value.map(student => `${student.id}:${(student.tags || []).join(',')}`).join('|'),
+    () => rules.value.map(rule => `${rule.id}:${rule.updatedAt || rule.createdAt || 0}:${rule.enabled !== false}`).join('|'),
+    () => assignConfig.value.maxIterations,
+    () => seats.value.map(seat => `${seat.id}:${seat.kind || ''}:${seat.isEmpty ? 1 : 0}:${seat.groupIndex}:${seat.columnIndex}:${seat.rowIndex}:${seat.guardSide || ''}`).join('|'),
+    () => zones.value.map(zone => `${zone.id}:${zone.seatIds?.join(',') || ''}`).join('|'),
+    () => `${seatConfig.value.groupCount}:${seatConfig.value.columnsPerGroup}:${seatConfig.value.seatsPerColumn}:${seatConfig.value.podiumPosition || ''}:${JSON.stringify(seatConfig.value.groups || [])}:${JSON.stringify(seatConfig.value.guardSeats || {})}`
+  ],
+  scheduleAutoPrecheck
 )
 
 // 监听 seatConfig 变化，同步到 configForm
@@ -1569,10 +1591,6 @@ watch(
   },
   { deep: true, immediate: true }
 )
-
-onMounted(() => {
-  runAssignmentPrecheck({ silent: true })
-})
 
 // 日志相关方法
 const handleClearLogs = () => {
@@ -1951,6 +1969,22 @@ const formatLogTime = (timestamp) => {
   box-shadow: 0 8px 20px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
+.option-button.primary.danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--color-danger) 18%, transparent);
+}
+
+.option-button.primary.danger:not(:disabled):not(.confirming) {
+  animation: none;
+}
+
+.option-button.primary.danger:hover {
+  background: var(--color-danger-hover);
+  border-color: var(--color-danger-hover);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-danger) 28%, transparent);
+}
+
 .option-button.primary:active {
   transform: translateY(0) scale(0.98);
   transition: all 0.1s ease;
@@ -2034,75 +2068,6 @@ const formatLogTime = (timestamp) => {
   width: 16px;
   height: 16px;
   cursor: pointer;
-}
-
-/* 标签设置列表 */
-.tag-settings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 12px;
-  background: var(--color-bg-subtle);
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-}
-
-.tag-setting-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  background: var(--color-surface);
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-}
-
-.tag-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--color-text-primary);
-}
-
-.tag-checkbox input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-
-.tag-display-text-label {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  margin-top: 4px;
-}
-
-.tag-color-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  flex-shrink: 0;
-}
-
-.tag-text-input {
-  padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  font-size: 13px;
-  transition: border-color 0.3s;
-  width: 100%;
-}
-
-.tag-text-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
-
-.tag-text-input::placeholder {
-  color: var(--color-text-disabled);
 }
 
 /* 间距设置网格 */
@@ -2439,19 +2404,17 @@ const formatLogTime = (timestamp) => {
     inset: 0;
     background: var(--color-bg-overlay);
     z-index: 998;
-    backdrop-filter: blur(2px);
   }
 
   /* Vue Transition 淡入淡出动画 */
   .overlay-fade-enter-active,
   .overlay-fade-leave-active {
-    transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
+    transition: opacity 0.3s ease;
   }
 
   .overlay-fade-enter-from,
   .overlay-fade-leave-to {
     opacity: 0;
-    backdrop-filter: blur(0px);
   }
 
   /* 侧边栏整体：固定在底部 */

@@ -6,6 +6,7 @@ export type {
   Tag,
   Seat,
   SeatConfig,
+  NumericAttributeDefinition,
   GroupConfig,
   Zone,
   Rule,
@@ -17,6 +18,7 @@ export type {
   WorkspaceMeta,
   ExportSettings,
   TagSettings,
+  StudentAttributeSettings,
   SeatPosition,
   AssignmentIterationInfo,
   SubjectType

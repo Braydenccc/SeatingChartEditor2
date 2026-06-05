@@ -1008,7 +1008,6 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  backdrop-filter: blur(3px);
   animation: fadeIn 0.15s ease;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

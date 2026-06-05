@@ -1,5 +1,6 @@
 import { shallowRef } from 'vue'
 import { getEffectivePodiumPosition, getGuardSideForVisualSlot, getOrderedIndices, getRowNumber, getSourceRowIndex } from '@/utils/exportLayout'
+import { useStudentAttributes } from './useStudentAttributes'
 
 export const xlsxInstance = shallowRef(null)
 export const loadXlsx = async () => {
@@ -650,14 +651,81 @@ const createExcelLayoutCalculator = (seatConfig, config) => {
   }
 }
 
+const normalizeImportText = (value) => String(value ?? '')
+  .trim()
+  .replace(/[　]/g, ' ')
+  .replace(/\s+/g, '')
+  .replace(/[０-９Ａ-Ｚａ-ｚ]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xFEE0))
+  .toLowerCase()
+
+const isBlankImportValue = (value) => value == null || String(value).trim() === ''
+
+const tagTruthyValues = new Set(['1', '是', '有', '√', '✓', 'true', 'yes', 'y', '对', '勾'])
+const tagFalsyValues = new Set(['0', '否', '无', '×', 'x', 'false', 'no', 'n', '不', '没有'])
+
+const isTruthyTagMarker = (value) => tagTruthyValues.has(normalizeImportText(value))
+const isFalsyTagMarker = (value) => isBlankImportValue(value) || tagFalsyValues.has(normalizeImportText(value))
+
+const categoricalHeaderKeywords = [
+  '性别', '类别', '分类', '类型', '组别', '分组', '小组', '班级', '住宿', '午休', '晚修', '走读'
+]
+
+const numericHeaderKeywords = [
+  '数值', '属性', '标签数值', '成绩', '分数', '总分', '得分', '评分', '均分', '身高', '体重',
+  '年龄', '纪律分', '专注度', '等级', '排名', '名次', '次数', '积分', '分值', 'value', 'score',
+  'height', 'weight', 'age', 'rank'
+]
+
+const normalizeHeaderForImport = (header) => normalizeImportText(header)
+  .replace(/[：:]/g, '')
+  .replace(/[（）()\[\]【】\/／_\-－—–]/g, '')
+
+const headerLooksCategorical = (header) => {
+  const normalized = normalizeHeaderForImport(header)
+  return categoricalHeaderKeywords.some(keyword => normalized.includes(keyword))
+}
+
+const headerLooksNumeric = (header) => {
+  const normalized = normalizeHeaderForImport(header)
+  if (numericHeaderKeywords.some(keyword => normalized.includes(keyword.toLowerCase()))) return true
+  return /[（(【\[][^（）()\]】]*(cm|厘米|米|分|kg|公斤|千克|岁|次|名|%)[）)】\]]/i.test(String(header || '')) ||
+    /[/／](cm|厘米|米|分|kg|公斤|千克|岁|次|名|%)$/i.test(String(header || '').trim())
+}
+
+const getColumnValues = (rows, colIndex) => rows
+  .slice(1)
+  .map(row => row?.[colIndex])
+  .filter(value => !isBlankImportValue(value))
+
+const shouldInferNumericAttributeColumn = (header, rows, colIndex, parseNumericValue) => {
+  if (headerLooksCategorical(header)) return false
+  const values = getColumnValues(rows, colIndex)
+  if (values.length === 0) return false
+
+  const parsedValues = values
+    .map(value => parseNumericValue(value, null))
+    .filter(value => value !== null)
+  const numericRatio = parsedValues.length / values.length
+  if (numericRatio < 0.85) return false
+
+  const hasNonBinaryValue = parsedValues.some(value => value !== 0 && value !== 1)
+  return hasNonBinaryValue || headerLooksNumeric(header)
+}
+
+const getTagNamesForCell = (tagName, cellValue) => {
+  if (isTruthyTagMarker(cellValue)) return [tagName]
+  if (isFalsyTagMarker(cellValue)) return []
+  return [String(cellValue).trim()]
+}
+
 export function useExcelData() {
   const downloadTemplate = async () => {
     const XLSX = await loadXlsx()
     const templateData = [
-      ['学号', '姓名', '性别', '不修', '830', '住宿生', '午休', '周五走'],
-      ['1', '示例学生1', '男', '1', '', '', '1', ''],
-      ['2', '示例学生2', '女', '', '1', '1', '', ''],
-      ['3', '示例学生3', '男', '', '1', '', '1', '']
+      ['学号', '姓名', '身高(cm)', '成绩', '标签数值:纪律分', '性别', '不修', '830', '住宿生', '午休', '周五走'],
+      ['1', '示例学生1', '150', '92', '8', '男', '1', '', '', '1', ''],
+      ['2', '示例学生2', '158', '86', '9', '女', '', '1', '1', '', ''],
+      ['3', '示例学生3', '146', '95', '7', '男', '', '1', '', '1', '']
     ]
 
     const ws = XLSX.utils.aoa_to_sheet(templateData)
@@ -717,11 +785,30 @@ export function useExcelData() {
             return
           }
 
-          const tagHeaders = headers.slice(2).filter(h => {
-            if (h == null) return false
-            const str = String(h).trim()
-            return str.length > 0
-          }).map(h => String(h).trim())
+          const tagHeaders = headers
+            .map((h, index) => ({
+              name: h == null ? '' : String(h).trim(),
+              colIndex: index
+            }))
+            .filter(header => header.colIndex >= 2 && header.name.length > 0)
+
+          const { ensureAttributeForHeader, parseNumericValue } = useStudentAttributes()
+          const attributeColumns = []
+          const tagColumns = []
+
+          tagHeaders.forEach(header => {
+            const explicitAttribute = ensureAttributeForHeader(header.name)
+            const attribute = explicitAttribute || (
+              shouldInferNumericAttributeColumn(header.name, jsonData, header.colIndex, parseNumericValue)
+                ? ensureAttributeForHeader(header.name, { allowImplicit: true })
+                : null
+            )
+            if (attribute) {
+              attributeColumns.push({ ...header, attribute })
+            } else {
+              tagColumns.push(header)
+            }
+          })
 
           const studentCount = jsonData.length - 1
           if (studentCount > 100) {
@@ -737,20 +824,15 @@ export function useExcelData() {
           const tagMap = {}
           const allTagNames = new Set()
 
-          tagHeaders.forEach((tagName, index) => {
-            const colIndex = index + 2
+          tagColumns.forEach(({ name: tagName, colIndex }) => {
             let hasValidData = false
 
             for (let i = 1; i < jsonData.length; i++) {
               const cellValue = jsonData[i][colIndex]
-              if (cellValue === 1 || cellValue === '1') {
-                hasValidData = true
-                allTagNames.add(tagName)
-              } else if (cellValue != null && cellValue !== '' && cellValue !== '0' && cellValue !== 0) {
-                hasValidData = true
-                allTagNames.add(tagName)
-                allTagNames.add(String(cellValue).trim())
-              }
+              const cellTagNames = getTagNamesForCell(tagName, cellValue)
+              if (cellTagNames.length === 0) continue
+              hasValidData = true
+              cellTagNames.forEach(name => allTagNames.add(name))
             }
 
             if (hasValidData) {
@@ -779,21 +861,23 @@ export function useExcelData() {
             if (!name || !name.toString().trim()) continue
 
             const studentTagNames = []
+            const numericAttributes = {}
 
             validTagIndices.forEach(colIndex => {
               const cellValue = row[colIndex]
+              studentTagNames.push(...getTagNamesForCell(tagMap[colIndex], cellValue))
+            })
 
-              if (cellValue === 1 || cellValue === '1') {
-                studentTagNames.push(tagMap[colIndex])
-              } else if (cellValue != null && cellValue !== '' && cellValue !== '0' && cellValue !== 0) {
-                studentTagNames.push(String(cellValue).trim())
-              }
+            attributeColumns.forEach(({ colIndex, attribute }) => {
+              const numericValue = parseNumericValue(row[colIndex], attribute)
+              numericAttributes[attribute.id] = numericValue
             })
 
             studentsData.push({
               studentNumber: studentNumber ? studentNumber.toString() : null,
               name: name.toString().trim(),
-              tagNames: studentTagNames
+              tagNames: studentTagNames,
+              numericAttributes
             })
           }
 
@@ -814,14 +898,20 @@ export function useExcelData() {
     })
   }
 
-  const exportToExcel = async (students, tags) => {
+  const exportToExcel = async (students, tags, numericAttributes = null) => {
     const XLSX = await loadXlsx()
     if (!students || students.length === 0) {
       alert('没有学生数据可导出')
       return
     }
 
+    const { enabledAttributeDefinitions } = useStudentAttributes()
+    const attributeDefinitions = numericAttributes || enabledAttributeDefinitions.value
+
     const headers = ['学号', '姓名']
+    attributeDefinitions.forEach(attribute => {
+      headers.push(`数值:${attribute.name}${attribute.unit ? `(${attribute.unit})` : ''}`)
+    })
     tags.forEach(tag => {
       headers.push(tag.name)
     })
@@ -833,6 +923,11 @@ export function useExcelData() {
         student.studentNumber || '',
         student.name || ''
       ]
+
+      attributeDefinitions.forEach(attribute => {
+        const value = student.numericAttributes?.[attribute.id]
+        row.push(value ?? '')
+      })
 
       tags.forEach(tag => {
         const hasTag = student.tags && student.tags.includes(tag.id)

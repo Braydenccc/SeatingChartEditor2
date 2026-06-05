@@ -118,7 +118,7 @@ watch(() => props.student, (newVal) => {
   localName.value = newVal.name || ''
   localNumber.value = newVal.studentNumber || ''
   localTags.value = newVal.tags ? [...newVal.tags] : []
-}, { deep: true })
+})
 
 // 统一保存逻辑
 const handleSave = () => {

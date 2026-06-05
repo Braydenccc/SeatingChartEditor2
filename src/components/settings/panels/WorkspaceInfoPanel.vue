@@ -68,23 +68,15 @@
 
       <div class="section-divider"></div>
 
-      <h3 class="section-title">学生与标签管理</h3>
-      <p class="section-desc">管理学生名单和标签系统</p>
+      <h3 class="section-title">名单与属性管理</h3>
+      <p class="section-desc">管理学生名单、数值属性和标签系统</p>
 
       <div class="action-buttons">
         <button class="action-button" @click="openStudentRoster">
           <Users :size="18" />
           <div class="button-content">
-            <span class="button-title">编辑学生名单</span>
-            <span class="button-desc">添加、编辑或删除学生信息</span>
-          </div>
-        </button>
-
-        <button class="action-button" @click="openTagSettings">
-          <Tag :size="18" />
-          <div class="button-content">
-            <span class="button-title">标签设置</span>
-            <span class="button-desc">管理学生标签和分类</span>
+            <span class="button-title">名单与属性</span>
+            <span class="button-desc">添加、编辑学生、数值属性和标签</span>
           </div>
         </button>
       </div>
@@ -97,12 +89,6 @@
       @update:visible="showStudentRoster = $event"
     />
 
-    <!-- 标签设置对话框 -->
-    <TagSettingsDialog
-      v-if="showTagSettings"
-      :visible="showTagSettings"
-      @update:visible="showTagSettings = $event"
-    />
   </div>
 </template>
 
@@ -114,7 +100,6 @@ import { useTagData } from '@/composables/useTagData'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useSeatRules } from '@/composables/useSeatRules'
 import StudentRosterDialog from '@/components/student/StudentRosterDialog.vue'
-import TagSettingsDialog from '@/components/student/TagSettingsDialog.vue'
 
 const { students } = useStudentData()
 const { tags } = useTagData()
@@ -122,7 +107,6 @@ const { seats } = useSeatChart()
 const { rules } = useSeatRules()
 
 const showStudentRoster = ref(false)
-const showTagSettings = ref(false)
 
 const studentCount = computed(() => students.value.length)
 const tagCount = computed(() => tags.value.length)
@@ -135,9 +119,6 @@ const openStudentRoster = () => {
   showStudentRoster.value = true
 }
 
-const openTagSettings = () => {
-  showTagSettings.value = true
-}
 </script>
 
 <style scoped>

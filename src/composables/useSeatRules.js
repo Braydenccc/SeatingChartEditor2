@@ -6,6 +6,7 @@ import { ref, computed } from 'vue'
 import { useStudentData } from './useStudentData'
 import { useTagData } from './useTagData'
 import { useZoneData } from './useZoneData'
+import { useStudentAttributes } from './useStudentAttributes'
 import {
   RulePriority,
   PRIORITY_ICONS,
@@ -33,6 +34,9 @@ const normalizeSubjectEntry = (entry) => {
   if (!entry) return null
   if (entry.type === 'person' || entry.type === 'tag') {
     return { type: entry.type, id: entry.id ?? null }
+  }
+  if (entry.type === 'all') {
+    return { type: 'all', id: null }
   }
   return null
 }
@@ -95,23 +99,59 @@ export function useSeatRules() {
   const { students } = useStudentData()
   const { tags } = useTagData()
   const { zones } = useZoneData()
+  const { attributeDefinitions, getAttributeById } = useStudentAttributes()
+
+  const studentNameMap = computed(() => {
+    const map = new Map()
+    for (const student of students.value) {
+      map.set(student.id, student.name || `学生#${student.id}`)
+    }
+    return map
+  })
+
+  const tagNameMap = computed(() => {
+    const map = new Map()
+    for (const tag of tags.value) {
+      map.set(tag.id, tag.name || `标签#${tag.id}`)
+    }
+    return map
+  })
+
+  const zoneNameMap = computed(() => {
+    const map = new Map()
+    for (const zone of zones.value) {
+      map.set(zone.id, zone.name || `选区#${zone.id}`)
+    }
+    return map
+  })
+
+  const attributeNameMap = computed(() => {
+    const map = new Map()
+    for (const attribute of attributeDefinitions?.value || []) {
+      const label = attribute.unit ? `${attribute.name}（${attribute.unit}）` : attribute.name
+      map.set(attribute.id, label)
+    }
+    return map
+  })
 
   const getStudentName = (id) => {
-    const s = students.value.find(s => s.id === id)
-    if (!s) return `学生#${id}`
-    return s.name || `学生#${id}`
+    return studentNameMap.value.get(id) || `学生#${id}`
   }
 
   const getTagName = (id) => {
-    const t = tags.value.find(t => t.id === id)
-    if (!t) return `标签#${id}`
-    return t.name || `标签#${id}`
+    return tagNameMap.value.get(id) || `标签#${id}`
   }
 
   const getZoneName = (id) => {
-    const z = zones.value.find(z => z.id === id)
-    if (!z) return `选区#${id}`
-    return z.name || `选区#${id}`
+    return zoneNameMap.value.get(id) || `选区#${id}`
+  }
+
+  const getAttributeName = (id) => {
+    const cached = attributeNameMap.value.get(id)
+    if (cached) return cached
+    const attribute = getAttributeById(id)
+    if (!attribute) return `属性#${id}`
+    return attribute.unit ? `${attribute.name}（${attribute.unit}）` : attribute.name
   }
 
   const getSubjectsText = (subjects) => {
@@ -119,6 +159,7 @@ export function useSeatRules() {
       .map(entry => {
         if (entry.type === 'person') return getStudentName(entry.id)
         if (entry.type === 'tag') return `[${getTagName(entry.id)}]全体`
+        if (entry.type === 'all') return '全体学生'
         return ''
       })
       .filter(Boolean)
@@ -133,8 +174,7 @@ export function useSeatRules() {
     if (rule.subRules && rule.subRules.length > 1) {
       const logicOp = rule.logicOperator === 'OR' ? ' 或 ' : ' 且 '
       const subTexts = rule.subRules.map((sr, idx) => {
-        const text = renderSingleRuleText(sr.predicate, sr.params, sr.not, normalized.subjects, priorityLabel)
-        return sr.not ? `[非]${text}` : text
+        return renderSingleRuleText(sr.predicate, sr.params, sr.not, normalized.subjects, priorityLabel)
       })
       return `${getSubjectsText(normalized.subjects)} · (${subTexts.join(logicOp)})`
     }
@@ -200,6 +240,18 @@ export function useSeatRules() {
         break
       case 'CLUSTER_TOGETHER':
         predicateText = `${priorityLabel}聚集在同一${SCOPE_LABELS[params.scope] ?? params.scope}`
+        break
+      case 'ATTRIBUTE_ROW_GRADIENT':
+        predicateText = `${priorityLabel}按${getAttributeName(params.attributeId)}${params.direction === 'highFront' ? '高值靠前' : '低值靠前'}`
+        break
+      case 'ATTRIBUTE_GROUP_BALANCE':
+        predicateText = `${priorityLabel}让各大组${params.aggregate === 'sum' ? '合计' : '平均'}${getAttributeName(params.attributeId)}尽量接近`
+        break
+      case 'ATTRIBUTE_PAIR_DELTA':
+        predicateText = `${priorityLabel}${getAttributeName(params.attributeId)}差值不超过 ${params.maxDelta}`
+        break
+      case 'ATTRIBUTE_DISTRIBUTE_BANDS':
+        predicateText = `${priorityLabel}按${getAttributeName(params.attributeId)}分 ${params.bandCount} 层均匀分散`
         break
       default:
         predicateText = RULE_TYPE_LABELS[predicate] ?? predicate
@@ -272,6 +324,18 @@ export function useSeatRules() {
       case 'CLUSTER_TOGETHER':
         predicateText = `${priorityLabel}聚集在同一${SCOPE_LABELS[params.scope] ?? params.scope}`
         break
+      case 'ATTRIBUTE_ROW_GRADIENT':
+        predicateText = `${priorityLabel}按${getAttributeName(params.attributeId)}${params.direction === 'highFront' ? '高值靠前' : '低值靠前'}`
+        break
+      case 'ATTRIBUTE_GROUP_BALANCE':
+        predicateText = `${priorityLabel}让各大组${params.aggregate === 'sum' ? '合计' : '平均'}${getAttributeName(params.attributeId)}尽量接近`
+        break
+      case 'ATTRIBUTE_PAIR_DELTA':
+        predicateText = `${priorityLabel}${getAttributeName(params.attributeId)}差值不超过 ${params.maxDelta}`
+        break
+      case 'ATTRIBUTE_DISTRIBUTE_BANDS':
+        predicateText = `${priorityLabel}按${getAttributeName(params.attributeId)}分 ${params.bandCount} 层均匀分散`
+        break
       default:
         predicateText = RULE_TYPE_LABELS[predicate] ?? predicate
     }
@@ -302,10 +366,11 @@ export function useSeatRules() {
     }
 
     const validateEntry = (entry, label) => {
-      if (!entry?.type || !['person', 'tag'].includes(entry.type)) {
+      if (!entry?.type || !['person', 'tag', 'all'].includes(entry.type)) {
         warnings.push(`集合 ${label} 存在无效对象类型`)
         return
       }
+      if (entry.type === 'all') return
       if (!entry.id) {
         warnings.push(`集合 ${label} 存在未选择对象`)
       }
@@ -328,6 +393,9 @@ export function useSeatRules() {
           warnings.push(`参数「${paramSpec.label}」最小值为 ${paramSpec.min}`)
         }
       }
+      if (paramSpec.type === 'attribute' && !getAttributeById(val)) {
+        warnings.push(`参数「${paramSpec.label}」未选择有效数值属性`)
+      }
     }
 
     if (ruleData.predicate === 'IN_ROW_RANGE' && ruleData.params?.minRow > ruleData.params?.maxRow) {
@@ -343,6 +411,10 @@ export function useSeatRules() {
   const expandEntriesToStudentIds = (entries = []) => {
     const ids = new Set()
     for (const e of entries) {
+      if (e.type === 'all') {
+        for (const s of students.value) ids.add(s.id)
+        continue
+      }
       if (!e?.id) continue
       if (e.type === 'person') {
         ids.add(e.id)
@@ -404,6 +476,40 @@ export function useSeatRules() {
   const detectConflicts = (zoneHelper = null, seatChartHelper = null) => {
     const conflicts = []
     const activeRules = rules.value.filter(r => r.enabled)
+    const expandedSubjectCache = new WeakMap()
+    const pairKeyCache = new WeakMap()
+
+    const getCachedExpandedSubjectIds = (ruleLike) => {
+      if (expandedSubjectCache.has(ruleLike)) return expandedSubjectCache.get(ruleLike)
+      const expanded = getExpandedSubjectIds(ruleLike)
+      expandedSubjectCache.set(ruleLike, expanded)
+      return expanded
+    }
+
+    const getCachedPairKeys = (ruleLike) => {
+      const ordered = !!PREDICATE_META[ruleLike.predicate]?.ordered
+      const cacheKey = ordered ? 'ordered' : 'unordered'
+      const cached = pairKeyCache.get(ruleLike)
+      if (cached?.[cacheKey]) return cached[cacheKey]
+
+      const expanded = getCachedExpandedSubjectIds(ruleLike)
+      const keys = buildPairKeys(expanded.subjects, ordered)
+      pairKeyCache.set(ruleLike, {
+        ...(cached || {}),
+        [cacheKey]: keys
+      })
+      return keys
+    }
+
+    const hasCachedPairScopeOverlap = (r1, r2) => {
+      return hasOverlap(getCachedPairKeys(r1), getCachedPairKeys(r2))
+    }
+
+    const hasCachedSingleScopeOverlap = (r1, r2) => {
+      const s1 = getCachedExpandedSubjectIds(r1)
+      const s2 = getCachedExpandedSubjectIds(r2)
+      return hasOverlap(s1.subjects, s2.subjects)
+    }
 
     for (let i = 0; i < activeRules.length; i++) {
       for (let j = i + 1; j < activeRules.length; j++) {
@@ -413,7 +519,7 @@ export function useSeatRules() {
           (r1.predicate === 'MUST_BE_SEATMATES' && r2.predicate === 'MUST_NOT_BE_SEATMATES') ||
           (r1.predicate === 'MUST_NOT_BE_SEATMATES' && r2.predicate === 'MUST_BE_SEATMATES')
         ) {
-          if (!hasPairScopeOverlap(r1, r2)) continue
+          if (!hasCachedPairScopeOverlap(r1, r2)) continue
           conflicts.push({
             type: 'contradiction',
             ruleIds: [r1.id, r2.id],
@@ -425,7 +531,7 @@ export function useSeatRules() {
           (r1.predicate === 'MUST_BE_SAME_GROUP' && r2.predicate === 'MUST_NOT_BE_SAME_GROUP') ||
           (r1.predicate === 'MUST_NOT_BE_SAME_GROUP' && r2.predicate === 'MUST_BE_SAME_GROUP')
         ) {
-          if (!hasPairScopeOverlap(r1, r2)) continue
+          if (!hasCachedPairScopeOverlap(r1, r2)) continue
           conflicts.push({
             type: 'contradiction',
             ruleIds: [r1.id, r2.id],
@@ -437,7 +543,7 @@ export function useSeatRules() {
           (r1.predicate === 'MUST_BE_SEATMATES' && r2.predicate === 'MUST_NOT_BE_SAME_GROUP') ||
           (r1.predicate === 'MUST_NOT_BE_SAME_GROUP' && r2.predicate === 'MUST_BE_SEATMATES')
         ) {
-          if (!hasPairScopeOverlap(r1, r2)) continue
+          if (!hasCachedPairScopeOverlap(r1, r2)) continue
           conflicts.push({
             type: 'infeasible',
             ruleIds: [r1.id, r2.id],
@@ -449,7 +555,7 @@ export function useSeatRules() {
           (r1.predicate === 'IN_ZONE' && r2.predicate === 'NOT_IN_ZONE') ||
           (r1.predicate === 'NOT_IN_ZONE' && r2.predicate === 'IN_ZONE')
         ) {
-          if (!hasSingleScopeOverlap(r1, r2)) continue
+          if (!hasCachedSingleScopeOverlap(r1, r2)) continue
           if (r1.params?.zoneId === r2.params?.zoneId) {
             conflicts.push({
               type: 'contradiction',
@@ -460,7 +566,7 @@ export function useSeatRules() {
         }
 
         if (r1.predicate === 'IN_ROW_RANGE' && r2.predicate === 'IN_ROW_RANGE') {
-          if (!hasSingleScopeOverlap(r1, r2)) continue
+          if (!hasCachedSingleScopeOverlap(r1, r2)) continue
           const disjoint = r1.params?.maxRow < r2.params?.minRow || r2.params?.maxRow < r1.params?.minRow
           if (disjoint) {
             conflicts.push({
@@ -472,7 +578,7 @@ export function useSeatRules() {
         }
 
         if (r1.predicate === 'IN_GROUP_RANGE' && r2.predicate === 'IN_GROUP_RANGE') {
-          if (!hasSingleScopeOverlap(r1, r2)) continue
+          if (!hasCachedSingleScopeOverlap(r1, r2)) continue
           const disjoint = r1.params?.maxGroup < r2.params?.minGroup || r2.params?.maxGroup < r1.params?.minGroup
           if (disjoint) {
             conflicts.push({
@@ -487,7 +593,7 @@ export function useSeatRules() {
           (r1.predicate === 'DISTANCE_AT_MOST' && r2.predicate === 'DISTANCE_AT_LEAST') ||
           (r1.predicate === 'DISTANCE_AT_LEAST' && r2.predicate === 'DISTANCE_AT_MOST')
         ) {
-          if (!hasPairScopeOverlap(r1, r2)) continue
+          if (!hasCachedPairScopeOverlap(r1, r2)) continue
           const maxRule = r1.predicate === 'DISTANCE_AT_MOST' ? r1 : r2
           const minRule = r1.predicate === 'DISTANCE_AT_LEAST' ? r1 : r2
           if ((minRule.params?.distance ?? 0) > (maxRule.params?.distance ?? 0)) {
@@ -503,7 +609,7 @@ export function useSeatRules() {
           (r1.predicate === 'MUST_BE_SEATMATES' && r2.predicate === 'DISTANCE_AT_LEAST') ||
           (r1.predicate === 'DISTANCE_AT_LEAST' && r2.predicate === 'MUST_BE_SEATMATES')
         ) {
-          if (!hasPairScopeOverlap(r1, r2)) continue
+          if (!hasCachedPairScopeOverlap(r1, r2)) continue
           const distRule = r1.predicate === 'DISTANCE_AT_LEAST' ? r1 : r2
           if ((distRule.params?.distance ?? 0) > 1) {
             conflicts.push({
@@ -515,8 +621,8 @@ export function useSeatRules() {
         }
 
         if (zoneHelper && seatChartHelper) {
-          checkZoneRangeConflicts(r1, r2, zoneHelper, seatChartHelper, conflicts)
-          checkZoneZoneConflicts(r1, r2, zoneHelper, conflicts)
+          checkZoneRangeConflicts(r1, r2, zoneHelper, seatChartHelper, conflicts, hasCachedSingleScopeOverlap)
+          checkZoneZoneConflicts(r1, r2, zoneHelper, conflicts, hasCachedSingleScopeOverlap)
         }
       }
     }
@@ -524,7 +630,7 @@ export function useSeatRules() {
     return conflicts
   }
 
-  const checkZoneRangeConflicts = (r1, r2, zoneHelper, seatChartHelper, conflicts) => {
+  const checkZoneRangeConflicts = (r1, r2, zoneHelper, seatChartHelper, conflicts, hasSingleScopeOverlapFn = hasSingleScopeOverlap) => {
     const isZoneRule = (r) => r.predicate === 'IN_ZONE' || r.predicate === 'NOT_IN_ZONE'
     const isRangeRule = (r) => r.predicate === 'IN_ROW_RANGE' || r.predicate === 'IN_GROUP_RANGE'
 
@@ -535,7 +641,7 @@ export function useSeatRules() {
     const zoneRule = isZoneRule(r1) ? r1 : r2
     const rangeRule = isRangeRule(r1) ? r1 : r2
 
-    if (!hasSingleScopeOverlap(zoneRule, rangeRule)) return
+    if (!hasSingleScopeOverlapFn(zoneRule, rangeRule)) return
 
     const zone = zoneHelper.zones.find(z => z.id === zoneRule.params?.zoneId)
     if (!zone || zone.seatIds.length === 0) return
@@ -573,9 +679,9 @@ export function useSeatRules() {
     }
   }
 
-  const checkZoneZoneConflicts = (r1, r2, zoneHelper, conflicts) => {
+  const checkZoneZoneConflicts = (r1, r2, zoneHelper, conflicts, hasSingleScopeOverlapFn = hasSingleScopeOverlap) => {
     if (r1.predicate !== 'IN_ZONE' || r2.predicate !== 'IN_ZONE') return
-    if (!hasSingleScopeOverlap(r1, r2)) return
+    if (!hasSingleScopeOverlapFn(r1, r2)) return
 
     const zone1 = zoneHelper.zones.find(z => z.id === r1.params?.zoneId)
     const zone2 = zoneHelper.zones.find(z => z.id === r2.params?.zoneId)
@@ -612,6 +718,7 @@ export function useSeatRules() {
       params: { ...(ruleData.params ?? getDefaultParams(ruleData.predicate)) },
       description: ruleData.description ?? '',
       createdAt: ruleData.createdAt ?? Date.now(),
+      updatedAt: ruleData.updatedAt ?? Date.now(),
       // 新增字段：NOT 取反 和 多规则组合
       not: ruleData.not ?? false,
       logicOperator: ruleData.logicOperator ?? null,
@@ -651,6 +758,7 @@ export function useSeatRules() {
     const rule = rules.value.find(r => r.id === ruleId)
     if (!rule) return false
     Object.assign(rule, patch)
+    rule.updatedAt = Date.now()
     return true
   }
 
@@ -658,6 +766,7 @@ export function useSeatRules() {
     const rule = rules.value.find(r => r.id === ruleId)
     if (!rule) return false
     rule.enabled = !rule.enabled
+    rule.updatedAt = Date.now()
     return rule.enabled
   }
 
@@ -676,6 +785,8 @@ export function useSeatRules() {
       const allEntries = [...(normalized.subjects || [])]
       const byPerson = allEntries.some(e => e.type === 'person' && e.id === studentId)
       if (byPerson) return true
+      const byAll = allEntries.some(e => e.type === 'all')
+      if (byAll) return true
       const byTag = allEntries.some(e => e.type === 'tag' && student?.tags?.includes(e.id))
       return !!byTag
     })

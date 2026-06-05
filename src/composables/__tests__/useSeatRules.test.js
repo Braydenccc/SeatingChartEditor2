@@ -19,6 +19,12 @@ vi.mock('../useZoneData', () => ({
   })
 }))
 
+vi.mock('../useStudentAttributes', () => ({
+  useStudentAttributes: () => ({
+    getAttributeById: (id) => id ? { id, name: id === 'height' ? '身高' : '成绩', unit: id === 'height' ? 'cm' : '分' } : undefined
+  })
+}))
+
 describe('useSeatRules', () => {
   let seatRules
 
@@ -44,6 +50,21 @@ describe('useSeatRules', () => {
       })
     })
 
+    it('should add an all-students numeric rule', () => {
+      const result = seatRules.addRule({
+        predicate: 'ATTRIBUTE_ROW_GRADIENT',
+        subjects: [{ type: 'all', id: null }],
+        params: { attributeId: 'height', direction: 'lowFront' }
+      })
+
+      expect(result.success).toBe(true)
+      expect(seatRules.rules.value[0]).toMatchObject({
+        predicate: 'ATTRIBUTE_ROW_GRADIENT',
+        subjects: [{ type: 'all', id: null }]
+      })
+      expect(seatRules.renderRuleText(seatRules.rules.value[0])).toContain('全体学生')
+    })
+
     it('should generate unique IDs for multiple rules', () => {
       const result1 = seatRules.addRule({
         predicate: 'IN_ROW_RANGE',
@@ -58,6 +79,31 @@ describe('useSeatRules', () => {
 
       expect(result1.rule.id).not.toBe(result2.rule.id)
       expect(seatRules.rules.value).toHaveLength(2)
+    })
+  })
+
+  describe('renderRuleText', () => {
+    it('should render a negated composite sub-rule with a single negation marker', () => {
+      const text = seatRules.renderRuleText({
+        priority: 'prefer',
+        subjects: [{ type: 'person', id: 1 }],
+        logicOperator: 'AND',
+        subRules: [
+          {
+            predicate: 'IN_ROW_RANGE',
+            not: true,
+            params: { minRow: 1, maxRow: 2 }
+          },
+          {
+            predicate: 'NOT_IN_COLUMN_TYPE',
+            not: false,
+            params: { columnType: 'wall' }
+          }
+        ]
+      })
+
+      expect(text).toContain('[非]尽量坐在第 1～2 排')
+      expect(text).not.toContain('[非][非]')
     })
   })
 

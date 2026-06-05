@@ -531,10 +531,12 @@ export function useSeatChart() {
     // 列数<=1 时结构上不存在同桌位（0 也按不可同桌处理，避免无效配置误判）
     if (columnsInGroup <= 1) return false
 
-    // 同桌 = 同大组 且 同排(rowIndex相同) 且 不是同一列
+    // 同桌 = 同大组、同排，且列距离在相邻/近邻范围内
+    const colDiff = Math.abs(seat1.columnIndex - seat2.columnIndex)
     return (
       seat1.rowIndex === seat2.rowIndex &&
-      seat1.columnIndex !== seat2.columnIndex
+      colDiff >= 1 &&
+      colDiff <= 2
     )
   }
 
@@ -547,7 +549,8 @@ export function useSeatChart() {
     return seats.value.filter(seat =>
       seat.groupIndex === parsed.groupIndex &&
       seat.rowIndex === parsed.rowIndex &&
-      seat.columnIndex !== parsed.columnIndex &&
+      Math.abs(seat.columnIndex - parsed.columnIndex) >= 1 &&
+      Math.abs(seat.columnIndex - parsed.columnIndex) <= 2 &&
       seat.id !== seatId
     )
   }

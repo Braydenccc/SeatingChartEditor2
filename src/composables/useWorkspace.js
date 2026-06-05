@@ -4,17 +4,40 @@ import { useSeatChart } from './useSeatChart'
 import { useExportSettings } from './useExportSettings'
 import { useZoneData } from './useZoneData'
 import { useSeatRules } from './useSeatRules'
+import { useStudentAttributes } from './useStudentAttributes'
 import { useLogger } from './useLogger'
-import { setCookie, getCookie } from './useAuth'
+import { setCookie, getCookie, eraseCookie } from './useAuth'
 import { useUndo } from './useUndo'
 import { useSelection } from './useSelection'
 import { useEditMode } from './useEditMode'
 import { useZoneRotation } from './useZoneRotation'
+import { initializeTags } from './useTagData'
 
 const LAST_WORKSPACE_COOKIE = 'sce_last_workspace'
 
 const FILE_EXT = '.sce'
-const CURRENT_VERSION = '2.1'
+const CURRENT_VERSION = '2.2'
+
+const createDefaultSeatConfig = () => ({
+  groupCount: 4,
+  columnsPerGroup: 2,
+  seatsPerColumn: 7,
+  groups: [
+    { columns: 2, rows: 7 },
+    { columns: 2, rows: 7 },
+    { columns: 2, rows: 7 },
+    { columns: 2, rows: 7 }
+  ],
+  shiftDistance: 4,
+  podiumPosition: 'bottom',
+  guardSeats: {
+    enabled: true,
+    leftEnabled: true,
+    rightEnabled: true,
+    includeInAutoAssignment: false,
+    hideEmptyOnExport: true
+  }
+})
 
 export function useWorkspace() {
   const { students, addStudent, updateStudent, clearAllStudents, syncStudentIdCounter } = useStudentData()
@@ -23,11 +46,17 @@ export function useWorkspace() {
   const { exportSettings, resetExportSettings, applyExportSettings } = useExportSettings()
   const { zones, clearAllZones, addZone, updateZone, syncZoneIdCounter } = useZoneData()
   const { rules, clearAllRules, addRule } = useSeatRules()
+  const {
+    attributeDefinitions,
+    replaceAttributeDefinitions,
+    showNumericAttributesInEditor,
+    setShowNumericAttributesInEditor
+  } = useStudentAttributes()
   const { success, warning, error } = useLogger()
   const { clearHistory } = useUndo()
   const { clearSelection } = useSelection()
   const { resetEditMode } = useEditMode()
-  const { syncZoneRotationIdCounter } = useZoneRotation()
+  const { clearAllRotData, syncZoneRotationIdCounter } = useZoneRotation()
 
   // 生成工作区 JSON 数据 (用于云端或本地保存)
   const getWorkspaceJson = () => {
@@ -42,8 +71,13 @@ export function useWorkspace() {
           id: s.id,
           name: s.name,
           studentNumber: s.studentNumber,
-          tags: s.tags
+          tags: s.tags,
+          numericAttributes: { ...(s.numericAttributes || {}) }
         })),
+        studentAttributeDefinitions: attributeDefinitions.value.map(def => ({ ...def })),
+        studentAttributeSettings: {
+          showNumericAttributesInEditor: showNumericAttributesInEditor.value
+        },
         tags: tags.value.map(t => ({
           id: t.id,
           name: t.name,
@@ -76,6 +110,8 @@ export function useWorkspace() {
         })),
         exportSettings: { ...exportSettings.value },
         rules: (rules.value || []).map(r => ({
+          id: r.id,
+          version: r.version,
           enabled: r.enabled,
           priority: r.priority,
           subjects: [...(r.subjects || [])],
@@ -86,7 +122,18 @@ export function useWorkspace() {
           subject: r.subject ? { ...r.subject } : undefined,
           predicate: r.predicate,
           params: { ...r.params },
-          description: r.description
+          description: r.description,
+          createdAt: r.createdAt,
+          not: r.not ?? false,
+          logicOperator: r.logicOperator ?? null,
+          subRules: Array.isArray(r.subRules)
+            ? r.subRules.map(sr => ({
+              predicate: sr.predicate,
+              not: sr.not ?? false,
+              subjects: [...(sr.subjects || [])],
+              params: { ...(sr.params || {}) }
+            }))
+            : null
         }))
       }
       return JSON.stringify(workspace, null, 2)
@@ -181,6 +228,13 @@ export function useWorkspace() {
         // 2. 清空现有数据
         clearAllStudents()
         clearAllTags()
+        replaceAttributeDefinitions(
+          workspace.studentAttributeDefinitions || [],
+          { useDefaultsWhenEmpty: false }
+        )
+        if (workspace.studentAttributeSettings?.showNumericAttributesInEditor !== undefined) {
+          setShowNumericAttributesInEditor(workspace.studentAttributeSettings.showNumericAttributesInEditor)
+        }
 
         // 恢复标签并记录旧ID->新ID映射
         const oldTagIdToNewId = {}
@@ -212,7 +266,8 @@ export function useWorkspace() {
           updateStudent(newId, {
             name: s.name,
             studentNumber: s.studentNumber,
-            tags: mappedTags
+            tags: mappedTags,
+            numericAttributes: { ...(s.numericAttributes || {}) }
           })
           oldStudentIdToNewId[s.id] = newId
         })
@@ -308,6 +363,9 @@ export function useWorkspace() {
           if (entry.type === 'tag') {
             return { ...entry, id: oldTagIdToNewIdMap[entry.id] }
           }
+          if (entry.type === 'all') {
+            return { type: 'all', id: null }
+          }
           return entry
         }
 
@@ -321,7 +379,7 @@ export function useWorkspace() {
             const normalized = normalizeRule(r)
 
             const remappedSubjects = normalized.subjects.map(entry => remapEntry(entry, oldStudentIdToNewId, oldTagIdToNewId))
-            const subjects = remappedSubjects.filter(e => !!e?.id)
+            const subjects = remappedSubjects.filter(e => e?.type === 'all' || !!e?.id)
             const dropped = remappedSubjects.length - subjects.length
             if (dropped > 0) {
               totalDroppedSubjects += dropped
@@ -331,19 +389,33 @@ export function useWorkspace() {
               })
             }
 
-            const newParams = { ...r.params }
-            if (newParams.tagId) newParams.tagId = oldTagIdToNewId[newParams.tagId]
-            if (newParams.zoneId) newParams.zoneId = oldZoneIdToNewId[newParams.zoneId]
+            const remapParams = (params = {}) => {
+              const newParams = { ...params }
+              if (newParams.tagId) newParams.tagId = oldTagIdToNewId[newParams.tagId]
+              if (newParams.zoneId) newParams.zoneId = oldZoneIdToNewId[newParams.zoneId]
+              return newParams
+            }
 
             const hasValidSubjects = subjects.length > 0
             if (hasValidSubjects) {
+              const subRules = Array.isArray(r.subRules)
+                ? r.subRules.map(sr => ({
+                  predicate: sr.predicate,
+                  not: sr.not ?? false,
+                  subjects,
+                  params: remapParams(sr.params)
+                }))
+                : null
               const result = addRule({
                 enabled: r.enabled ?? true,
                 priority: r.priority,
                 subjects,
                 predicate: r.predicate,
-                params: newParams,
-                description: r.description || ''
+                params: remapParams(r.params),
+                description: r.description || '',
+                not: r.not ?? false,
+                logicOperator: r.logicOperator ?? null,
+                subRules
               })
               if (!result?.success) {
                 totalDroppedRules += 1
@@ -376,6 +448,36 @@ export function useWorkspace() {
         resolve(false)
       }
     })
+  }
+
+  const createNewWorkspace = () => {
+    try {
+      clearHistory()
+      clearSelection()
+      resetEditMode()
+      resetExportSettings()
+
+      clearAllStudents()
+      clearAllTags()
+      initializeTags()
+      replaceAttributeDefinitions()
+      setShowNumericAttributesInEditor(true)
+      setShowTagsInSeatChart(true)
+      setTagDisplayMode('dot')
+
+      clearAllZones()
+      clearAllRules()
+      clearAllRotData()
+      updateConfig(createDefaultSeatConfig())
+
+      eraseCookie(LAST_WORKSPACE_COOKIE)
+      success('已新建空白工作区')
+      return true
+    } catch (err) {
+      console.error('Create new workspace failed:', err)
+      error('新建工作区失败: ' + (err.message || err))
+      return false
+    }
   }
 
   // 版本迁移
@@ -493,6 +595,7 @@ export function useWorkspace() {
     saveWorkspace,
     loadWorkspace,
     getWorkspaceJson,
+    createNewWorkspace,
     applyWorkspaceData
   }
 }

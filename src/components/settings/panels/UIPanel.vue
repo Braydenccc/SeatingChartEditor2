@@ -722,6 +722,16 @@
           <div class="element-toggle-group">
             <label class="toggle-item">
               <input
+                v-model="localShowNumericAttributes"
+                type="checkbox"
+                class="setting-checkbox"
+              />
+              <span>数值</span>
+            </label>
+          </div>
+          <div class="element-toggle-group">
+            <label class="toggle-item">
+              <input
                 v-model="localSettings.showEditorRowNumbers"
                 type="checkbox"
                 class="setting-checkbox"
@@ -741,6 +751,7 @@ import { computed, watch } from 'vue'
 import { RotateCcw, Sun, Moon, Monitor } from 'lucide-vue-next'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useTagData } from '@/composables/useTagData'
+import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { checkColorCombination } from '@/utils/colorContrast'
 
 const props = defineProps({
@@ -754,6 +765,7 @@ const emit = defineEmits(['update:settings'])
 
 const { defaultSettings, applyThemeColor, applyColorScheme } = useGlobalSettings()
 const { tagDisplayMode, setTagDisplayMode, showTagsInSeatChart, setShowTagsInSeatChart } = useTagData()
+const { showNumericAttributesInEditor, setShowNumericAttributesInEditor } = useStudentAttributes()
 
 const localSettings = computed({
   get: () => props.settings || {},
@@ -768,9 +780,16 @@ const localShowTags = computed({
   get: () => showTagsInSeatChart.value,
   set: (val) => setShowTagsInSeatChart(val)
 })
+const localShowNumericAttributes = computed({
+  get: () => showNumericAttributesInEditor.value,
+  set: (val) => setShowNumericAttributesInEditor(val)
+})
 
 const hasHiddenElement = computed(() => {
-  return !localSettings.value.showStudentName || !localSettings.value.showStudentNumber || !localShowTags.value
+  return !localSettings.value.showStudentName ||
+    !localSettings.value.showStudentNumber ||
+    !localShowTags.value ||
+    !localShowNumericAttributes.value
 })
 
 const canEnableLargeName = computed(() => {

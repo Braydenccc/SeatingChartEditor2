@@ -40,6 +40,7 @@ export function useAssignment() {
   const { zones, getZoneForSeat } = useZoneData()
 
   const isAssigning = ref(false)
+  const isAssignmentCancelRequested = ref(false)
   const assignmentProgress = ref(0) // 0~100
   const assignmentIterationInfo = ref({
     i: 0,
@@ -207,6 +208,10 @@ export function useAssignment() {
   const expandEntriesToStudentIds = (entries, studentList) => {
     const ids = new Set()
     for (const entry of entries || []) {
+      if (entry?.type === 'all') {
+        for (const s of studentList) ids.add(s.id)
+        continue
+      }
       if (!entry?.id) continue
       if (entry.type === 'person') ids.add(entry.id)
       if (entry.type === 'tag') {
@@ -259,6 +264,203 @@ export function useAssignment() {
       }
     }
     return pairs
+  }
+
+  const ATTRIBUTE_PREDICATES = new Set([
+    'ATTRIBUTE_ROW_GRADIENT',
+    'ATTRIBUTE_GROUP_BALANCE',
+    'ATTRIBUTE_PAIR_DELTA',
+    'ATTRIBUTE_DISTRIBUTE_BANDS'
+  ])
+
+  const isAttributePredicate = (predicate) => ATTRIBUTE_PREDICATES.has(predicate)
+
+  const buildNumericValueMap = (attributeId, studentList) => {
+    const values = new Map()
+    if (!attributeId) return values
+    for (const student of studentList) {
+      const raw = student.numericAttributes?.[attributeId]
+      if (raw === null || raw === undefined || raw === '') continue
+      const value = Number(raw)
+      if (Number.isFinite(value)) values.set(student.id, value)
+    }
+    return values
+  }
+
+  const getCompiledSubjects = (rule, studentList) => {
+    return rule._subjects || expandSubject(rule, studentList)
+  }
+
+  const getSubjectStudentIds = (subject) => {
+    if (subject.type === 'single') return [subject.studentId]
+    if (subject.type === 'pair') return [subject.studentId1, subject.studentId2]
+    return []
+  }
+
+  const buildSubjectStudentIdSet = (subjects) => {
+    const ids = new Set()
+    for (const subject of subjects || []) {
+      if (subject.type === 'single') {
+        ids.add(subject.studentId)
+      } else if (subject.type === 'pair') {
+        ids.add(subject.studentId1)
+        ids.add(subject.studentId2)
+      }
+    }
+    return ids
+  }
+
+  const compileRulesForAssignment = (activeRules, studentList, availableSeats = []) => {
+    const compileOne = (rule) => {
+      const compiled = { ...rule }
+      if (isAttributePredicate(compiled.predicate)) {
+        compiled._numericValues = buildNumericValueMap(compiled.params?.attributeId, studentList)
+      }
+      if (Array.isArray(compiled.subRules)) {
+        compiled.subRules = compiled.subRules.map(sr => compileOne({
+          ...sr,
+          priority: compiled.priority,
+          subjects: compiled.subjects || sr.subjects || []
+        }))
+      }
+      compiled._subjects = expandSubject(compiled, studentList)
+      compiled._subjectStudentIds = buildSubjectStudentIdSet(compiled._subjects)
+      return compiled
+    }
+    const rules = activeRules.map(compileOne)
+    const context = buildAssignmentContext(rules, studentList, availableSeats)
+    return {
+      rules,
+      context
+    }
+  }
+
+  const getNumericValue = (rule, studentId, studentList) => {
+    if (rule._numericValues) return rule._numericValues.get(studentId)
+    const student = studentList.find(s => s.id === studentId)
+    const raw = student?.numericAttributes?.[rule.params?.attributeId]
+    if (raw === null || raw === undefined || raw === '') return undefined
+    const value = Number(raw)
+    return Number.isFinite(value) ? value : undefined
+  }
+
+  const getSeatBackRatio = (seatId) => {
+    if (!seatId || isGuardSeatId(seatId)) return null
+    const parsed = parseSeatId(seatId)
+    if (!parsed) return null
+    const maxRows = Math.max(1, getMaxRows() - 1)
+    const frontRank = seatConfig.value.podiumPosition === 'top'
+      ? parsed.rowIndex
+      : (getMaxRows() - 1 - parsed.rowIndex)
+    return maxRows === 0 ? 0 : frontRank / maxRows
+  }
+
+  const checkAttributeGroupViolation = (rule, expandedSubjects, assignment, studentList, returnDetails = false) => {
+    const predicate = rule.predicate
+    const params = rule.params || {}
+    const weight = PENALTY_WEIGHTS[rule.priority] ?? PENALTY_WEIGHTS.optional
+    const positioned = []
+
+    for (const subj of expandedSubjects) {
+      if (subj.type !== 'single') continue
+      const value = getNumericValue(rule, subj.studentId, studentList)
+      if (value === undefined) continue
+      const seatId = assignment.get(subj.studentId)
+      if (!seatId || isGuardSeatId(seatId)) continue
+      const parsed = parseSeatId(seatId)
+      if (!parsed) continue
+      positioned.push({
+        studentId: subj.studentId,
+        value,
+        seatId,
+        groupIndex: parsed.groupIndex,
+        rowIndex: parsed.rowIndex,
+        backRatio: getSeatBackRatio(seatId)
+      })
+    }
+
+    if (positioned.length <= 1) {
+      return returnDetails ? { penalties: 0, details: { positionedCount: positioned.length, missingCount: expandedSubjects.length - positioned.length } } : 0
+    }
+
+    let penalties = 0
+    const values = positioned.map(item => item.value)
+    const minValue = Math.min(...values)
+    const maxValue = Math.max(...values)
+    const valueRange = Math.max(1, maxValue - minValue)
+
+    if (predicate === 'ATTRIBUTE_ROW_GRADIENT') {
+      let totalDiff = 0
+      for (const item of positioned) {
+        if (item.backRatio === null) continue
+        const valueRatio = (item.value - minValue) / valueRange
+        const targetBackRatio = params.direction === 'highFront' ? 1 - valueRatio : valueRatio
+        const diff = Math.abs(item.backRatio - targetBackRatio)
+        totalDiff += diff
+        penalties += diff * diff * weight * 1.8
+      }
+      const avgDiff = totalDiff / positioned.length
+      return returnDetails ? { penalties, details: { positionedCount: positioned.length, avgDiff } } : penalties
+    }
+
+    if (predicate === 'ATTRIBUTE_GROUP_BALANCE') {
+      const groupMap = new Map()
+      for (const item of positioned) {
+        const group = groupMap.get(item.groupIndex) || { sum: 0, count: 0 }
+        group.sum += item.value
+        group.count += 1
+        groupMap.set(item.groupIndex, group)
+      }
+      const metrics = [...groupMap.values()].map(group =>
+        params.aggregate === 'sum' ? group.sum : group.sum / Math.max(1, group.count)
+      )
+      if (metrics.length <= 1) return returnDetails ? { penalties: 0, details: { positionedCount: positioned.length } } : 0
+      const mean = metrics.reduce((sum, value) => sum + value, 0) / metrics.length
+      for (const metric of metrics) {
+        const normalizedDiff = Math.abs(metric - mean) / valueRange
+        penalties += normalizedDiff * normalizedDiff * weight * 2.5
+      }
+      return returnDetails ? { penalties, details: { positionedCount: positioned.length, groupCount: metrics.length } } : penalties
+    }
+
+    if (predicate === 'ATTRIBUTE_DISTRIBUTE_BANDS') {
+      const bandCount = Math.max(2, Number(params.bandCount || 3))
+      const sorted = [...positioned].sort((a, b) => a.value - b.value)
+      const bandByStudent = new Map()
+      sorted.forEach((item, index) => {
+        const band = Math.min(bandCount - 1, Math.floor(index / Math.max(1, sorted.length / bandCount)))
+        bandByStudent.set(item.studentId, band)
+      })
+      const bandGroupCounts = new Map()
+      for (const item of positioned) {
+        const band = bandByStudent.get(item.studentId)
+        const key = `${band}:${item.groupIndex}`
+        bandGroupCounts.set(key, (bandGroupCounts.get(key) || 0) + 1)
+      }
+      for (let band = 0; band < bandCount; band++) {
+        const counts = []
+        for (let groupIndex = 0; groupIndex < seatConfig.value.groupCount; groupIndex++) {
+          counts.push(bandGroupCounts.get(`${band}:${groupIndex}`) || 0)
+        }
+        const max = Math.max(...counts)
+        const min = Math.min(...counts)
+        penalties += (max - min) * weight * 0.45
+      }
+      return returnDetails ? { penalties, details: { positionedCount: positioned.length, bandCount } } : penalties
+    }
+
+    return returnDetails ? { penalties: 0, details: { positionedCount: positioned.length } } : 0
+  }
+
+  const checkAttributePairViolation = (rule, subject, studentList) => {
+    if (rule.predicate !== 'ATTRIBUTE_PAIR_DELTA') return { violated: false, excess: 0 }
+    const value1 = getNumericValue(rule, subject.studentId1, studentList)
+    const value2 = getNumericValue(rule, subject.studentId2, studentList)
+    if (value1 === undefined || value2 === undefined) return { violated: false, excess: 0 }
+    const diff = Math.abs(value1 - value2)
+    const maxDelta = Number(rule.params?.maxDelta ?? Infinity)
+    const violated = diff > maxDelta
+    return { violated, excess: violated ? diff - maxDelta : 0 }
   }
 
   // ==================== 新引擎：违规检测 ====================
@@ -327,7 +529,14 @@ export function useAssignment() {
           }
           case 'DISTANCE_AT_LEAST': {
             if (hasGuardSeat(seatId1, seatId2)) return { violated: false, excess: 0 }
-            const dist = getSeatDistance(seatId1, seatId2)
+            const p1 = parseSeatId(seatId1)
+            const p2 = parseSeatId(seatId2)
+            const dist = p1.groupIndex === p2.groupIndex
+              ? Math.sqrt(
+                Math.pow(p1.columnIndex - p2.columnIndex, 2) +
+                Math.pow(p1.rowIndex - p2.rowIndex, 2)
+              )
+              : Infinity
             const violated = dist < params.distance
             const excess = violated ? params.distance - dist : 0
             return { violated, excess }
@@ -597,6 +806,332 @@ export function useAssignment() {
     return []
   }
 
+  const buildSeatInfo = (seatId) => {
+    const guard = isGuardSeatId(seatId)
+    if (guard) {
+      return {
+        id: seatId,
+        guard: true,
+        groupIndex: null,
+        columnIndex: null,
+        rowIndex: null,
+        normalizedRow: null,
+        columnType: null,
+        zoneId: null,
+        backRatio: null,
+        globalCol: null,
+        columnsInGroup: 0
+      }
+    }
+
+    const parsed = parseSeatId(seatId)
+    if (!parsed) return null
+    const groupConfig = getGroupConfig(parsed.groupIndex)
+    const columnsInGroup = groupConfig.columns
+    const rowsInGroup = groupConfig.rows
+    const isFirstGroup = parsed.groupIndex === 0
+    const isLastGroup = parsed.groupIndex === seatConfig.value.groupCount - 1
+    const isFirstCol = parsed.columnIndex === 0
+    const isLastCol = parsed.columnIndex === columnsInGroup - 1
+    const isWall = (isFirstGroup && isFirstCol) || (isLastGroup && isLastCol)
+    const isAisle = isFirstCol || isLastCol
+    const columnType = isWall ? 'wall' : (isAisle ? 'aisle' : 'center')
+    const normalizedRow = seatConfig.value.podiumPosition === 'top'
+      ? parsed.rowIndex + 1
+      : rowsInGroup - parsed.rowIndex
+    const zone = getZoneForSeat(seatId)
+
+    return {
+      id: seatId,
+      guard: false,
+      groupIndex: parsed.groupIndex,
+      columnIndex: parsed.columnIndex,
+      rowIndex: parsed.rowIndex,
+      normalizedRow,
+      columnType,
+      zoneId: zone?.id ?? null,
+      backRatio: getSeatBackRatio(seatId),
+      globalCol: getGlobalColumn(parsed.groupIndex, parsed.columnIndex),
+      columnsInGroup
+    }
+  }
+
+  const buildPairInfo = (seatInfo1, seatInfo2) => {
+    if (!seatInfo1 || !seatInfo2) return null
+    if (seatInfo1.guard || seatInfo2.guard) {
+      return {
+        hasGuard: true,
+        sameGroup: false,
+        deskmates: false,
+        distance: Infinity,
+        directlyBehind: Infinity,
+        adjacentRow: false
+      }
+    }
+
+    const sameGroup = seatInfo1.groupIndex === seatInfo2.groupIndex
+    const colDiff = Math.abs(seatInfo1.columnIndex - seatInfo2.columnIndex)
+    const rowDiff = Math.abs(seatInfo1.rowIndex - seatInfo2.rowIndex)
+    const isInFront = seatConfig.value.podiumPosition === 'top'
+      ? seatInfo1.rowIndex < seatInfo2.rowIndex
+      : seatInfo1.rowIndex > seatInfo2.rowIndex
+
+    return {
+      hasGuard: false,
+      sameGroup,
+      deskmates: sameGroup &&
+        seatInfo1.rowIndex === seatInfo2.rowIndex &&
+        colDiff >= 1 &&
+        colDiff <= 2 &&
+        seatInfo1.columnsInGroup > 1,
+      distance: sameGroup ? colDiff + rowDiff : Infinity,
+      euclideanDistance: sameGroup ? Math.sqrt(colDiff * colDiff + rowDiff * rowDiff) : Infinity,
+      directlyBehind: sameGroup && isInFront ? colDiff : Infinity,
+      adjacentRow: sameGroup && rowDiff === 1
+    }
+  }
+
+  const getPairInfo = (context, seatId1, seatId2) => {
+    if (!context) return null
+    const key = `${seatId1}|${seatId2}`
+    let info = context.pairInfoCache.get(key)
+    if (!info) {
+      info = buildPairInfo(context.seatInfoById.get(seatId1), context.seatInfoById.get(seatId2))
+      context.pairInfoCache.set(key, info)
+    }
+    return info
+  }
+
+  const isFastColumnType = (seatInfo, columnType) => {
+    if (!seatInfo || seatInfo.guard) return false
+    if (columnType === 'edge') return seatInfo.columnType === 'wall' || seatInfo.columnType === 'aisle'
+    return seatInfo.columnType === columnType
+  }
+
+  const fastCheckViolation = (rule, subject, assignment, context) => {
+    if (!context) return checkViolation(rule, subject, assignment)
+    const { predicate, params, not } = rule
+
+    const detect = () => {
+      if (subject.type === 'single') {
+        const seatId = assignment.get(subject.studentId)
+        if (!seatId) return { violated: false }
+        const seatInfo = context.seatInfoById.get(seatId)
+        if (!seatInfo) return checkViolation(rule, subject, assignment)
+
+        switch (predicate) {
+          case 'IN_ROW_RANGE':
+            if (seatInfo.guard) return { violated: true }
+            return { violated: seatInfo.normalizedRow < params.minRow || seatInfo.normalizedRow > params.maxRow }
+          case 'NOT_IN_COLUMN_TYPE':
+            if (seatInfo.guard) return { violated: false }
+            return { violated: isFastColumnType(seatInfo, params.columnType) }
+          case 'IN_ZONE':
+            if (seatInfo.guard) return { violated: true }
+            return { violated: seatInfo.zoneId !== params.zoneId }
+          case 'NOT_IN_ZONE':
+            if (seatInfo.guard) return { violated: false }
+            return { violated: seatInfo.zoneId === params.zoneId }
+          case 'IN_GROUP_RANGE': {
+            if (seatInfo.guard) return { violated: true }
+            const group = seatInfo.groupIndex + 1
+            return { violated: group < params.minGroup || group > params.maxGroup }
+          }
+          default:
+            return { violated: false }
+        }
+      }
+
+      if (subject.type === 'pair') {
+        const seatId1 = assignment.get(subject.studentId1)
+        const seatId2 = assignment.get(subject.studentId2)
+        if (!seatId1 || !seatId2) return { violated: false }
+        const pairInfo = getPairInfo(context, seatId1, seatId2)
+        if (!pairInfo) return checkViolation(rule, subject, assignment)
+
+        switch (predicate) {
+          case 'MUST_BE_SEATMATES':
+            if (pairInfo.hasGuard) return { violated: true }
+            return { violated: !pairInfo.deskmates }
+          case 'MUST_NOT_BE_SEATMATES':
+            if (pairInfo.hasGuard) return { violated: false }
+            return { violated: pairInfo.deskmates }
+          case 'DISTANCE_AT_MOST': {
+            if (pairInfo.hasGuard) return { violated: true, excess: params.distance }
+            const violated = pairInfo.distance > params.distance
+            return { violated, excess: violated ? pairInfo.distance - params.distance : 0 }
+          }
+          case 'DISTANCE_AT_LEAST': {
+            if (pairInfo.hasGuard) return { violated: false, excess: 0 }
+            const violated = pairInfo.euclideanDistance < params.distance
+            return { violated, excess: violated ? params.distance - pairInfo.euclideanDistance : 0 }
+          }
+          case 'NOT_BLOCK_VIEW':
+            if (pairInfo.hasGuard) return { violated: false }
+            return { violated: pairInfo.directlyBehind <= (params.tolerance ?? 0) }
+          case 'MUST_BE_SAME_GROUP':
+            if (pairInfo.hasGuard) return { violated: true }
+            return { violated: !pairInfo.sameGroup }
+          case 'MUST_NOT_BE_SAME_GROUP':
+            if (pairInfo.hasGuard) return { violated: false }
+            return { violated: pairInfo.sameGroup }
+          case 'MUST_BE_ADJACENT_ROW':
+            if (pairInfo.hasGuard) return { violated: true }
+            return { violated: !pairInfo.adjacentRow }
+          default:
+            return { violated: false }
+        }
+      }
+
+      return { violated: false }
+    }
+
+    const result = detect()
+    if (not) return { ...result, violated: !result.violated, excess: undefined }
+    return result
+  }
+
+  const isGlobalScoringRule = (rule) => {
+    if (rule.subRules && rule.subRules.length > 1) return true
+    if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') return true
+    if (isAttributePredicate(rule.predicate) && rule.predicate !== 'ATTRIBUTE_PAIR_DELTA') return true
+    return false
+  }
+
+  const scoreSubjectForRule = (rule, subject, assignment, studentList, context) => {
+    const weight = PENALTY_WEIGHTS[rule.priority] ?? PENALTY_WEIGHTS.optional
+
+    if (rule.predicate === 'ATTRIBUTE_PAIR_DELTA') {
+      const { violated, excess = 0 } = checkAttributePairViolation(rule, subject, studentList)
+      if (!violated) return 0
+      return -weight - (excess > 0 ? excess * weight * 0.1 : 0)
+    }
+
+    const { violated, excess = 0 } = fastCheckViolation(rule, subject, assignment, context)
+    if (!violated) return 0
+    return -weight - (excess > 0 ? excess * weight * 0.1 : 0)
+  }
+
+  const scoreRule = (rule, assignment, studentList, context) => {
+    const weight = PENALTY_WEIGHTS[rule.priority] ?? PENALTY_WEIGHTS.optional
+
+    if (rule.subRules && rule.subRules.length > 1) {
+      const subScores = []
+      for (const subRule of rule.subRules) {
+        if (!subRule.predicate) continue
+        const subSubjects = getCompiledSubjects(subRule, studentList)
+        let subScore = 0
+
+        if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
+          const result = checkGroupViolation(subRule, subSubjects, assignment)
+          subScore = -(typeof result === 'object' ? result.penalties : result)
+        } else if (isAttributePredicate(subRule.predicate) && subRule.predicate !== 'ATTRIBUTE_PAIR_DELTA') {
+          const result = checkAttributeGroupViolation(subRule, subSubjects, assignment, studentList)
+          subScore = -(typeof result === 'object' ? result.penalties : result)
+        } else {
+          for (const subject of subSubjects) {
+            if (subRule.predicate === 'ATTRIBUTE_PAIR_DELTA') {
+              const { violated, excess = 0 } = checkAttributePairViolation(subRule, subject, studentList)
+              if (violated) {
+                subScore -= weight
+                if (excess > 0) subScore -= excess * weight * 0.1
+              }
+            } else {
+              const { violated, excess = 0 } = fastCheckViolation(subRule, subject, assignment, context)
+              if (violated) {
+                subScore -= weight
+                if (excess > 0) subScore -= excess * weight * 0.1
+              }
+            }
+          }
+        }
+        subScores.push(subScore)
+      }
+
+      if (rule.logicOperator === 'OR') return Math.max(...subScores)
+      return subScores.reduce((sum, s) => sum + s, 0)
+    }
+
+    const subjects = getCompiledSubjects(rule, studentList)
+
+    if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
+      const result = checkGroupViolation(rule, subjects, assignment)
+      return -(typeof result === 'object' ? result.penalties : result)
+    }
+
+    if (isAttributePredicate(rule.predicate) && rule.predicate !== 'ATTRIBUTE_PAIR_DELTA') {
+      const result = checkAttributeGroupViolation(rule, subjects, assignment, studentList)
+      return -(typeof result === 'object' ? result.penalties : result)
+    }
+
+    let score = 0
+    for (const subject of subjects) {
+      score += scoreSubjectForRule(rule, subject, assignment, studentList, context)
+    }
+    return score
+  }
+
+  const buildScoringUnits = (rules, studentList) => {
+    const units = []
+    const unitIndexesByStudentId = new Map()
+    const globalUnitIndexes = []
+
+    const addStudentUnitIndex = (studentId, unitIndex) => {
+      if (!unitIndexesByStudentId.has(studentId)) unitIndexesByStudentId.set(studentId, [])
+      unitIndexesByStudentId.get(studentId).push(unitIndex)
+    }
+
+    for (const rule of rules) {
+      if (isGlobalScoringRule(rule)) {
+        const unitIndex = units.length
+        units.push({ type: 'rule', rule, global: true })
+        globalUnitIndexes.push(unitIndex)
+        continue
+      }
+
+      const subjects = getCompiledSubjects(rule, studentList)
+      for (const subject of subjects) {
+        const unitIndex = units.length
+        units.push({ type: 'subject', rule, subject, global: false })
+        for (const studentId of getSubjectStudentIds(subject)) {
+          addStudentUnitIndex(studentId, unitIndex)
+        }
+      }
+    }
+
+    return { units, unitIndexesByStudentId, globalUnitIndexes }
+  }
+
+  const buildAssignmentContext = (rules, studentList, availableSeats) => {
+    const studentById = new Map()
+    for (const student of studentList) {
+      studentById.set(student.id, student)
+    }
+
+    const seatInfoById = new Map()
+    for (const seat of availableSeats || []) {
+      const info = buildSeatInfo(seat.id)
+      if (info) seatInfoById.set(seat.id, info)
+    }
+
+    const scoring = buildScoringUnits(rules, studentList)
+    return {
+      studentById,
+      seatInfoById,
+      pairInfoCache: new Map(),
+      scoringUnits: scoring.units,
+      unitIndexesByStudentId: scoring.unitIndexesByStudentId,
+      globalUnitIndexes: scoring.globalUnitIndexes
+    }
+  }
+
+  const scoreUnit = (unit, assignment, studentList, context) => {
+    if (unit.type === 'subject') {
+      return scoreSubjectForRule(unit.rule, unit.subject, assignment, studentList, context)
+    }
+    return scoreRule(unit.rule, assignment, studentList, context)
+  }
+
   // ==================== 新引擎：评分函数 ====================
 
   /**
@@ -605,7 +1140,15 @@ export function useAssignment() {
    * @param {Array} activeRules - 已启用的规则列表
    * @param {Array} studentList - 学生列表
    */
-  const evaluateScore = (assignment, activeRules, studentList) => {
+  const evaluateScore = (assignment, activeRules, studentList, context = null) => {
+    if (context?.scoringUnits) {
+      let compiledScore = 0
+      for (const unit of context.scoringUnits) {
+        compiledScore += scoreUnit(unit, assignment, studentList, context)
+      }
+      return compiledScore
+    }
+
     let score = 0
 
     for (const rule of activeRules) {
@@ -617,16 +1160,27 @@ export function useAssignment() {
         const subScores = []
         for (const subRule of rule.subRules) {
           if (!subRule.predicate) continue
-          const subSubjects = expandSubject(subRule, studentList)
+          const subSubjects = getCompiledSubjects(subRule, studentList)
           let subScore = 0
 
           // 分组谓词单独处理
           if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
             const result = checkGroupViolation(subRule, subSubjects, assignment)
-            subScore = typeof result === 'object' ? result.penalties : result
+            subScore = -(typeof result === 'object' ? result.penalties : result)
+          } else if (isAttributePredicate(subRule.predicate) && subRule.predicate !== 'ATTRIBUTE_PAIR_DELTA') {
+            const result = checkAttributeGroupViolation(subRule, subSubjects, assignment, studentList)
+            subScore = -(typeof result === 'object' ? result.penalties : result)
+          } else if (subRule.predicate === 'ATTRIBUTE_PAIR_DELTA') {
+            for (const subject of subSubjects) {
+              const { violated, excess = 0 } = checkAttributePairViolation(subRule, subject, studentList)
+              if (violated) {
+                subScore -= weight
+                if (excess > 0) subScore -= excess * weight * 0.1
+              }
+            }
           } else {
             for (const subject of subSubjects) {
-              const { violated, excess = 0 } = checkViolation(subRule, subject, assignment)
+              const { violated, excess = 0 } = fastCheckViolation(subRule, subject, assignment, context)
               if (violated) {
                 subScore -= weight
                 if (excess > 0) {
@@ -650,7 +1204,7 @@ export function useAssignment() {
       }
 
       // 单条规则评估（原有逻辑）
-      const subjects = expandSubject(rule, studentList)
+      const subjects = getCompiledSubjects(rule, studentList)
 
       // 分组谓词单独处理
       if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
@@ -659,8 +1213,27 @@ export function useAssignment() {
         continue
       }
 
+      if (isAttributePredicate(rule.predicate) && rule.predicate !== 'ATTRIBUTE_PAIR_DELTA') {
+        const result = checkAttributeGroupViolation(rule, subjects, assignment, studentList)
+        score -= typeof result === 'object' ? result.penalties : result
+        continue
+      }
+
+      if (rule.predicate === 'ATTRIBUTE_PAIR_DELTA') {
+        for (const subject of subjects) {
+          const { violated, excess = 0 } = checkAttributePairViolation(rule, subject, studentList)
+          if (violated) {
+            score -= weight
+            if (excess > 0) {
+              score -= excess * weight * 0.1
+            }
+          }
+        }
+        continue
+      }
+
       for (const subject of subjects) {
-        const { violated, excess = 0 } = checkViolation(rule, subject, assignment)
+        const { violated, excess = 0 } = fastCheckViolation(rule, subject, assignment, context)
         if (violated) {
           score -= weight
           if (excess > 0) {
@@ -703,11 +1276,11 @@ export function useAssignment() {
     }
 
     // Step 1: 处理 required 的 IN_ROW_RANGE 和 IN_GROUP_RANGE 规则
-    for (const rule of activeRules) {
+    for (const rule of shuffleArray(activeRules)) {
       if (rule.priority !== RulePriority.REQUIRED) continue
       if (!['IN_ROW_RANGE', 'IN_GROUP_RANGE'].includes(rule.predicate)) continue
 
-      const subjects = expandSubject(rule, studentList)
+      const subjects = shuffleArray(getCompiledSubjects(rule, studentList))
       for (const subj of subjects) {
         if (subj.type !== 'single') continue
         if (assignedStudents.has(subj.studentId)) continue
@@ -729,12 +1302,44 @@ export function useAssignment() {
       }
     }
 
+    // Step 1.5: 处理数值前后梯度，生成更合理的初始分布
+    for (const rule of shuffleArray(activeRules)) {
+      if (rule.priority !== RulePriority.PREFER) continue
+      if (rule.predicate !== 'ATTRIBUTE_ROW_GRADIENT') continue
+
+      const subjects = getCompiledSubjects(rule, studentList)
+      const candidates = []
+      for (const subj of subjects) {
+        if (subj.type !== 'single') continue
+        if (assignedStudents.has(subj.studentId)) continue
+        const value = getNumericValue(rule, subj.studentId, studentList)
+        if (value === undefined) continue
+        candidates.push({ studentId: subj.studentId, value })
+      }
+      if (candidates.length === 0) continue
+
+      candidates.sort((a, b) => {
+        const diff = rule.params?.direction === 'highFront' ? b.value - a.value : a.value - b.value
+        return diff || (Math.random() - 0.5)
+      })
+      const sortedSeats = availableSeats
+        .filter(seat => !occupiedSeats.has(seat.id) && !isGuardSeatId(seat.id))
+        .map(seat => ({ seat, ratio: getSeatBackRatio(seat.id) ?? 1 }))
+        .sort((a, b) => (a.ratio - b.ratio) || (Math.random() - 0.5))
+
+      for (let i = 0; i < candidates.length && i < sortedSeats.length; i++) {
+        assignment.set(candidates[i].studentId, sortedSeats[i].seat.id)
+        occupiedSeats.add(sortedSeats[i].seat.id)
+        assignedStudents.add(candidates[i].studentId)
+      }
+    }
+
     // Step 2: 处理 required 的 MUST_BE_SEATMATES（同桌绑定）
-    for (const rule of activeRules) {
+    for (const rule of shuffleArray(activeRules)) {
       if (rule.priority !== RulePriority.REQUIRED) continue
       if (rule.predicate !== 'MUST_BE_SEATMATES') continue
 
-      const subjects = expandSubject(rule, studentList)
+      const subjects = shuffleArray(getCompiledSubjects(rule, studentList))
       for (const subj of subjects) {
         if (subj.type !== 'pair') continue
         if (assignedStudents.has(subj.studentId1) || assignedStudents.has(subj.studentId2)) continue
@@ -807,11 +1412,79 @@ export function useAssignment() {
 
   // ==================== 新引擎：模拟退火辅助类 ====================
 
+  class ScoreTracker {
+    constructor(assignment, activeRules, studentList, context) {
+      this.activeRules = activeRules
+      this.studentList = studentList
+      this.context = context
+      this.unitScores = []
+      this.totalScore = 0
+      this.rebuild(assignment)
+    }
+
+    rebuild(assignment) {
+      this.unitScores = []
+      this.totalScore = 0
+      if (!this.context?.scoringUnits) {
+        this.totalScore = evaluateScore(assignment, this.activeRules, this.studentList, this.context)
+        return
+      }
+      for (let i = 0; i < this.context.scoringUnits.length; i++) {
+        const unitScore = scoreUnit(this.context.scoringUnits[i], assignment, this.studentList, this.context)
+        this.unitScores[i] = unitScore
+        this.totalScore += unitScore
+      }
+    }
+
+    getAffectedUnitIndexes(studentIds) {
+      if (!this.context?.scoringUnits) return null
+      const affected = new Set(this.context.globalUnitIndexes)
+      for (const studentId of studentIds) {
+        const indexes = this.context.unitIndexesByStudentId.get(studentId)
+        if (!indexes) continue
+        for (let i = 0; i < indexes.length; i++) {
+          affected.add(indexes[i])
+        }
+      }
+      return affected
+    }
+
+    previewScore(assignment, studentIds) {
+      const affected = this.getAffectedUnitIndexes(studentIds)
+      if (!affected) {
+        return {
+          score: evaluateScore(assignment, this.activeRules, this.studentList, this.context),
+          updates: null
+        }
+      }
+
+      let score = this.totalScore
+      const updates = []
+      for (const unitIndex of affected) {
+        const newUnitScore = scoreUnit(this.context.scoringUnits[unitIndex], assignment, this.studentList, this.context)
+        const oldUnitScore = this.unitScores[unitIndex] ?? 0
+        score += newUnitScore - oldUnitScore
+        updates.push([unitIndex, newUnitScore])
+      }
+      return { score, updates }
+    }
+
+    commitPreview(score, updates) {
+      this.totalScore = score
+      if (!updates) return
+      for (let i = 0; i < updates.length; i++) {
+        const [unitIndex, unitScore] = updates[i]
+        this.unitScores[unitIndex] = unitScore
+      }
+    }
+  }
+
   class AnnealingState {
-    constructor(initialAssignment, activeRules, studentList, availableSeats) {
+    constructor(initialAssignment, activeRules, studentList, availableSeats, context = null) {
       this.current = new Map(initialAssignment)
       this.best = new Map(initialAssignment)
-      this.currentScore = evaluateScore(this.current, activeRules, studentList)
+      this.tracker = new ScoreTracker(this.current, activeRules, studentList, context)
+      this.currentScore = this.tracker.totalScore
       this.bestScore = this.currentScore
       this.currentReverse = this.buildReverse(this.current)
       this.emptySeats = this.buildEmptySeats(availableSeats)
@@ -848,6 +1521,11 @@ export function useAssignment() {
       this.stagnationCounter++
       this.stagnationSinceBest++
     }
+
+    rebuildScore(activeRules, studentList, context) {
+      this.tracker = new ScoreTracker(this.current, activeRules, studentList, context)
+      this.currentScore = this.tracker.totalScore
+    }
   }
 
   class ReheatStrategy {
@@ -859,7 +1537,7 @@ export function useAssignment() {
       throw new Error('Must implement shouldTrigger')
     }
 
-    execute(state, reheatCount, activeRules, studentList, availableSeats) {
+    execute(state, reheatCount, activeRules, studentList, availableSeats, context) {
       throw new Error('Must implement execute')
     }
   }
@@ -871,7 +1549,7 @@ export function useAssignment() {
              state.stagnationSinceBest <= this.config.baseThreshold * 4
     }
 
-    execute(state, reheatCount, activeRules, studentList, availableSeats) {
+    execute(state, reheatCount, activeRules, studentList, availableSeats, context) {
       const intensity = 0.5 * Math.pow(0.7, reheatCount - 1)
       const newTemp = this.config.tStart * intensity
       
@@ -879,8 +1557,8 @@ export function useAssignment() {
       state.currentReverse = state.buildReverse(state.current)
       
       const pStrength = Math.max(1, Math.floor(state.current.size * 0.05))
+      const ids = [...state.current.keys()]
       for (let p = 0; p < pStrength; p++) {
-        const ids = [...state.current.keys()]
         const s1 = ids[Math.floor(Math.random() * ids.length)]
         const s2 = ids[Math.floor(Math.random() * ids.length)]
         if (s1 === s2) continue
@@ -894,7 +1572,7 @@ export function useAssignment() {
       }
       
       state.stagnationCounter = 0
-      state.currentScore = evaluateScore(state.current, activeRules, studentList)
+      state.rebuildScore(activeRules, studentList, context)
       state.emptySeats = state.buildEmptySeats(availableSeats)
       return { newTemp, reheatType: 'soft_jitter' }
     }
@@ -907,13 +1585,13 @@ export function useAssignment() {
              state.stagnationSinceBest > this.config.baseThreshold * 4
     }
 
-    execute(state, reheatCount, activeRules, studentList, availableSeats) {
+    execute(state, reheatCount, activeRules, studentList, availableSeats, context) {
       const intensity = 0.8 * Math.pow(0.8, reheatCount / 2)
       const newTemp = this.config.tStart * intensity
       
       const shuffleCount = Math.max(2, Math.floor(state.current.size * 0.15))
+      const ids = [...state.current.keys()]
       for (let p = 0; p < shuffleCount; p++) {
-        const ids = [...state.current.keys()]
         const s1 = ids[Math.floor(Math.random() * ids.length)]
         const s2 = ids[Math.floor(Math.random() * ids.length)]
         if (s1 === s2) continue
@@ -928,7 +1606,7 @@ export function useAssignment() {
       
       state.stagnationSinceBest = 0
       state.stagnationCounter = 0
-      state.currentScore = evaluateScore(state.current, activeRules, studentList)
+      state.rebuildScore(activeRules, studentList, context)
       state.emptySeats = state.buildEmptySeats(availableSeats)
       return { newTemp, reheatType: 'global_shakeup' }
     }
@@ -940,11 +1618,11 @@ export function useAssignment() {
       this.reheatCount = 0
     }
 
-    tryReheat(state, activeRules, studentList, availableSeats) {
+    tryReheat(state, activeRules, studentList, availableSeats, context) {
       for (const strategy of this.strategies) {
         if (strategy.shouldTrigger(state, this.reheatCount)) {
           this.reheatCount++
-          const result = strategy.execute(state, this.reheatCount, activeRules, studentList, availableSeats)
+          const result = strategy.execute(state, this.reheatCount, activeRules, studentList, availableSeats, context)
           return { shouldReheat: true, ...result }
         }
       }
@@ -975,7 +1653,7 @@ export function useAssignment() {
     const partnerMap = new Map()
     activeRules.forEach(r => {
       if (r.priority === RulePriority.REQUIRED && r.predicate === 'MUST_BE_SEATMATES') {
-        const subjects = expandSubject(r, studentList)
+        const subjects = getCompiledSubjects(r, studentList)
         subjects.forEach(s => {
           if (s.type === 'pair') {
             partnerMap.set(s.studentId1, s.studentId2)
@@ -987,14 +1665,37 @@ export function useAssignment() {
     return partnerMap
   }
 
-  const computeViolatingStudents = (assignment, activeRules, studentList) => {
+  const buildRuleAffectedStudentIds = (activeRules, studentList, assignedStudentIds) => {
+    const affected = new Set()
+    for (const rule of activeRules) {
+      for (const subject of getCompiledSubjects(rule, studentList)) {
+        for (const studentId of getSubjectStudentIds(subject)) {
+          affected.add(studentId)
+        }
+      }
+      if (Array.isArray(rule.subRules)) {
+        for (const subRule of rule.subRules) {
+          for (const subject of getCompiledSubjects(subRule, studentList)) {
+            for (const studentId of getSubjectStudentIds(subject)) {
+              affected.add(studentId)
+            }
+          }
+        }
+      }
+    }
+
+    const assigned = new Set(assignedStudentIds)
+    return [...affected].filter(studentId => assigned.has(studentId))
+  }
+
+  const computeViolatingStudents = (assignment, activeRules, studentList, context = null) => {
     const violating = new Set()
     for (const rule of activeRules) {
       // 支持复合规则（多规则组合）
       if (rule.subRules && rule.subRules.length > 1) {
         for (const subRule of rule.subRules) {
           if (!subRule.predicate) continue
-          const subSubjects = expandSubject(subRule, studentList)
+          const subSubjects = getCompiledSubjects(subRule, studentList)
           if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
             const groupPenalty = checkGroupViolation(subRule, subSubjects, assignment)
             if (groupPenalty > 0) {
@@ -1004,7 +1705,7 @@ export function useAssignment() {
             continue
           }
           for (const subj of subSubjects) {
-            const { violated } = checkViolation(subRule, subj, assignment)
+            const { violated } = fastCheckViolation(subRule, subj, assignment, context)
             if (violated) {
               if (subj.type === 'single') violating.add(subj.studentId)
               if (subj.type === 'pair') {
@@ -1018,7 +1719,7 @@ export function useAssignment() {
       }
 
       // 单条规则评估（原有逻辑）
-      const subjects = expandSubject(rule, studentList)
+      const subjects = getCompiledSubjects(rule, studentList)
       if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
         const groupPenalty = checkGroupViolation(rule, subjects, assignment)
         if (groupPenalty > 0) {
@@ -1028,7 +1729,7 @@ export function useAssignment() {
         continue
       }
       for (const subj of subjects) {
-        const { violated } = checkViolation(rule, subj, assignment)
+        const { violated } = fastCheckViolation(rule, subj, assignment, context)
         if (violated) {
           if (subj.type === 'single') violating.add(subj.studentId)
           if (subj.type === 'pair') {
@@ -1039,6 +1740,46 @@ export function useAssignment() {
       }
     }
     return [...violating]
+  }
+
+  const randomizePlateauSolution = (state, activeRules, studentList, availableSeats, context, config = {}) => {
+    const {
+      assignedStudentIds = [...state.best.keys()],
+      partnerMap = new Map(),
+      iterations = 50000,
+      shouldCancel = null
+    } = config
+
+    if (assignedStudentIds.length < 2) return
+
+    state.current = new Map(state.best)
+    state.currentReverse = state.buildReverse(state.current)
+    state.emptySeats = state.buildEmptySeats(availableSeats)
+    state.rebuildScore(activeRules, studentList, context)
+
+    const moves = Math.max(200, Math.min(3000, Math.floor(iterations * 0.08)))
+    for (let i = 0; i < moves; i++) {
+      if (shouldCancel && shouldCancel()) break
+
+      const studentA = assignedStudentIds[Math.floor(Math.random() * assignedStudentIds.length)]
+      const seatA = state.current.get(studentA)
+      const useEmptySeat = state.emptySeats.length > 0 && Math.random() < 0.15
+      const isPairMove = partnerMap.has(studentA) && !useEmptySeat && Math.random() < 0.25
+      const moveResult = isPairMove
+        ? tryPairMove(state, studentA, partnerMap, assignedStudentIds, 0, activeRules, studentList)
+        : trySingleMove(state, studentA, assignedStudentIds, useEmptySeat, 0, activeRules, studentList)
+
+      if (!moveResult || !moveResult.accepted) continue
+
+      state.currentScore = moveResult.newScore
+      if (moveResult.useEmptySeat && moveResult.emptySeatIdx >= 0) {
+        state.emptySeats[moveResult.emptySeatIdx] = seatA
+      }
+      if (state.currentScore >= state.bestScore) {
+        state.bestScore = state.currentScore
+        state.best = new Map(state.current)
+      }
+    }
   }
 
   // ==================== 新引擎：模拟退火主循环 ====================
@@ -1056,14 +1797,12 @@ export function useAssignment() {
       tStart = 1000,
       tEnd = 0.01,
       availableSeats = [],
-      onProgress = null
+      context = null,
+      onProgress = null,
+      shouldCancel = null
     } = config
 
-    const state = new AnnealingState(initialAssignment, activeRules, studentList, availableSeats)
-    
-    if (state.bestScore === 0) {
-      return { solution: state.best, score: state.bestScore, reheatCount: 0 }
-    }
+    const state = new AnnealingState(initialAssignment, activeRules, studentList, availableSeats, context)
 
     const baseReheatThreshold = Math.max(800, Math.floor(iterations * 0.05))
     
@@ -1083,18 +1822,33 @@ export function useAssignment() {
 
     const partnerMap = buildPartnerMap(activeRules, studentList)
     const assignedStudentIds = [...state.current.keys()]
-    let violatingStudents = computeViolatingStudents(state.current, activeRules, studentList)
+    const ruleAffectedStudentIds = buildRuleAffectedStudentIds(activeRules, studentList, assignedStudentIds)
+    let violatingStudents = computeViolatingStudents(state.current, activeRules, studentList, context)
+
+    if (state.bestScore === 0) {
+      randomizePlateauSolution(state, activeRules, studentList, availableSeats, context, {
+        assignedStudentIds,
+        partnerMap,
+        iterations,
+        shouldCancel
+      })
+      return { solution: state.best, score: state.bestScore, reheatCount: reheatManager.reheatCount }
+    }
     
     const cooling = Math.pow(tEnd / tStart, 1 / iterations)
     let T = tStart
 
     for (let i = 0; i < iterations; i++) {
+      if (shouldCancel && shouldCancel()) {
+        return { solution: state.best, score: state.bestScore, reheatCount: reheatManager.reheatCount, canceled: true }
+      }
+
       T *= cooling
 
-      const reheatResult = reheatManager.tryReheat(state, activeRules, studentList, availableSeats)
+      const reheatResult = reheatManager.tryReheat(state, activeRules, studentList, availableSeats, context)
       if (reheatResult.shouldReheat) {
         T = reheatResult.newTemp
-        violatingStudents = computeViolatingStudents(state.current, activeRules, studentList)
+        violatingStudents = computeViolatingStudents(state.current, activeRules, studentList, context)
       }
 
       const probViolating = probAdjuster.getViolatingStudentProbability(state.stagnationSinceBest)
@@ -1105,6 +1859,8 @@ export function useAssignment() {
       let studentA
       if (violatingStudents.length > 0 && Math.random() < probViolating) {
         studentA = violatingStudents[Math.floor(Math.random() * violatingStudents.length)]
+      } else if (ruleAffectedStudentIds.length > 0 && Math.random() < 0.65) {
+        studentA = ruleAffectedStudentIds[Math.floor(Math.random() * ruleAffectedStudentIds.length)]
       } else {
         studentA = assignedStudentIds[Math.floor(Math.random() * assignedStudentIds.length)]
       }
@@ -1147,7 +1903,7 @@ export function useAssignment() {
       }
 
       if (i % 500 === 0) {
-        violatingStudents = computeViolatingStudents(state.current, activeRules, studentList)
+        violatingStudents = computeViolatingStudents(state.current, activeRules, studentList, context)
       }
 
       if (onProgress && i % 1000 === 0) {
@@ -1159,7 +1915,19 @@ export function useAssignment() {
           reheatCount: reheatManager.reheatCount
         })
         await new Promise(r => setTimeout(r, 0))
+        if (shouldCancel && shouldCancel()) {
+          return { solution: state.best, score: state.bestScore, reheatCount: reheatManager.reheatCount, canceled: true }
+        }
       }
+    }
+
+    if (!shouldCancel || !shouldCancel()) {
+      randomizePlateauSolution(state, activeRules, studentList, availableSeats, context, {
+        assignedStudentIds,
+        partnerMap,
+        iterations,
+        shouldCancel
+      })
     }
 
     return { solution: state.best, score: state.bestScore, reheatCount: reheatManager.reheatCount }
@@ -1179,7 +1947,7 @@ export function useAssignment() {
     const adjC = getAdjacentSeats(seatC)
     const seatDId = adjC.length > 0
       ? adjC[Math.floor(Math.random() * adjC.length)].id
-      : [...state.current.values()][Math.floor(Math.random() * state.current.size)]
+      : state.current.get(assignedStudentIds[Math.floor(Math.random() * assignedStudentIds.length)])
     
     const studentD = state.currentReverse.get(seatDId)
     
@@ -1198,7 +1966,9 @@ export function useAssignment() {
     state.currentReverse.set(seatA, studentC)
     state.currentReverse.set(seatPartner, studentD)
     
-    const newScore = evaluateScore(state.current, activeRules, studentList)
+    const movedStudents = [studentA, partner, studentC, studentD]
+    const scorePreview = state.tracker.previewScore(state.current, movedStudents)
+    const newScore = scorePreview.score
     const delta = newScore - state.currentScore
     const accepted = delta >= 0 || Math.random() < Math.exp(delta / T)
     
@@ -1211,6 +1981,8 @@ export function useAssignment() {
       state.currentReverse.set(seatPartner, partner)
       state.currentReverse.set(seatC, studentC)
       state.currentReverse.set(seatD, studentD)
+    } else {
+      state.tracker.commitPreview(newScore, scorePreview.updates)
     }
     
     return { accepted, newScore, useEmptySeat: false, emptySeatIdx: -1 }
@@ -1238,7 +2010,9 @@ export function useAssignment() {
       state.currentReverse.set(seatB, studentA)
     }
     
-    const newScore = evaluateScore(state.current, activeRules, studentList)
+    const movedStudents = useEmptySeat ? [studentA] : [studentA, studentB]
+    const scorePreview = state.tracker.previewScore(state.current, movedStudents)
+    const newScore = scorePreview.score
     const delta = newScore - state.currentScore
     const accepted = delta >= 0 || Math.random() < Math.exp(delta / T)
     
@@ -1253,6 +2027,8 @@ export function useAssignment() {
         state.currentReverse.set(seatA, studentA)
         state.currentReverse.set(seatB, studentB)
       }
+    } else {
+      state.tracker.commitPreview(newScore, scorePreview.updates)
     }
     
     return { accepted, newScore, useEmptySeat, emptySeatIdx }
@@ -1278,7 +2054,7 @@ export function useAssignment() {
 
         for (const subRule of rule.subRules) {
           if (!subRule.predicate) continue
-          const subSubjects = expandSubject(subRule, studentList)
+          const subSubjects = getCompiledSubjects(subRule, studentList)
           let subSatisfied = true
           const subRuleViolations = []
 
@@ -1345,6 +2121,25 @@ export function useAssignment() {
                 }
               }
             }
+          } else if (isAttributePredicate(subRule.predicate)) {
+            if (subRule.predicate === 'ATTRIBUTE_PAIR_DELTA') {
+              for (const subj of subSubjects) {
+                const { violated: v } = checkAttributePairViolation(subRule, subj, studentList)
+                if (v) {
+                  subSatisfied = false
+                  const s1 = studentList.find(st => st.id === subj.studentId1)
+                  const s2 = studentList.find(st => st.id === subj.studentId2)
+                  subRuleViolations.push(`${s1?.name ?? subj.studentId1} & ${s2?.name ?? subj.studentId2}`)
+                }
+              }
+            } else {
+              const result = checkAttributeGroupViolation(subRule, subSubjects, solution, studentList, true)
+              const penalty = typeof result === 'object' ? result.penalties : result
+              if (penalty > 0) {
+                subSatisfied = false
+                subRuleViolations.push('数值分布偏差')
+              }
+            }
           } else {
             for (const subj of subSubjects) {
               const { violated: v } = checkViolation(subRule, subj, solution)
@@ -1390,7 +2185,7 @@ export function useAssignment() {
         continue
       }
 
-      const subjects = expandSubject(rule, studentList)
+      const subjects = getCompiledSubjects(rule, studentList)
       if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
         const result = checkGroupViolation(rule, subjects, solution, true)
         const penalty = typeof result === 'object' ? result.penalties : result
@@ -1472,6 +2267,40 @@ export function useAssignment() {
         }
         continue
       }
+
+      if (isAttributePredicate(rule.predicate)) {
+        let isSatisfied = true
+        const violationReasons = []
+        if (rule.predicate === 'ATTRIBUTE_PAIR_DELTA') {
+          for (const subj of subjects) {
+            const { violated: v } = checkAttributePairViolation(rule, subj, studentList)
+            if (v) {
+              isSatisfied = false
+              const s1 = studentList.find(st => st.id === subj.studentId1)
+              const s2 = studentList.find(st => st.id === subj.studentId2)
+              violationReasons.push(`${s1?.name ?? subj.studentId1} & ${s2?.name ?? subj.studentId2}`)
+            }
+          }
+        } else {
+          const result = checkAttributeGroupViolation(rule, subjects, solution, studentList, true)
+          const penalty = typeof result === 'object' ? result.penalties : result
+          if (penalty > 0) {
+            isSatisfied = false
+            violationReasons.push('数值分布偏差')
+          }
+        }
+
+        if (isSatisfied) {
+          satisfied.push(rule)
+        } else {
+          violated.push({
+            rule,
+            violatingSubjects: violationReasons,
+            reason: violationReasons.length > 0 ? violationReasons.slice(0, 3).join('、') : '数值规则未满足'
+          })
+        }
+        continue
+      }
       let isFullySatisfied = true
       const violationDetails = []
 
@@ -1516,6 +2345,12 @@ export function useAssignment() {
    * 运行智能排位（模拟退火）
    * @param {object} options
    */
+  const cancelSmartAssignment = () => {
+    if (!isAssigning.value) return false
+    isAssignmentCancelRequested.value = true
+    return true
+  }
+
   const runSmartAssignment = async (options = {}) => {
     const {
       useRules = true,
@@ -1526,10 +2361,12 @@ export function useAssignment() {
     } = options
 
     if (isAssigning.value) {
-      return { success: false, message: '正在排位中，请稍候...' }
+      cancelSmartAssignment()
+      return { success: false, canceled: true, message: '已请求中断智能排位' }
     }
 
     isAssigning.value = true
+    isAssignmentCancelRequested.value = false
     assignmentProgress.value = 0
     const startTime = Date.now()
 
@@ -1548,7 +2385,10 @@ export function useAssignment() {
 
       // 收集规则
       const { getActiveRules } = useSeatRules()
-      const activeRules = useRules ? [...getActiveRules()] : []
+      const rawActiveRules = useRules ? [...getActiveRules()] : []
+      const { rules: activeRules, context: assignmentContext } = useRules
+        ? compileRulesForAssignment(rawActiveRules, studentList, availableSeats)
+        : { rules: [], context: buildAssignmentContext([], studentList, availableSeats) }
 
       let solution
       let score = 0
@@ -1569,12 +2409,22 @@ export function useAssignment() {
         const result = await runAnnealingLoop(initial, activeRules, studentList, {
           iterations,
           availableSeats,
+          context: assignmentContext,
           onProgress: (pct, info) => {
             assignmentProgress.value = pct
             if (info) assignmentIterationInfo.value = info
             if (onProgress) onProgress(pct)
-          }
+          },
+          shouldCancel: () => isAssignmentCancelRequested.value
         })
+        if (result.canceled) {
+          return {
+            success: false,
+            canceled: true,
+            message: '已中断智能排位，座位未更改',
+            duration: Date.now() - startTime
+          }
+        }
         solution = result.solution
         score = result.score
         finalReheatCount = result.reheatCount
@@ -1634,14 +2484,17 @@ export function useAssignment() {
       }
     } finally {
       isAssigning.value = false
+      isAssignmentCancelRequested.value = false
     }
   }
 
   
   return {
     isAssigning,
+    isAssignmentCancelRequested,
     assignmentProgress,
     assignmentIterationInfo,
-    runSmartAssignment
+    runSmartAssignment,
+    cancelSmartAssignment
   }
 }

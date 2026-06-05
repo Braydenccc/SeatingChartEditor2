@@ -32,6 +32,27 @@
             />
           </div>
 
+          <div v-if="enabledAttributeDefinitions.length > 0" class="form-group">
+            <label class="form-label">数值属性</label>
+            <div class="numeric-grid">
+              <label
+                v-for="attribute in enabledAttributeDefinitions"
+                :key="attribute.id"
+                class="numeric-field"
+              >
+                <span>{{ attribute.unit ? `${attribute.name}（${attribute.unit}）` : attribute.name }}</span>
+                <input
+                  v-model="localNumericAttributes[attribute.id]"
+                  type="number"
+                  :min="attribute.min ?? undefined"
+                  :max="attribute.max ?? undefined"
+                  class="form-input"
+                  @keyup.enter="handleSave"
+                />
+              </label>
+            </div>
+          </div>
+
           <div class="form-group">
             <label class="form-label">标签</label>
             <div class="tags-container">
@@ -77,6 +98,7 @@ import { ref, computed, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
+import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useLogger } from '@/composables/useLogger'
 
 const props = defineProps({
@@ -94,11 +116,13 @@ const emit = defineEmits(['update:visible', 'saved'])
 
 const { students, updateStudent } = useStudentData()
 const { tags } = useTagData()
+const { enabledAttributeDefinitions } = useStudentAttributes()
 const { success } = useLogger()
 
 const localName = ref('')
 const localNumber = ref('')
 const localTags = ref([])
+const localNumericAttributes = ref({})
 
 // 当前学生信息
 const currentStudent = computed(() => {
@@ -117,6 +141,7 @@ watch(() => props.studentId, (newId) => {
     localName.value = currentStudent.value.name || ''
     localNumber.value = currentStudent.value.studentNumber || ''
     localTags.value = currentStudent.value.tags ? [...currentStudent.value.tags] : []
+    localNumericAttributes.value = { ...(currentStudent.value.numericAttributes || {}) }
   }
 }, { immediate: true })
 
@@ -126,6 +151,7 @@ watch(() => props.visible, (newVisible) => {
     localName.value = currentStudent.value.name || ''
     localNumber.value = currentStudent.value.studentNumber || ''
     localTags.value = currentStudent.value.tags ? [...currentStudent.value.tags] : []
+    localNumericAttributes.value = { ...(currentStudent.value.numericAttributes || {}) }
   }
 })
 
@@ -152,10 +178,22 @@ const removeTag = (tagId) => {
 const handleSave = () => {
   if (!props.studentId) return
 
+  const numericAttributes = {}
+  enabledAttributeDefinitions.value.forEach(attribute => {
+    const value = localNumericAttributes.value[attribute.id]
+    if (value === '' || value === null || value === undefined) {
+      numericAttributes[attribute.id] = null
+      return
+    }
+    const parsed = Number(value)
+    numericAttributes[attribute.id] = Number.isFinite(parsed) ? parsed : null
+  })
+
   updateStudent(props.studentId, {
     name: localName.value,
     studentNumber: localNumber.value,
-    tags: localTags.value
+    tags: localTags.value,
+    numericAttributes
   })
 
   success('学生信息已更新')
@@ -180,7 +218,6 @@ const close = () => {
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  backdrop-filter: blur(4px);
 }
 
 .student-edit-dialog {
@@ -274,6 +311,23 @@ const close = () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.numeric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.numeric-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.numeric-field span {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 
 .selected-tags {

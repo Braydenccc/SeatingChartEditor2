@@ -32,7 +32,7 @@ interface Rule {
 
 // 对象描述符
 interface RuleSubject {
-  type: 'person' | 'tag';
+  type: 'person' | 'tag' | 'all';
   id: number | string;  
 }
 
@@ -52,6 +52,8 @@ const PREDICATE_META = {
 ## 4. 关键实现节点 (Implementation Details)
 - **自然语言渲染 (`renderRuleText`)**: 能够根据 `subjects` (主体), `predicate` (动词/条件), `params` (参数) 拼接成类似：`❗ 张三、李四 · 禁止同桌` 的字符串，用于展示在左侧列表。
 - **平埔展开 (`expandEntriesToStudentIds`)**: 由于规则主体支持“标签(Tag)”，真正的算法计算前，必须利用此函数将一个规则平铺展开成若干个“学生实例(StudentId)”。
+- **全体主体 (`type: 'all'`)**: 用于数值参考等班级级规则，展开时表示当前学生列表中的全部学生，不需要额外 `id`。
+- **数值参考谓词**: `ATTRIBUTE_ROW_GRADIENT`、`ATTRIBUTE_GROUP_BALANCE`、`ATTRIBUTE_PAIR_DELTA`、`ATTRIBUTE_DISTRIBUTE_BANDS` 通过 `params.attributeId` 绑定学生数值属性。`PREDICATE_META` 支持 `attribute` 参数类型，由规则 UI 渲染为属性选择器。
 - **高级拓扑冲突 (`detectConflicts`)**: 利用笛卡尔组合判断所有激活的规则是否存在矛盾。这是整个系统的最强亮点。比如判定：“规则A要求张三离李四超过 3 步”，同时“规则B要求张三离李四不得超过 2 步”，就会抛出异常。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
@@ -60,3 +62,4 @@ const PREDICATE_META = {
   1. `ruleTypes.js` 中添加对应的 `PREDICATE_META`。
   2. `useSeatRules.js` 的 `renderRuleText` 中加上 switch-case 的文案。
   3. `useAssignment.js`（核心算法层）中补齐其惩罚函数的实现。不需要改动已有 UI！它会自动识别 `meta` 渲染出参数框。
+- **复合规则落盘**: 工作区保存必须保留 `not`、`logicOperator`、`subRules`，否则规则工作台创建的复合规则和数值参数会在保存后丢失。

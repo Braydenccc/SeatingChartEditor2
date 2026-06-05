@@ -34,6 +34,13 @@
             :title="tag.name">
           </span>
         </div>
+        <div v-if="hasNumericAttributes && tagDisplayMode === 'dot'" class="student-attributes-text">
+          <span v-for="attribute in visibleStudentAttributes" :key="attribute.id"
+            class="attribute-text-item"
+            :title="attribute.title">
+            {{ attribute.displayText }}
+          </span>
+        </div>
         <!-- 座位下部文字模式：学号绝对定位到右上角 -->
         <div v-if="showStudentNumber && tagDisplayMode === 'bottom'" class="student-number-corner">
           {{ studentInfo.studentNumber || '-' }}
@@ -48,6 +55,13 @@
             {{ tag.name.substring(0, 2) }}
           </span>
         </div>
+        <div v-if="hasNumericAttributes && tagDisplayMode === 'bottom'" class="student-attributes-text">
+          <span v-for="attribute in visibleStudentAttributes" :key="attribute.id"
+            class="attribute-text-item"
+            :title="attribute.title">
+            {{ attribute.displayText }}
+          </span>
+        </div>
       </div>
       <!-- 右上角文字模式：只显示学生拥有的标签 -->
       <div v-if="hasTags && tagDisplayMode === 'corner'" class="corner-tags">
@@ -56,6 +70,13 @@
           :style="{ backgroundColor: tag.color }"
           :title="tag.name">
           {{ tag.name.substring(0, 2) }}
+        </span>
+      </div>
+      <div v-if="hasNumericAttributes && tagDisplayMode === 'corner'" class="corner-attributes">
+        <span v-for="attribute in visibleStudentAttributes" :key="attribute.id"
+          class="corner-attribute-item"
+          :title="attribute.title">
+          {{ attribute.displayText }}
         </span>
       </div>
     </template>
@@ -78,6 +99,7 @@ import { useDragState } from '@/composables/useDragState'
 import { useSelection } from '@/composables/useSelection'
 import { useDragPreview } from '@/composables/useDragPreview'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
+import { useStudentAttributes } from '@/composables/useStudentAttributes'
 
 const props = defineProps({
   seat: {
@@ -102,6 +124,7 @@ const { dragCleanupVersion, startDragFromSeat, endDragFromSeat, startTouchDragFr
 const { selectedSeatIds, selectedSeatsArray, isDraggingSelection, startDraggingSelection, endDraggingSelection, isSelectionMode, toggleSeatInSelection } = useSelection()
 const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
 const { settings } = useGlobalSettings()
+const { enabledAttributeDefinitions, formatNumericValue, showNumericAttributesInEditor } = useStudentAttributes()
 
 const showStudentName = computed(() => settings.value.ui.showStudentName !== false)
 const showStudentNumber = computed(() => settings.value.ui.showStudentNumber !== false)
@@ -170,6 +193,31 @@ const hasTags = computed(() => {
   }
   return studentTags.value.length > 0
 })
+
+const visibleStudentAttributes = computed(() => {
+  if (!showNumericAttributesInEditor.value) return []
+  if (!studentInfo.value) return []
+  const numericAttributes = studentInfo.value.numericAttributes || {}
+  return enabledAttributeDefinitions.value
+    .filter(attribute => attribute.showInEditor !== false)
+    .map(attribute => {
+      const rawValue = numericAttributes[attribute.id]
+      if (rawValue === null || rawValue === undefined || rawValue === '') return null
+      const numberValue = Number(rawValue)
+      if (!Number.isFinite(numberValue)) return null
+      const formattedValue = formatNumericValue(numberValue, attribute.id)
+      if (!formattedValue) return null
+      const shortName = (attribute.name || '数值').substring(0, 2)
+      return {
+        id: attribute.id,
+        displayText: `${shortName}${formattedValue}`,
+        title: `${attribute.name}: ${formattedValue}`
+      }
+    })
+    .filter(Boolean)
+})
+
+const hasNumericAttributes = computed(() => visibleStudentAttributes.value.length > 0)
 
 const isFirstSelected = computed(() => {
   return currentMode.value === EditMode.SWAP && firstSelectedSeat.value === props.seat.id
@@ -829,6 +877,31 @@ onUnmounted(() => {
   line-height: 1.2;
 }
 
+.student-attributes-text {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  max-width: 100%;
+}
+
+.attribute-text-item {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1.2;
+}
+
 .corner-tags {
   position: absolute;
   top: 4px;
@@ -850,6 +923,32 @@ onUnmounted(() => {
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
   line-height: 1.2;
   white-space: nowrap;
+}
+
+.corner-attributes {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  max-width: 82%;
+  z-index: 1;
+}
+
+.corner-attribute-item {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1.2;
 }
 
 .student-number {
@@ -1052,6 +1151,18 @@ onUnmounted(() => {
     padding: 1px 3px;
   }
 
+  .attribute-text-item,
+  .corner-attribute-item {
+    font-size: 7px;
+    padding: 1px 3px;
+  }
+
+  .corner-attributes {
+    left: 3px;
+    bottom: 3px;
+    gap: 1px;
+  }
+
   .empty-text,
   .seat-placeholder {
     font-size: 11px;
@@ -1111,6 +1222,18 @@ onUnmounted(() => {
   .corner-tag-item {
     font-size: 6px;
     padding: 1px 2px;
+  }
+
+  .attribute-text-item,
+  .corner-attribute-item {
+    font-size: 6px;
+    padding: 1px 2px;
+  }
+
+  .corner-attributes {
+    left: 2px;
+    bottom: 2px;
+    gap: 1px;
   }
 
   .empty-text,
@@ -1182,6 +1305,12 @@ onUnmounted(() => {
     padding: 1px 3px;
   }
 
+  .attribute-text-item,
+  .corner-attribute-item {
+    font-size: 7px;
+    padding: 1px 3px;
+  }
+
   .empty-text,
   .seat-placeholder {
     font-size: 11px;
@@ -1231,6 +1360,17 @@ onUnmounted(() => {
   .corner-tag-item {
     font-size: 5px;
     padding: 0 2px;
+  }
+
+  .attribute-text-item,
+  .corner-attribute-item {
+    font-size: 6px;
+    padding: 0 2px;
+  }
+
+  .corner-attributes {
+    left: 2px;
+    bottom: 2px;
   }
 
   .empty-text,

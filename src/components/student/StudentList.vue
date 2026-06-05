@@ -72,7 +72,6 @@
     </div>
 
     <StudentRosterDialog v-if="showRosterDialog" v-model:visible="showRosterDialog" />
-    <TagSettingsDialog v-if="showTagSettingsDialog" v-model:visible="showTagSettingsDialog" />
 
     <!-- 学生编辑弹窗 -->
     <StudentEditDialog v-if="showStudentEditDialog" v-model:visible="showStudentEditDialog" :studentId="editingStudentId" />
@@ -86,7 +85,6 @@ import { Users, FileInput, FolderOpen, CloudDownload, CheckCircle, LogOut } from
 import CandidateItem from './CandidateItem.vue'
 // 修改为动态导入，避免阻塞主 chunk 进行加载
 // import StudentRosterDialog from './StudentRosterDialog.vue'
-// import TagSettingsDialog from './TagSettingsDialog.vue'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
 import { useSeatChart } from '@/composables/useSeatChart'
@@ -100,24 +98,18 @@ import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useResizablePanel } from '@/composables/useResizablePanel'
 
 const StudentRosterDialog = defineAsyncComponent(() => import('./StudentRosterDialog.vue'))
-const TagSettingsDialog = defineAsyncComponent(() => import('./TagSettingsDialog.vue'))
 const StudentEditDialog = defineAsyncComponent(() => import('./StudentEditDialog.vue'))
 
 const props = defineProps({
   showRoster: {
     type: Boolean,
     default: false
-  },
-  showTagSettings: {
-    type: Boolean,
-    default: false
   }
 })
 
-const emit = defineEmits(['update:show-roster', 'update:show-tag-settings'])
+const emit = defineEmits(['update:show-roster'])
 
 const showRosterDialog = ref(false)
-const showTagSettingsDialog = ref(false)
 const showStudentEditDialog = ref(false)
 const editingStudentId = ref(null)
 
@@ -126,17 +118,9 @@ watch(() => props.showRoster, (val) => {
   showRosterDialog.value = val
 })
 
-watch(() => props.showTagSettings, (val) => {
-  showTagSettingsDialog.value = val
-})
-
 // 监听本地状态变化，同步回父组件
 watch(showRosterDialog, (val) => {
   emit('update:show-roster', val)
-})
-
-watch(showTagSettingsDialog, (val) => {
-  emit('update:show-tag-settings', val)
 })
 
 const { tags, addTag, clearAllTags } = useTagData()
@@ -210,7 +194,8 @@ const handleImportExcel = async (event) => {
       updateStudent(newStudentId, {
         name: studentData.name,
         studentNumber: studentData.studentNumber,
-        tags: studentTags
+        tags: studentTags,
+        numericAttributes: studentData.numericAttributes || {}
       })
     })
 

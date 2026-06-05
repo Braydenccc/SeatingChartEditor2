@@ -7,7 +7,7 @@
         <div class="guide-steps">
           <div class="guide-step">
             <span class="step-number">1</span>
-            <span class="step-text">在「规则总览」标签页点击「快速模式」，选择适合的场景模板</span>
+            <span class="step-text">在「规则总览」标签页选择快捷方案，或直接填写规则条件</span>
           </div>
           <div class="guide-step">
             <span class="step-number">2</span>

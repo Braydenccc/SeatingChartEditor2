@@ -69,7 +69,13 @@ export const RuleType = {
 
   // C. 分组分散谓词
   DISTRIBUTE_EVENLY: 'DISTRIBUTE_EVENLY',
-  CLUSTER_TOGETHER: 'CLUSTER_TOGETHER'
+  CLUSTER_TOGETHER: 'CLUSTER_TOGETHER',
+
+  // D. 数值参考谓词
+  ATTRIBUTE_ROW_GRADIENT: 'ATTRIBUTE_ROW_GRADIENT',
+  ATTRIBUTE_GROUP_BALANCE: 'ATTRIBUTE_GROUP_BALANCE',
+  ATTRIBUTE_PAIR_DELTA: 'ATTRIBUTE_PAIR_DELTA',
+  ATTRIBUTE_DISTRIBUTE_BANDS: 'ATTRIBUTE_DISTRIBUTE_BANDS'
 }
 
 // 谓词中文标签
@@ -88,7 +94,11 @@ export const RULE_TYPE_LABELS = {
   MUST_NOT_BE_SAME_GROUP: '必须不同大组',
   MUST_BE_ADJACENT_ROW: '必须相邻排',
   DISTRIBUTE_EVENLY: '均匀分散',
-  CLUSTER_TOGETHER: '聚集在一起'
+  CLUSTER_TOGETHER: '聚集在一起',
+  ATTRIBUTE_ROW_GRADIENT: '数值前后梯度',
+  ATTRIBUTE_GROUP_BALANCE: '数值大组均衡',
+  ATTRIBUTE_PAIR_DELTA: '数值差距控制',
+  ATTRIBUTE_DISTRIBUTE_BANDS: '数值分层分散'
 }
 
 // 谓词描述（用于 UI 提示）
@@ -101,13 +111,17 @@ export const RULE_TYPE_DESCRIPTIONS = {
   MUST_BE_SEATMATES: '对象集合内任意两者必须同桌',
   MUST_NOT_BE_SEATMATES: '对象集合内任意两者禁止同桌',
   DISTANCE_AT_MOST: '对象集合内任意两者曼哈顿距离不超过 N',
-  DISTANCE_AT_LEAST: '对象集合内任意两者曼哈顿距离至少为 N',
+  DISTANCE_AT_LEAST: '对象集合内任意两者直线距离至少为 N',
   NOT_BLOCK_VIEW: '对象集合内前者不可坐在后者的视线正后方',
   MUST_BE_SAME_GROUP: '对象集合内任意两者必须同一大组',
   MUST_NOT_BE_SAME_GROUP: '对象集合内任意两者必须不同大组',
   MUST_BE_ADJACENT_ROW: '对象集合内任意两者在同大组内行数差为 1',
   DISTRIBUTE_EVENLY: '同标签学生两两之间保持足够距离（直线距离最大化）',
-  CLUSTER_TOGETHER: '同标签学生尽量聚集在同一区域'
+  CLUSTER_TOGETHER: '同标签学生尽量聚集在同一区域',
+  ATTRIBUTE_ROW_GRADIENT: '按数值从前到后形成梯度，如身高低值靠前',
+  ATTRIBUTE_GROUP_BALANCE: '让各大组的数值均值或总和尽量接近',
+  ATTRIBUTE_PAIR_DELTA: '控制对象集合内两两数值差距',
+  ATTRIBUTE_DISTRIBUTE_BANDS: '按数值分层后均匀分散到各组'
 }
 
 // 谓词元数据：适用对象语义 + 参数规格
@@ -235,6 +249,56 @@ export const PREDICATE_META = {
         ],
         default: 'group'
       }
+    ]
+  },
+  ATTRIBUTE_ROW_GRADIENT: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      { key: 'attributeId', label: '数值属性', type: 'attribute', default: 'height' },
+      {
+        key: 'direction',
+        label: '方向',
+        type: 'select',
+        options: [
+          { value: 'lowFront', label: '低值靠前' },
+          { value: 'highFront', label: '高值靠前' }
+        ],
+        default: 'lowFront'
+      }
+    ]
+  },
+  ATTRIBUTE_GROUP_BALANCE: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      { key: 'attributeId', label: '数值属性', type: 'attribute', default: 'score' },
+      {
+        key: 'aggregate',
+        label: '均衡目标',
+        type: 'select',
+        options: [
+          { value: 'average', label: '大组平均值' },
+          { value: 'sum', label: '大组合计值' }
+        ],
+        default: 'average'
+      }
+    ]
+  },
+  ATTRIBUTE_PAIR_DELTA: {
+    relation: 'pair',
+    minSubjects: 2,
+    params: [
+      { key: 'attributeId', label: '数值属性', type: 'attribute', default: 'score' },
+      { key: 'maxDelta', label: '最大差值', type: 'number', min: 0, default: 20 }
+    ]
+  },
+  ATTRIBUTE_DISTRIBUTE_BANDS: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      { key: 'attributeId', label: '数值属性', type: 'attribute', default: 'score' },
+      { key: 'bandCount', label: '分层数', type: 'number', min: 2, default: 3 }
     ]
   }
 }

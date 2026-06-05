@@ -15,6 +15,13 @@
           :title="tag.name">
         </span>
       </div>
+      <div v-if="hasNumericAttributes && tagDisplayMode === 'dot'" class="student-attributes-text">
+        <span v-for="attribute in visibleStudentAttributes" :key="attribute.id"
+          class="attribute-text-item"
+          :title="attribute.title">
+          {{ attribute.displayText }}
+        </span>
+      </div>
       <!-- 座位下部文字模式：学号绝对定位到右上角 -->
       <div v-if="showStudentNumber && tagDisplayMode === 'bottom'" class="student-number-corner">
         {{ student.studentNumber || '-' }}
@@ -29,6 +36,13 @@
           {{ tag.name.substring(0, 2) }}
         </span>
       </div>
+      <div v-if="hasNumericAttributes && tagDisplayMode === 'bottom'" class="student-attributes-text">
+        <span v-for="attribute in visibleStudentAttributes" :key="attribute.id"
+          class="attribute-text-item"
+          :title="attribute.title">
+          {{ attribute.displayText }}
+        </span>
+      </div>
     </div>
     <!-- 右上角文字模式：只显示学生拥有的标签 -->
     <div v-if="hasTags && tagDisplayMode === 'corner'" class="corner-tags">
@@ -37,6 +51,13 @@
         :style="{ backgroundColor: tag.color }"
         :title="tag.name">
         {{ tag.name.substring(0, 2) }}
+      </span>
+    </div>
+    <div v-if="hasNumericAttributes && tagDisplayMode === 'corner'" class="corner-attributes">
+      <span v-for="attribute in visibleStudentAttributes" :key="attribute.id"
+        class="corner-attribute-item"
+        :title="attribute.title">
+        {{ attribute.displayText }}
       </span>
     </div>
   </div>
@@ -51,6 +72,7 @@ import { useStudentData } from '@/composables/useStudentData'
 import { useEditMode } from '@/composables/useEditMode'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useLogger } from '@/composables/useLogger'
+import { useStudentAttributes } from '@/composables/useStudentAttributes'
 
 const props = defineProps({
   student: {
@@ -68,6 +90,7 @@ const { selectedStudentId, selectStudent, clearSelection } = useStudentData()
 const { currentMode, setMode, EditMode } = useEditMode()
 const { settings } = useGlobalSettings()
 const { success, warning } = useLogger()
+const { enabledAttributeDefinitions, formatNumericValue, showNumericAttributesInEditor } = useStudentAttributes()
 
 const isSelected = computed(() => selectedStudentId.value === props.student.id)
 
@@ -97,6 +120,30 @@ const hasTags = computed(() => {
   }
   return studentTags.value.length > 0
 })
+
+const visibleStudentAttributes = computed(() => {
+  if (!showNumericAttributesInEditor.value) return []
+  const numericAttributes = props.student.numericAttributes || {}
+  return enabledAttributeDefinitions.value
+    .filter(attribute => attribute.showInEditor !== false)
+    .map(attribute => {
+      const rawValue = numericAttributes[attribute.id]
+      if (rawValue === null || rawValue === undefined || rawValue === '') return null
+      const numberValue = Number(rawValue)
+      if (!Number.isFinite(numberValue)) return null
+      const formattedValue = formatNumericValue(numberValue, attribute.id)
+      if (!formattedValue) return null
+      const shortName = (attribute.name || '数值').substring(0, 2)
+      return {
+        id: attribute.id,
+        displayText: `${shortName}${formattedValue}`,
+        title: `${attribute.name}: ${formattedValue}`
+      }
+    })
+    .filter(Boolean)
+})
+
+const hasNumericAttributes = computed(() => visibleStudentAttributes.value.length > 0)
 
 const {
   isStudentDragging,
@@ -297,6 +344,31 @@ const handleDoubleClick = () => {
   line-height: 1.2;
 }
 
+.student-attributes-text {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  max-width: 100%;
+}
+
+.attribute-text-item {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1.2;
+}
+
 .corner-tags {
   position: absolute;
   top: 4px;
@@ -320,6 +392,32 @@ const handleDoubleClick = () => {
   white-space: nowrap;
 }
 
+.corner-attributes {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  max-width: 82%;
+  z-index: 1;
+}
+
+.corner-attribute-item {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1.2;
+}
+
 @media (max-width: 1366px) and (min-width: 1025px) {
   .candidate-item { width: 102px; height: 68px; border-radius: 10px; }
   .student-display { gap: 3px; padding: 5px; }
@@ -330,7 +428,10 @@ const handleDoubleClick = () => {
   .tag-dot-hollow { border-width: 1.2px; }
   .tag-text-item { font-size: 8px; padding: 1px 4px; }
   .corner-tag-item { font-size: 8px; padding: 1px 3px; }
+  .attribute-text-item,
+  .corner-attribute-item { font-size: 7px; padding: 1px 3px; }
   .corner-tags { top: 3px; right: 3px; gap: 1px; }
+  .corner-attributes { left: 3px; bottom: 3px; gap: 1px; }
 }
 
 @media (max-height: 820px) and (min-width: 1025px) {
@@ -343,7 +444,10 @@ const handleDoubleClick = () => {
   .tag-dot-hollow { border-width: 1px; }
   .tag-text-item { font-size: 7px; padding: 1px 3px; }
   .corner-tag-item { font-size: 7px; padding: 1px 2px; }
+  .attribute-text-item,
+  .corner-attribute-item { font-size: 6px; padding: 1px 2px; }
   .corner-tags { top: 2px; right: 2px; gap: 1px; }
+  .corner-attributes { left: 2px; bottom: 2px; gap: 1px; }
 }
 
 @media (max-width: 1200px) {
@@ -360,6 +464,8 @@ const handleDoubleClick = () => {
   .tag-dot-hollow { border-width: 1px; }
   .tag-text-item { font-size: 8px; padding: 1px 4px; }
   .corner-tag-item { font-size: 8px; padding: 1px 3px; }
+  .attribute-text-item,
+  .corner-attribute-item { font-size: 7px; padding: 1px 3px; }
 }
 
 @media (max-width: 480px) {
@@ -372,6 +478,9 @@ const handleDoubleClick = () => {
   .tag-dot-hollow { border-width: 0.8px; }
   .tag-text-item { font-size: 7px; padding: 1px 3px; }
   .corner-tag-item { font-size: 7px; padding: 1px 2px; }
+  .attribute-text-item,
+  .corner-attribute-item { font-size: 6px; padding: 0 2px; }
   .corner-tags { top: 2px; right: 2px; }
+  .corner-attributes { left: 2px; bottom: 2px; }
 }
 </style>

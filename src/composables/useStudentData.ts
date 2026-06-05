@@ -9,6 +9,31 @@ let nextStudentId: number = 1
 // 当前选中的学生ID
 const selectedStudentId = ref<number | null>(null)
 
+const createEmptyNumericAttributes = (): Record<string, number | null> => ({})
+
+const normalizeNumericAttributes = (
+  attributes?: Record<string, unknown> | null
+): Record<string, number | null> => {
+  const normalized: Record<string, number | null> = {}
+  if (!attributes || typeof attributes !== 'object') return normalized
+
+  Object.entries(attributes).forEach(([key, value]) => {
+    if (!key) return
+    if (value === null || value === undefined || value === '') {
+      normalized[key] = null
+      return
+    }
+    const numberValue = typeof value === 'number' ? value : Number(value)
+    normalized[key] = Number.isFinite(numberValue) ? numberValue : null
+  })
+  return normalized
+}
+
+const hasMeaningfulNumericAttributes = (attributes?: Record<string, number | null>): boolean => {
+  if (!attributes) return false
+  return Object.values(attributes).some(value => value !== null && value !== undefined)
+}
+
 export function useStudentData(): UseStudentDataReturn {
   // 排序后的学生列表：空白学号在前，有学号的按学号排序
   const sortedStudents: ComputedRef<Student[]> = computed(() => {
@@ -28,7 +53,8 @@ export function useStudentData(): UseStudentDataReturn {
       id: nextStudentId++,
       name: '',
       studentNumber: null,
-      tags: []
+      tags: [],
+      numericAttributes: createEmptyNumericAttributes()
     }
     students.value.push(newStudent)
     return newStudent.id
@@ -46,13 +72,19 @@ export function useStudentData(): UseStudentDataReturn {
           id: nextStudentId++,
           name: '',
           studentNumber: null,
-          tags: []
+          tags: [],
+          numericAttributes: createEmptyNumericAttributes()
         })
       }
       return true
     } else if (targetCount < currentCount) {
       // 删除空白学生
-      const emptyStudents = students.value.filter(s => !s.name && !s.studentNumber && s.tags.length === 0)
+      const emptyStudents = students.value.filter(s =>
+        !s.name &&
+        !s.studentNumber &&
+        s.tags.length === 0 &&
+        !hasMeaningfulNumericAttributes(s.numericAttributes)
+      )
       const toDelete = currentCount - targetCount
 
       if (emptyStudents.length >= toDelete) {
@@ -73,23 +105,42 @@ export function useStudentData(): UseStudentDataReturn {
   // 更新学生
   const updateStudent = (
     studentId: number,
-    studentData: Partial<Omit<Student, 'tags'>> & { tags?: (number | null | undefined)[] }
+    studentData: Partial<Omit<Student, 'tags' | 'numericAttributes'>> & {
+      tags?: (number | null | undefined)[]
+      numericAttributes?: Record<string, unknown>
+    }
   ): void => {
     const student = students.value.find(s => s.id === studentId)
     if (!student) return
+    if (!student.numericAttributes) {
+      student.numericAttributes = createEmptyNumericAttributes()
+    }
 
     // 学号防重：如果新设定的学号不为空，且已被他人使用，优先将他人的学号清空，避免同一班级出现两个相同学号
-    if (studentData.studentNumber !== null && studentData.studentNumber !== student.studentNumber) {
+    if (
+      Object.prototype.hasOwnProperty.call(studentData, 'studentNumber') &&
+      studentData.studentNumber !== null &&
+      studentData.studentNumber !== student.studentNumber
+    ) {
       const conflictStudent = students.value.find(s => s.studentNumber === studentData.studentNumber && s.id !== studentId)
       if (conflictStudent) {
         conflictStudent.studentNumber = null
       }
     }
 
-    student.name = studentData.name?.trim() || ''
-    student.studentNumber = studentData.studentNumber ?? student.studentNumber
+    if (Object.prototype.hasOwnProperty.call(studentData, 'name')) {
+      student.name = studentData.name?.trim() || ''
+    }
+    if (Object.prototype.hasOwnProperty.call(studentData, 'studentNumber')) {
+      student.studentNumber = studentData.studentNumber ?? null
+    }
     // 过滤掉无效(null/undefined)的标签，并进行去重防腐
-    student.tags = [...new Set((studentData.tags || []).filter((tag): tag is number => tag !== null && tag !== undefined))]
+    if (Object.prototype.hasOwnProperty.call(studentData, 'tags')) {
+      student.tags = [...new Set((studentData.tags || []).filter((tag): tag is number => tag !== null && tag !== undefined))]
+    }
+    if (Object.prototype.hasOwnProperty.call(studentData, 'numericAttributes')) {
+      student.numericAttributes = normalizeNumericAttributes(studentData.numericAttributes)
+    }
   }
 
   // 删除学生

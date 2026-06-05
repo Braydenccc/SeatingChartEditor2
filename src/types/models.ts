@@ -6,6 +6,21 @@ export interface Student {
   name: string
   studentNumber: number | null
   tags: number[]
+  numericAttributes: Record<string, number | null>
+}
+
+// 学生数值属性定义
+export interface NumericAttributeDefinition {
+  id: string
+  name: string
+  unit: string
+  min: number | null
+  max: number | null
+  precision: number
+  enabled: boolean
+  showInEditor?: boolean
+  builtInKey?: 'height' | 'score'
+  createdFrom?: 'default' | 'manual' | 'excel'
 }
 
 // 标签数据模型
@@ -62,7 +77,7 @@ export interface Zone {
 }
 
 // 规则主体类型
-export type SubjectType = 'person' | 'tag'
+export type SubjectType = 'person' | 'tag' | 'all'
 
 export interface RuleSubject {
   type: SubjectType
@@ -89,6 +104,10 @@ export type RulePredicate =
   | 'MUST_BE_ADJACENT_ROW'
   | 'DISTRIBUTE_EVENLY'
   | 'CLUSTER_TOGETHER'
+  | 'ATTRIBUTE_ROW_GRADIENT'
+  | 'ATTRIBUTE_GROUP_BALANCE'
+  | 'ATTRIBUTE_PAIR_DELTA'
+  | 'ATTRIBUTE_DISTRIBUTE_BANDS'
 
 // 规则参数类型
 export interface RuleParams {
@@ -100,6 +119,12 @@ export interface RuleParams {
   groupEnd?: number
   distance?: number
   scope?: 'global' | 'group'
+  attributeId?: string
+  direction?: 'lowFront' | 'highFront'
+  aggregate?: 'average' | 'sum'
+  bandCount?: number
+  maxDelta?: number
+  minDelta?: number
   [key: string]: unknown
 }
 
@@ -124,6 +149,8 @@ export interface WorkspaceMeta {
 export interface Workspace {
   meta: WorkspaceMeta
   students: Student[]
+  studentAttributeDefinitions?: NumericAttributeDefinition[]
+  studentAttributeSettings?: StudentAttributeSettings
   tags: Tag[]
   seatConfig: SeatConfig
   seats: Seat[]
@@ -146,6 +173,11 @@ export interface ExportSettings {
 export interface TagSettings {
   showTagsInSeatChart: boolean
   tagDisplayMode: 'dot' | 'corner' | 'bottom'
+}
+
+// 学生数值属性显示设置
+export interface StudentAttributeSettings {
+  showNumericAttributesInEditor: boolean
 }
 
 // 座位位置解析结果

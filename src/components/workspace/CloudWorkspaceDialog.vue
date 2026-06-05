@@ -384,8 +384,6 @@ const formatSize = (bytes) => {
   right: 0;
   bottom: 0;
   background: var(--color-bg-overlay);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -757,7 +755,7 @@ const formatSize = (bytes) => {
 
 /* Transition styles */
 .dialog-fade-enter-active {
-  transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
+  transition: opacity 0.3s ease;
 }
 
 .dialog-fade-enter-active .cloud-workspace-dialog {
@@ -766,8 +764,6 @@ const formatSize = (bytes) => {
 
 .dialog-fade-enter-from {
   opacity: 0;
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
 }
 
 .dialog-fade-enter-from .cloud-workspace-dialog {
@@ -776,7 +772,7 @@ const formatSize = (bytes) => {
 }
 
 .dialog-fade-leave-active {
-  transition: opacity 0.2s ease, backdrop-filter 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .dialog-fade-leave-active .cloud-workspace-dialog {
@@ -785,8 +781,6 @@ const formatSize = (bytes) => {
 
 .dialog-fade-leave-to {
   opacity: 0;
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
 }
 
 .dialog-fade-leave-to .cloud-workspace-dialog {
