@@ -16,7 +16,7 @@ function adminApplyCorsForDev() {
     if ($isAllowedOrigin) {
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Access-Control-Allow-Methods: POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, X-Admin-Token, X-Admin-Action');
+        header('Access-Control-Allow-Headers: Content-Type, X-Admin-Token');
         header('Access-Control-Max-Age: 600');
         header('Vary: Origin');
     }
@@ -56,7 +56,6 @@ function adminCreateRequestSummary($rawInput = null, $jsonError = '') {
         'contentLength' => isset($_SERVER['CONTENT_LENGTH']) ? (int)$_SERVER['CONTENT_LENGTH'] : null,
         'rawInputLength' => is_string($rawInput) ? strlen($rawInput) : null,
         'hasPostFields' => !empty($_POST),
-        'adminActionHeader' => adminGetHeaderValue('X-Admin-Action'),
         'origin' => isset($_SERVER['HTTP_ORIGIN']) ? substr((string)$_SERVER['HTTP_ORIGIN'], 0, 160) : '',
         'referer' => isset($_SERVER['HTTP_REFERER']) ? substr((string)$_SERVER['HTTP_REFERER'], 0, 200) : ''
     ];
