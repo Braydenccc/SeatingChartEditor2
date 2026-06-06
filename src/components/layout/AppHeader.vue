@@ -40,6 +40,21 @@
       </button>
 
       <!-- 设置按钮 -->
+      <button class="header-btn" @click="openFiles" title="文件">
+        <FileText :size="18" stroke-width="2" />
+        <span class="btn-text">文件</span>
+      </button>
+
+      <button class="header-btn" @click="openStudents" title="学生">
+        <Users :size="18" stroke-width="2" />
+        <span class="btn-text">学生</span>
+      </button>
+
+      <button class="header-btn" @click="openExport" title="导出">
+        <FileOutput :size="18" stroke-width="2" />
+        <span class="btn-text">导出</span>
+      </button>
+
       <button class="header-btn" @click="openUnifiedSettings" title="统一设置">
         <Settings :size="18" stroke-width="2" />
         <span class="btn-text">设置</span>
@@ -64,30 +79,23 @@
     </div>
 
     <div class="header-right"></div>
-
-    <UnifiedSettingsDialog
-      v-if="showUnifiedSettings"
-      @save="handleSaveSettings"
-    />
   </header>
 </template>
 
 <script setup>
-import { onMounted, ref, onBeforeUnmount, computed, defineAsyncComponent } from 'vue'
-import { Cloud, FolderOpen, Github, LogIn, Monitor, Moon, Settings, Sun, User } from 'lucide-vue-next'
+import { onMounted, ref, onBeforeUnmount, computed } from 'vue'
+import { Cloud, FileOutput, FileText, FolderOpen, LogIn, Monitor, Moon, Settings, Sun, User, Users } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
-import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
-
-const UnifiedSettingsDialog = defineAsyncComponent(() => import('../settings/UnifiedSettingsDialog.vue'))
 
 const emit = defineEmits(['open-login'])
 
 const { currentUser, webdavConfig, isLoggedIn, logout, authType, initAuth } = useAuth()
-const { openCloudDialog } = useCloudWorkspaceDialog()
 const { settings, saveToLocalStorage, applyColorScheme, applyThemeColor } = useGlobalSettings()
-const { visible: showUnifiedSettings, openSettings, closeSettings } = useSettingsDialog()
+const { openSettings, closeSettings } = useSettingsDialog()
+const router = useRouter()
 
 const showDropdown = ref(false)
 const menuContainer = ref(null)
@@ -116,7 +124,7 @@ const toggleDropdown = () => {
 }
 
 const openWorkspaceManagement = () => {
-  openCloudDialog('load')
+  router.push({ path: '/files', query: { section: 'workspace' } })
   showDropdown.value = false
 }
 
@@ -125,9 +133,9 @@ const openUnifiedSettings = () => {
   showDropdown.value = false
 }
 
-const handleSaveSettings = () => {
-  saveToLocalStorage()
-}
+const openFiles = () => router.push('/files')
+const openStudents = () => router.push('/students')
+const openExport = () => router.push({ path: '/export', query: { tab: 'image' } })
 
 const handleLogout = (target) => {
   logout(target)

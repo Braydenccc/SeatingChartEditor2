@@ -1,9 +1,9 @@
 <template>
-  <Teleport to="body">
-    <div v-show="visible" class="export-overlay"
+  <Teleport to="body" :disabled="presentation === 'embedded'">
+    <div v-show="visible" :class="['export-overlay', { embedded: presentation === 'embedded' }]"
       @mousedown.self="overlayMouseDownSelf = true"
       @mouseup.self="handleOverlayMouseUp">
-      <div class="export-dialog">
+      <div :class="['export-dialog', { embedded: presentation === 'embedded' }]">
 
         <!-- ── 标题栏 ── -->
         <div class="dialog-header">
@@ -361,7 +361,19 @@ import { useWebDav } from '@/composables/useWebDav'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
 import { escapeHtmlWithBreaks } from '@/utils/xss'
 
-const props = defineProps({ visible: { type: Boolean, default: false } })
+const props = defineProps({
+  visible: { type: Boolean, default: false },
+  presentation: {
+    type: String,
+    default: 'dialog',
+    validator: (value) => ['dialog', 'embedded'].includes(value)
+  },
+  initialTab: {
+    type: String,
+    default: 'image',
+    validator: (value) => ['image', 'excel'].includes(value)
+  }
+})
 const emit = defineEmits(['close', 'exported'])
 
 const { exportSettings, initializeTagSettings, updateTagSetting } = useExportSettings()
@@ -374,7 +386,7 @@ const { authType, webdavConfig } = useAuth()
 const { putFile } = useWebDav()
 const { loadCloudSettings, saveCloudSettings } = useCloudWorkspace()
 
-const activeTab = ref('image')
+const activeTab = ref(props.initialTab === 'excel' ? 'excel' : 'image')
 const previewUrl = ref('')
 const isGenerating = ref(false)
 const isExcelGenerating = ref(false)
@@ -942,6 +954,10 @@ watch(activeTab, (v) => {
   if (v === 'excel' && props.visible) nextTick(updateExcelScale)
 })
 
+watch(() => props.initialTab, (tab) => {
+  activeTab.value = tab === 'excel' ? 'excel' : 'image'
+})
+
 watch(() => excelPreviewHtml.value, () => {
   if (activeTab.value === 'excel' && props.visible) nextTick(updateExcelScale)
 })
@@ -1012,6 +1028,18 @@ onBeforeUnmount(() => {
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+.export-overlay.embedded {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+  justify-content: stretch;
+  background: transparent;
+  animation: none;
+}
+
 /* ── 对话框 ── */
 .export-dialog {
   background: var(--color-surface);
@@ -1025,6 +1053,38 @@ onBeforeUnmount(() => {
   animation: slideUp 0.2s ease;
 }
 @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.export-dialog.embedded {
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+  border: none;
+}
+
+.export-dialog.embedded .dialog-header {
+  display: none;
+}
+
+.export-dialog.embedded .tab-bar {
+  padding: 8px 16px 0;
+}
+
+.export-dialog.embedded .settings-panel {
+  width: 340px;
+}
+
+.export-dialog.embedded .preview-panel {
+  min-height: 0;
+}
+
+.export-dialog.embedded .dialog-footer .secondary {
+  display: none;
+}
 
 /* ── 标题栏 ── */
 .dialog-header {
@@ -1392,8 +1452,10 @@ onBeforeUnmount(() => {
 /* ── 响应式 ── */
 @media (max-width: 768px) {
   .export-dialog { width: 98vw; max-height: 92vh; border-radius: 12px; }
+  .export-dialog.embedded { width: 100%; max-height: none; border-radius: 0; }
   .dialog-body { flex-direction: column; }
   .settings-panel { width: 100%; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--color-border-light); }
+  .export-dialog.embedded .settings-panel { width: 100%; max-height: 42vh; }
   .preview-panel { min-height: 160px; padding: 14px; }
   .preview-img { max-height: 28vh; }
   .setting-row input[type="text"] { min-height: 44px; padding: 10px 12px; font-size: 15px; }

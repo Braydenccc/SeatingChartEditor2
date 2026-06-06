@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import router from '@/router'
 
 const visible = ref(false)
 const initialTab = ref('global')
@@ -10,7 +11,14 @@ export function useSettingsDialog() {
     else initialTab.value = 'global'
     if (category) initialCategory.value = category
     else initialCategory.value = 'sync'
-    visible.value = true
+    visible.value = false
+    return router.push({
+      path: '/settings',
+      query: {
+        tab: initialTab.value,
+        category: initialCategory.value
+      }
+    })
   }
 
   const closeSettings = () => {

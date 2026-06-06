@@ -36,61 +36,8 @@
         </div>
       </div>
       <div class="options-bar">
-        <!-- 文件管理 -->
-        <div class="option-content" :class="{ active: activeTab === 1 }">
-          <div class="tab-header">
-            <h3>工作区管理</h3>
-          </div>
-          <div class="options-group">
-            <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" style="display: none"
-              @change="handleLoadWorkspace" />
-            <button
-              class="option-button"
-              :class="{ 'confirming': isConfirming('newWorkspace').value }"
-              @click="handleNewWorkspace"
-            >
-              <span class="btn-content">
-                <FilePlus :size="14" stroke-width="2" />
-                <span v-if="isConfirming('newWorkspace').value">再次点击确认新建</span>
-                <span v-else>新建工作区</span>
-              </span>
-            </button>
-            <button class="option-button" @click="$refs.workspaceInput.click()">
-              <span class="btn-content"><FolderOpen :size="14" stroke-width="2" />加载本地</span>
-            </button>
-            <button class="option-button" @click="handleSaveWorkspace">
-              <span class="btn-content"><Save :size="14" stroke-width="2" />保存到本地</span>
-            </button>
-            <button class="option-button" @click="openCloudLoad">
-              <span class="btn-content"><CloudDownload :size="14" stroke-width="2" />从云端加载</span>
-            </button>
-            <button class="option-button primary" @click="openCloudSave">
-              <span class="btn-content"><CloudUpload :size="14" stroke-width="2" />保存至云端</span>
-            </button>
-          </div>
-
-          <div class="tab-header">
-            <h3>名单管理</h3>
-          </div>
-          <div class="options-group">
-            <button class="option-button" @click="showRosterDialog = true">
-              <span class="btn-content"><Users :size="14" stroke-width="2" />名单与属性</span>
-            </button>
-            <button class="option-button" @click="handleDownloadTemplate">
-              <span class="btn-content"><Download :size="14" stroke-width="2" />下载名单模板</span>
-            </button>
-            <input ref="excelInput" type="file" accept=".xlsx,.xls" style="display: none" @change="handleImportExcel" />
-            <button class="option-button" @click="$refs.excelInput.click()">
-              <span class="btn-content"><FileInput :size="14" stroke-width="2" />从Excel导入名单</span>
-            </button>
-            <button class="option-button" @click="handleExportExcel">
-              <span class="btn-content"><FileOutput :size="14" stroke-width="2" />导出名单到Excel</span>
-            </button>
-          </div>
-        </div>
-
         <!-- 对座位进行局部编辑 -->
-        <div class="option-content" :class="{ active: activeTab === 2 }">
+        <div class="option-content" :class="{ active: activeTab === 1 }">
           <div class="tab-header">
             <h3>座位表配置</h3>
           </div>
@@ -298,7 +245,7 @@
         </div>
 
         <!-- 自动调位、随机排位、座位选区、座位绑定 -->
-        <div class="option-content" :class="{ active: activeTab === 3 }">
+        <div class="option-content" :class="{ active: activeTab === 2 }">
           <div class="tab-header">
             <h3>智能排位</h3>
           </div>
@@ -423,34 +370,6 @@
           />
         </div>
 
-        <!-- 导出座位表图片 -->
-        <div class="option-content" :class="{ active: activeTab === 4 }">
-          <div class="tab-header">
-            <h3>导出图片</h3>
-          </div>
-          <div class="options-group">
-            <button class="option-button" @click="showExportDialog = true">
-              <span class="btn-content"><Settings2 :size="14" stroke-width="2" />导出设置</span>
-            </button>
-          </div>
-
-          <div class="options-group" v-if="lastExportUrl">
-            <p class="preview-label">上次导出预览</p>
-            <div class="export-thumbnail-wrap">
-              <img :src="lastExportUrl" alt="上次导出" class="export-thumbnail" @click="showExportDialog = true" />
-            </div>
-          </div>
-
-          <div class="options-group">
-            <button class="option-button primary" :disabled="isExporting" @click="handleQuickExport">
-              <span class="btn-content">
-                <Loader2 v-if="isExporting" :size="14" stroke-width="2" class="spin-icon" />
-                <FileOutput v-else :size="14" stroke-width="2" />
-                {{ isExporting ? '正在生成...' : '导出' }}
-              </span>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -474,9 +393,6 @@
     </div>
   </div>
 
-  <!-- 导出设置弹窗 -->
-  <ExportDialog v-if="showExportDialog" :visible="showExportDialog" @close="showExportDialog = false" @exported="onExported" />
-
   <!-- 座位规则编辑器模态框 -->
   <SeatRuleEditor
     v-if="showRuleEditor"
@@ -485,9 +401,6 @@
     :focus-rule-id="focusedRuleId"
     @close="showRuleEditor = false"
   />
-
-  <!-- 名单与属性弹窗 -->
-  <StudentRosterDialog v-if="showRosterDialog" v-model:visible="showRosterDialog" />
 
   <!-- 座位表配置弹窗 -->
   <SeatConfigDialog
@@ -531,6 +444,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { createAssignmentPrecheck } from '@/utils/assignmentPrecheck'
 
 const { activeTab, mobileMenuOpen, setActiveTab, closeMobileMenu } = useSidebar()
 const { seatConfig, updateConfig, clearAllSeats, seats, shiftSeats, getAvailableSeats, isInRowRange, isColumnType } = useSeatChart()
@@ -661,10 +575,8 @@ const handleApplyZoneRotation = () => {
 }
 
 const tabs = [
-  { id: 1, label: '文件', icon: FileText },
-  { id: 2, label: '编辑', icon: Edit3 },
-  { id: 3, label: '排位', icon: Shuffle },
-  { id: 4, label: '导出', icon: FileOutput }
+  { id: 1, label: '编辑', icon: Edit3 },
+  { id: 2, label: '排位', icon: Shuffle }
 ]
 
 // 座位配置表单
@@ -1463,85 +1375,20 @@ const detectDistributeEvenlyFeasibility = (ctx) => {
 }
 
 const runAssignmentPrecheck = ({ silent = false } = {}) => {
-  const ctx = buildPrecheckContext()
-  const studentCount = ctx.studentList.length
-  const availableSeatCount = ctx.availableSeats.length
-  const activeRuleCount = ctx.activeRules.length
-  
-  const zoneHelper = { zones: ctx.zoneList }
-  const seatChartHelper = { seats: ctx.seatList, seatConfig: ctx.config }
-  const conflictList = detectConflicts(zoneHelper, seatChartHelper)
-  const conflictCount = conflictList.length
-  const blockingReasons = []
-  const warnings = []
-
-  if (studentCount === 0) blockingReasons.push('没有学生数据')
-  if (availableSeatCount === 0) blockingReasons.push('没有可用座位')
-  if (studentCount > 0 && availableSeatCount < studentCount) {
-    blockingReasons.push(`可用座位不足（学生 ${studentCount} 人 / 座位 ${availableSeatCount} 个）`)
-  }
-
-  const hardConflictCount = conflictList.filter(c => c.type === 'infeasible' || c.type === 'contradiction').length
-  if (hardConflictCount > 0) {
-    blockingReasons.push(`存在 ${hardConflictCount} 条不可满足或逻辑矛盾规则`)
-    conflictList.slice(0, 5).forEach(c => {
-      blockingReasons.push(c.message)
-    })
-  }
-
-  const deskmateBindingConflict = detectDeskmateBindingConflicts(ctx)
-  if (deskmateBindingConflict.count > 0) {
-    blockingReasons.push(`存在 ${deskmateBindingConflict.count} 处同桌绑定冲突`)
-    blockingReasons.push(...deskmateBindingConflict.details.slice(0, 5))
-  }
-
-  const seatCapacityConflict = detectSeatCapacityConflicts(ctx)
-  if (seatCapacityConflict.count > 0) {
-    blockingReasons.push(`存在 ${seatCapacityConflict.count} 处座位容量冲突`)
-    blockingReasons.push(...seatCapacityConflict.details.slice(0, 5))
-  }
-
-  const studentFeasibilityConflict = detectStudentFeasibilityConflicts(ctx)
-  if (studentFeasibilityConflict.count > 0) {
-    blockingReasons.push(`存在 ${studentFeasibilityConflict.count} 处学生位置不可行问题`)
-    blockingReasons.push(...studentFeasibilityConflict.details.slice(0, 5))
-  }
-
-  const distributeEvenlyWarning = detectDistributeEvenlyFeasibility(ctx)
-  if (distributeEvenlyWarning.count > 0) {
-    warnings.push(...distributeEvenlyWarning.details)
-  }
-
-  if (activeRuleCount === 0) {
-    warnings.push('当前未启用规则，本次将接近随机排位')
-  }
-
-  const coveredStudents = ctx.coveredStudentIds.size
-  const coverageRate = studentCount > 0 ? Math.round((coveredStudents / studentCount) * 100) : 0
-  const estimatedMs = Math.max(
-    300,
-    Math.round((assignConfig.value.maxIterations / 100000) * Math.max(1, studentCount / 20) * 900)
-  )
-
-  let risk = 'low'
-  if (blockingReasons.length > 0) {
-    risk = 'high'
-  } else if (warnings.length > 0 || conflictCount > 0) {
-    risk = 'medium'
-  }
-
-  const result = {
-    pass: blockingReasons.length === 0,
-    risk,
-    studentCount,
-    availableSeatCount,
-    activeRuleCount,
-    conflictCount,
-    coverageRate,
-    estimatedMs,
-    blockingReasons,
-    warnings
-  }
+  const includeGuardSeats = seatConfig.value.guardSeats?.includeInAutoAssignment === true
+  const result = createAssignmentPrecheck({
+    students: students.value,
+    activeRules: getActiveRules(),
+    availableSeats: getAvailableSeats(includeGuardSeats),
+    seats: seats.value,
+    seatConfig: seatConfig.value,
+    zones: zones.value,
+    detectConflicts,
+    renderRuleText,
+    isInRowRange,
+    isColumnType,
+    maxIterations: assignConfig.value.maxIterations
+  })
 
   precheckResult.value = result
 
@@ -3002,9 +2849,9 @@ const formatLogTime = (timestamp) => {
 }
 
 .zone-rot-item.selected {
-  border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent);
+  border-color: var(--color-selection-border);
+  background: var(--color-selection-bg);
+  box-shadow: var(--shadow-selection-ring);
 }
 
 .zone-rot-item-row {

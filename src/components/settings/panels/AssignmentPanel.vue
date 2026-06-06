@@ -56,36 +56,39 @@
       </div>
 
       <button class="action-button" @click="openRuleEditor">
-        <Wand2 :size="18" />
-        <div class="button-content">
-          <span class="button-title">打开规则编辑器</span>
-          <span class="button-desc">在侧边栏中配置排位规则</span>
-        </div>
-      </button>
+          <Wand2 :size="18" />
+          <div class="button-content">
+            <span class="button-title">打开规则编辑器</span>
+            <span class="button-desc">在编辑器工作台中配置排位规则</span>
+          </div>
+        </button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Info, Zap, Target, TrendingUp, Wand2 } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
-import { useSidebar } from '@/composables/useSidebar'
+import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
 const emit = defineEmits(['update:visible'])
+const router = useRouter()
 
 const { rules } = useSeatRules()
 const { enabledAttributeDefinitions, getMissingValueSummary } = useStudentAttributes()
-const { setActiveTab } = useSidebar()
+const { openDialog } = useEditorWorkbench()
 
 const ruleCount = computed(() => rules.value?.length || 0)
 const attributeCount = computed(() => enabledAttributeDefinitions.value.length)
 const missingSummary = computed(() => getMissingValueSummary())
 
-const openRuleEditor = () => {
-  setActiveTab(3) // 切换到侧边栏的"排位"标签
-  emit('update:visible', false) // 关闭设置对话框
+const openRuleEditor = async () => {
+  await router.push('/editor')
+  openDialog('rules')
+  emit('update:visible', false)
 }
 </script>
 

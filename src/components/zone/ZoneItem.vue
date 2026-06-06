@@ -275,9 +275,18 @@ onUnmounted(() => {
 }
 
 .zone-item.selected {
-  border-color: var(--color-primary);
-  background: var(--color-bg-hover);
-  box-shadow: 0 2px 12px color-mix(in srgb, var(--color-primary) 25%, transparent);
+  border-color: var(--color-selection-border);
+  background: var(--color-selection-bg);
+  box-shadow: var(--shadow-selection-ring), var(--shadow-selection-card);
+}
+
+.zone-item.selected::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--color-selection-border);
+  pointer-events: none;
 }
 
 .zone-header {

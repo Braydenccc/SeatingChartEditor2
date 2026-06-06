@@ -247,7 +247,7 @@ const organizedSeats = computed(() => {
 const guardSeats = computed(() => {
   ensureGuardSeatsConfig()
   return ['left', 'right']
-    .map(side => seatMap.get(generateGuardSeatId(side)))
+    .map(side => seats.value.find(seat => seat.id === generateGuardSeatId(side)))
     .filter(Boolean)
 })
 

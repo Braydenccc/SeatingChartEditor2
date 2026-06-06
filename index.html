@@ -44,12 +44,65 @@
   <link rel="preload" href="https://fonts.proxy.ustclug.org/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link href="https://fonts.proxy.ustclug.org/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 
+  <script>
+    (function () {
+      try {
+        const stored = localStorage.getItem('sce-global-settings')
+        if (!stored) return
+
+        const settings = JSON.parse(stored)
+        const ui = settings && settings.ui ? settings.ui : {}
+        const root = document.documentElement
+        const isHex = function (value) {
+          return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
+        }
+
+        if (ui.colorMode === 'custom') {
+          root.setAttribute('data-theme', 'custom')
+          if (isHex(ui.customColors && ui.customColors.primary)) {
+            root.style.setProperty('--color-primary', ui.customColors.primary)
+          }
+          return
+        }
+
+        if (ui.colorScheme && ui.colorScheme !== 'auto') {
+          root.setAttribute('data-theme', ui.colorScheme)
+        }
+        if (isHex(ui.themeColor)) {
+          root.style.setProperty('--color-primary', ui.themeColor)
+        }
+      } catch (_) {
+        // 主题预取失败不阻塞应用启动。
+      }
+    })()
+  </script>
+
   <!-- Critical Path CSS: 提升首次内容渲染 (FCP) 速度，消除白屏感 -->
   <style>
-    :root { --color-primary: #23587b; }
-    body, html { margin: 0; padding: 0; font-family: 'Inter', -apple-system, system-ui, sans-serif; background: #f5f5f5; }
+    :root {
+      --color-primary: #23587b;
+      --color-initial-bg: #f5f5f5;
+      --color-initial-spinner-track: rgba(35, 88, 123, 0.1);
+      --shadow-initial-header: rgba(0, 0, 0, 0.15);
+    }
+
+    :root[data-theme="dark"] {
+      --color-initial-bg: #151d2e;
+      --color-initial-spinner-track: rgba(74, 158, 255, 0.18);
+      --shadow-initial-header: rgba(0, 0, 0, 0.45);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme]) {
+        --color-initial-bg: #151d2e;
+        --color-initial-spinner-track: rgba(74, 158, 255, 0.18);
+        --shadow-initial-header: rgba(0, 0, 0, 0.45);
+      }
+    }
+
+    body, html { margin: 0; padding: 0; font-family: 'Inter', -apple-system, system-ui, sans-serif; background: var(--color-initial-bg); }
     
-    .app-header-placeholder { height: 100px; background: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.15); width: 100%; position: relative; z-index: 10; }
+    .app-header-placeholder { height: 100px; background: var(--color-primary); box-shadow: 0 2px 8px var(--shadow-initial-header); width: 100%; position: relative; z-index: 10; }
     
     .initial-loading-container {
       display: flex;
@@ -57,14 +110,14 @@
       align-items: center;
       justify-content: center;
       height: calc(100vh - 100px);
-      background: #f5f5f5;
+      background: var(--color-initial-bg);
       gap: 16px;
     }
     
     .initial-spinner {
       width: 42px;
       height: 42px;
-      border: 3px solid rgba(35, 88, 123, 0.1);
+      border: 3px solid var(--color-initial-spinner-track);
       border-top: 3px solid var(--color-primary);
       border-radius: 50%;
       animation: spin 1s linear infinite;
@@ -119,7 +172,7 @@
 
       function hideWhenAppHasContent() {
         const app = document.getElementById('app')
-        if (app && app.children.length > 0) {
+        if (app && app.dataset.ready === 'true') {
           hideLoading()
           return true
         }

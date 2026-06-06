@@ -36,7 +36,7 @@
       <div class="hint-box">
         <p><strong>使用说明：</strong></p>
         <ul>
-          <li>在侧边栏"轮换"标签中创建轮换组</li>
+          <li>在编辑器工作台的轮换配置中创建轮换组</li>
           <li>为每个组添加选区并框选座位</li>
           <li>点击"执行轮换"按钮手动触发</li>
           <li>支持循环模式（≥2个选区）和互换模式（2个选区）</li>
@@ -44,32 +44,35 @@
       </div>
 
       <button class="action-button" @click="openRotationConfig">
-        <RotateCw :size="18" />
-        <div class="button-content">
-          <span class="button-title">打开轮换配置</span>
-          <span class="button-desc">在侧边栏中管理轮换组和选区</span>
-        </div>
-      </button>
+          <RotateCw :size="18" />
+          <div class="button-content">
+            <span class="button-title">打开轮换配置</span>
+            <span class="button-desc">在编辑器工作台中管理轮换组和选区</span>
+          </div>
+        </button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Info, RotateCw, ArrowLeftRight } from 'lucide-vue-next'
 import { useZoneRotation } from '@/composables/useZoneRotation'
-import { useSidebar } from '@/composables/useSidebar'
+import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
 const emit = defineEmits(['update:visible'])
+const router = useRouter()
 
 const { rotGroups } = useZoneRotation()
-const { setActiveTab } = useSidebar()
+const { openDialog } = useEditorWorkbench()
 
 const rotationGroupCount = computed(() => rotGroups.value?.length || 0)
 
-const openRotationConfig = () => {
-  setActiveTab(3) // 切换到侧边栏的"排位"标签
-  emit('update:visible', false) // 关闭设置对话框
+const openRotationConfig = async () => {
+  await router.push('/editor')
+  openDialog('zoneRotation')
+  emit('update:visible', false)
 }
 </script>
 

@@ -1,7 +1,7 @@
 <template>
   <transition name="dialog-fade">
-    <div v-if="visible" class="student-roster-overlay" @mousedown.self="close">
-      <div class="student-roster-dialog">
+    <div v-if="visible" :class="['student-roster-overlay', { embedded: presentation === 'embedded' }]" @mousedown.self="close">
+      <div :class="['student-roster-dialog', { embedded: presentation === 'embedded' }]">
         <div class="dialog-header">
           <h3>名单与属性</h3>
           <button class="close-btn" @click="close" aria-label="关闭">
@@ -355,7 +355,12 @@ import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
 
 const props = defineProps({
-  visible: Boolean
+  visible: Boolean,
+  presentation: {
+    type: String,
+    default: 'dialog',
+    validator: (value) => ['dialog', 'embedded'].includes(value)
+  }
 })
 
 const emit = defineEmits(['update:visible'])
@@ -692,6 +697,17 @@ const close = () => {
   z-index: 9999;
 }
 
+.student-roster-overlay.embedded {
+  position: static;
+  inset: auto;
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+  justify-content: stretch;
+  background: transparent;
+  z-index: auto;
+}
+
 .student-roster-dialog {
   background: var(--color-surface, #ffffff);
   width: 96vw;
@@ -702,6 +718,27 @@ const close = () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.student-roster-dialog.embedded {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+}
+
+.student-roster-dialog.embedded .dialog-header {
+  display: none;
+}
+
+.dialog-fade-enter-active .student-roster-dialog.embedded,
+.dialog-fade-leave-active .student-roster-dialog.embedded,
+.dialog-fade-enter-from .student-roster-dialog.embedded,
+.dialog-fade-leave-to .student-roster-dialog.embedded {
+  opacity: 1;
+  transform: none;
 }
 
 .dialog-header {
@@ -1414,13 +1451,18 @@ th.sticky-col-3 {
     height: 92vh;
   }
 
+  .student-roster-dialog.embedded {
+    width: 100%;
+    height: 100%;
+  }
+
   .dialog-body {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
   }
 
   .roster-context {
-    max-height: 260px;
+    max-height: 220px;
     border-right: none;
     border-bottom: 1px solid var(--color-border);
   }

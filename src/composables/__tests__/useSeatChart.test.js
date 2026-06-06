@@ -151,6 +151,16 @@ describe('useSeatChart', () => {
       expect(seatChart.getStudentAtSeat('guard-left')).toBe(1)
     })
 
+    it('should keep visible guard seats synced after seats are reinitialized', () => {
+      expect(seatChart.visibleGuardSeats.value.find(seat => seat.id === 'guard-left').studentId).toBe(null)
+
+      seatChart.initializeSeats()
+      seatChart.assignStudent('guard-left', 1, false)
+
+      expect(seatChart.getStudentAtSeat('guard-left')).toBe(1)
+      expect(seatChart.visibleGuardSeats.value.find(seat => seat.id === 'guard-left').studentId).toBe(1)
+    })
+
     it('should exclude guard seats from available seats unless requested', () => {
       expect(seatChart.getAvailableSeats().some(seat => seat.kind === 'guard')).toBe(false)
 

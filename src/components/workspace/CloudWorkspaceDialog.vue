@@ -599,8 +599,9 @@ const formatSize = (bytes) => {
 }
 
 .workspace-item.selected {
-  background: var(--color-info-bg);
-  border-left: 3px solid var(--color-info);
+  background: var(--color-selection-bg);
+  border-left: 3px solid var(--color-selection-border);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-selection-border) 18%, transparent);
 }
 
 .ws-info {

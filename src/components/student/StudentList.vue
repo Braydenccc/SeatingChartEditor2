@@ -1,15 +1,23 @@
 <template>
-  <div class="student-list-container" :class="{ 'all-assigned': unassignedStudents.length === 0, 'is-collapsed': isCollapsed }">
+  <div
+    class="student-list-container"
+    :class="{
+      'all-assigned': visibleStudents.length === 0,
+      'is-collapsed': isCollapsed,
+      'display-compact': displayMode === 'compact'
+    }"
+  >
     <!-- 学生列表 / 空状态占位 -->
     <div ref="studentItemsRef" class="student-items" @dragover.prevent="handleDragOver" @drop.prevent="handleDrop" @dragleave="handleDragLeave"
-      :class="{ 'drag-over': isDragOver, 'is-empty': unassignedStudents.length === 0, 'has-placeholder': showEmptyPlaceholder, 'touch-dragging': isTouchDraggingFromSeat }">
+      :class="{ 'drag-over': isDragOver, 'is-empty': visibleStudents.length === 0, 'has-placeholder': showEmptyPlaceholder, 'touch-dragging': isTouchDraggingFromSeat }">
 
       <!-- 有未分配学生时正常显示 -->
       <TransitionGroup name="list" tag="div" class="candidates-grid">
         <CandidateItem
-          v-for="student in unassignedStudents"
+          v-for="student in visibleStudents"
           :key="student.id"
           :student="student"
+          :display-mode="displayMode"
           @edit-student="handleEditStudent"
         />
       </TransitionGroup>
@@ -28,18 +36,16 @@
 
         <!-- 操作按钮组 - 仅在高度足够时显示 -->
         <div v-if="!isHeightConstrained" class="empty-actions">
-          <input ref="excelInput" type="file" accept=".xlsx,.xls" style="display: none" @change="handleImportExcel" />
-          <button class="empty-action-btn primary" @click="$refs.excelInput.click()">
+          <button class="empty-action-btn primary" @click="router.push({ path: '/files', query: { section: 'students' } })">
             <FileInput :size="16" stroke-width="2" />
             <span>导入 Excel 名单</span>
           </button>
           <div class="empty-action-row">
-            <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" style="display: none" @change="handleLoadWorkspace" />
-            <button class="empty-action-btn outline" @click="$refs.workspaceInput.click()">
+            <button class="empty-action-btn outline" @click="router.push({ path: '/files', query: { section: 'workspace' } })">
               <FolderOpen :size="14" stroke-width="2" />
               <span>本地工作区</span>
             </button>
-            <button class="empty-action-btn outline" @click="openCloudLoad">
+            <button class="empty-action-btn outline" @click="router.push({ path: '/files', query: { section: 'workspace' } })">
               <CloudDownload :size="14" stroke-width="2" />
               <span>云端工作区</span>
             </button>
@@ -47,8 +53,8 @@
         </div>
       </div>
 
-      <!-- 空状态占位：全部已分配 -->
-      <div v-else-if="unassignedStudents.length === 0 && students.length > 0" v-show="!isTouchDraggingFromSeat" class="empty-placeholder assigned-done">
+      <!-- 空状态占位：全部已入座 -->
+      <div v-else-if="isAllAssignedEmpty" v-show="!isTouchDraggingFromSeat" class="empty-placeholder assigned-done">
         <div class="empty-content-row">
           <div class="empty-icon success">
             <CheckCircle :size="32" stroke-width="2" />
@@ -56,6 +62,19 @@
           <div class="empty-text-group">
             <p class="empty-title">全部学生已入座</p>
             <p class="empty-hint">{{ students.length }} 名学生已安排到座位上</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 空状态占位：未找到学生 -->
+      <div v-else-if="visibleStudents.length === 0 && students.length > 0" v-show="!isTouchDraggingFromSeat" class="empty-placeholder no-results">
+        <div class="empty-content-row">
+          <div class="empty-icon search-empty">
+            <SearchX :size="32" stroke-width="2" />
+          </div>
+          <div class="empty-text-group">
+            <p class="empty-title">未找到学生</p>
+            <p class="empty-hint">请调整搜索关键词或筛选条件</p>
           </div>
         </div>
       </div>
@@ -71,8 +90,6 @@
       </div>
     </div>
 
-    <StudentRosterDialog v-if="showRosterDialog" v-model:visible="showRosterDialog" />
-
     <!-- 学生编辑弹窗 -->
     <StudentEditDialog v-if="showStudentEditDialog" v-model:visible="showStudentEditDialog" :studentId="editingStudentId" />
   </div>
@@ -80,11 +97,10 @@
 
 <script setup>
 import { computed, ref, defineAsyncComponent, onBeforeUnmount, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
-import { Users, FileInput, FolderOpen, CloudDownload, CheckCircle, LogOut } from 'lucide-vue-next'
+import { Users, FileInput, FolderOpen, CloudDownload, CheckCircle, SearchX, LogOut } from 'lucide-vue-next'
 import CandidateItem from './CandidateItem.vue'
-// 修改为动态导入，避免阻塞主 chunk 进行加载
-// import StudentRosterDialog from './StudentRosterDialog.vue'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
 import { useSeatChart } from '@/composables/useSeatChart'
@@ -97,31 +113,32 @@ import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useResizablePanel } from '@/composables/useResizablePanel'
 
-const StudentRosterDialog = defineAsyncComponent(() => import('./StudentRosterDialog.vue'))
 const StudentEditDialog = defineAsyncComponent(() => import('./StudentEditDialog.vue'))
-
 const props = defineProps({
-  showRoster: {
+  displayMode: {
+    type: String,
+    default: 'grid'
+  },
+  filterMode: {
+    type: String,
+    default: 'unassigned'
+  },
+  searchText: {
+    type: String,
+    default: ''
+  },
+  activeTagIds: {
+    type: Array,
+    default: () => []
+  },
+  collapsible: {
     type: Boolean,
-    default: false
+    default: true
   }
 })
-
-const emit = defineEmits(['update:show-roster'])
-
-const showRosterDialog = ref(false)
+const router = useRouter()
 const showStudentEditDialog = ref(false)
 const editingStudentId = ref(null)
-
-// 监听 props 变化，同步到本地状态
-watch(() => props.showRoster, (val) => {
-  showRosterDialog.value = val
-})
-
-// 监听本地状态变化，同步回父组件
-watch(showRosterDialog, (val) => {
-  emit('update:show-roster', val)
-})
 
 const { tags, addTag, clearAllTags } = useTagData()
 const { students, updateStudent, deleteStudent, clearAllStudents, addStudent } = useStudentData()
@@ -139,7 +156,7 @@ const { userHeight, getEffectiveHeight } = useResizablePanel()
 const isMobile = computed(() => windowWidth.value <= 1024)
 
 // 折叠状态检测
-const isCollapsed = computed(() => userHeight.value === 0)
+const isCollapsed = computed(() => props.collapsible && userHeight.value === 0)
 
 // 检测高度是否受限（用于简化空状态占位符）
 const isHeightConstrained = computed(() => {
@@ -245,8 +262,33 @@ const unassignedStudents = computed(() => {
   return students.value.filter(student => !findSeatByStudent(student.id))
 })
 
+const visibleStudents = computed(() => {
+  const search = props.searchText.trim().toLowerCase()
+  const activeTags = props.activeTagIds || []
+  return students.value.filter(student => {
+    const seat = findSeatByStudent(student.id)
+    if (props.filterMode === 'unassigned' && seat) return false
+    if (props.filterMode === 'assigned' && !seat) return false
+    if (activeTags.length > 0 && !activeTags.every(tagId => (student.tags || []).includes(tagId))) return false
+    if (!search) return true
+    const name = String(student.name || '').toLowerCase()
+    const number = String(student.studentNumber || '').toLowerCase()
+    return name.includes(search) || number.includes(search)
+  })
+})
+
+const isAllAssignedEmpty = computed(() => {
+  const hasSearch = props.searchText.trim().length > 0
+  const hasTagFilter = (props.activeTagIds || []).length > 0
+  return props.filterMode === 'unassigned' &&
+    !hasSearch &&
+    !hasTagFilter &&
+    students.value.length > 0 &&
+    unassignedStudents.value.length === 0
+})
+
 const showEmptyPlaceholder = computed(() => {
-  return students.value.length === 0 || (unassignedStudents.value.length === 0 && students.value.length > 0)
+  return students.value.length === 0 || (visibleStudents.value.length === 0 && students.value.length > 0)
 })
 
 // ==================== 触摸移出处理 ====================
@@ -366,6 +408,13 @@ const getDragData = (e) => {
   display: contents;
 }
 
+.student-list-container.display-compact .student-items {
+  padding: 10px;
+  grid-template-columns: 1fr;
+  grid-auto-rows: 56px;
+  gap: 8px;
+}
+
 /* 列表动画 */
 .list-enter-active {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -481,6 +530,14 @@ const getDragData = (e) => {
   height: 32px;
   min-width: 32px;
   color: var(--color-success);
+  animation: none;
+}
+
+.empty-icon.search-empty {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  color: var(--color-text-muted);
   animation: none;
 }
 

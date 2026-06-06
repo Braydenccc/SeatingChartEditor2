@@ -12,6 +12,7 @@
     'selection-dragging': isSelectionDragging,
     'undo-highlighted': undoHighlighted,
     'selection-selected': isInSelection,
+    'student-selected': isStudentSelected,
     'drag-ghost': isGhost
   }" :style="zoneHighlightStyle" :data-seat-id="seat.id" :draggable="isDraggable"
     @click="handleClick"
@@ -100,6 +101,7 @@ import { useSelection } from '@/composables/useSelection'
 import { useDragPreview } from '@/composables/useDragPreview'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
+import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
 const props = defineProps({
   seat: {
@@ -121,10 +123,21 @@ const { editingZoneId, getRotZoneHighlights, toggleSeatInEditingZone } = useZone
 const { tags, showTagsInSeatChart, tagDisplayMode } = useTagData()
 const { isHighlighted } = useUndo()
 const { dragCleanupVersion, startDragFromSeat, endDragFromSeat, startTouchDragFromSeat, endTouchDragFromSeat } = useDragState()
-const { selectedSeatIds, selectedSeatsArray, isDraggingSelection, startDraggingSelection, endDraggingSelection, isSelectionMode, toggleSeatInSelection } = useSelection()
+const {
+  selectedSeatIds,
+  selectedSeatsArray,
+  isDraggingSelection,
+  startDraggingSelection,
+  endDraggingSelection,
+  isSelectionMode,
+  toggleSeatInSelection,
+  selectSingleSeat,
+  clearSelection
+} = useSelection()
 const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
 const { settings } = useGlobalSettings()
 const { enabledAttributeDefinitions, formatNumericValue, showNumericAttributesInEditor } = useStudentAttributes()
+const { setRightRailTab } = useEditorWorkbench()
 
 const showStudentName = computed(() => settings.value.ui.showStudentName !== false)
 const showStudentNumber = computed(() => settings.value.ui.showStudentNumber !== false)
@@ -264,6 +277,10 @@ const isSelectionDragging = computed(() => {
 // 拖拽吸附幽灵
 const isGhost = computed(() => isGhostSeat(props.seat.id))
 
+const isStudentSelected = computed(() => {
+  return hasStudent.value && selectedStudentId.value === props.seat.studentId
+})
+
 // 多选拖拽发起者
 const isDragAnchor = computed(() => {
   return isDragging.value &&
@@ -293,19 +310,31 @@ const handlePointerDown = (e) => {
 // ==================== 点击处理 ====================
 
 const handleClick = () => {
-  if (!isClickable.value) return
-
   // 手机端选择模式：点击切换选中状态
   if (isMobile.value && isSelectionMode.value && !isGuardSeat.value) {
     toggleSeatInSelection(props.seat.id)
     return
   }
 
+  if (currentMode.value === EditMode.NORMAL && selectedStudentId.value && !props.seat.isEmpty) {
+    emit('assign-student', props.seat.id, selectedStudentId.value)
+    return
+  }
+
+  if (currentMode.value === EditMode.NORMAL && !isGuardSeat.value) {
+    if (isInSelection.value) {
+      clearSelection()
+    } else {
+      selectSingleSeat(props.seat.id)
+      setRightRailTab('selection')
+    }
+    return
+  }
+
+  if (!isClickable.value) return
+
   switch (currentMode.value) {
     case EditMode.NORMAL:
-      if (selectedStudentId.value && !props.seat.isEmpty) {
-        emit('assign-student', props.seat.id, selectedStudentId.value)
-      }
       break
     case EditMode.EMPTY_EDIT:
       emit('toggle-empty', props.seat.id)
@@ -721,8 +750,8 @@ onUnmounted(() => {
 }
 
 .seat-item.selection-selected.clickable:hover {
-  border-color: var(--color-info);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-info) 20%, transparent);
+  border-color: var(--color-selection-border);
+  box-shadow: var(--shadow-selection-ring), var(--shadow-selection-card);
   transform: none;
 }
 
@@ -1064,17 +1093,23 @@ onUnmounted(() => {
 
 /* 选区选中 */
 .seat-item.selection-selected {
-  border-color: var(--color-info);
+  border-color: var(--color-selection-border);
   border-width: 2.5px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent), 0 4px 12px color-mix(in srgb, var(--color-primary) 20%, transparent);
-  background: color-mix(in srgb, var(--color-info) 6%, var(--color-bg-card));
+  box-shadow: var(--shadow-selection-ring), var(--shadow-selection-card);
+  background: var(--color-selection-bg);
   transform: scale(1.05);
   z-index: 10;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .seat-item.selection-selected.occupied {
-  background: color-mix(in srgb, color-mix(in srgb, var(--color-info) 12%, var(--color-bg-card)) 50%, var(--color-bg-selected));
+  background: var(--color-selection-bg-strong);
+}
+
+.seat-item.student-selected {
+  border-color: var(--color-selection-border);
+  background: var(--color-selection-bg);
+  box-shadow: var(--shadow-selection-ring);
 }
 
 /* 拖拽吸附幽灵 */

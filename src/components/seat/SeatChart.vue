@@ -1,92 +1,10 @@
 <template>
   <div class="seat-chart-container">
-    <!-- 顶部功能栏 -->
-    <div class="seat-toolbar"
-      @dragover.prevent="handleToolbarDragOver" @dragleave="handleToolbarDragLeave" @drop.prevent="handleToolbarDrop">
-      <div class="toolbar-info">
-        <span class="info-item">{{ seatConfig.groupCount }} 大组</span>
-        <span class="info-separator">·</span>
-        <span class="info-item">每组 {{ seatConfig.columnsPerGroup }} 列</span>
-        <span class="info-separator">·</span>
-        <span class="info-item">每列 {{ seatConfig.seatsPerColumn }} 座</span>
-        <span class="info-separator">·</span>
-        <span class="info-item">共 {{ totalSeats }} 个座位</span>
-        <span class="info-separator">·</span>
-        <span class="info-item">讲台位置: {{ seatConfig.podiumPosition === 'bottom' ? '底部' : '顶部' }}</span>
-      </div>
-      <div class="toolbar-right">
-        <button
-          v-if="isMobile"
-          @click="undo"
-          :disabled="!canUndo"
-          class="mobile-undo-btn"
-          title="撤销"
-        >
-          <Undo2 :size="16" stroke-width="2" />
-        </button>
-        <button
-          v-if="isMobile"
-          @click="redo"
-          :disabled="!canRedo"
-          class="mobile-redo-btn"
-          title="重做"
-        >
-          <Redo2 :size="16" stroke-width="2" />
-        </button>
-        <button
-          v-if="isMobile"
-          @click="toggleSelectionMode"
-          :class="['mobile-select-btn', { active: isSelectionMode }]"
-        >
-          {{ isSelectionMode ? '关闭' : '选择' }}
-        </button>
-        <div class="zoom-controls">
-          <button class="zoom-btn" @click.stop="zoomOut" :disabled="scale <= MIN_SCALE" title="缩小">
-            <Minus :size="16" stroke-width="2.5" />
-          </button>
-          <button class="zoom-label" @click.stop="fitToViewport" title="自适应大小">
-            {{ Math.round(scale * 100) }}%
-          </button>
-          <button class="zoom-btn" @click.stop="zoomIn" :disabled="scale >= MAX_SCALE" title="放大">
-            <Plus :size="16" stroke-width="2.5" />
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 手机端固定选区工具栏 -->
-    <div v-if="isMobile && isSelectionMode" class="mobile-selection-toolbar-fixed">
-      <div class="selection-info">
-        <template v-if="selectedCount > 0">已选 {{ selectedCount }} 个座位</template>
-        <template v-else>请点击或滑动选择座位</template>
-      </div>
-      <div class="selection-actions">
-        <button @click="handleSelEdit" title="编辑" :disabled="selectedCount === 0">
-          <Edit2 :size="16" />
-        </button>
-        <button @click="handleSelClear" title="移出" :disabled="selectedCount === 0">
-          <UserMinus :size="16" />
-        </button>
-        <button v-if="selectedCount === 2" @click="handleSelShuffle" title="交换" :disabled="selectedCount < 2">
-          <ArrowLeftRight :size="16" />
-        </button>
-        <button v-else @click="handleSelShuffle" title="打乱" :disabled="selectedCount < 2">
-          <Shuffle :size="16" />
-        </button>
-        <button @click="handleSelAssign" title="排入" :disabled="selectedCount === 0">
-          <UserPlus :size="16" />
-        </button>
-        <button @click="clearSeatSelection" title="取消" class="cancel-btn">
-          <X :size="16" />
-        </button>
-      </div>
-    </div>
-
     <div ref="viewportRef" class="seat-chart-viewport" :class="{ 'is-panning': isPanning }" @wheel.prevent="handleWheel"
       @click.capture="handleViewportClickCapture"
       @mousedown="handleMouseDown" @mousemove="handleMouseMove" @mouseup="handleMouseUp" @mouseleave="handleMouseUp"
       @touchstart="handleTouchStart" @touchmove.prevent="handleTouchMove" @touchend="handleTouchEnd"
-      @dragover.prevent="handleDragOver" @drop.prevent="handleDrop" @contextmenu.prevent>
+      @dragover.prevent="handleDragOver" @drop.prevent="handleDrop" @contextmenu.prevent="handleContextMenu">
       <div
         ref="chartRef"
         class="seat-chart"
@@ -111,6 +29,7 @@
             <div v-if="seatConfig.podiumPosition === 'top'" class="podium-row">
               <SeatItem
                 v-if="guardSeatLeft"
+                :key="guardSeatLeftRenderKey"
                 :seat="guardSeatLeft"
                 class="guard-seat-item"
                 @assign-student="handleAssignStudent"
@@ -125,6 +44,7 @@
               <div class="podium-block">讲台</div>
               <SeatItem
                 v-if="guardSeatRight"
+                :key="guardSeatRightRenderKey"
                 :seat="guardSeatRight"
                 class="guard-seat-item"
                 @assign-student="handleAssignStudent"
@@ -159,6 +79,7 @@
             <div v-if="seatConfig.podiumPosition !== 'top'" class="podium-row">
               <SeatItem
                 v-if="guardSeatLeft"
+                :key="guardSeatLeftRenderKey"
                 :seat="guardSeatLeft"
                 class="guard-seat-item"
                 @assign-student="handleAssignStudent"
@@ -173,6 +94,7 @@
               <div class="podium-block">讲台</div>
               <SeatItem
                 v-if="guardSeatRight"
+                :key="guardSeatRightRenderKey"
                 :seat="guardSeatRight"
                 class="guard-seat-item"
                 @assign-student="handleAssignStudent"
@@ -223,30 +145,7 @@
 
       <!-- 矩形框选叠加层 -->
       <div v-if="isRectSelecting" class="rect-select-overlay" :style="rectSelectStyle"></div>
-
-      <!-- 选区操作工具栏 -->
-      <SelectionToolbar
-        v-if="!isMobile"
-        :visible="showSelToolbar"
-        :anchorX="selToolbarAnchor.x"
-        :anchorY="selToolbarAnchor.y"
-        :isFull="isSelectionFull"
-        :hasStudent="isSelectionHasStudent"
-        :canShuffle="selectedCount >= 2"
-        :isExactlyTwo="selectedCount === 2"
-        @edit="handleSelEdit"
-        @clear="handleSelClear"
-        @shuffle="handleSelShuffle"
-        @assign="handleSelAssign"
-        @cancel="clearSeatSelection"
-      />
     </div>
-
-    <!-- 批量编辑弹窗 -->
-    <BatchEditDialog
-      v-model:visible="showBatchEditDialog"
-      :studentIds="batchEditStudentIds"
-    />
 
     <!-- 学生编辑弹窗 -->
     <StudentEditDialog
@@ -269,10 +168,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
-import { Minus, Plus, Edit2, UserMinus, Shuffle, UserPlus, X, ArrowLeftRight, Undo2, Redo2 } from 'lucide-vue-next'
 import SeatItem from './SeatItem.vue'
-import SelectionToolbar from './SelectionToolbar.vue'
-import BatchEditDialog from '@/components/student/BatchEditDialog.vue'
 import StudentEditDialog from '@/components/student/StudentEditDialog.vue'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useEditMode } from '@/composables/useEditMode'
@@ -285,8 +181,9 @@ import { useSelection } from '@/composables/useSelection'
 import { useDragPreview } from '@/composables/useDragPreview'
 import { useLayoutConstants } from '@/composables/useLayoutConstants'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
+import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import { parseSeatId, generateSeatId } from '@/utils/seatHelpers'
-import { getGuardSideForVisualSlot, getRowNumber } from '@/utils/exportLayout'
+import { getRowNumber } from '@/utils/exportLayout'
 
 // Fisher-Yates 洗牌算法
 const shuffleArray = (array) => {
@@ -323,13 +220,14 @@ const { recordAssign, recordBatch, createSnapshot, canUndo, canRedo, undo, redo 
 const { isDraggingFromSeat: globalIsDraggingFromSeat, endDragFromSeat } = useDragState()
 const {
   clearSelection: clearSeatSelection,
+  selectedSeatIds,
   selectedSeatsArray,
   selectedCount,
+  addSeatToSelection,
   setSelection,
   startSelection,
   updateSelection,
   endSelection,
-  toggleSeatInSelection,
   isSelectionMode,
   toggleSelectionMode
 } = useSelection()
@@ -342,6 +240,7 @@ const {
   updateDragPreview,
   endDragPreview
 } = useDragPreview()
+const { setRightRailTab } = useEditorWorkbench()
 
 const dragPreviewRef = ref(null)
 const viewportRef = ref(null)
@@ -488,7 +387,7 @@ const handleMouseMove = (e) => {
       mouseMoved = true
     }
     const seatEl = findSeatElement(e.target)
-    if (seatEl && seatEl.dataset.seatId) {
+    if (seatEl && seatEl.dataset.seatId && !isGuardSeatId(seatEl.dataset.seatId)) {
       updateSelection(seatEl.dataset.seatId)
     }
     return
@@ -515,8 +414,8 @@ const handleMouseUp = () => {
   }
 
   if (rightMouseDown) {
-    if (!mouseMoved && rightStartSeatId) {
-      toggleSeatInSelection(rightStartSeatId)
+    if (!mouseMoved && rightStartSeatId && !isGuardSeatId(rightStartSeatId)) {
+      addSeatToSelection(rightStartSeatId)
     }
     endSelection()
     rightMouseDown = false
@@ -533,10 +432,16 @@ const handleMouseUp = () => {
 }
 
 const handleViewportClickCapture = (e) => {
-  if (!suppressNextClick) return
-  suppressNextClick = false
-  e.preventDefault()
-  e.stopPropagation()
+  if (suppressNextClick) {
+    suppressNextClick = false
+    e.preventDefault()
+    e.stopPropagation()
+    return
+  }
+
+  if (!findSeatElement(e.target) && selectedCount.value > 0) {
+    clearSeatSelection()
+  }
 }
 
 const isPannableEmptySeatTarget = (el) => {
@@ -920,130 +825,19 @@ const handleKeyDown = (e) => {
   }
 }
 
-// ==================== 选区工具栏 ====================
-const selToolbarAnchor = ref({ x: 0, y: 0 })
-const showSelToolbar = computed(() => selectedCount.value >= 1 && !dragPreviewState.isActive)
-
-// 批量编辑弹窗
-const showBatchEditDialog = ref(false)
-const batchEditStudentIds = ref([])
-
 // 学生编辑弹窗
 const showStudentEditDialog = ref(false)
 const editingStudentId = ref(null)
 
-// 判断选区是否已满（所有选中的座位都有学生）
-const isSelectionFull = computed(() => {
-  if (selectedCount.value === 0) return false
-  return selectedSeatsArray.value.every(seatId => getStudentAtSeat(seatId))
-})
+const handleContextMenu = (e) => {
+  const seatEl = findSeatElement(e.target)
+  const seatId = seatEl?.dataset?.seatId
+  if (!seatId || isGuardSeatId(seatId)) return
 
-// 判断选区是否有学生（至少有一个座位有学生）
-const isSelectionHasStudent = computed(() => {
-  if (selectedCount.value === 0) return false
-  return selectedSeatsArray.value.some(seatId => getStudentAtSeat(seatId))
-})
-
-const updateSelToolbarPosition = () => {
-  if (!viewportRef.value || selectedCount.value < 1) return
-  const vpRect = viewportRef.value.getBoundingClientRect()
-  const ids = selectedSeatsArray.value
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const id of ids) {
-    const el = viewportRef.value.querySelector(`[data-seat-id="${id}"]`)
-    if (!el) continue
-    const r = el.getBoundingClientRect()
-    if (r.left < minX) minX = r.left
-    if (r.top < minY) minY = r.top
-    if (r.right > maxX) maxX = r.right
-    if (r.bottom > maxY) maxY = r.bottom
+  if (!selectedSeatIds.value.has(seatId)) {
+    addSeatToSelection(seatId)
   }
-  if (minX === Infinity) return
-  selToolbarAnchor.value = {
-    x: (minX + maxX) / 2 - vpRect.left,
-    y: maxY - vpRect.top + 10
-  }
-}
-
-watch([selectedSeatsArray, scale, panX, panY], () => {
-  nextTick(updateSelToolbarPosition)
-}, { deep: true })
-
-const handleSelClear = () => {
-  const beforeSnapshot = createSnapshot()
-  for (const seatId of selectedSeatsArray.value) {
-    const studentId = getStudentAtSeat(seatId)
-    if (studentId) {
-      clearSeat(seatId, false)
-    }
-  }
-  const afterSnapshot = createSnapshot()
-  recordBatch(beforeSnapshot, afterSnapshot)
-  clearSeatSelection()
-}
-
-const handleSelShuffle = () => {
-  const ids = selectedSeatsArray.value
-  const studentIds = ids.map(id => getStudentAtSeat(id)).filter(Boolean)
-  if (studentIds.length < 2) return
-
-  const beforeSnapshot = createSnapshot()
-
-  if (ids.length === 2) {
-    const [seatA, seatB] = ids
-    const studentA = getStudentAtSeat(seatA)
-    const studentB = getStudentAtSeat(seatB)
-    if (studentA && studentB) {
-      swapSeats(seatA, seatB, false)
-    } else if (studentA || studentB) {
-      const fromSeat = studentA ? seatA : seatB
-      const toSeat = studentA ? seatB : seatA
-      const studentId = studentA || studentB
-      clearSeat(fromSeat, false)
-      assignStudent(toSeat, studentId, false)
-    }
-    const afterSnapshot = createSnapshot()
-    recordBatch(beforeSnapshot, afterSnapshot)
-    return
-  }
-
-  for (let i = studentIds.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [studentIds[i], studentIds[j]] = [studentIds[j], studentIds[i]]
-  }
-  const occupiedIds = ids.filter(id => getStudentAtSeat(id))
-  for (const seatId of occupiedIds) {
-    clearSeat(seatId, false)
-  }
-  for (let i = 0; i < occupiedIds.length; i++) {
-    assignStudent(occupiedIds[i], studentIds[i], false)
-  }
-  const afterSnapshot = createSnapshot()
-  recordBatch(beforeSnapshot, afterSnapshot)
-}
-
-const handleSelAssign = () => {
-  const ids = selectedSeatsArray.value
-  const emptyIds = ids.filter(id => !getStudentAtSeat(id))
-  const unassigned = students.value.filter(s => !findSeatByStudent(s.id))
-  if (emptyIds.length === 0 || unassigned.length === 0) return
-  const shuffled = [...unassigned].sort(() => Math.random() - 0.5)
-  const count = Math.min(emptyIds.length, shuffled.length)
-  const beforeSnapshot = createSnapshot()
-  for (let i = 0; i < count; i++) {
-    assignStudent(emptyIds[i], shuffled[i].id, false)
-  }
-  const afterSnapshot = createSnapshot()
-  recordBatch(beforeSnapshot, afterSnapshot)
-  clearSeatSelection()
-}
-
-const handleSelEdit = () => {
-  const ids = selectedSeatsArray.value
-  const studentIds = ids.map(id => getStudentAtSeat(id)).filter(Boolean)
-  if (studentIds.length === 0) return
-  batchEditStudentIds.value = studentIds
-  showBatchEditDialog.value = true
+  setRightRailTab('selection')
 }
 
 // 处理双击编辑学生
@@ -1188,13 +982,25 @@ const { settings } = useGlobalSettings()
 const showEditorRowNumbers = computed(() => settings.value.ui.showEditorRowNumbers !== false)
 
 const getGuardSeatInVisualSlot = (visualSide) => {
-  const guardSide = getGuardSideForVisualSlot(visualSide, seatConfig.value.podiumPosition)
-  return visibleGuardSeats.value.find(seat => seat.guardSide === guardSide) || null
+  const seat = visibleGuardSeats.value.find(seat => seat.guardSide === visualSide) || null
+  if (seat) {
+    void seat.studentId
+    void seat.isEmpty
+  }
+  return seat
 }
 
 const guardSeatLeft = computed(() => getGuardSeatInVisualSlot('left'))
 
 const guardSeatRight = computed(() => getGuardSeatInVisualSlot('right'))
+
+const getGuardSeatRenderKey = (seat) => (
+  seat ? `${seat.id}:${seat.studentId ?? 'empty'}:${seat.isEmpty ? '1' : '0'}` : 'none'
+)
+
+const guardSeatLeftRenderKey = computed(() => getGuardSeatRenderKey(guardSeatLeft.value))
+
+const guardSeatRightRenderKey = computed(() => getGuardSeatRenderKey(guardSeatRight.value))
 
 const getColumnRowCount = (groupIndex, columnIndex) => {
   const column = organizedSeats.value?.[groupIndex]?.[columnIndex] || []
@@ -1524,7 +1330,8 @@ const rectSelectStyle = computed(() => {
   justify-content: center;
   gap: 20px;
   min-height: var(--podium-row-height);
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
 }
 
 .podium-block {
@@ -1845,60 +1652,6 @@ const rectSelectStyle = computed(() => {
   .mobile-undo-btn:not(:disabled):active,
   .mobile-redo-btn:not(:disabled):active {
     background: var(--color-bg-hover);
-  }
-
-  .mobile-selection-toolbar-fixed {
-    position: sticky;
-    top: 36px;
-    z-index: 10;
-    background: var(--color-bg-secondary);
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 12px;
-    border-bottom: 1px solid var(--color-border);
-    flex-shrink: 0;
-  }
-
-  .selection-info {
-    font-size: 12px;
-    color: var(--color-text-secondary);
-    font-weight: 500;
-  }
-
-  .selection-actions {
-    display: flex;
-    gap: 6px;
-  }
-
-  .selection-actions button {
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border-radius: 6px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .selection-actions button:active {
-    transform: scale(0.95);
-  }
-
-  .selection-actions button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .selection-actions button.cancel-btn {
-    background: var(--color-danger);
-    color: var(--color-surface);
-    border-color: var(--color-danger);
   }
 
   .toolbar-info {

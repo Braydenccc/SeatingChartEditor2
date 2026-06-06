@@ -72,18 +72,26 @@ const bootstrap = async () => {
   await import('./styles/touch-optimization.css')
   await import('./styles/disable-animations.css')
 
-  const [{ createApp }, { default: App }] = await Promise.all([
+  const [{ createApp }, { default: App }, { default: router }] = await Promise.all([
     import('vue'),
-    import('./App.vue')
+    import('./App.vue'),
+    import('./router')
   ])
 
   const app = createApp(App)
+  app.use(router)
 
   app.config.errorHandler = (error) => {
     console.error('Vue runtime error:', error)
   }
 
+  await router.isReady()
   app.mount('#app')
+  const appRoot = document.getElementById('app')
+  if (appRoot) {
+    appRoot.dataset.ready = 'true'
+  }
+  await new Promise((resolve) => requestAnimationFrame(resolve))
   hideLoading()
 }
 

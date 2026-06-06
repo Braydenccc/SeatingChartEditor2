@@ -67,27 +67,19 @@
       </button>
     </div>
 
-    <!-- 导出预览对话框 -->
-    <ExportPreview
-      v-if="showExportPreview"
-      :visible="showExportPreview"
-      @update:visible="showExportPreview = $event"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Image, FileSpreadsheet, FileDown } from 'lucide-vue-next'
 import { useExportSettings } from '@/composables/useExportSettings'
-
-const ExportPreview = defineAsyncComponent(() => import('@/components/layout/ExportPreview.vue'))
 
 const emit = defineEmits(['update:visible'])
 
 const { exportSettings } = useExportSettings()
-
-const showExportPreview = ref(false)
+const router = useRouter()
 
 const colorModeText = computed(() => {
   const modes = {
@@ -99,8 +91,8 @@ const colorModeText = computed(() => {
 })
 
 const openExportPreview = () => {
-  showExportPreview.value = true
   emit('update:visible', false) // 关闭设置对话框
+  router.push('/export')
 }
 </script>
 
