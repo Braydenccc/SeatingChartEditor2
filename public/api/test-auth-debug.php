@@ -1,4 +1,5 @@
 <?php
+require_once "api/debug-guard.php";
 // 调试脚本：检查 auth.php 的问题
 error_reporting(E_ALL);
 ini_set('display_errors', '1');

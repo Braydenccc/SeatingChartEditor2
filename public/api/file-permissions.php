@@ -121,19 +121,27 @@ function getUserFiles($permDb, $username) {
     $fileIds = [];
 
     foreach ($allKeys as $key) {
-        // 匹配格式：perm_{fileId}_{username}
-        if (strpos($key, "perm_") === 0 && strpos($key, "_{$username}") !== false) {
-            $permData = $permDb->get($key);
-            if ($permData) {
-                $perm = json_decode($permData, true);
-                if ($perm && isset($perm['fileId'])) {
-                    $fileIds[] = $perm['fileId'];
-                }
-            }
+        if (strpos($key, "perm_") !== 0) {
+            continue;
+        }
+
+        $permData = $permDb->get($key);
+        if (!$permData) {
+            continue;
+        }
+
+        $perm = json_decode($permData, true);
+        if (
+            is_array($perm) &&
+            isset($perm['username'], $perm['fileId']) &&
+            $perm['username'] === $username &&
+            isValidFileId($perm['fileId'])
+        ) {
+            $fileIds[] = $perm['fileId'];
         }
     }
 
-    return $fileIds;
+    return array_values(array_unique($fileIds));
 }
 
 // Aliases for backward compatibility

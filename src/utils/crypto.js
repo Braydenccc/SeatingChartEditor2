@@ -111,3 +111,55 @@ export async function decrypt(ciphertext, userKey = null) {
     }
 }
 
+async function deriveTransportKey(username) {
+    const cryptoApi = globalThis.crypto
+    const encoder = new TextEncoder()
+    const keyMaterial = encoder.encode(`sce-auth-${username}`)
+    const importedKey = await cryptoApi.subtle.importKey(
+        'raw',
+        keyMaterial,
+        'PBKDF2',
+        false,
+        ['deriveBits', 'deriveKey']
+    )
+
+    return await cryptoApi.subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt: encoder.encode('sce-transport-salt-v1'),
+            iterations: 100000,
+            hash: 'SHA-256'
+        },
+        importedKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt']
+    )
+}
+
+export async function encryptPasswordForTransport(password, username) {
+    const cryptoApi = globalThis.crypto
+    if (!password || !username || !cryptoApi?.subtle) {
+        return null
+    }
+
+    try {
+        const encoder = new TextEncoder()
+        const iv = cryptoApi.getRandomValues(new Uint8Array(12))
+        const key = await deriveTransportKey(username)
+        const encrypted = await cryptoApi.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            encoder.encode(password)
+        )
+
+        const combined = new Uint8Array(iv.length + encrypted.byteLength)
+        combined.set(iv, 0)
+        combined.set(new Uint8Array(encrypted), iv.length)
+
+        return btoa(String.fromCharCode(...combined))
+    } catch (error) {
+        console.error('Password transport encryption failed:', error)
+        return null
+    }
+}

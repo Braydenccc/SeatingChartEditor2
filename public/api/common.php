@@ -22,6 +22,25 @@ function respond($payload, $code = 200) {
     exit($code >= 400 ? 1 : 0);
 }
 
+function isLocalRequestHost() {
+    $rawHost = isset($_SERVER['HTTP_HOST']) ? strtolower(trim((string)$_SERVER['HTTP_HOST'])) : '';
+    if (strpos($rawHost, '[::1]') === 0 || in_array(trim($rawHost, '[]'), ['localhost', '127.0.0.1', '::1'], true)) {
+        return true;
+    }
+
+    $host = normalizeRequestHost(trim($rawHost, '[]'));
+    return $host === 'localhost' || $host === '127.0.0.1' || $host === '::1';
+}
+
+function envFlagEnabled($name) {
+    if (!function_exists('getenv')) {
+        return false;
+    }
+
+    $value = getenv($name);
+    return $value === '1' || strtolower((string)$value) === 'true';
+}
+
 function isValidUsername($username) {
     return is_string($username) && preg_match('/^[A-Za-z0-9_-]{1,32}$/', $username);
 }
@@ -193,7 +212,7 @@ function isHttpsRequest() {
     if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
         return true;
     }
-    if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+    if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
         return true;
     }
     if (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on') {
@@ -205,12 +224,14 @@ function isHttpsRequest() {
     if (isset($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] === 'https') {
         return true;
     }
-    if (isset($_SERVER['HTTP_ORIGIN']) && isHttpsSameHostUrl($_SERVER['HTTP_ORIGIN'])) {
-        return true;
+
+    if (isset($_SERVER['HTTP_CF_VISITOR'])) {
+        $cfVisitor = json_decode((string)$_SERVER['HTTP_CF_VISITOR'], true);
+        if (is_array($cfVisitor) && isset($cfVisitor['scheme']) && strtolower($cfVisitor['scheme']) === 'https') {
+            return true;
+        }
     }
-    if (isset($_SERVER['HTTP_REFERER']) && isHttpsSameHostUrl($_SERVER['HTTP_REFERER'])) {
-        return true;
-    }
+
     return false;
 }
 
@@ -247,10 +268,14 @@ function getClientIp() {
         return $cachedIp;
     }
 
-    $ip = $_SERVER['HTTP_X_REAL_IP'] ??
-          $_SERVER['HTTP_X_FORWARDED_FOR'] ??
-          $_SERVER['REMOTE_ADDR'] ??
-          'unknown';
+    $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown';
+
+    if (envFlagEnabled('TRUST_PROXY_IP_HEADERS')) {
+        $ip = $_SERVER['HTTP_CF_CONNECTING_IP'] ??
+              $_SERVER['HTTP_X_REAL_IP'] ??
+              $_SERVER['HTTP_X_FORWARDED_FOR'] ??
+              $ip;
+    }
 
     if (strpos($ip, ',') !== false) {
         $ip = explode(',', $ip)[0];

@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { safeStorageGet as storageGet, safeStorageSet as storageSet, safeStorageRemove as storageRemove } from '@/utils/storage'
-import { encrypt, decrypt } from '@/utils/crypto'
+import { encrypt, decrypt, encryptPasswordForTransport } from '@/utils/crypto'
 
 const currentUser = ref(null)
 const token = ref(null)
@@ -256,9 +256,17 @@ export function useAuth() {
             const requestBody = {
                 action,
                 username,
-                password,
                 _csrf: csrfToken
             }
+
+            if (password) {
+                const encryptedPassword = await encryptPasswordForTransport(password, username)
+                if (!encryptedPassword) {
+                    return { success: false, message: '密码加密失败，请使用现代浏览器重试' }
+                }
+                requestBody.encryptedPassword = encryptedPassword
+            }
+
             const response = await fetch('/api/auth.php', {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -318,6 +326,12 @@ export function useAuth() {
 
         try {
             const csrfToken = getOrCreateCsrfToken()
+            const encryptedCurrentPassword = await encryptPasswordForTransport(currentPassword, currentUser.value.username)
+            const encryptedNewPassword = await encryptPasswordForTransport(newPassword, currentUser.value.username)
+            if (!encryptedCurrentPassword || !encryptedNewPassword) {
+                return { success: false, message: '密码加密失败，请使用现代浏览器重试' }
+            }
+
             const response = await fetch('/api/auth.php', {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -327,8 +341,8 @@ export function useAuth() {
                 },
                 body: JSON.stringify({
                     action: 'change_password',
-                    currentPassword,
-                    newPassword,
+                    encryptedCurrentPassword,
+                    encryptedNewPassword,
                     _csrf: csrfToken
                 })
             })

@@ -1,4 +1,5 @@
 <?php
+require_once "api/debug-guard.php";
 header('Content-Type: application/json; charset=utf-8');
 
 $host = $_SERVER['HTTP_HOST'] ?? '';

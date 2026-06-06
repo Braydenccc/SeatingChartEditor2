@@ -178,6 +178,7 @@ try {
         // 消毒文件 ID 用作数据库键名
         $sanitizedFileId = sanitizeDbKey($fileId);
         $existingFileRaw = $dbFiles->get($sanitizedFileId);
+        $existingFileData = null;
         if ($existingFileRaw !== null) {
             $existingFileData = json_decode($existingFileRaw, true);
             if (isWorkspaceDeleted($existingFileData)) {
@@ -191,6 +192,16 @@ try {
 
         if ($existingPerm !== null) {
             if (!hasFilePermission($dbPermissions, $fileId, $username, 'write')) {
+                respond(['success' => false, 'message' => '无权限修改此文件'], 403);
+            }
+        } elseif ($existingFileRaw !== null) {
+            if (
+                is_array($existingFileData) &&
+                isset($existingFileData['metadata']['author']) &&
+                $existingFileData['metadata']['author'] === $username
+            ) {
+                grantFilePermission($dbPermissions, $fileId, $username, 'owner');
+            } else {
                 respond(['success' => false, 'message' => '无权限修改此文件'], 403);
             }
         } else {

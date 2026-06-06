@@ -1,4 +1,5 @@
 <?php
+require_once "api/debug-guard.php";
 header('Content-Type: application/json; charset=utf-8');
 
 // Database 类存根（仅用于 IDE 类型检查，实际由 Retinbox 平台提供）

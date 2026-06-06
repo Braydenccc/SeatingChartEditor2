@@ -1,4 +1,5 @@
 <?php
+require_once "api/debug-guard.php";
 require_once "api/common.php";
 header('Content-Type: application/json; charset=utf-8');
 

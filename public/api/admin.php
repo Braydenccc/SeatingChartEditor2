@@ -163,6 +163,16 @@ function adminIsVerified($adminDb) {
     return hash_equals(strtolower(trim($savedHash)), hash('sha256', $token));
 }
 
+function adminEnsureHttps() {
+    if (isHttpsRequest() || isLocalRequestHost() || envFlagEnabled('ADMIN_ALLOW_HTTP')) {
+        return;
+    }
+
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => '管理接口必须使用 HTTPS 连接'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+    exit(1);
+}
+
 function adminCheckUnverifiedRateLimit() {
     $rateDb = new Database('admin_rate_limit');
     $key = sanitizeDbKey('admin_unverified_' . getClientIp());
@@ -420,6 +430,7 @@ $adminDb = new Database(ADMIN_DB_NAME);
 $parseResult = adminParseRequest();
 $input = $parseResult['input'];
 $action = isset($input['action']) && is_string($input['action']) ? $input['action'] : 'unknown';
+adminEnsureHttps();
 $verified = adminIsVerified($adminDb);
 
 if (!$verified) {

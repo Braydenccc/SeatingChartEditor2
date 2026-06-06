@@ -104,6 +104,41 @@ function validatePassword($password) {
     }
 }
 
+function decryptPasswordFromTransport($encryptedPassword, $username) {
+    if (!is_string($encryptedPassword) || $encryptedPassword === '' || !isValidUsername($username)) {
+        return null;
+    }
+
+    if (!function_exists('openssl_decrypt') || !function_exists('hash_pbkdf2')) {
+        return null;
+    }
+
+    $combined = base64_decode($encryptedPassword, true);
+    if ($combined === false || strlen($combined) <= 28) {
+        return null;
+    }
+
+    $iv = substr($combined, 0, 12);
+    $tag = substr($combined, -16);
+    $ciphertext = substr($combined, 12, -16);
+    $key = hash_pbkdf2('sha256', 'sce-auth-' . $username, 'sce-transport-salt-v1', 100000, 32, true);
+    $password = openssl_decrypt($ciphertext, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+
+    return is_string($password) ? $password : null;
+}
+
+function readPasswordField($input, $plainKey, $encryptedKey, $username) {
+    if (isset($input[$encryptedKey]) && is_string($input[$encryptedKey]) && $input[$encryptedKey] !== '') {
+        $password = decryptPasswordFromTransport($input[$encryptedKey], $username);
+        if ($password === null) {
+            respond(['success' => false, 'message' => '密码解密失败'], 400);
+        }
+        return $password;
+    }
+
+    return isset($input[$plainKey]) && is_string($input[$plainKey]) ? $input[$plainKey] : '';
+}
+
 function issueSessionToken($sessionDb, $username, $rememberMe = false) {
     $token = bin2hex(random_bytes(32));
     $expiryDays = $rememberMe ? TOKEN_EXPIRY_REMEMBER_ME : TOKEN_EXPIRY_DAYS;
@@ -145,7 +180,7 @@ try {
 
     $action = $input['action'];
     $username = isset($input['username']) ? trim($input['username']) : '';
-    $password = isset($input['password']) && is_string($input['password']) ? $input['password'] : '';
+    $password = readPasswordField($input, 'password', 'encryptedPassword', $username);
     $currentPassword = isset($input['currentPassword']) && is_string($input['currentPassword']) ? $input['currentPassword'] : '';
     $newPassword = isset($input['newPassword']) && is_string($input['newPassword']) ? $input['newPassword'] : '';
 
@@ -259,6 +294,8 @@ try {
         ensureHttps();
         $authUsername = requireAuthenticatedUsername($sessionDb);
         checkRateLimitGeneric('change_password_' . $authUsername, MAX_ATTEMPTS, '密码修改尝试次数过多', 'change_password_rate_limit', $authUsername);
+        $currentPassword = readPasswordField($input, 'currentPassword', 'encryptedCurrentPassword', $authUsername);
+        $newPassword = readPasswordField($input, 'newPassword', 'encryptedNewPassword', $authUsername);
 
         if ($currentPassword === '' || $newPassword === '') {
             respond(['success' => false, 'message' => '当前密码和新密码不能为空']);

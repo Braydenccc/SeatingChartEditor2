@@ -82,10 +82,12 @@ describe('useAuth', () => {
     expect(request.headers['X-CSRF-Token']).toEqual(expect.any(String))
     expect(requestBody).toMatchObject({
       action: 'change_password',
-      currentPassword: 'OldPass123',
-      newPassword: 'NewPass123',
       _csrf: request.headers['X-CSRF-Token']
     })
+    expect(requestBody.currentPassword).toBeUndefined()
+    expect(requestBody.newPassword).toBeUndefined()
+    expect(requestBody.encryptedCurrentPassword).toEqual(expect.any(String))
+    expect(requestBody.encryptedNewPassword).toEqual(expect.any(String))
   })
 
   it('passes through change_password failure responses', async () => {
