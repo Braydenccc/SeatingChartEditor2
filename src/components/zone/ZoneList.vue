@@ -2,7 +2,7 @@
   <div class="zone-list-container">
     <div class="zone-list-header">
       <h4>选区列表</h4>
-      <button class="add-zone-btn" @click="handleAddZone">添加选区</button>
+      <button class="add-zone-btn" @click="handleAddZone"><Plus :size="11" stroke-width="2" /> 添加选区</button>
     </div>
 
     <div class="zone-list-content">
@@ -29,7 +29,7 @@
 </template>
 
 <script setup>
-import ZoneItem from './ZoneItem.vue'
+import { Plus } from 'lucide-vue-next'
 import { useZoneData } from '@/composables/useZoneData'
 import { useTagData } from '@/composables/useTagData'
 import { useEditMode, EditMode } from '@/composables/useEditMode'

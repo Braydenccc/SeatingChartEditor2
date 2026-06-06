@@ -337,8 +337,9 @@
                 <span class="btn-content">
                   <Loader2 v-if="isAssignmentCancelRequested" :size="14" stroke-width="2" class="spin-icon" />
                   <X v-else-if="isAssigning" :size="14" stroke-width="2" />
+                  <circle-alert v-else-if="precheckResult && !precheckResult.pass" :size="14" stroke-width="2" />
                   <Play v-else :size="14" stroke-width="2" />
-                  {{ isAssignmentCancelRequested ? '正在中断...' : (isAssigning ? '中断排位' : (precheckResult && !precheckResult.pass ? '先修复阻断项' : '开始排位')) }}
+                  {{ isAssignmentCancelRequested ? '正在中断...' : (isAssigning ? '中断排位' : (precheckResult && !precheckResult.pass ? '预检查未通过' : '开始排位')) }}
                 </span>
               </button>
             </div>
@@ -502,7 +503,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed, defineAsyncComponent } from 'vue'
-import { ArrowLeftRight, Check, CircleX, CloudDownload, CloudUpload, Download, Edit3, FilePlus, FileText, FolderOpen, LayoutGrid, ListFilter, Loader2, Minus, Plus, Play, RefreshCcw, Save, Scale, Settings, Settings2, Shuffle, Sliders, Trash2, FileInput, FileOutput, Users, X } from 'lucide-vue-next'
+import { ArrowLeftRight, Check, CircleAlert, CircleX, CloudDownload, CloudUpload, Download, Edit3, FilePlus, FileText, FolderOpen, LayoutGrid, ListFilter, Loader2, Minus, Plus, Play, RefreshCcw, Save, Scale, Settings, Settings2, Shuffle, Sliders, Trash2, FileInput, FileOutput, Users, X } from 'lucide-vue-next'
 
 const SeatRuleEditor = defineAsyncComponent(() => import('../relation/SeatRuleEditor.vue'))
 const ExportDialog = defineAsyncComponent(() => import('./ExportPreview.vue'))
