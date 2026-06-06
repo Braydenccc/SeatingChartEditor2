@@ -92,7 +92,7 @@ import { useSettingsDialog } from '@/composables/useSettingsDialog'
 
 const emit = defineEmits(['open-login'])
 
-const { currentUser, token, webdavConfig, isLoggedIn, logout, authType, initAuth } = useAuth()
+const { currentUser, token, webdavConfig, isLoggedIn, logout, authType } = useAuth()
 const { settings, saveToLocalStorage, applyColorScheme, applyThemeColor } = useGlobalSettings()
 const { openSettings, closeSettings } = useSettingsDialog()
 const router = useRouter()
@@ -149,7 +149,6 @@ const closeDropdownOnOutsideClick = (e) => {
 }
 
 onMounted(() => {
-  initAuth()
   document.addEventListener('click', closeDropdownOnOutsideClick)
 })
 

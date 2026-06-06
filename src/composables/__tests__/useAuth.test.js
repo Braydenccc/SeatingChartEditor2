@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 const clearCookies = () => {
   document.cookie.split(';').forEach(cookie => {
@@ -16,6 +16,10 @@ describe('useAuth', () => {
     vi.clearAllMocks()
     clearCookies()
     globalThis.fetch = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('persists encrypted WebDAV credentials for account sync without sending plaintext passwords', async () => {
@@ -106,5 +110,54 @@ describe('useAuth', () => {
       success: false,
       message: '当前密码不正确'
     })
+  })
+
+  it('keeps deferred sync from consuming fetch mocks created after initAuth', async () => {
+    vi.useFakeTimers()
+
+    const firstFetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          success: true,
+          data: { username: 'teacher' }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ success: true, data: {} })
+      })
+
+    globalThis.fetch = firstFetch
+    const firstModule = await import('../useAuth')
+    const firstAuth = firstModule.useAuth()
+    await firstAuth.initAuth()
+
+    vi.resetModules()
+
+    const secondFetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          success: true,
+          data: { username: 'teacher' }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ success: true, message: '密码已修改' })
+      })
+
+    globalThis.fetch = secondFetch
+    await vi.advanceTimersByTimeAsync(100)
+
+    const secondModule = await import('../useAuth')
+    const secondAuth = secondModule.useAuth()
+    await secondAuth.initAuth()
+    const result = await secondAuth.changePassword('OldPass123', 'NewPass123')
+
+    expect(result).toEqual({ success: true, message: '密码已修改' })
+    expect(JSON.parse(secondFetch.mock.calls[0][1].body).action).toBe('verify')
+    expect(JSON.parse(secondFetch.mock.calls[1][1].body).action).toBe('change_password')
   })
 })

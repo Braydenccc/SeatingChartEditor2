@@ -36,9 +36,9 @@ const handleOpenLogin = (tab = 'login') => {
   isLoginDialogVisible.value = true
 }
 
-initAuth()
-
 onMounted(async () => {
+  await initAuth()
+
   initializeTags()
   applyColorScheme()
   applyThemeColor()

@@ -1,32 +1,33 @@
 <template>
-  <SeatConfigDialog
-    v-if="activeWorkbenchDialog === 'seatConfig'"
-    :visible="activeWorkbenchDialog === 'seatConfig' && !isWorkbenchDialogHidden"
-    :is-confirming="isConfirming('applyConfig').value"
-    @update:visible="handleDialogVisible"
-    @confirm="handleSeatConfigConfirm"
-  />
+  <div class="workbench-dialog-host">
+    <SeatConfigDialog
+      v-if="activeWorkbenchDialog === 'seatConfig'"
+      :visible="activeWorkbenchDialog === 'seatConfig' && !isWorkbenchDialogHidden"
+      :is-confirming="isConfirming('applyConfig').value"
+      @update:visible="handleDialogVisible"
+      @confirm="handleSeatConfigConfirm"
+    />
 
-  <ShiftRotationDialog
-    v-if="activeWorkbenchDialog === 'shiftRotation'"
-    :visible="activeWorkbenchDialog === 'shiftRotation' && !isWorkbenchDialogHidden"
-    @close="closeDialog"
-  />
+    <ShiftRotationDialog
+      v-if="activeWorkbenchDialog === 'shiftRotation'"
+      :visible="activeWorkbenchDialog === 'shiftRotation' && !isWorkbenchDialogHidden"
+      @close="closeDialog"
+    />
 
-  <ZoneRotationDialog
-    v-if="activeWorkbenchDialog === 'zoneRotation'"
-    :visible="activeWorkbenchDialog === 'zoneRotation' && !isWorkbenchDialogHidden"
-    @close="closeDialog"
-  />
+    <ZoneRotationDialog
+      v-if="activeWorkbenchDialog === 'zoneRotation'"
+      :visible="activeWorkbenchDialog === 'zoneRotation' && !isWorkbenchDialogHidden"
+      @close="closeDialog"
+    />
 
-  <AssignmentWorkbenchDialog
-    v-if="activeWorkbenchDialog === 'assignment'"
-    :visible="activeWorkbenchDialog === 'assignment' && !isWorkbenchDialogHidden"
-    :initial-panel="assignmentWorkbenchPanel"
-    :focus-rule-id="focusedRuleId"
-    @close="closeDialog"
-  />
-
+    <AssignmentWorkbenchDialog
+      v-if="activeWorkbenchDialog === 'assignment'"
+      :visible="activeWorkbenchDialog === 'assignment' && !isWorkbenchDialogHidden"
+      :initial-panel="assignmentWorkbenchPanel"
+      :focus-rule-id="focusedRuleId"
+      @close="closeDialog"
+    />
+  </div>
 </template>
 
 <script setup>
@@ -68,3 +69,9 @@ const handleSeatConfigConfirm = (newConfig) => {
   }
 }
 </script>
+
+<style scoped>
+.workbench-dialog-host {
+  display: contents;
+}
+</style>

@@ -205,15 +205,16 @@ const initAuth = async () => {
     // 初始化后如果本身是受信任状态，则拉取后台同步数据
     // 延迟执行，避免阻塞应用初始加载
     if (currentUser.value && token.value === cookieSessionToken) {
-        setTimeout(() => fetchSyncSettings(), 100)
+        const fetchApi = globalThis.fetch
+        setTimeout(() => fetchSyncSettings(fetchApi), 100)
     }
 }
 
-const fetchSyncSettings = async () => {
+const fetchSyncSettings = async (fetchApi = fetch) => {
     if (!currentUser.value || token.value !== cookieSessionToken) return;
     try {
         const csrfToken = getOrCreateCsrfToken()
-        const response = await fetch('/api/auth.php', {
+        const response = await fetchApi('/api/auth.php', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },

@@ -154,8 +154,8 @@
     />
 
     <!-- 浮动拖拽预览 -->
-    <Teleport to="body">
-      <div v-show="dragPreviewState.isActive" ref="dragPreviewRef" class="drag-preview-overlay">
+    <Teleport v-if="dragPreviewState.isActive" to="body">
+      <div ref="dragPreviewRef" class="drag-preview-overlay">
         <div v-for="item in previewItems" :key="item.seatId"
           class="drag-preview-seat" :class="{ 'is-anchor': item.isAnchor }" :style="item.style"
           v-html="item.contentHtml">
