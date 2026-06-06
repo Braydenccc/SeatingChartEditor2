@@ -69,6 +69,12 @@ function adminCreateRequestSummary($rawInput = null, $jsonError = '') {
 
 function adminNormalizePostInput($post) {
     $input = is_array($post) ? $post : [];
+    foreach ($input as $key => $value) {
+        if (is_array($value) && count($value) === 1) {
+            $input[$key] = reset($value);
+        }
+    }
+
     foreach (['deleted', 'includeContent'] as $key) {
         if (!isset($input[$key]) || is_bool($input[$key])) {
             continue;
@@ -100,9 +106,10 @@ function adminParseRequest() {
     if (is_string($rawInput) && trim($rawInput) !== '') {
         $input = json_decode($rawInput, true);
         if (!is_array($input)) {
-            if (!empty($_POST) && isset($_POST['action']) && is_string($_POST['action'])) {
+            $postInput = adminNormalizePostInput($_POST);
+            if (!empty($postInput) && isset($postInput['action']) && is_string($postInput['action'])) {
                 return [
-                    'input' => adminNormalizePostInput($_POST),
+                    'input' => $postInput,
                     'error' => null,
                     'status' => 200,
                     'requestSummary' => adminCreateRequestSummary($rawInput, json_last_error_msg())
