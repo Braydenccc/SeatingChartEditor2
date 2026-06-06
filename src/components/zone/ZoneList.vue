@@ -11,7 +11,7 @@
         :key="zone.id"
         :zone="zone"
         :is-selected="selectedZoneId === zone.id"
-  :available-tags="tags"
+        :available-tags="tags"
         :zone-color="getZoneColor(zone.id)"
         @select="handleSelectZone"
         @update-zone="handleUpdateZone"
@@ -33,6 +33,8 @@ import { Plus } from 'lucide-vue-next'
 import { useZoneData } from '@/composables/useZoneData'
 import { useTagData } from '@/composables/useTagData'
 import { useEditMode, EditMode } from '@/composables/useEditMode'
+import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
+import { useZoneRotation } from '@/composables/useZoneRotation'
 
 const {
   zones,
@@ -50,13 +52,28 @@ const {
 
 const { tags } = useTagData()
 const { setMode } = useEditMode()
+const { activeWorkbenchDialog, startZoneEditSession } = useEditorWorkbench()
+const { clearEditingZone } = useZoneRotation()
+
+const startGlobalZoneEdit = (zoneId) => {
+  const zone = zones.value.find(item => item.id === zoneId)
+  clearEditingZone()
+  selectZone(zoneId)
+  setMode(EditMode.ZONE_EDIT)
+  if (activeWorkbenchDialog.value !== 'assignment') return
+  startZoneEditSession({
+    kind: 'assignment',
+    sourceDialog: 'assignment',
+    zoneId,
+    title: zone?.name || `选区 ${zoneId}`,
+    subtitle: '在座位表上点击座位，将其加入或移出当前排位选区'
+  })
+}
 
 // 添加选区
 const handleAddZone = () => {
-  const newZone = addZone()
-  // 自动选中新选区并进入选区编辑模式
-  selectZone(newZone.id)
-  setMode(EditMode.ZONE_EDIT)
+  const newZoneId = addZone()
+  startGlobalZoneEdit(newZoneId)
 }
 
 // 选择选区
@@ -66,9 +83,7 @@ const handleSelectZone = (zoneId) => {
     clearZoneSelection()
     setMode(EditMode.NORMAL)
   } else {
-    // 选中选区,进入选区编辑模式
-    selectZone(zoneId)
-    setMode(EditMode.ZONE_EDIT)
+    startGlobalZoneEdit(zoneId)
   }
 }
 
@@ -79,9 +94,10 @@ const handleUpdateZone = (zoneId, updates) => {
 
 // 删除选区
 const handleDeleteZone = (zoneId) => {
+  const wasSelected = selectedZoneId.value === zoneId
   deleteZone(zoneId)
   // 如果删除的是当前选中的选区,退出选区编辑模式
-  if (selectedZoneId.value === zoneId) {
+  if (wasSelected) {
     setMode(EditMode.NORMAL)
   }
 }
@@ -125,9 +141,9 @@ const handleToggleVisible = (zoneId) => {
 
 .add-zone-btn {
   padding: 6px 12px;
-  background: var(--color-primary);
-  color: var(--color-surface);
-  border: none;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
@@ -136,8 +152,9 @@ const handleToggleVisible = (zoneId) => {
 }
 
 .add-zone-btn:hover {
-  background: var(--color-primary-hover);
-  transform: translateY(-1px);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-bg-secondary);
 }
 
 .zone-list-content {

@@ -13,6 +13,11 @@
   --color-surface: #ffffff;
   --color-surface-rgb: 255, 255, 255;
   --color-bg-selected: #e8f4f8;
+  --color-selection-bg: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg-card));
+  --color-selection-bg-strong: color-mix(in srgb, var(--color-primary) 16%, var(--color-bg-card));
+  --color-selection-border: var(--color-primary);
+  --shadow-selection-ring: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent);
+  --shadow-selection-card: 0 8px 18px color-mix(in srgb, var(--color-primary) 18%, transparent);
   --color-bg-card: #fafbfc;
   --color-bg-subtle: #f8fafc;
   --color-bg-soft: #f1f5f9;

@@ -163,7 +163,7 @@
 
 1. 部署测试脚本到服务器：
    ```bash
-   npm run deploy:test
+   # 当前 package.json 未定义测试环境部署脚本，请按 Retinbox 平台文档手动部署测试环境
    ```
 
 2. 访问测试页面：

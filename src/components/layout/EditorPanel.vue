@@ -8,7 +8,6 @@
     <StudentListHeader
       v-if="!isMobile"
       :unassigned-count="unassignedCount"
-      @open-roster="showRosterDialog = true"
     />
 
     <!-- 桌面端：添加可拖动分隔条 -->
@@ -19,13 +18,9 @@
       <StudentListHeader
         v-if="isMobile"
         :unassigned-count="unassignedCount"
-        @open-roster="showRosterDialog = true"
       />
 
-      <StudentList
-        :show-roster="showRosterDialog"
-        @update:show-roster="showRosterDialog = $event"
-      />
+      <StudentList />
     </div>
 
     <!-- 桌面端快捷键提示栏 - 从 StudentList 移出，固定在底部 -->
@@ -39,8 +34,9 @@
       <div class="hint-divider"></div>
       <div class="hint-group">
         <span class="hint-label">鼠标:</span>
-        <span class="hint-item">左键 分配/操作座位</span>
-        <span class="hint-item">右键拖拽 多选座位</span>
+        <span class="hint-item">左键 单选座位</span>
+        <span class="hint-item">多选模式左键涂抹</span>
+        <span class="hint-item">右键 菜单</span>
         <span class="hint-item">滚轮 平移</span>
         <span class="hint-item"><kbd>Ctrl</kbd>+滚轮 缩放</span>
       </div>
@@ -49,7 +45,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useWindowSize } from '@vueuse/core'
 import StudentList from '../student/StudentList.vue'
 import StudentListHeader from '../student/StudentListHeader.vue'
@@ -65,8 +61,6 @@ const { getEffectiveHeight } = useResizablePanel()
 const { width: windowWidth } = useWindowSize()
 
 const isMobile = computed(() => windowWidth.value <= 1024)
-const showRosterDialog = ref(false)
-
 const unassignedCount = computed(() => {
   return students.value.reduce((count, s) =>
     !findSeatByStudent(s.id) ? count + 1 : count, 0)
@@ -201,7 +195,7 @@ const candidatePanelStyle = computed(() => {
   }
 }
 
-/* 响应式设计 - 平板和移动设备（SidebarPanel 固定底部） */
+/* 响应式设计 - 平板和移动设备（底部工具栏固定） */
 @media (max-width: 1024px) {
   .editor-panel {
     width: 100%;

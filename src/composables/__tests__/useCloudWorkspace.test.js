@@ -111,4 +111,36 @@ describe('useCloudWorkspace', () => {
     expect(fetchWithRetry).not.toHaveBeenCalled()
     expect(mockPutFile).not.toHaveBeenCalled()
   })
+
+  it('sends trimmed workspace name when renaming Retiehe workspace', async () => {
+    const workspace = useCloudWorkspace()
+
+    vi.mocked(fetchWithRetry).mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: {
+          fileId: 'abc123',
+          metadata: { name: '新名称' }
+        }
+      })
+    })
+
+    await expect(
+      workspace.renameWorkspaceInCloud('abc123', '  新名称  ', 'retiehe')
+    ).resolves.toEqual({
+      success: true,
+      data: {
+        fileId: 'abc123',
+        metadata: { name: '新名称' }
+      }
+    })
+
+    const [, options] = vi.mocked(fetchWithRetry).mock.calls[0]
+    expect(JSON.parse(options.body)).toMatchObject({
+      action: 'rename',
+      fileId: 'abc123',
+      name: '新名称'
+    })
+  })
 })

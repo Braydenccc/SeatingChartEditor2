@@ -1,10 +1,10 @@
 ---
 trigger: conditional
 globs:
-  - "src/composables/useStudentData.js"
+  - "src/composables/useStudentData.ts"
   - "src/composables/useSeatChart.js"
   - "src/composables/useWorkspace.js"
-  - "src/composables/useZoneData.js"
+  - "src/composables/useZoneData.ts"
 ---
 
 # 核心数据模型

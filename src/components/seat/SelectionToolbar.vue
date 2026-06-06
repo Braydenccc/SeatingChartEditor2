@@ -22,7 +22,7 @@
         <span class="sel-btn-label">排入</span>
       </button>
       <div class="sel-divider"></div>
-      <button class="sel-btn sel-btn--cancel" title="取消选区" @click="handleCancel">
+      <button class="sel-btn sel-btn--cancel" title="取消多选" @click="handleCancel">
         <X :size="14" stroke-width="2.5" />
       </button>
     </div>

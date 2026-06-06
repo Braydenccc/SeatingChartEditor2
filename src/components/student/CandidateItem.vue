@@ -1,10 +1,10 @@
 <template>
-  <div class="candidate-item" :class="{ dragging: isStudentDragging, selected: isSelected }"
+  <div class="candidate-item" :class="{ dragging: isStudentDragging, selected: isSelected, compact: displayMode === 'compact' }"
     ref="itemRef" :draggable="canHtmlDrag()"
     @click="handleClick"
     @dragstart="handleDragStart" @dragend="handleDragEnd"
     @dblclick="handleDoubleClick"
-    @contextmenu.prevent @pointerdown="handlePointerDown">
+    @contextmenu.prevent="handleContextMenu" @pointerdown="handlePointerDown" @touchstart.passive="handleTouchStart">
     <div class="student-display" :class="{ 'bottom-tag-mode': tagDisplayMode === 'bottom', 'name-hidden': !showStudentName, 'number-hidden': !showStudentNumber, 'large-name': largeNameMode, 'large-number': largeNumberMode }">
       <div v-if="showStudentName" class="student-name">{{ student.name || '未命名' }}</div>
       <!-- 颜色点模式：显示所有标签，用实心/空心区分 -->
@@ -73,11 +73,16 @@ import { useEditMode } from '@/composables/useEditMode'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useLogger } from '@/composables/useLogger'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
+import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
 const props = defineProps({
   student: {
     type: Object,
     required: true
+  },
+  displayMode: {
+    type: String,
+    default: 'grid'
   }
 })
 
@@ -91,6 +96,7 @@ const { currentMode, setMode, EditMode } = useEditMode()
 const { settings } = useGlobalSettings()
 const { success, warning } = useLogger()
 const { enabledAttributeDefinitions, formatNumericValue, showNumericAttributesInEditor } = useStudentAttributes()
+const { setRightRailTab, showMobileDrawer, suspendMobileDrawerForDrag, restoreMobileDrawerAfterDrag } = useEditorWorkbench()
 
 const isSelected = computed(() => selectedStudentId.value === props.student.id)
 
@@ -149,9 +155,13 @@ const {
   isStudentDragging,
   canHtmlDrag,
   handlePointerDown,
+  handleTouchStart,
   handleDragStart,
   handleDragEnd
-} = useStudentDragging(itemRef, computed(() => props.student))
+} = useStudentDragging(itemRef, computed(() => props.student), {
+  onStartDrag: () => suspendMobileDrawerForDrag('candidates'),
+  onEndDrag: restoreMobileDrawerAfterDrag
+})
 
 const handleClick = () => {
   if (isSelected.value) {
@@ -162,6 +172,15 @@ const handleClick = () => {
     setMode(EditMode.NORMAL)
   }
   selectStudent(props.student.id)
+  setRightRailTab('selection')
+}
+
+const handleContextMenu = () => {
+  selectStudent(props.student.id)
+  setRightRailTab('selection')
+  if (window.matchMedia('(max-width: 768px)').matches) {
+    showMobileDrawer('selection')
+  }
 }
 
 // 双击处理
@@ -196,13 +215,13 @@ const handleDoubleClick = () => {
 .candidate-item {
   width: 120px;
   height: 80px;
-  border: 2px solid var(--color-primary);
+  border: 1.5px solid var(--color-border);
   contain: layout style;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg-selected);
+  background: var(--color-bg-card);
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
   position: relative;
   overflow: hidden;
@@ -212,8 +231,9 @@ const handleDoubleClick = () => {
 }
 
 .candidate-item:hover {
-  background: linear-gradient(135deg, var(--color-bg-selected) 0%, color-mix(in srgb, var(--color-primary) 15%, var(--color-bg-card)) 100%);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-color: var(--color-selection-border);
+  background: var(--color-selection-bg);
+  box-shadow: var(--shadow-selection-card);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -224,16 +244,49 @@ const handleDoubleClick = () => {
 
 .candidate-item.dragging {
   opacity: 0.5;
-  transform: scale(1.05) rotate(2deg);
+  transform: scale(0.98);
   background: transparent !important;
   border-color: var(--color-border) !important;
-  transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
 .candidate-item.selected {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg-card));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  border-color: var(--color-selection-border);
+  background: var(--color-selection-bg-strong);
+  box-shadow: var(--shadow-selection-ring), var(--shadow-selection-card);
+}
+
+.candidate-item.selected::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--color-selection-border);
+  pointer-events: none;
+}
+
+.candidate-item.compact {
+  width: 100%;
+  height: 56px;
+  border-width: 1px;
+  border-radius: 8px;
+}
+
+.candidate-item.compact .student-display {
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 10px;
+}
+
+.candidate-item.compact .student-name {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.candidate-item.compact .student-number {
+  min-width: 0;
+  font-size: 11px;
+  padding: 1px 6px;
 }
 
 .student-display {
@@ -282,7 +335,7 @@ const handleDoubleClick = () => {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 2px var(--shadow-lg);
 }
 
 .tag-dot-hollow {
@@ -340,7 +393,7 @@ const handleDoubleClick = () => {
   color: var(--color-text-inverse);
   padding: 1px 4px;
   border-radius: 3px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 1px var(--shadow-lg);
   line-height: 1.2;
 }
 
@@ -387,7 +440,7 @@ const handleDoubleClick = () => {
   color: var(--color-text-inverse);
   padding: 1px 4px;
   border-radius: 3px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 1px var(--shadow-lg);
   line-height: 1.2;
   white-space: nowrap;
 }

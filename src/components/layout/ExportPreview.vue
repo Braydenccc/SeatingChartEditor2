@@ -1,9 +1,9 @@
 <template>
-  <Teleport to="body">
-    <div v-show="visible" class="export-overlay"
+  <Teleport to="body" :disabled="presentation === 'embedded'">
+    <div v-show="visible" :class="['export-overlay', { embedded: presentation === 'embedded' }]"
       @mousedown.self="overlayMouseDownSelf = true"
       @mouseup.self="handleOverlayMouseUp">
-      <div class="export-dialog">
+      <div :class="['export-dialog', { embedded: presentation === 'embedded' }]">
 
         <!-- ── 标题栏 ── -->
         <div class="dialog-header">
@@ -361,7 +361,19 @@ import { useWebDav } from '@/composables/useWebDav'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
 import { escapeHtmlWithBreaks } from '@/utils/xss'
 
-const props = defineProps({ visible: { type: Boolean, default: false } })
+const props = defineProps({
+  visible: { type: Boolean, default: false },
+  presentation: {
+    type: String,
+    default: 'dialog',
+    validator: (value) => ['dialog', 'embedded'].includes(value)
+  },
+  initialTab: {
+    type: String,
+    default: 'image',
+    validator: (value) => ['image', 'excel'].includes(value)
+  }
+})
 const emit = defineEmits(['close', 'exported'])
 
 const { exportSettings, initializeTagSettings, updateTagSetting } = useExportSettings()
@@ -374,7 +386,7 @@ const { authType, webdavConfig } = useAuth()
 const { putFile } = useWebDav()
 const { loadCloudSettings, saveCloudSettings } = useCloudWorkspace()
 
-const activeTab = ref('image')
+const activeTab = ref(props.initialTab === 'excel' ? 'excel' : 'image')
 const previewUrl = ref('')
 const isGenerating = ref(false)
 const isExcelGenerating = ref(false)
@@ -942,6 +954,10 @@ watch(activeTab, (v) => {
   if (v === 'excel' && props.visible) nextTick(updateExcelScale)
 })
 
+watch(() => props.initialTab, (tab) => {
+  activeTab.value = tab === 'excel' ? 'excel' : 'image'
+})
+
 watch(() => excelPreviewHtml.value, () => {
   if (activeTab.value === 'excel' && props.visible) nextTick(updateExcelScale)
 })
@@ -1012,11 +1028,23 @@ onBeforeUnmount(() => {
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+.export-overlay.embedded {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+  justify-content: stretch;
+  background: transparent;
+  animation: none;
+}
+
 /* ── 对话框 ── */
 .export-dialog {
   background: var(--color-surface);
   border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 20px 60px var(--shadow-lg);
   display: flex;
   flex-direction: column;
   width: 1100px;
@@ -1025,6 +1053,38 @@ onBeforeUnmount(() => {
   animation: slideUp 0.2s ease;
 }
 @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.export-dialog.embedded {
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+  border: none;
+}
+
+.export-dialog.embedded .dialog-header {
+  display: none;
+}
+
+.export-dialog.embedded .tab-bar {
+  padding: 8px 16px 0;
+}
+
+.export-dialog.embedded .settings-panel {
+  width: 340px;
+}
+
+.export-dialog.embedded .preview-panel {
+  min-height: 0;
+}
+
+.export-dialog.embedded .dialog-footer .secondary {
+  display: none;
+}
 
 /* ── 标题栏 ── */
 .dialog-header {
@@ -1151,7 +1211,7 @@ onBeforeUnmount(() => {
   display: flex; flex-direction: column; gap: 4px; padding: 6px 8px;
   background: var(--color-bg-subtle); border-radius: 6px; border: 1px solid var(--color-border);
 }
-.tag-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0; }
+.tag-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--shadow-lg); flex-shrink: 0; }
 .tag-input {
   padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 4px;
   font-size: 12px; width: 100%; box-sizing: border-box;
@@ -1285,7 +1345,7 @@ onBeforeUnmount(() => {
 }
 
 /* 图片预览 */
-.preview-img { max-width: 100%; max-height: 60vh; border-radius: 6px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+.preview-img { max-width: 100%; max-height: 60vh; border-radius: 6px; box-shadow: 0 2px 12px var(--shadow-md); }
 .preview-loading, .preview-empty { color: var(--color-text-disabled); font-size: 14px; }
 .preview-loading { animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
@@ -1392,11 +1452,18 @@ onBeforeUnmount(() => {
 /* ── 响应式 ── */
 @media (max-width: 768px) {
   .export-dialog { width: 98vw; max-height: 92vh; border-radius: 12px; }
+  .export-dialog.embedded { width: 100%; max-height: none; border-radius: 0; }
+  .export-dialog.embedded .tab-bar { padding: 6px 10px 0; overflow-x: auto; scrollbar-width: none; }
+  .export-dialog.embedded .tab-bar::-webkit-scrollbar { display: none; }
   .dialog-body { flex-direction: column; }
-  .settings-panel { width: 100%; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--color-border-light); }
-  .preview-panel { min-height: 160px; padding: 14px; }
-  .preview-img { max-height: 28vh; }
+  .settings-panel { width: 100%; max-height: 40vh; border-right: none; border-bottom: 1px solid var(--color-border-light); padding: 12px; }
+  .export-dialog.embedded .settings-panel { width: 100%; max-height: 34vh; }
+  .preview-panel { flex: 1; min-height: 0; padding: 12px; }
+  .preview-img { max-height: 30vh; }
+  .tab-btn { min-height: 40px; padding: 0 16px; white-space: nowrap; }
   .setting-row input[type="text"] { min-height: 44px; padding: 10px 12px; font-size: 15px; }
+  .setting-row textarea,
+  .num-input select { min-height: 44px; font-size: 15px; }
   .check-item { min-height: 40px; padding: 8px 0; font-size: 14px; }
   .check-item input[type="checkbox"] { width: 18px; height: 18px; }
   .radio-item { font-size: 14px; }
@@ -1404,7 +1471,7 @@ onBeforeUnmount(() => {
   .num-input input[type="number"] { min-height: 44px; padding: 8px 10px; font-size: 15px; }
   .tag-input { min-height: 40px; padding: 8px 10px; font-size: 14px; }
   .btn { min-height: 44px; padding: 10px 20px; font-size: 14px; }
-  .dialog-footer { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0)); }
+  .dialog-footer { flex-wrap: wrap; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0)); }
   .dialog-header { padding: 12px 16px; }
   .close-btn { width: 36px; height: 36px; }
 }

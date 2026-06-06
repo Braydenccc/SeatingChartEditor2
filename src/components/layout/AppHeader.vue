@@ -5,18 +5,18 @@
 
       <!-- 用户菜单 -->
       <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
-        <button class="header-btn user-btn" @click="toggleDropdown">
+        <button class="header-btn user-btn" :title="currentUser?.username || '账户'" @click="toggleDropdown">
           <Cloud v-if="authType === 'webdav'" :size="18" stroke-width="2" />
           <User v-else :size="18" stroke-width="2" />
           <span class="btn-text">{{ currentUser?.username }}</span>
-          <span class="dropdown-icon">▼</span>
+          <ChevronDown class="dropdown-icon" :size="14" stroke-width="2" />
         </button>
 
         <Transition name="fade-slide">
           <div v-if="showDropdown" class="user-dropdown">
-            <button class="dropdown-item" @click="openWorkspaceManagement">
-              <FolderOpen :size="16" stroke-width="2" />
-              <span>工作区管理</span>
+            <button class="dropdown-item" @click="openUserPage">
+              <User :size="16" stroke-width="2" />
+              <span>账号中心</span>
             </button>
 
             <button v-if="!hasRetiehe" class="dropdown-item" @click="emit('open-login', 'login'); showDropdown = false">
@@ -34,12 +34,27 @@
       </div>
 
       <!-- 登录按钮 -->
-      <button v-else class="header-btn login-btn" @click="emit('open-login')">
+      <button v-else class="header-btn login-btn" title="登录" @click="emit('open-login')">
         <Cloud :size="18" stroke-width="2" />
         <span class="btn-text">登录</span>
       </button>
 
       <!-- 设置按钮 -->
+      <button class="header-btn" @click="openFiles" title="文件">
+        <FileText :size="18" stroke-width="2" />
+        <span class="btn-text">文件</span>
+      </button>
+
+      <button class="header-btn" @click="openStudents" title="学生">
+        <Users :size="18" stroke-width="2" />
+        <span class="btn-text">学生</span>
+      </button>
+
+      <button class="header-btn" @click="openExport" title="导出">
+        <FileOutput :size="18" stroke-width="2" />
+        <span class="btn-text">导出</span>
+      </button>
+
       <button class="header-btn" @click="openUnifiedSettings" title="统一设置">
         <Settings :size="18" stroke-width="2" />
         <span class="btn-text">设置</span>
@@ -64,35 +79,28 @@
     </div>
 
     <div class="header-right"></div>
-
-    <UnifiedSettingsDialog
-      v-if="showUnifiedSettings"
-      @save="handleSaveSettings"
-    />
   </header>
 </template>
 
 <script setup>
-import { onMounted, ref, onBeforeUnmount, computed, defineAsyncComponent } from 'vue'
-import { Cloud, FolderOpen, Github, LogIn, Monitor, Moon, Settings, Sun, User } from 'lucide-vue-next'
+import { onMounted, ref, onBeforeUnmount, computed } from 'vue'
+import { ChevronDown, Cloud, FileOutput, FileText, LogIn, Monitor, Moon, Settings, Sun, User, Users } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
-import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
 
-const UnifiedSettingsDialog = defineAsyncComponent(() => import('../settings/UnifiedSettingsDialog.vue'))
-
 const emit = defineEmits(['open-login'])
 
-const { currentUser, webdavConfig, isLoggedIn, logout, authType, initAuth } = useAuth()
-const { openCloudDialog } = useCloudWorkspaceDialog()
+const { currentUser, token, webdavConfig, isLoggedIn, logout, authType, initAuth } = useAuth()
 const { settings, saveToLocalStorage, applyColorScheme, applyThemeColor } = useGlobalSettings()
-const { visible: showUnifiedSettings, openSettings, closeSettings } = useSettingsDialog()
+const { openSettings, closeSettings } = useSettingsDialog()
+const router = useRouter()
 
 const showDropdown = ref(false)
 const menuContainer = ref(null)
 
-const hasRetiehe = computed(() => !!currentUser.value)
+const hasRetiehe = computed(() => !!token.value)
 const hasWebdav = computed(() => !!webdavConfig.value)
 
 // 主题切换
@@ -115,8 +123,8 @@ const toggleDropdown = () => {
   showDropdown.value = !showDropdown.value
 }
 
-const openWorkspaceManagement = () => {
-  openCloudDialog('load')
+const openUserPage = () => {
+  router.push('/user')
   showDropdown.value = false
 }
 
@@ -125,9 +133,9 @@ const openUnifiedSettings = () => {
   showDropdown.value = false
 }
 
-const handleSaveSettings = () => {
-  saveToLocalStorage()
-}
+const openFiles = () => router.push('/files')
+const openStudents = () => router.push('/students')
+const openExport = () => router.push({ path: '/export', query: { tab: 'image' } })
 
 const handleLogout = (target) => {
   logout(target)
@@ -160,11 +168,12 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   width: 100%;
   background: var(--color-primary);
-  height: 100px;
+  height: var(--app-header-height, 100px);
   color: var(--color-text-inverse);
   padding: 0 30px;
   box-shadow: var(--shadow-md);
   gap: 20px;
+  z-index: 30;
 }
 
 .header-left {
@@ -192,9 +201,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--color-text-inverse) 12%, transparent);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid color-mix(in srgb, var(--color-text-inverse) 20%, transparent);
   color: var(--color-text-inverse);
   padding: 8px 16px;
   border-radius: 24px;
@@ -202,20 +211,20 @@ onBeforeUnmount(() => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--shadow-md);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .header-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--color-text-inverse) 20%, transparent);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 12px var(--shadow-lg);
 }
 
 .header-btn:active {
   transform: scale(0.98);
-  background: rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--color-text-inverse) 15%, transparent);
 }
 
 .btn-text {
@@ -225,8 +234,8 @@ onBeforeUnmount(() => {
 
 /* 登录按钮特殊样式 */
 .login-btn {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: color-mix(in srgb, var(--color-text-inverse) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-text-inverse) 30%, transparent);
 }
 
 /* ===== 用户菜单 ===== */
@@ -235,9 +244,9 @@ onBeforeUnmount(() => {
 }
 
 .user-btn .dropdown-icon {
-  font-size: 10px;
   margin-left: 2px;
   transition: transform 0.25s;
+  flex-shrink: 0;
 }
 
 .user-btn:hover .dropdown-icon {
@@ -301,11 +310,11 @@ onBeforeUnmount(() => {
 .theme-switcher {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--color-text-inverse) 10%, transparent);
   border-radius: 24px;
   padding: 4px;
   gap: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid color-mix(in srgb, var(--color-text-inverse) 15%, transparent);
   flex-shrink: 0;
 }
 
@@ -317,7 +326,7 @@ onBeforeUnmount(() => {
   padding: 6px 10px;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
+  color: color-mix(in srgb, var(--color-text-inverse) 60%, transparent);
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -327,14 +336,14 @@ onBeforeUnmount(() => {
 }
 
 .theme-btn:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.08);
+  color: color-mix(in srgb, var(--color-text-inverse) 90%, transparent);
+  background: color-mix(in srgb, var(--color-text-inverse) 8%, transparent);
 }
 
 .theme-btn.active {
-  background: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--color-text-inverse) 20%, transparent);
   color: var(--color-text-inverse);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px var(--shadow-md);
 }
 
 .theme-label {
@@ -402,7 +411,7 @@ onBeforeUnmount(() => {
 @media (max-width: 1024px) {
   .app-header {
     padding: 0 20px;
-    height: 90px;
+    height: var(--app-header-height, 90px);
   }
 
   .header-text {
@@ -413,67 +422,97 @@ onBeforeUnmount(() => {
 /* ===== 响应式 - 移动设备 ===== */
 @media (max-width: 768px) {
   .app-header {
-    height: 52px;
-    padding: 0;
+    height: var(--app-header-height, calc(78px + env(safe-area-inset-top, 0px)));
+    min-height: var(--app-header-height, calc(78px + env(safe-area-inset-top, 0px)));
+    padding: env(safe-area-inset-top, 0px) 0 0;
     gap: 0;
     display: flex;
-    align-items: center;
+    align-items: stretch;
+    justify-content: flex-start;
+    flex-direction: column;
+    box-sizing: border-box;
+    box-shadow: 0 4px 14px var(--shadow-md);
   }
 
-  /* 左侧按钮区 */
+  /* 操作层 */
   .header-left {
-    height: 100%;
+    order: 2;
+    width: 100%;
+    height: 44px;
+    flex: 0 0 44px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 0;
+    gap: 4px;
+    padding: 2px 8px;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+    background: color-mix(in srgb, var(--color-primary-dark) 44%, var(--color-primary));
+    border-top: 1px solid color-mix(in srgb, var(--color-text-inverse) 12%, transparent);
+    box-sizing: border-box;
+  }
+
+  .header-left::-webkit-scrollbar {
+    display: none;
   }
 
   .header-left .header-text {
     display: none;
   }
 
-  /* 右侧标题区 - 移动端保留 */
+  /* 标题层 */
   .header-right {
-    flex: 1;
-    max-width: none;
-    height: 100%;
+    order: 1;
+    flex: 0 0 34px;
+    width: 100%;
+    height: 34px;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    padding: 0 12px;
+    justify-content: center;
+    padding: 0 14px;
     min-width: 0;
+    box-sizing: border-box;
   }
 
   .header-right::before {
     content: 'BraydenSCE V2';
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
-    letter-spacing: 0.5px;
+    letter-spacing: 0;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  /* 按钮方块样式 */
+  /* 分层工具按钮 */
   .user-menu-container,
   .login-btn,
   .header-btn {
-    height: 100%;
+    height: 40px;
     flex-shrink: 0;
   }
 
+  .user-menu-container {
+    display: flex;
+    align-items: center;
+  }
+
   .header-btn {
-    height: 100%;
-    border-radius: 0;
-    background: transparent;
-    border: none;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 0 14px;
+    min-width: 44px;
+    min-height: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--color-text-inverse) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-text-inverse) 12%, transparent);
+    padding: 0 9px;
+    gap: 5px;
     box-shadow: none;
   }
 
   .header-btn:hover {
     transform: none;
-    background: rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, var(--color-text-inverse) 14%, transparent);
   }
 
   .header-btn:active {
@@ -481,21 +520,28 @@ onBeforeUnmount(() => {
   }
 
   .btn-text {
-    font-size: 13px;
-    max-width: 60px;
+    display: none;
+  }
+
+  .user-btn .btn-text {
+    display: inline-block;
+    font-size: 12px;
+    max-width: 72px;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .user-btn .dropdown-icon {
-    display: none;
+    display: inline-flex;
   }
 
   .user-dropdown {
-    top: 100%;
-    left: 0;
-    border-radius: 0 0 12px 12px;
-    z-index: 1000;
+    position: fixed;
+    top: calc(var(--app-header-height, calc(78px + env(safe-area-inset-top, 0px))) + 4px);
+    left: 8px;
+    border-radius: 10px;
+    max-width: calc(100vw - 16px);
+    z-index: 2000;
   }
 
   .theme-switcher {

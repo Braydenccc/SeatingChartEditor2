@@ -58,14 +58,13 @@ export function useCloudWorkspace() {
             const csrfToken = getOrCreateCsrfToken()
             const response = await fetchWithRetry('/api/workspace.php', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-Token': csrfToken
                 },
                 body: JSON.stringify({
                     action,
-                    username: currentUser.value.username,
-                    token: token.value,
                     _csrf: csrfToken,
                     ...payload
                 })
@@ -94,7 +93,7 @@ export function useCloudWorkspace() {
     const listWorkspaces = async () => {
         const tasks = []
         
-        if (webdavConfig.value && !(backupMode.value && currentUser.value)) {
+        if (webdavConfig.value && !(backupMode.value && token.value)) {
             tasks.push((async () => {
                 startFetch()
                 try {
@@ -168,7 +167,7 @@ export function useCloudWorkspace() {
         }
         const jsonStr = typeof content === 'string' ? content : JSON.stringify(content, null, 2)
 
-        if (target === 'webdav' && !(backupMode.value && currentUser.value)) {
+        if (target === 'webdav' && !(backupMode.value && token.value)) {
             if (!webdavConfig.value) return { success: false, message: '请先连接 WebDAV' }
             startFetch()
             try {
@@ -223,7 +222,7 @@ export function useCloudWorkspace() {
 
     // Delete a workspace
     const deleteWorkspaceFromCloud = async (fileId, source = authType.value) => {
-        if (source === 'webdav' && !(backupMode.value && currentUser.value)) {
+        if (source === 'webdav' && !(backupMode.value && token.value)) {
             if (!webdavConfig.value) return { success: false, message: '请先连接 WebDAV' }
             startFetch()
             try {
@@ -248,12 +247,29 @@ export function useCloudWorkspace() {
         return primaryResult
     }
 
+    const renameWorkspaceInCloud = async (fileId, name, source = authType.value) => {
+        const trimmedName = String(name || '').trim()
+        if (!trimmedName) {
+            return { success: false, message: '工作区名称不能为空' }
+        }
+
+        if (source === 'webdav') {
+            return { success: false, message: 'WebDAV 工作区请通过保存为新名称管理' }
+        }
+
+        return await callWorkspaceApi('rename', {
+            fileId,
+            name: trimmedName
+        })
+    }
+
     return {
         isFetching,
         listWorkspaces,
         saveWorkspaceToCloud,
         loadWorkspaceFromCloud,
         deleteWorkspaceFromCloud,
+        renameWorkspaceInCloud,
         loadCloudSettings,
         saveCloudSettings
     }

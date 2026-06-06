@@ -414,6 +414,36 @@ const handleReset = () => {
 }
 
 @media (max-width: 768px) {
+  .settings-overlay {
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .settings-dialog {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .settings-tabs {
+    overflow-x: auto;
+    padding: env(safe-area-inset-top, 0px) 10px 0;
+    border-radius: 0;
+    scrollbar-width: none;
+  }
+
+  .settings-tabs::-webkit-scrollbar,
+  .settings-sub-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-button {
+    min-height: 44px;
+    padding: 0 16px;
+    white-space: nowrap;
+  }
+
   .settings-nav {
     display: none;
   }
@@ -425,12 +455,13 @@ const handleReset = () => {
     background: var(--color-bg-hover);
     border-bottom: 1px solid var(--color-border);
     overflow-x: auto;
-    scrollbar-gutter: stable;
+    scrollbar-width: none;
   }
 
   .sub-tab-btn {
     flex-shrink: 0;
-    padding: 6px 12px;
+    min-height: 38px;
+    padding: 0 12px;
     border: none;
     background: none;
     cursor: pointer;
@@ -453,7 +484,7 @@ const handleReset = () => {
   }
 
   .content-header {
-    padding: 16px;
+    padding: 10px 14px;
   }
 
   .content-header h2 {
@@ -462,7 +493,22 @@ const handleReset = () => {
   }
 
   .content-body {
-    padding: 16px;
+    padding: 14px 12px;
+  }
+
+  .settings-footer {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    border-radius: 0;
+  }
+
+  .footer-actions {
+    gap: 8px;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    min-height: 40px;
+    padding: 0 14px;
   }
 }
 </style>

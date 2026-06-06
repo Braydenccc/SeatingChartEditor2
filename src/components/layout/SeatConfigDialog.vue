@@ -113,8 +113,8 @@
           :class="{ 'confirming': isConfirming }"
           @click="handleConfirm"
         >
-          <span v-if="isConfirming">再次点击确认清空</span>
-          <span v-else>应用配置并清空</span>
+          <span v-if="isConfirming">再次点击确认应用</span>
+          <span v-else>应用配置</span>
         </button>
       </div>
     </div>
@@ -306,7 +306,7 @@ function handleConfirm() {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20px 40px var(--shadow-lg);
 }
 
 .dialog-header {
@@ -414,7 +414,7 @@ function handleConfirm() {
 
 .preview-seat.first-row {
   background: var(--color-warning);
-  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.3);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
 
 .group-controls {
@@ -653,6 +653,6 @@ function handleConfirm() {
 }
 
 .confirm-btn.confirming:hover {
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-danger) 40%, transparent);
 }
 </style>

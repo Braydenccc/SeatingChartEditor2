@@ -118,28 +118,41 @@ function validateWorkspaceContent($content) {
     return ['valid' => true, 'message' => ''];
 }
 
+function isWorkspaceDeleted($fileData) {
+    if (!$fileData || !is_array($fileData)) {
+        return false;
+    }
+
+    if (isset($fileData['deleted']) && $fileData['deleted'] === true) {
+        return true;
+    }
+
+    if (isset($fileData['metadata']) && is_array($fileData['metadata'])) {
+        if (isset($fileData['metadata']['deleted']) && $fileData['metadata']['deleted'] === true) {
+            return true;
+        }
+
+        if (isset($fileData['metadata']['tags']) && is_array($fileData['metadata']['tags'])) {
+            return in_array('deleted', $fileData['metadata']['tags']);
+        }
+    }
+
+    return false;
+}
+
 $input = parseRequestInput();
 
 $action = $input['action'];
-$username = isset($input['username']) ? trim($input['username']) : null;
-$token = isset($input['token']) ? trim($input['token']) : null;
 
 if (!ensureCsrfMatched($input)) {
     respond(['success' => false, 'message' => 'CSRF 校验失败'], 403);
-}
-
-if (!isValidUsername($username) || !$token) {
-    respond(['success' => false, 'message' => '未授权的访问'], 401);
 }
 
 $dbUsers = new Database("users");
 $dbFiles = new Database("scefiles");
 $dbPermissions = new Database("file_permissions");
 $sessionDb = new Database("users_sessions");
-
-if (!isAuthorized($sessionDb, $username, $token)) {
-    respond(['success' => false, 'message' => 'Token无效或已过期'], 401);
-}
+$username = requireAuthenticatedUsername($sessionDb);
 
 try {
     if ($action === 'save') {
@@ -164,6 +177,13 @@ try {
 
         // 消毒文件 ID 用作数据库键名
         $sanitizedFileId = sanitizeDbKey($fileId);
+        $existingFileRaw = $dbFiles->get($sanitizedFileId);
+        if ($existingFileRaw !== null) {
+            $existingFileData = json_decode($existingFileRaw, true);
+            if (isWorkspaceDeleted($existingFileData)) {
+                respond(['success' => false, 'message' => '工作区已被删除，不能继续操作']);
+            }
+        }
 
         // 检查权限（通过权限表，避免冗余的文件读取）
         $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
@@ -218,15 +238,13 @@ try {
         ]);
 
     } elseif ($action === 'list') {
-        // 从权限表获取文件
-        $fileIds = getUserAccessibleFiles($dbPermissions, $username);
-        
-        // 兼容旧数据：同时从用户文件列表获取文件
         $userFilesKey = sanitizeDbKey($username . '_files');
         $legacyFileIds = $dbUsers->get_array($userFilesKey);
-        if ($legacyFileIds && is_array($legacyFileIds)) {
-            $fileIds = array_unique(array_merge($fileIds ?: [], $legacyFileIds));
+        if (!$legacyFileIds || !is_array($legacyFileIds)) {
+            $legacyFileIds = [];
         }
+        $permissionFileIds = getUserAccessibleFiles($dbPermissions, $username);
+        $fileIds = array_values(array_unique(array_merge($permissionFileIds ?: [], $legacyFileIds)));
 
         $list = [];
         if ($fileIds && is_array($fileIds)) {
@@ -239,6 +257,7 @@ try {
 
                 $fileData = json_decode($fileRaw, true);
                 if (!$fileData || !isset($fileData['metadata'])) continue;
+                if (isWorkspaceDeleted($fileData)) continue;
 
                 // 兼容旧数据：自动迁移权限记录
                 $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
@@ -265,6 +284,75 @@ try {
             'data' => $list
         ]);
 
+    } elseif ($action === 'rename') {
+        $fileId = isset($input['fileId']) ? trim($input['fileId']) : null;
+        $name = isset($input['name']) ? trim($input['name']) : '';
+
+        if (!$fileId) {
+            respond(['success' => false, 'message' => '缺少 fileId']);
+        }
+
+        if (!isValidFileId($fileId)) {
+            respond(['success' => false, 'message' => '文件ID格式无效']);
+        }
+
+        if ($name === '') {
+            respond(['success' => false, 'message' => '工作区名称不能为空']);
+        }
+
+        $nameLength = function_exists('mb_strlen') ? mb_strlen($name) : strlen($name);
+        if ($nameLength > 50) {
+            respond(['success' => false, 'message' => '工作区名称不能超过 50 个字符']);
+        }
+
+        $sanitizedFileId = sanitizeDbKey($fileId);
+        $fileRaw = $dbFiles->get($sanitizedFileId);
+        if ($fileRaw === null) {
+            respond(['success' => false, 'message' => '文件不存在或已被删除']);
+        }
+
+        $fileData = json_decode($fileRaw, true);
+        if (!$fileData || !isset($fileData['metadata']) || !isset($fileData['content'])) {
+            respond(['success' => false, 'message' => '文件格式损坏']);
+        }
+
+        if (isWorkspaceDeleted($fileData)) {
+            respond(['success' => false, 'message' => '工作区已被删除，不能继续操作']);
+        }
+
+        $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
+        if ($dbPermissions->get($permKey) === null) {
+            if (isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
+                grantFilePermission($dbPermissions, $fileId, $username, 'owner');
+            } else {
+                respond(['success' => false, 'message' => '无权限修改此文件'], 403);
+            }
+        } elseif (!hasFilePermission($dbPermissions, $fileId, $username, 'write')) {
+            respond(['success' => false, 'message' => '无权限修改此文件'], 403);
+        }
+
+        $fileData['metadata']['name'] = $name;
+        $dbFiles->set($sanitizedFileId, json_encode($fileData));
+
+        $userFilesKey = sanitizeDbKey($username . '_files');
+        $existingFiles = $dbUsers->get_array($userFilesKey);
+        if (!$existingFiles || !is_array($existingFiles)) {
+            $existingFiles = [];
+        }
+
+        if (!in_array($fileId, $existingFiles)) {
+            $dbUsers->push($userFilesKey, $fileId);
+        }
+
+        respond([
+            'success' => true,
+            'message' => '工作区名称已更新',
+            'data' => [
+                'fileId' => $fileId,
+                'metadata' => $fileData['metadata']
+            ]
+        ]);
+
     } elseif ($action === 'load') {
         $fileId = isset($input['fileId']) ? trim($input['fileId']) : null;
         if (!$fileId) {
@@ -286,6 +374,10 @@ try {
         $fileData = json_decode($fileRaw, true);
         if (!$fileData || !isset($fileData['metadata']) || !isset($fileData['content'])) {
              respond(['success' => false, 'message' => '文件格式损坏']);
+        }
+
+        if (isWorkspaceDeleted($fileData)) {
+            respond(['success' => false, 'message' => '文件不存在或已被删除']);
         }
 
         // 检查读权限（兼容旧数据：如果没有权限记录，检查文件作者）
@@ -317,18 +409,24 @@ try {
              respond(['success' => false, 'message' => '文件ID格式无效']);
          }
 
-         // 消毒文件 ID
          $sanitizedFileId = sanitizeDbKey($fileId);
-
          $fileRaw = $dbFiles->get($sanitizedFileId);
-         
-         // 检查写权限（兼容旧数据：如果没有权限记录，检查文件作者）
+         if ($fileRaw === null) {
+             respond(['success' => true, 'message' => '工作区已被忽略']);
+         }
+
+         $fileData = json_decode($fileRaw, true);
+         if (!$fileData || !isset($fileData['metadata']) || !isset($fileData['content'])) {
+             respond(['success' => false, 'message' => '文件格式损坏']);
+         }
+
+         if (isWorkspaceDeleted($fileData)) {
+             respond(['success' => true, 'message' => '工作区已标记删除']);
+         }
+
          $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
          if ($dbPermissions->get($permKey) === null) {
-             // 没有权限记录，检查文件作者
-             $fileData = $fileRaw ? json_decode($fileRaw, true) : null;
-             if ($fileData && isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
-                 // 自动迁移：创建权限记录
+             if (isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
                  grantFilePermission($dbPermissions, $fileId, $username, 'owner');
              } else {
                  respond(['success' => false, 'message' => '无权删除该文件'], 403);
@@ -337,27 +435,19 @@ try {
              respond(['success' => false, 'message' => '无权删除该文件'], 403);
          }
 
-         if ($fileRaw !== null) {
-             $dbFiles->delete($sanitizedFileId);
+         if (!isset($fileData['metadata']['tags']) || !is_array($fileData['metadata']['tags'])) {
+             $fileData['metadata']['tags'] = [];
+         }
 
-             // 消毒用户文件列表键名
-             $userFilesKey = sanitizeDbKey($username . '_files');
-             $dbUsers->delete($userFilesKey, $fileId);
+         if (!in_array('deleted', $fileData['metadata']['tags'])) {
+             $fileData['metadata']['tags'][] = 'deleted';
+         }
 
-             // 删除权限记录
-             revokeFilePermission($dbPermissions, $fileId, $username);
+         $fileData['metadata']['deleted'] = true;
+         $fileData['metadata']['deletedAt'] = date('c');
+         $dbFiles->set($sanitizedFileId, json_encode($fileData));
 
-             respond(['success' => true, 'message' => '文件已删除']);
-          } else {
-              // 消毒用户文件列表键名
-              $userFilesKey = sanitizeDbKey($username . '_files');
-              $dbUsers->delete($userFilesKey, $fileId);
-
-              // 删除权限记录
-              revokeFilePermission($dbPermissions, $fileId, $username);
-
-              respond(['success' => true, 'message' => '文件已被移除']);
-          }
+         respond(['success' => true, 'message' => '工作区已标记删除']);
     } else {
         respond(['success' => false, 'message' => 'Unknown action'], 400);
     }

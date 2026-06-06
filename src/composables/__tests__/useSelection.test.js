@@ -100,6 +100,29 @@ describe('useSelection', () => {
     })
   })
 
+  describe('selectSingleSeat', () => {
+    it('should replace existing selection with one seat', () => {
+      const { setSelection, selectSingleSeat, selectedCount, isSeatSelected } = useSelection()
+
+      setSelection(['seat-1', 'seat-2'])
+      selectSingleSeat('seat-3')
+
+      expect(selectedCount.value).toBe(1)
+      expect(isSeatSelected('seat-1')).toBe(false)
+      expect(isSeatSelected('seat-2')).toBe(false)
+      expect(isSeatSelected('seat-3')).toBe(true)
+    })
+
+    it('should clear selection when seat id is empty', () => {
+      const { setSelection, selectSingleSeat, selectedCount } = useSelection()
+
+      setSelection(['seat-1', 'seat-2'])
+      selectSingleSeat(null)
+
+      expect(selectedCount.value).toBe(0)
+    })
+  })
+
   describe('isSeatSelected', () => {
     it('should return false for non-selected seat', () => {
       const { isSeatSelected } = useSelection()

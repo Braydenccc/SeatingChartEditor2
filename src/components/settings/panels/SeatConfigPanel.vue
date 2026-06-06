@@ -108,26 +108,28 @@
       <p class="section-desc">为每个大组单独设置列数和行数</p>
 
       <button class="action-button" @click="openAdvancedConfig">
-        <Settings :size="18" />
-        <div class="button-content">
-          <span class="button-title">打开高级配置</span>
-          <span class="button-desc">在侧边栏中进行详细配置</span>
-        </div>
-      </button>
+          <Settings :size="18" />
+          <div class="button-content">
+            <span class="button-title">打开高级配置</span>
+            <span class="button-desc">在编辑器工作台中进行详细配置</span>
+          </div>
+        </button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { AlertCircle, Settings } from 'lucide-vue-next'
 import { useSeatChart } from '@/composables/useSeatChart'
-import { useSidebar } from '@/composables/useSidebar'
+import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
 const emit = defineEmits(['update:visible'])
+const router = useRouter()
 
 const { seatConfig, regenerateSeats, normalizeGuardSeatsConfig } = useSeatChart()
-const { setActiveTab } = useSidebar()
+const { openDialog } = useEditorWorkbench()
 
 const localConfig = computed(() => seatConfig.value)
 
@@ -174,9 +176,10 @@ const handleGroupCountChange = () => {
   }
 }
 
-const openAdvancedConfig = () => {
-  setActiveTab(2) // 切换到侧边栏的"编辑"标签
-  emit('update:visible', false) // 关闭设置对话框
+const openAdvancedConfig = async () => {
+  await router.push('/editor')
+  openDialog('seatConfig')
+  emit('update:visible', false)
 }
 </script>
 

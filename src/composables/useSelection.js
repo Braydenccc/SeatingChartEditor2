@@ -43,6 +43,14 @@ export function useSelection() {
     selectedSeatIds.value = new Set(seatIds)
   }
 
+  const selectSingleSeat = (seatId) => {
+    if (!seatId) {
+      clearSelection()
+      return
+    }
+    selectedSeatIds.value = new Set([seatId])
+  }
+
   const isSeatSelected = (seatId) => {
     return selectedSeatIds.value.has(seatId)
   }
@@ -91,6 +99,7 @@ export function useSelection() {
     clearSelection,
     toggleSelectionMode,
     setSelection,
+    selectSingleSeat,
     isSeatSelected,
     selectedCount,
     selectedSeatsArray,

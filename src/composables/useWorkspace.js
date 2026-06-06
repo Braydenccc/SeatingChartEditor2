@@ -589,9 +589,18 @@ export function useWorkspace() {
     }
   }
 
+  const clearLastWorkspace = () => {
+    try {
+      eraseCookie(LAST_WORKSPACE_COOKIE)
+    } catch (e) {
+      console.error('Clear last workspace failed:', e)
+    }
+  }
+
   return {
     saveLastWorkspace,
     getLastWorkspace,
+    clearLastWorkspace,
     saveWorkspace,
     loadWorkspace,
     getWorkspaceJson,

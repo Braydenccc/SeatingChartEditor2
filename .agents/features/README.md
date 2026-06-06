@@ -37,24 +37,25 @@ graph TD
 
 如果你在开发中需要修改指定的模块，请使用 `view_file` 查阅对应的 Markdown，那里包含 `TypeScript` 数据结构、文件路径以及非常明确的警告项。
 
-- 🗺️ **基础铺垫**
+- **基础铺垫**
   - [00-项目概览 (00-project-overview.md)](./00-project-overview.md)
   - [01-核心数据模型 (01-core-datamodel.md)](./01-core-datamodel.md)
 
-- 🖌️ **界面与交互**
+- **界面与交互**
   - [02-布局编辑器实现 (02-layout-editor.md)](./02-layout-editor.md)
   - [03-学生与数据处理 (03-student-management.md)](./03-student-management.md)
 
-- 🧠 **最强核心 (排位引擎)**
+- **最强核心 (排位引擎)**
   - [04-规则引擎方案 (04-rule-engine.md)](./04-rule-engine.md)
   - [05-自动排位算法 (05-auto-assignment.md)](./05-auto-assignment.md)
   - [06-区域与轮换系统 (06-zone-rotation.md)](./06-zone-rotation.md)
 
-- ☁️ **云端网络与输出渲染**
+- **云端网络与输出渲染**
   - [07-云端同步与认证 (07-cloud-sync.md)](./07-cloud-sync.md)
   - [08-导出系统 (08-export-system.md)](./08-export-system.md)
+  - [09-安全增强 (09-security-enhancements.md)](./09-security-enhancements.md)
 
 ## Vibe Coding 注意事项
 
-1. **优先保持结构完整**: 不要破坏已有的 `useXXX.js` 单例导出。如果是加功能，在原文件里暴露新的变量。
+1. **优先保持结构完整**: 不要破坏已有的 `useXXX` 单例导出。如果是加功能，在原文件里暴露新的变量。
 2. **遵守 TypeScript 模型约束**: 上述文档已将项目里隐式的对象类型严格定义了，在修改业务之前，必须了解其底层是 `Map` 还是 `Array`，以及坐标维度。

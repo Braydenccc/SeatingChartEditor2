@@ -151,6 +151,16 @@ describe('useSeatChart', () => {
       expect(seatChart.getStudentAtSeat('guard-left')).toBe(1)
     })
 
+    it('should keep visible guard seats synced after seats are reinitialized', () => {
+      expect(seatChart.visibleGuardSeats.value.find(seat => seat.id === 'guard-left').studentId).toBe(null)
+
+      seatChart.initializeSeats()
+      seatChart.assignStudent('guard-left', 1, false)
+
+      expect(seatChart.getStudentAtSeat('guard-left')).toBe(1)
+      expect(seatChart.visibleGuardSeats.value.find(seat => seat.id === 'guard-left').studentId).toBe(1)
+    })
+
     it('should exclude guard seats from available seats unless requested', () => {
       expect(seatChart.getAvailableSeats().some(seat => seat.kind === 'guard')).toBe(false)
 
@@ -165,6 +175,42 @@ describe('useSeatChart', () => {
       })
 
       expect(seatChart.getAvailableSeats(true).filter(seat => seat.kind === 'guard')).toHaveLength(2)
+    })
+  })
+
+  describe('updateConfig', () => {
+    it('should preserve compatible seat state and remove only conflicting assignments', () => {
+      seatChart.assignStudent('seat-0-0-0', 1, false)
+      seatChart.assignStudent('seat-0-1-6', 2, false)
+      seatChart.assignStudent('seat-3-1-6', 3, false)
+      seatChart.assignStudent('guard-left', 4, false)
+      seatChart.assignStudent('guard-right', 5, false)
+      seatChart.toggleEmpty('seat-0-0-1', false)
+
+      seatChart.updateConfig({
+        groupCount: 1,
+        columnsPerGroup: 1,
+        seatsPerColumn: 2,
+        groups: [{ columns: 1, rows: 2 }],
+        guardSeats: {
+          enabled: true,
+          leftEnabled: true,
+          rightEnabled: false,
+          includeInAutoAssignment: false,
+          hideEmptyOnExport: true
+        }
+      })
+
+      expect(seatChart.getStudentAtSeat('seat-0-0-0')).toBe(1)
+      expect(seatChart.getSeat('seat-0-0-1').isEmpty).toBe(true)
+      expect(seatChart.getStudentAtSeat('guard-left')).toBe(4)
+
+      expect(seatChart.hasSeat('seat-0-1-6')).toBe(false)
+      expect(seatChart.hasSeat('seat-3-1-6')).toBe(false)
+      expect(seatChart.findSeatByStudent(2)).toBeUndefined()
+      expect(seatChart.findSeatByStudent(3)).toBeUndefined()
+      expect(seatChart.getStudentAtSeat('guard-right')).toBe(null)
+      expect(seatChart.findSeatByStudent(5)).toBeUndefined()
     })
   })
 

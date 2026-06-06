@@ -179,7 +179,8 @@ const toggleStudent = (studentId) => {
 }
 
 .student-row.selected {
-  background: var(--color-bg-subtle);
+  background: var(--color-selection-bg);
+  box-shadow: inset 3px 0 0 var(--color-selection-border);
 }
 
 .checkbox-wrapper {

@@ -24,6 +24,43 @@ export function authMockPlugin() {
     }
 }
 
+function parseCookies(req) {
+    const header = req.headers.cookie || ''
+    return Object.fromEntries(header.split(';').map(part => {
+        const [name, ...rest] = part.trim().split('=')
+        return [name, decodeURIComponent(rest.join('=') || '')]
+    }).filter(([name]) => name))
+}
+
+function setAuthCookies(res, username, token) {
+    res.setHeader('Set-Cookie', [
+        `sce_username=${encodeURIComponent(username)}; Path=/; SameSite=Lax; HttpOnly`,
+        `sce_token=${encodeURIComponent(token)}; Path=/; SameSite=Lax; HttpOnly`
+    ])
+}
+
+function clearAuthCookies(res) {
+    res.setHeader('Set-Cookie', [
+        'sce_username=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; HttpOnly',
+        'sce_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; HttpOnly'
+    ])
+}
+
+function getMockAuth(req) {
+    const cookies = parseCookies(req)
+    const username = cookies.sce_username || ''
+    const token = cookies.sce_token || ''
+    if (!username || !token) return null
+
+    try {
+        const decodedToken = Buffer.from(token, 'base64').toString('utf8')
+        if (!decodedToken.startsWith(username + ':')) return null
+        return { username, token }
+    } catch (e) {
+        return null
+    }
+}
+
 function handleRequestWithTimeout(req, res, handler) {
     let body = ''
     let bodyComplete = false
@@ -54,29 +91,7 @@ async function handleAuthRequest(req, res, body) {
         const csrfCookie = csrfCookieMatch ? decodeURIComponent(csrfCookieMatch[1]) : null
         let csrfBodyToken = null
         try { csrfBodyToken = body ? JSON.parse(body)._csrf || null : null } catch(e) {}
-        
-        // Check 1: If both header and body tokens are present and match, accept first
-        let csrfMatched = false
-        if (csrfHeader !== '' && csrfBodyToken !== null && csrfHeader === csrfBodyToken) {
-            csrfMatched = true
-        }
-        
-        // Check 2: Primary method - Double-Submit Cookie
-        if (!csrfMatched) {
-            const submittedToken = csrfHeader || csrfBodyToken
-            if (submittedToken) {
-                if (csrfCookie && submittedToken === csrfCookie) {
-                    csrfMatched = true
-                }
-            }
-        }
-        
-        // Check 3: Additional fallback - accept either header or body
-        if (!csrfMatched) {
-            if (csrfHeader !== '' || csrfBodyToken !== null) {
-                csrfMatched = true
-            }
-        }
+        const csrfMatched = csrfHeader !== '' && csrfBodyToken && csrfCookie && csrfHeader === csrfBodyToken && csrfHeader === csrfCookie
         
         if (!csrfMatched) {
             res.statusCode = 403
@@ -97,10 +112,7 @@ async function handleAuthRequest(req, res, body) {
             // file not exists, use empty db
         }
 
-        const { action, username, encryptedPassword, password: plainPassword } = input
-        // 本地开发环境：支持加密密码传输，但直接使用（跳过解密）
-        // 因为前端会加密密码，而本地 mock 不需要真正的解密
-        const password = plainPassword || encryptedPassword
+        const { action, username, password } = input
 
         if (action === 'register') {
             if (!username || !password) {
@@ -115,10 +127,11 @@ async function handleAuthRequest(req, res, body) {
             await fs.writeFile(dbPath, JSON.stringify(db, null, 2))
 
             const token = Buffer.from(`${username}:${Date.now()}`).toString('base64')
+            setAuthCookies(res, username, token)
             return res.end(JSON.stringify({
                 success: true,
                 message: '注册成功',
-                data: { username, token }
+                data: { username }
             }))
         } else if (action === 'login') {
             if (!username || !password) {
@@ -133,26 +146,32 @@ async function handleAuthRequest(req, res, body) {
             const isValid = await bcrypt.compare(password, existingHash)
             if (isValid) {
                 const token = Buffer.from(`${username}:${Date.now()}`).toString('base64')
+                setAuthCookies(res, username, token)
                 return res.end(JSON.stringify({
                     success: true,
                     message: '登录成功',
-                    data: { username, token }
+                    data: { username }
                 }))
             } else {
                 return res.end(JSON.stringify({ success: false, message: '用户名或密码不正确' }))
             }
+        } else if (action === 'verify') {
+            const auth = getMockAuth(req)
+            if (!auth) {
+                res.statusCode = 401
+                return res.end(JSON.stringify({ success: false, message: '未登录' }))
+            }
+            return res.end(JSON.stringify({ success: true, data: { username: auth.username } }))
+        } else if (action === 'logout') {
+            clearAuthCookies(res)
+            return res.end(JSON.stringify({ success: true, message: '登出成功' }))
         } else if (action === 'set_settings' || action === 'get_settings') {
-            const token = input.token
-            if (!token || !username) {
+            const auth = getMockAuth(req)
+            if (!auth) {
                 res.statusCode = 401;
                 return res.end(JSON.stringify({ success: false, message: '未授权的访问' }))
             }
-            const expectedPrefix = username + ':'
-            const decodedToken = Buffer.from(token, 'base64').toString('utf8')
-            if (!decodedToken.startsWith(expectedPrefix)) {
-                res.statusCode = 401;
-                return res.end(JSON.stringify({ success: false, message: 'Token无效或已过期' }))
-            }
+            const settingsUsername = auth.username
 
             const settingsDbPath = path.resolve('.local-users-settings.json')
             let settingsDb = {}
@@ -164,11 +183,15 @@ async function handleAuthRequest(req, res, body) {
             }
 
             if (action === 'set_settings') {
-                settingsDb[username] = input.settings || {}
+                const settings = input.settings || {}
+                if (settings.webdav) {
+                    delete settings.webdav.password
+                }
+                settingsDb[settingsUsername] = settings
                 await fs.writeFile(settingsDbPath, JSON.stringify(settingsDb, null, 2))
                 return res.end(JSON.stringify({ success: true, message: '设置已保存' }))
             } else {
-                return res.end(JSON.stringify({ success: true, data: settingsDb[username] || null }))
+                return res.end(JSON.stringify({ success: true, data: settingsDb[settingsUsername] || null }))
             }
         } else {
             return res.end(JSON.stringify({ success: false, message: 'Unknown action' }))
@@ -207,19 +230,13 @@ async function handleWorkspaceRequest(req, res, body) {
             // Ignore
         }
 
-        const { action, username, token } = input
-        if (!username || !token) {
+        const auth = getMockAuth(req)
+        if (!auth) {
             res.statusCode = 401;
             return res.end(JSON.stringify({ success: false, message: '未授权的访问' }))
         }
-
-        // Simple token validation (matching backend logic)
-        const expectedPrefix = username + ':'
-        const decodedToken = Buffer.from(token, 'base64').toString('utf8')
-        if (!decodedToken.startsWith(expectedPrefix)) {
-            res.statusCode = 401;
-            return res.end(JSON.stringify({ success: false, message: 'Token无效或已过期' }))
-        }
+        const { action } = input
+        const username = auth.username
 
         const userFilesKey = username + '_files'
 
@@ -329,13 +346,29 @@ async function handleWorkspaceRequest(req, res, body) {
 }
 
 async function handleDavProxy(req, res) {
-    const davUrl = req.headers['x-dav-url']
-    if (!davUrl) {
+    const auth = getMockAuth(req)
+    const cookies = parseCookies(req)
+    if (!auth) {
+        res.statusCode = 401
+        return res.end(JSON.stringify({ success: false, message: '未授权的访问' }))
+    }
+    if (!req.headers['x-csrf-token'] || req.headers['x-csrf-token'] !== cookies.sce_csrf) {
+        res.statusCode = 403
+        return res.end(JSON.stringify({ success: false, message: 'CSRF 校验失败' }))
+    }
+
+    const davBaseUrl = req.headers['x-dav-base-url']
+    const davPath = req.headers['x-dav-path']
+    if (!davBaseUrl || !davPath) {
         res.statusCode = 400
-        return res.end('Missing x-dav-url header')
+        return res.end('Missing WebDAV proxy headers')
     }
     try {
-        const targetUrl = new URL(davUrl)
+        const targetUrl = new URL(String(davPath).replace(/^\/?/, '/'), String(davBaseUrl).replace(/\/+$/, '') + '/')
+        if (targetUrl.protocol !== 'https:') {
+            res.statusCode = 400
+            return res.end('Only HTTPS WebDAV URLs are allowed')
+        }
         const options = {
             hostname: targetUrl.hostname,
             port: targetUrl.port,
@@ -344,16 +377,17 @@ async function handleDavProxy(req, res) {
             headers: { ...req.headers }
         }
         delete options.headers['host']
-        delete options.headers['x-dav-url']
+        delete options.headers['x-dav-base-url']
+        delete options.headers['x-dav-path']
+        delete options.headers['x-csrf-token']
         delete options.headers['connection']
         delete options.headers['origin']
         delete options.headers['referer']
+        delete options.headers['cookie']
 
-        const http = await import('http')
         const https = await import('https')
-        const client = targetUrl.protocol === 'https:' ? https : http
 
-        const proxyReq = client.request(options, (proxyRes) => {
+        const proxyReq = https.request(options, (proxyRes) => {
             res.writeHead(proxyRes.statusCode, proxyRes.headers)
             proxyRes.pipe(res, { end: true })
         })

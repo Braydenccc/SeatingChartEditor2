@@ -30,6 +30,49 @@ function isValidFileId($fileId) {
     return is_string($fileId) && preg_match('/^[A-Za-z0-9_-]{1,64}$/', $fileId);
 }
 
+function validatePasswordStrength($password) {
+    if (!is_string($password) || strlen($password) < 8) {
+        return ['valid' => false, 'message' => '密码至少需要 8 个字符'];
+    }
+
+    if (!preg_match('/[A-Z]/', $password)) {
+        return ['valid' => false, 'message' => '密码必须包含至少一个大写字母'];
+    }
+
+    if (!preg_match('/[a-z]/', $password)) {
+        return ['valid' => false, 'message' => '密码必须包含至少一个小写字母'];
+    }
+
+    if (!preg_match('/[0-9]/', $password)) {
+        return ['valid' => false, 'message' => '密码必须包含至少一个数字'];
+    }
+
+    return ['valid' => true, 'message' => ''];
+}
+
+function getUserProfile($profileDb, $username) {
+    if (!isValidUsername($username)) {
+        return ['status' => 'disabled'];
+    }
+
+    $rawProfile = $profileDb->get($username);
+    $profile = $rawProfile ? json_decode($rawProfile, true) : [];
+    if (!is_array($profile)) {
+        $profile = [];
+    }
+
+    $status = isset($profile['status']) && $profile['status'] === 'disabled' ? 'disabled' : 'active';
+    $profile['username'] = $username;
+    $profile['status'] = $status;
+
+    return $profile;
+}
+
+function isUserDisabled($profileDb, $username) {
+    $profile = getUserProfile($profileDb, $username);
+    return isset($profile['status']) && $profile['status'] === 'disabled';
+}
+
 function ensureCsrfMatched($input = null) {
     if ($input === null) {
         global $input;
@@ -37,12 +80,26 @@ function ensureCsrfMatched($input = null) {
 
     $csrfHeader = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? trim($_SERVER['HTTP_X_CSRF_TOKEN']) : '';
     $bodyCsrf = (is_array($input) && isset($input['_csrf']) && is_string($input['_csrf'])) ? trim($input['_csrf']) : '';
+    $cookieCsrf = isset($_COOKIE['sce_csrf']) && is_string($_COOKIE['sce_csrf']) ? trim($_COOKIE['sce_csrf']) : '';
 
-    if ($csrfHeader !== '' && $bodyCsrf !== '' && hash_equals($csrfHeader, $bodyCsrf)) {
+    if (
+        $csrfHeader !== '' &&
+        $bodyCsrf !== '' &&
+        $cookieCsrf !== '' &&
+        hash_equals($csrfHeader, $bodyCsrf) &&
+        hash_equals($csrfHeader, $cookieCsrf)
+    ) {
         return true;
     }
 
     return false;
+}
+
+function ensureCsrfHeaderCookieMatched() {
+    $csrfHeader = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? trim($_SERVER['HTTP_X_CSRF_TOKEN']) : '';
+    $cookieCsrf = isset($_COOKIE['sce_csrf']) && is_string($_COOKIE['sce_csrf']) ? trim($_COOKIE['sce_csrf']) : '';
+
+    return $csrfHeader !== '' && $cookieCsrf !== '' && hash_equals($csrfHeader, $cookieCsrf);
 }
 
 function isAuthorized($sessionDb, $username, $token) {
@@ -73,6 +130,71 @@ function isAuthorized($sessionDb, $username, $token) {
 
     // 旧格式：比对明文 Token（向后兼容）
     return hash_equals($data['token'], $token);
+}
+
+function getAuthenticatedUsername($sessionDb) {
+    $username = isset($_COOKIE['sce_username']) && is_string($_COOKIE['sce_username']) ? trim($_COOKIE['sce_username']) : '';
+    $token = isset($_COOKIE['sce_token']) && is_string($_COOKIE['sce_token']) ? trim($_COOKIE['sce_token']) : '';
+
+    if (!isValidUsername($username) || !isAuthorized($sessionDb, $username, $token)) {
+        return null;
+    }
+
+    $profileDb = new Database('user_profiles');
+    if (isUserDisabled($profileDb, $username)) {
+        return null;
+    }
+
+    return $username;
+}
+
+function requireAuthenticatedUsername($sessionDb) {
+    $username = getAuthenticatedUsername($sessionDb);
+    if ($username === null) {
+        respond(['success' => false, 'message' => '未授权的访问'], 401);
+    }
+    return $username;
+}
+
+function isHttpsRequest() {
+    if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
+        return true;
+    }
+    if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+        return true;
+    }
+    if (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on') {
+        return true;
+    }
+    if (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) {
+        return true;
+    }
+    if (isset($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] === 'https') {
+        return true;
+    }
+    return false;
+}
+
+function setAppCookie($name, $value, $days, $httpOnly = true) {
+    $options = [
+        'expires' => time() + ($days * 86400),
+        'path' => '/',
+        'secure' => isHttpsRequest(),
+        'httponly' => $httpOnly,
+        'samesite' => 'Lax'
+    ];
+    setcookie($name, $value, $options);
+}
+
+function clearAppCookie($name, $httpOnly = true) {
+    $options = [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'secure' => isHttpsRequest(),
+        'httponly' => $httpOnly,
+        'samesite' => 'Lax'
+    ];
+    setcookie($name, '', $options);
 }
 
 function sanitizeDbKey($key) {

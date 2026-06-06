@@ -1,7 +1,7 @@
 <template>
   <transition name="dialog-fade">
-    <div v-if="visible" class="student-roster-overlay" @mousedown.self="close">
-      <div class="student-roster-dialog">
+    <div v-if="visible" :class="['student-roster-overlay', { embedded: presentation === 'embedded' }]" @mousedown.self="close">
+      <div :class="['student-roster-dialog', { embedded: presentation === 'embedded' }]">
         <div class="dialog-header">
           <h3>名单与属性</h3>
           <button class="close-btn" @click="close" aria-label="关闭">
@@ -355,7 +355,12 @@ import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
 
 const props = defineProps({
-  visible: Boolean
+  visible: Boolean,
+  presentation: {
+    type: String,
+    default: 'dialog',
+    validator: (value) => ['dialog', 'embedded'].includes(value)
+  }
 })
 
 const emit = defineEmits(['update:visible'])
@@ -692,16 +697,48 @@ const close = () => {
   z-index: 9999;
 }
 
+.student-roster-overlay.embedded {
+  position: static;
+  inset: auto;
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+  justify-content: stretch;
+  background: transparent;
+  z-index: auto;
+}
+
 .student-roster-dialog {
-  background: var(--color-surface, #ffffff);
+  background: var(--color-surface);
   width: 96vw;
   max-width: 1280px;
   height: 88vh;
   border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 25px var(--shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.student-roster-dialog.embedded {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+}
+
+.student-roster-dialog.embedded .dialog-header {
+  display: none;
+}
+
+.dialog-fade-enter-active .student-roster-dialog.embedded,
+.dialog-fade-leave-active .student-roster-dialog.embedded,
+.dialog-fade-enter-from .student-roster-dialog.embedded,
+.dialog-fade-leave-to .student-roster-dialog.embedded {
+  opacity: 1;
+  transform: none;
 }
 
 .dialog-header {
@@ -709,13 +746,13 @@ const close = () => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background: var(--color-bg-subtle, #f8f9fa);
-  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .dialog-header h3 {
   margin: 0;
-  color: var(--color-primary, #23587b);
+  color: var(--color-primary);
   font-size: 18px;
 }
 
@@ -1414,19 +1451,110 @@ th.sticky-col-3 {
     height: 92vh;
   }
 
+  .student-roster-dialog.embedded {
+    width: 100%;
+    height: 100%;
+  }
+
   .dialog-body {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
   }
 
   .roster-context {
-    max-height: 260px;
+    max-height: 220px;
     border-right: none;
     border-bottom: 1px solid var(--color-border);
+    padding: 12px;
   }
 
   .sheet-toolbar {
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .student-roster-dialog {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .dialog-body {
+    min-height: 0;
+  }
+
+  .roster-context {
+    max-height: 158px;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .context-header {
+    display: none;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(4, minmax(70px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .summary-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .summary-card {
+    padding: 8px;
+  }
+
+  .summary-value {
+    font-size: 17px;
+  }
+
+  .quick-actions,
+  .context-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .context-action-btn,
+  .context-list-item {
+    min-height: 40px;
+  }
+
+  .sheet-toolbar {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .sheet-title-group {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .sheet-title-group h3 {
+    font-size: 15px;
+  }
+
+  .student-count-control {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .student-count-input {
+    min-height: 40px;
+  }
+
+  .add-student-btn {
+    min-height: 40px;
+    margin-left: auto;
+  }
+
+  .sheet-wrap {
+    overscroll-behavior: contain;
   }
 }
 </style>

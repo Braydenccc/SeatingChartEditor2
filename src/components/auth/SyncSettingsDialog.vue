@@ -97,7 +97,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible'])
 
-const { webdavConfig, backupMode, updateSyncSettings, authType, setAuthType, currentUser } = useAuth()
+const { webdavConfig, backupMode, updateSyncSettings, authType, setAuthType, token } = useAuth()
 const { mkcol } = useWebDav()
 
 const webdavUrl = ref('')
@@ -109,7 +109,7 @@ const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 
-const hasRetiehe = computed(() => !!currentUser.value)
+const hasRetiehe = computed(() => !!token.value)
 
 const hasWebdavConfigured = computed(() => !!webdavConfig.value)
 const hasAnyWebdavInput = computed(() => !!(webdavUrl.value.trim() || webdavUser.value.trim() || webdavPass.value.trim()))

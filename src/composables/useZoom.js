@@ -29,10 +29,12 @@ export function useZoom() {
     }
 
     const setScale = (value) => {
+        if (!Number.isFinite(value)) return
         scale.value = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.round(value * 100) / 100))
     }
 
     const setPan = (x, y) => {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return
         panX.value = x
         panY.value = y
     }
@@ -69,12 +71,14 @@ export function useZoom() {
             const padV = 30
             const availW = vpRect.width - padH
             const availH = vpRect.height - padV
+            if (availW <= 0 || availH <= 0) return
 
             const fitScale = Math.min(
                 availW / chartRect.width,
                 availH / chartRect.height,
                 1.0
             )
+            if (!Number.isFinite(fitScale)) return
 
             setScale(Math.max(MIN_SCALE, fitScale))
             setPan(0, 0)
