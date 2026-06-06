@@ -93,11 +93,17 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
 
     htmlDragImageEl = preview.clone
     htmlDragImageEl.style.position = 'fixed'
-    htmlDragImageEl.style.left = '-10000px'
-    htmlDragImageEl.style.top = '-10000px'
+    htmlDragImageEl.style.left = `${Math.max(0, e.clientX - preview.rect.width / 2)}px`
+    htmlDragImageEl.style.top = `${Math.max(0, e.clientY - preview.rect.height / 2)}px`
     htmlDragImageEl.style.zIndex = '9999'
     document.body.appendChild(htmlDragImageEl)
     e.dataTransfer.setDragImage(htmlDragImageEl, preview.rect.width / 2, preview.rect.height / 2)
+
+    requestAnimationFrame(() => {
+      if (htmlDragImageEl) {
+        htmlDragImageEl.style.visibility = 'hidden'
+      }
+    })
   }
 
   const handleDragStart = (e) => {

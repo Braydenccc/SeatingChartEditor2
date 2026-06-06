@@ -918,7 +918,6 @@ onMounted(() => {
   }
   registerViewport(viewportRef.value, chartRef.value)
   registerChartElement(chartRef.value)
-  registerPreviewElement(dragPreviewRef.value)
 
   if (viewportRef.value) {
     viewportRef.value.addEventListener('touch-seat-drop', handleTouchSeatDrop)
@@ -965,6 +964,10 @@ watch(
     })
   }
 )
+
+watch(dragPreviewRef, (el) => {
+  registerPreviewElement(el)
+}, { flush: 'post' })
 
 // 窗口大小变化时重新自适应
 let resizeObserver = null

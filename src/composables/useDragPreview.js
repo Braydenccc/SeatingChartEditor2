@@ -23,6 +23,15 @@ let cachedChartRect = null
 let previewEl = null
 let updateRafId = null
 
+const positionPreviewElement = () => {
+  if (!previewEl || !state.isActive) return
+
+  previewEl.style.left = `${state.mouseX}px`
+  previewEl.style.top = `${state.mouseY}px`
+  previewEl.style.transform = 'translate(-50%, -50%)'
+  previewEl.style.transition = 'none'
+}
+
 const escapeSelectorValue = (value) => {
   if (typeof window !== 'undefined' && window.CSS?.escape) {
     return window.CSS.escape(value)
@@ -41,6 +50,7 @@ export function useDragPreview() {
 
   const registerPreviewElement = (el) => {
     previewEl = el
+    positionPreviewElement()
   }
 
   function clientToChartLocal(clientX, clientY) {
@@ -90,12 +100,7 @@ export function useDragPreview() {
       cachedChartRect = chartEl.getBoundingClientRect()
     }
 
-    if (previewEl) {
-      previewEl.style.left = `${clientX}px`
-      previewEl.style.top = `${clientY}px`
-      previewEl.style.transform = 'translate(-50%, -50%)'
-      previewEl.style.transition = 'none'
-    }
+    positionPreviewElement()
   }
 
   const updateDragPreview = (clientX, clientY) => {
