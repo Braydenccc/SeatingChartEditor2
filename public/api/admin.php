@@ -67,6 +67,23 @@ function adminCreateRequestSummary($rawInput = null, $jsonError = '') {
     return $summary;
 }
 
+function adminNormalizePostInput($post) {
+    $input = is_array($post) ? $post : [];
+    foreach (['deleted', 'includeContent'] as $key) {
+        if (!isset($input[$key]) || is_bool($input[$key])) {
+            continue;
+        }
+
+        if ($input[$key] === 'true' || $input[$key] === '1' || $input[$key] === 1) {
+            $input[$key] = true;
+        } elseif ($input[$key] === 'false' || $input[$key] === '0' || $input[$key] === 0) {
+            $input[$key] = false;
+        }
+    }
+
+    return $input;
+}
+
 function adminParseRequest() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         return [
@@ -83,6 +100,15 @@ function adminParseRequest() {
     if (is_string($rawInput) && trim($rawInput) !== '') {
         $input = json_decode($rawInput, true);
         if (!is_array($input)) {
+            if (!empty($_POST) && isset($_POST['action']) && is_string($_POST['action'])) {
+                return [
+                    'input' => adminNormalizePostInput($_POST),
+                    'error' => null,
+                    'status' => 200,
+                    'requestSummary' => adminCreateRequestSummary($rawInput, json_last_error_msg())
+                ];
+            }
+
             return [
                 'input' => [],
                 'error' => 'Invalid JSON request body',
@@ -91,7 +117,7 @@ function adminParseRequest() {
             ];
         }
     } elseif (!empty($_POST)) {
-        $input = $_POST;
+        $input = adminNormalizePostInput($_POST);
     }
 
     if (!is_array($input) || !isset($input['action']) || !is_string($input['action'])) {
