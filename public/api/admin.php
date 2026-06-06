@@ -3,6 +3,31 @@ require_once "api/common.php";
 require_once "api/file-permissions.php";
 header('Content-Type: application/json; charset=utf-8');
 
+function adminApplyCorsForDev() {
+    $origin = isset($_SERVER['HTTP_ORIGIN']) && is_string($_SERVER['HTTP_ORIGIN']) ? trim($_SERVER['HTTP_ORIGIN']) : '';
+    $allowedOrigins = [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:5174',
+        'http://127.0.0.1:5174'
+    ];
+
+    if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Access-Control-Allow-Methods: POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, X-Admin-Token');
+        header('Access-Control-Max-Age: 600');
+        header('Vary: Origin');
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(204);
+        exit(0);
+    }
+}
+
+adminApplyCorsForDev();
+
 if (!class_exists('Database')) {
     http_response_code(503);
     echo json_encode(['success' => false, 'message' => 'Environment error: Database not supported.'], JSON_UNESCAPED_UNICODE);
