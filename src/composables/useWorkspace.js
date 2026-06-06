@@ -12,6 +12,7 @@ import { useSelection } from './useSelection'
 import { useEditMode } from './useEditMode'
 import { useZoneRotation } from './useZoneRotation'
 import { initializeTags } from './useTagData'
+import { parseSeatId, isGuardSeatId } from '@/utils/seatHelpers'
 
 const LAST_WORKSPACE_COOKIE = 'sce_last_workspace'
 
@@ -38,6 +39,63 @@ const createDefaultSeatConfig = () => ({
     hideEmptyOnExport: true
   }
 })
+
+const toIndex = (value) => {
+  const numberValue = Number(value)
+  return Number.isInteger(numberValue) ? numberValue : undefined
+}
+
+const getSeatPosition = (seat = {}) => {
+  const directPosition = {
+    group: toIndex(seat.group ?? seat.groupIndex),
+    col: toIndex(seat.col ?? seat.columnIndex),
+    row: toIndex(seat.row ?? seat.rowIndex)
+  }
+
+  if (
+    directPosition.group !== undefined &&
+    directPosition.col !== undefined &&
+    directPosition.row !== undefined
+  ) {
+    return directPosition
+  }
+
+  if (typeof seat.id === 'string' && !isGuardSeatId(seat.id)) {
+    const parsed = parseSeatId(seat.id)
+    const parsedPosition = {
+      group: toIndex(parsed.groupIndex),
+      col: toIndex(parsed.columnIndex),
+      row: toIndex(parsed.rowIndex)
+    }
+
+    if (
+      parsedPosition.group !== undefined &&
+      parsedPosition.col !== undefined &&
+      parsedPosition.row !== undefined
+    ) {
+      return parsedPosition
+    }
+  }
+
+  return directPosition
+}
+
+const normalizeWorkspaceSeat = (seat = {}) => {
+  const position = getSeatPosition(seat)
+  const guardSide = seat.guardSide ||
+    (seat.id === 'guard-left' ? 'left' : seat.id === 'guard-right' ? 'right' : undefined)
+
+  return {
+    id: seat.id,
+    kind: seat.kind || (isGuardSeatId(seat.id) ? 'guard' : 'regular'),
+    guardSide,
+    group: position.group,
+    col: position.col,
+    row: position.row,
+    studentId: seat.studentId ?? null,
+    empty: seat.empty ?? seat.isEmpty ?? false
+  }
+}
 
 export function useWorkspace() {
   const { students, addStudent, updateStudent, clearAllStudents, syncStudentIdCounter } = useStudentData()
@@ -282,9 +340,10 @@ export function useWorkspace() {
 
         if (workspace.layout && Array.isArray(workspace.layout.seats)) {
           const updates = workspace.layout.seats.map(sw => {
-            const match = sw.kind === 'guard'
+            const isGuardSeat = sw.kind === 'guard' || isGuardSeatId(sw.id)
+            const match = isGuardSeat
               ? seats.value.find(st => st.id === sw.id || (st.kind === 'guard' && st.guardSide === sw.guardSide))
-              : seats.value.find(st =>
+              : seats.value.find(st => st.id === sw.id) || seats.value.find(st =>
                 st.groupIndex === sw.group && st.columnIndex === sw.col && st.rowIndex === sw.row
               )
             if (!match) return null
@@ -469,6 +528,7 @@ export function useWorkspace() {
       clearAllRules()
       clearAllRotData()
       updateConfig(createDefaultSeatConfig())
+      clearAllSeats()
 
       eraseCookie(LAST_WORKSPACE_COOKIE)
       success('已新建空白工作区')
@@ -491,26 +551,26 @@ export function useWorkspace() {
       }
     }
 
-    // v1.x → v2.0：扁平结构 → 分组结构
-    if (version.startsWith('1.')) {
-      // 迁移 seats 到 layout.seats（字段重命名）
-      const oldSeats = ws.seats || []
+    // 旧版扁平结构 → layout 结构。部分近期云端存档版本号不可靠，因此按数据形状迁移。
+    if (!ws.layout && (ws.seats || ws.seatConfig)) {
+      const oldSeats = Array.isArray(ws.seats) ? ws.seats : []
       ws.layout = {
         config: ws.seatConfig || {},
-        seats: oldSeats.map(s => ({
-          id: s.id,
-          kind: s.kind || 'regular',
-          guardSide: s.guardSide,
-          group: s.groupIndex,
-          col: s.columnIndex,
-          row: s.rowIndex,
-          studentId: s.studentId,
-          empty: s.isEmpty || false
-        }))
+        seats: oldSeats.map(normalizeWorkspaceSeat)
       }
       delete ws.seatConfig
       delete ws.seats
+    } else if (ws.layout) {
+      if (!ws.layout.config && ws.seatConfig) {
+        ws.layout.config = ws.seatConfig
+      }
+      if (Array.isArray(ws.layout.seats)) {
+        ws.layout.seats = ws.layout.seats.map(normalizeWorkspaceSeat)
+      }
+    }
 
+    // v1.x → v2.0：丢弃旧关系并补齐 meta
+    if (version.startsWith('1.')) {
       // 丢弃旧的 relations
       if (ws.relations) {
         delete ws.relations

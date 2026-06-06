@@ -1,8 +1,4 @@
 <?php
-require_once "api/common.php";
-require_once "api/file-permissions.php";
-header('Content-Type: application/json; charset=utf-8');
-
 function adminApplyCorsForDev() {
     $origin = isset($_SERVER['HTTP_ORIGIN']) && is_string($_SERVER['HTTP_ORIGIN']) ? trim($_SERVER['HTTP_ORIGIN']) : '';
     $allowedOrigins = [
@@ -28,6 +24,10 @@ function adminApplyCorsForDev() {
 }
 
 adminApplyCorsForDev();
+
+require_once "api/common.php";
+require_once "api/file-permissions.php";
+header('Content-Type: application/json; charset=utf-8');
 
 if (!class_exists('Database')) {
     http_response_code(503);

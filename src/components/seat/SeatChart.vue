@@ -197,6 +197,7 @@ const shuffleArray = (array) => {
 
 const {
   seatConfig,
+  seats,
   organizedSeats,
   visibleGuardSeats,
   initializeSeats,
@@ -912,7 +913,9 @@ const handleEditStudent = (studentId) => {
 
 // ====================  初始化 ====================
 onMounted(() => {
-  initializeSeats()
+  if (seats.value.length === 0) {
+    initializeSeats()
+  }
   registerViewport(viewportRef.value, chartRef.value)
   registerChartElement(chartRef.value)
   registerPreviewElement(dragPreviewRef.value)
