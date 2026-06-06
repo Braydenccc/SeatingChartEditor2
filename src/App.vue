@@ -120,21 +120,34 @@ onMounted(async () => {
 </script>
 
 <template>
-  <RouterView @open-login="handleOpenLogin" />
+  <div class="app-root">
+    <RouterView @open-login="handleOpenLogin" />
 
-  <GlobalDropZone />
+    <GlobalDropZone />
 
-  <LoginDialog
-    v-if="isLoginDialogVisible"
-    v-model:visible="isLoginDialogVisible"
-    :initial-tab="loginDialogInitialTab"
-  />
+    <LoginDialog
+      v-if="isLoginDialogVisible"
+      v-model:visible="isLoginDialogVisible"
+      :initial-tab="loginDialogInitialTab"
+    />
 
-  <CloudWorkspaceDialog
-    v-if="showCloudDialog"
-    :visible="showCloudDialog"
-    :mode="cloudDialogMode"
-    @update:visible="showCloudDialog = $event"
-    @success="handleCloudSuccess"
-  />
+    <CloudWorkspaceDialog
+      v-if="showCloudDialog"
+      :visible="showCloudDialog"
+      :mode="cloudDialogMode"
+      @update:visible="showCloudDialog = $event"
+      @success="handleCloudSuccess"
+    />
+  </div>
 </template>
+
+<style scoped>
+.app-root {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+</style>
