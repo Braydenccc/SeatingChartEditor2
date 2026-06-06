@@ -54,35 +54,7 @@ function ensureHttps() {
         return;
     }
 
-    // 多种方式检测 HTTPS 连接
-    $isHttps = false;
-
-    // 1. 标准 HTTPS 检测
-    if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
-        $isHttps = true;
-    }
-
-    // 2. 反向代理设置的头（Retinbox 等平台）
-    if (!$isHttps && isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
-        $isHttps = true;
-    }
-
-    // 3. 另一种反向代理头
-    if (!$isHttps && isset($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on') {
-        $isHttps = true;
-    }
-
-    // 4. 检查端口
-    if (!$isHttps && isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) {
-        $isHttps = true;
-    }
-
-    // 5. Retinbox 平台特定：检查请求协议
-    if (!$isHttps && isset($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] === 'https') {
-        $isHttps = true;
-    }
-
-    if (!$isHttps) {
+    if (!isHttpsRequest()) {
         respond(['success' => false, 'message' => '必须使用 HTTPS 连接'], 403);
     }
 }

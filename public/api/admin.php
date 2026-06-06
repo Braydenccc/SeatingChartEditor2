@@ -11,18 +11,19 @@ function adminApplyCorsForDev() {
         'http://localhost:5174',
         'http://127.0.0.1:5174'
     ];
+    $isAllowedOrigin = $origin !== '' && in_array($origin, $allowedOrigins, true);
 
-    if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
+    if ($isAllowedOrigin) {
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Access-Control-Allow-Methods: POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, X-Admin-Token');
+        header('Access-Control-Allow-Headers: Content-Type, X-Admin-Token, X-Admin-Action');
         header('Access-Control-Max-Age: 600');
         header('Vary: Origin');
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        http_response_code(204);
-        exit(0);
+        http_response_code($origin === '' || $isAllowedOrigin ? 204 : 403);
+        exit($origin === '' || $isAllowedOrigin ? 0 : 1);
     }
 }
 
@@ -48,12 +49,32 @@ function adminGetHeaderValue($name) {
     return isset($_SERVER[$key]) && is_string($_SERVER[$key]) ? trim($_SERVER[$key]) : '';
 }
 
+function adminCreateRequestSummary($rawInput = null, $jsonError = '') {
+    $summary = [
+        'method' => isset($_SERVER['REQUEST_METHOD']) ? (string)$_SERVER['REQUEST_METHOD'] : '',
+        'contentType' => isset($_SERVER['CONTENT_TYPE']) ? substr((string)$_SERVER['CONTENT_TYPE'], 0, 120) : '',
+        'contentLength' => isset($_SERVER['CONTENT_LENGTH']) ? (int)$_SERVER['CONTENT_LENGTH'] : null,
+        'rawInputLength' => is_string($rawInput) ? strlen($rawInput) : null,
+        'hasPostFields' => !empty($_POST),
+        'adminActionHeader' => adminGetHeaderValue('X-Admin-Action'),
+        'origin' => isset($_SERVER['HTTP_ORIGIN']) ? substr((string)$_SERVER['HTTP_ORIGIN'], 0, 160) : '',
+        'referer' => isset($_SERVER['HTTP_REFERER']) ? substr((string)$_SERVER['HTTP_REFERER'], 0, 200) : ''
+    ];
+
+    if ($jsonError !== '') {
+        $summary['jsonError'] = $jsonError;
+    }
+
+    return $summary;
+}
+
 function adminParseRequest() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         return [
             'input' => [],
             'error' => 'Only POST requests are allowed',
-            'status' => 405
+            'status' => 405,
+            'requestSummary' => adminCreateRequestSummary()
         ];
     }
 
@@ -66,7 +87,8 @@ function adminParseRequest() {
             return [
                 'input' => [],
                 'error' => 'Invalid JSON request body',
-                'status' => 400
+                'status' => 400,
+                'requestSummary' => adminCreateRequestSummary($rawInput, json_last_error_msg())
             ];
         }
     } elseif (!empty($_POST)) {
@@ -77,14 +99,16 @@ function adminParseRequest() {
         return [
             'input' => is_array($input) ? $input : [],
             'error' => 'Invalid Request',
-            'status' => 400
+            'status' => 400,
+            'requestSummary' => adminCreateRequestSummary($rawInput)
         ];
     }
 
     return [
         'input' => $input,
         'error' => null,
-        'status' => 200
+        'status' => 200,
+        'requestSummary' => adminCreateRequestSummary($rawInput)
     ];
 }
 
@@ -175,8 +199,8 @@ function adminSanitizeForLog($value, $depth = 0) {
     return $sanitized;
 }
 
-function adminCreateLogEntry($action, $success, $verified, $status, $reason, $target, $input) {
-    return [
+function adminCreateLogEntry($action, $success, $verified, $status, $reason, $target, $input, $requestSummary = null) {
+    $entry = [
         'id' => bin2hex(random_bytes(8)),
         'time' => time(),
         'timestamp' => date('c'),
@@ -190,6 +214,12 @@ function adminCreateLogEntry($action, $success, $verified, $status, $reason, $ta
         'target' => $target,
         'paramsSummary' => adminSanitizeForLog($input)
     ];
+
+    if (is_array($requestSummary)) {
+        $entry['requestSummary'] = adminSanitizeForLog($requestSummary);
+    }
+
+    return $entry;
 }
 
 function adminAppendAuditLog($adminDb, $entry) {
@@ -204,7 +234,7 @@ function adminAppendAuditLog($adminDb, $entry) {
     }
 }
 
-function adminRespond($adminDb, $input, $action, $payload, $status, $success, $verified, $reason = '', $target = null) {
+function adminRespond($adminDb, $input, $action, $payload, $status, $success, $verified, $reason = '', $target = null, $requestSummary = null) {
     adminAppendAuditLog($adminDb, adminCreateLogEntry(
         $action,
         $success,
@@ -212,7 +242,8 @@ function adminRespond($adminDb, $input, $action, $payload, $status, $success, $v
         $status,
         $reason,
         $target,
-        $input
+        $input,
+        $requestSummary
     ));
 
     http_response_code($status);
@@ -382,7 +413,9 @@ if ($parseResult['error'] !== null) {
         $parseResult['status'],
         false,
         true,
-        'invalid_request'
+        'invalid_request',
+        null,
+        isset($parseResult['requestSummary']) ? $parseResult['requestSummary'] : null
     );
 }
 

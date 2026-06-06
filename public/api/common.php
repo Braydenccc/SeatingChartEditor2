@@ -156,6 +156,39 @@ function requireAuthenticatedUsername($sessionDb) {
     return $username;
 }
 
+function normalizeRequestHost($host) {
+    if (!is_string($host)) {
+        return '';
+    }
+
+    $host = strtolower(trim($host));
+    if ($host === '') {
+        return '';
+    }
+
+    return preg_replace('/:\d+$/', '', $host);
+}
+
+function isHttpsSameHostUrl($url) {
+    if (!is_string($url) || trim($url) === '') {
+        return false;
+    }
+
+    $parts = parse_url($url);
+    if (!is_array($parts) || !isset($parts['scheme']) || !isset($parts['host'])) {
+        return false;
+    }
+
+    if (strtolower($parts['scheme']) !== 'https') {
+        return false;
+    }
+
+    $requestHost = isset($_SERVER['HTTP_HOST']) ? normalizeRequestHost($_SERVER['HTTP_HOST']) : '';
+    $sourceHost = normalizeRequestHost($parts['host']);
+
+    return $requestHost !== '' && $sourceHost !== '' && hash_equals($requestHost, $sourceHost);
+}
+
 function isHttpsRequest() {
     if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
         return true;
@@ -170,6 +203,12 @@ function isHttpsRequest() {
         return true;
     }
     if (isset($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] === 'https') {
+        return true;
+    }
+    if (isset($_SERVER['HTTP_ORIGIN']) && isHttpsSameHostUrl($_SERVER['HTTP_ORIGIN'])) {
+        return true;
+    }
+    if (isset($_SERVER['HTTP_REFERER']) && isHttpsSameHostUrl($_SERVER['HTTP_REFERER'])) {
         return true;
     }
     return false;
