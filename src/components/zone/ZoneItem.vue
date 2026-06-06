@@ -392,8 +392,9 @@ onUnmounted(() => {
 }
 
 .add-tag-btn:hover {
-  background: var(--color-primary);
-  color: var(--color-surface);
+  border-color: var(--color-primary);
+  background: var(--color-bg-secondary);
+  color: var(--color-primary);
 }
 
 .zone-info {

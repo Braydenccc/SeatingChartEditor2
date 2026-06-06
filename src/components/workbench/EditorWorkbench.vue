@@ -16,7 +16,7 @@
       </div>
       <div class="rail-content">
         <ZoneEditContextPanel v-if="zoneEditSession" />
-        <ContextInspector v-else-if="isWideDesktop || rightRailTab === 'selection'" />
+        <ContextInspector v-else-if="isWideDesktop || rightRailTab === 'selection' || (isMobileWorkbench && rightRailTab === 'candidates')" />
         <StudentPoolPanel v-else-if="rightRailTab === 'candidates'" />
         <ActivityPanel v-else />
       </div>
@@ -24,22 +24,31 @@
 
     <EditorToolDock class="tool-dock" />
 
-    <Transition name="drawer">
-      <div v-if="mobileDrawer" class="mobile-drawer-shell">
-        <div class="mobile-drawer-header">
+    <Transition :name="suspendedMobileDrawer ? '' : 'drawer'">
+      <div
+        v-if="floatingMobileDrawer"
+        class="mobile-drawer-shell"
+        :class="{ 'is-drag-suspended': suspendedMobileDrawer }"
+      >
+        <div
+          class="mobile-drawer-header"
+          @pointerdown="handleDrawerPointerDown"
+          @pointermove="handleDrawerPointerMove"
+          @pointerup="handleDrawerPointerUp"
+          @pointercancel="handleDrawerPointerCancel"
+        >
           <strong>{{ mobileDrawerTitle }}</strong>
-          <button @click="closeMobileDrawer">关闭</button>
+          <button @pointerdown.stop @click="closeMobileDrawer">关闭</button>
         </div>
         <div class="mobile-drawer-body">
           <ZoneEditContextPanel v-if="zoneEditSession" />
           <StudentPoolPanel v-else-if="mobileDrawer === 'candidates'" />
-          <ContextInspector v-else-if="mobileDrawer === 'selection'" />
-          <ActivityPanel v-else-if="mobileDrawer === 'activity'" />
+          <MobileToolsPanel v-else-if="mobileDrawer === 'tools'" />
         </div>
       </div>
     </Transition>
 
-    <div v-if="mobileDrawer" class="mobile-drawer-backdrop" @click="closeMobileDrawer"></div>
+    <div v-if="floatingMobileDrawer && !suspendedMobileDrawer" class="mobile-drawer-backdrop" @click="closeMobileDrawer"></div>
 
     <WorkbenchDialogs />
   </div>
@@ -52,23 +61,54 @@ import SeatChart from '@/components/seat/SeatChart.vue'
 import ActivityPanel from './ActivityPanel.vue'
 import ContextInspector from './ContextInspector.vue'
 import EditorToolDock from './EditorToolDock.vue'
+import MobileToolsPanel from './MobileToolsPanel.vue'
 import StudentPoolPanel from './StudentPoolPanel.vue'
 import WorkbenchDialogs from './WorkbenchDialogs.vue'
 import ZoneEditContextPanel from './ZoneEditContextPanel.vue'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
-const { rightRailTab, mobileDrawer, zoneEditSession, setRightRailTab, closeMobileDrawer } = useEditorWorkbench()
+const { rightRailTab, mobileDrawer, suspendedMobileDrawer, zoneEditSession, setRightRailTab, closeMobileDrawer } = useEditorWorkbench()
 const isWideDesktop = useMediaQuery('(min-width: 1440px)')
+const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
+const floatingMobileDrawer = computed(() => mobileDrawer.value === 'candidates' || mobileDrawer.value === 'tools')
 
 const mobileDrawerTitle = computed(() => {
   const titles = {
-    candidates: '候选学生',
+    candidates: '学生',
     selection: '上下文',
-    activity: '状态',
     tools: '工具'
   }
   return titles[mobileDrawer.value] || ''
 })
+
+let drawerStartY = 0
+let drawerDragY = 0
+let isDrawerDragging = false
+
+const handleDrawerPointerDown = (e) => {
+  if (e.pointerType !== 'touch') return
+  isDrawerDragging = true
+  drawerStartY = e.clientY
+  drawerDragY = 0
+  e.currentTarget.setPointerCapture?.(e.pointerId)
+}
+
+const handleDrawerPointerMove = (e) => {
+  if (!isDrawerDragging) return
+  drawerDragY = e.clientY - drawerStartY
+}
+
+const handleDrawerPointerUp = () => {
+  if (!isDrawerDragging) return
+  isDrawerDragging = false
+  if (drawerDragY > 64) closeMobileDrawer()
+  drawerDragY = 0
+}
+
+const handleDrawerPointerCancel = () => {
+  isDrawerDragging = false
+  drawerDragY = 0
+}
 </script>
 
 <style scoped>
@@ -181,9 +221,11 @@ const mobileDrawerTitle = computed(() => {
 
 @media (max-width: 1024px) {
   .editor-workbench {
+    --mobile-tool-dock-height: calc(56px + env(safe-area-inset-bottom, 0px));
+    --mobile-drawer-limit: calc(100dvh - var(--app-header-height, 78px) - var(--mobile-tool-dock-height) - 8px);
     display: grid;
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) minmax(220px, 1fr) var(--mobile-tool-dock-height);
   }
 
   .chart-region {
@@ -191,15 +233,32 @@ const mobileDrawerTitle = computed(() => {
     grid-row: 1;
   }
 
-  .student-rail,
-  .context-rail {
+  .student-rail {
     display: none;
+  }
+
+  .context-rail {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: 0;
+    display: flex;
+    border-left: none;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .context-rail .rail-tabs {
+    display: none;
+  }
+
+  .tool-dock {
+    grid-column: 1;
+    grid-row: 3;
   }
 
   .mobile-drawer-backdrop {
     display: block;
     position: fixed;
-    inset: 0;
+    inset: var(--app-header-height, 0px) 0 var(--mobile-tool-dock-height) 0;
     z-index: 998;
     background: var(--color-bg-overlay);
   }
@@ -210,22 +269,49 @@ const mobileDrawerTitle = computed(() => {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 56px;
+    bottom: var(--mobile-tool-dock-height);
     z-index: 999;
-    max-height: 60vh;
-    min-height: 280px;
+    max-height: min(68vh, var(--mobile-drawer-limit));
+    min-height: min(240px, var(--mobile-drawer-limit));
     background: var(--color-surface);
     border-top: 1px solid var(--color-border);
-    border-radius: 12px 12px 0 0;
+    border-radius: 10px 10px 0 0;
     box-shadow: var(--shadow-lg);
     overflow: hidden;
+    transition: transform 0.2s ease, opacity 0.16s ease;
+  }
+
+  .mobile-drawer-shell:focus-within {
+    max-height: min(78vh, var(--mobile-drawer-limit));
+  }
+
+  .mobile-drawer-shell.is-drag-suspended {
+    transform: none;
+    opacity: 0;
+    visibility: hidden;
+    box-shadow: none;
+    pointer-events: none;
+    transition: none !important;
+  }
+
+  :global(body.student-dragging-from-candidate) .editor-workbench {
+    grid-template-rows: minmax(0, 1fr) 0 var(--mobile-tool-dock-height);
+  }
+
+  :global(body.student-dragging-from-candidate) .chart-region {
+    grid-row: 1 / 3;
+  }
+
+  :global(body.student-dragging-from-candidate) .context-rail {
+    display: none;
   }
 
   .mobile-drawer-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 14px;
+    min-height: 44px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
   }
@@ -236,9 +322,12 @@ const mobileDrawerTitle = computed(() => {
   }
 
   .mobile-drawer-header button {
-    border: none;
-    background: transparent;
+    min-height: 34px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
     color: var(--color-primary);
+    padding: 0 10px;
     font-size: 13px;
     cursor: pointer;
   }
@@ -246,6 +335,7 @@ const mobileDrawerTitle = computed(() => {
   .mobile-drawer-body {
     flex: 1;
     min-height: 0;
+    overflow: hidden;
   }
 }
 

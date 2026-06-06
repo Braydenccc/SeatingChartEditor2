@@ -89,4 +89,46 @@ describe('useEditorWorkbench', () => {
     workbench.openMobileDrawer('candidates')
     expect(workbench.mobileDrawer.value).toBeNull()
   })
+
+  it('temporarily hides and restores the candidates drawer while dragging', () => {
+    workbench.openMobileDrawer('candidates')
+
+    workbench.suspendMobileDrawerForDrag('candidates')
+    expect(workbench.mobileDrawer.value).toBe('candidates')
+    expect(workbench.suspendedMobileDrawer.value).toBe('candidates')
+
+    workbench.restoreMobileDrawerAfterDrag()
+    expect(workbench.mobileDrawer.value).toBe('candidates')
+    expect(workbench.suspendedMobileDrawer.value).toBeNull()
+  })
+
+  it('does not restore a drawer that was not suspended', () => {
+    workbench.openMobileDrawer('selection')
+
+    workbench.suspendMobileDrawerForDrag('candidates')
+    expect(workbench.mobileDrawer.value).toBe('selection')
+
+    workbench.restoreMobileDrawerAfterDrag()
+    expect(workbench.mobileDrawer.value).toBe('selection')
+  })
+
+  it('temporarily opens a drag target drawer and restores the previous drawer', () => {
+    workbench.openMobileDrawer('selection')
+
+    workbench.openMobileDrawerForDrag('candidates')
+    expect(workbench.mobileDrawer.value).toBe('candidates')
+    expect(workbench.dragOpenedMobileDrawer.value).toBe('candidates')
+
+    workbench.restoreMobileDrawerOpenedForDrag()
+    expect(workbench.mobileDrawer.value).toBe('selection')
+    expect(workbench.dragOpenedMobileDrawer.value).toBeNull()
+  })
+
+  it('closes the drag target drawer after drag when no drawer was previously open', () => {
+    workbench.openMobileDrawerForDrag('candidates')
+    expect(workbench.mobileDrawer.value).toBe('candidates')
+
+    workbench.restoreMobileDrawerOpenedForDrag()
+    expect(workbench.mobileDrawer.value).toBeNull()
+  })
 })

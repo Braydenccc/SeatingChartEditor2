@@ -2,7 +2,7 @@
 module_name: Student & Data Management
 description: 提供学生数据的增删改查、以及与 Excel 双向互通的完整实现。
 related_files:
-  - src/composables/useStudentData.js
+  - src/composables/useStudentData.ts
   - src/composables/useExcelData.js
 ---
 
@@ -12,14 +12,14 @@ related_files:
 解耦学生数据与座位。提供对学生列表的排序、标签绑定以及利用 `xlsx-js-style` 来解析用户上传的表格并转换成内化数据模型。
 
 ## 2. 源代码入口 (Source Files)
-- 学生数据 Store: `src/composables/useStudentData.js`
-- 标签数据 Store: `src/composables/useTagData.js`
+- 学生数据 Store: `src/composables/useStudentData.ts`
+- 标签数据 Store: `src/composables/useTagData.ts`
 - Excel数据处理: `src/composables/useExcelData.js`
 
 ## 3. 核心 API 暴露 (Core Internal Logic)
 
 ```typescript
-// useStudentData.js
+// useStudentData.ts
 export function useStudentData() {
   const students = ref<Student[]>([])
   

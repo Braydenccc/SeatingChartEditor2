@@ -709,12 +709,12 @@ const close = () => {
 }
 
 .student-roster-dialog {
-  background: var(--color-surface, #ffffff);
+  background: var(--color-surface);
   width: 96vw;
   max-width: 1280px;
   height: 88vh;
   border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 25px var(--shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -746,13 +746,13 @@ const close = () => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background: var(--color-bg-subtle, #f8f9fa);
-  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .dialog-header h3 {
   margin: 0;
-  color: var(--color-primary, #23587b);
+  color: var(--color-primary);
   font-size: 18px;
 }
 
@@ -1465,10 +1465,96 @@ th.sticky-col-3 {
     max-height: 220px;
     border-right: none;
     border-bottom: 1px solid var(--color-border);
+    padding: 12px;
   }
 
   .sheet-toolbar {
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .student-roster-dialog {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .dialog-body {
+    min-height: 0;
+  }
+
+  .roster-context {
+    max-height: 158px;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .context-header {
+    display: none;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(4, minmax(70px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .summary-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .summary-card {
+    padding: 8px;
+  }
+
+  .summary-value {
+    font-size: 17px;
+  }
+
+  .quick-actions,
+  .context-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .context-action-btn,
+  .context-list-item {
+    min-height: 40px;
+  }
+
+  .sheet-toolbar {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .sheet-title-group {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .sheet-title-group h3 {
+    font-size: 15px;
+  }
+
+  .student-count-control {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .student-count-input {
+    min-height: 40px;
+  }
+
+  .add-student-btn {
+    min-height: 40px;
+    margin-left: auto;
+  }
+
+  .sheet-wrap {
+    overscroll-behavior: contain;
   }
 }
 </style>

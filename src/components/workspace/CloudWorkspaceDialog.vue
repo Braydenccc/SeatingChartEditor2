@@ -167,10 +167,10 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'success'])
 
 const { isFetching, listWorkspaces, saveWorkspaceToCloud, loadWorkspaceFromCloud, deleteWorkspaceFromCloud } = useCloudWorkspace()
-const { getWorkspaceJson, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
+const { getWorkspaceJson, applyWorkspaceData, saveLastWorkspace, getLastWorkspace, clearLastWorkspace } = useWorkspace()
 const { success, error } = useLogger()
 const { requestConfirm } = useConfirmAction()
-const { currentUser, webdavConfig, authType, backupMode } = useAuth()
+const { token, webdavConfig, authType, backupMode } = useAuth()
 const { markSaved } = useAutoSave()
 
 const isSaveMode = ref(false)
@@ -180,7 +180,7 @@ const selectedOverwriteId = ref(null)
 const errorMessage = ref('')
 const isSaving = ref(false)
 
-const hasRetiehe = computed(() => !!currentUser.value)
+const hasRetiehe = computed(() => !!token.value)
 const hasWebdav = computed(() => !!webdavConfig.value && !(backupMode.value && hasRetiehe.value))
 const activeTab = ref('retiehe')
 const targetService = ref('retiehe')
@@ -348,7 +348,11 @@ const confirmDelete = (ws) => {
   if (requestConfirm(`delete_${ws.fileId}`, async () => {
     const result = await deleteWorkspaceFromCloud(ws.fileId, ws.source)
     if (result.success) {
-      success(`文件 ${ws.metadata.name} 已删除`)
+      const lastWorkspace = getLastWorkspace()
+      if (lastWorkspace?.type === 'cloud' && lastWorkspace.fileId === ws.fileId) {
+        clearLastWorkspace()
+      }
+      success(`工作区 ${ws.metadata.name} 已标记删除`)
       await fetchWorkspaces()
     } else {
       error(result.message || '删除失败')

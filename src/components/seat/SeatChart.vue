@@ -157,8 +157,8 @@
     <Teleport to="body">
       <div v-show="dragPreviewState.isActive" ref="dragPreviewRef" class="drag-preview-overlay">
         <div v-for="item in previewItems" :key="item.seatId"
-          class="drag-preview-seat" :class="{ 'is-anchor': item.isAnchor }" :style="item.style">
-          {{ item.studentName }}
+          class="drag-preview-seat" :class="{ 'is-anchor': item.isAnchor }" :style="item.style"
+          v-html="item.contentHtml">
         </div>
       </div>
     </Teleport>
@@ -215,7 +215,7 @@ const {
 
 const { firstSelectedSeat, setFirstSelectedSeat, clearFirstSelectedSeat } = useEditMode()
 const { clearSelection: clearStudentSelection, students } = useStudentData()
-const { scale, panX, panY, zoomIn, zoomOut, setScale, setPan, MIN_SCALE, MAX_SCALE, registerViewport, fitToViewport } = useZoom()
+const { scale, panX, panY, zoomIn, zoomOut, setScale, MIN_SCALE, MAX_SCALE, registerViewport, fitToViewport } = useZoom()
 const { recordAssign, recordBatch, createSnapshot, canUndo, canRedo, undo, redo } = useUndo()
 const { isDraggingFromSeat: globalIsDraggingFromSeat, endDragFromSeat } = useDragState()
 const {
@@ -240,7 +240,7 @@ const {
   updateDragPreview,
   endDragPreview
 } = useDragPreview()
-const { setRightRailTab } = useEditorWorkbench()
+const { setRightRailTab, showMobileDrawer, closeMobileDrawer } = useEditorWorkbench()
 
 const dragPreviewRef = ref(null)
 const viewportRef = ref(null)
@@ -291,6 +291,13 @@ const candidateAreaHidden = computed(() => {
 // 是否显示功能栏的移出放置区
 const showDropZone = computed(() => globalIsDraggingFromSeat.value && candidateAreaHidden.value)
 
+const focusSeatContext = (seatId) => {
+  if (!seatId || isGuardSeatId(seatId)) return
+  selectSingleSeat(seatId)
+  setRightRailTab('selection')
+  if (isMobile.value) showMobileDrawer('selection')
+}
+
 // ==================== 变换样式 ====================
 const chartTransformStyle = computed(() => ({
   transform: `translate(calc(-50% + ${panX.value}px), calc(-50% + ${panY.value}px)) scale(${scale.value})`,
@@ -332,6 +339,9 @@ let rightMouseDown = false
 let rightStartX = 0
 let rightStartY = 0
 let rightStartSeatId = null
+let leftSelectionMouseDown = false
+let leftSelectionStartX = 0
+let leftSelectionStartY = 0
 
 // 矩形框选状态
 const isRectSelecting = ref(false)
@@ -339,6 +349,21 @@ const rectSelectStart = ref({ x: 0, y: 0 })
 const rectSelectEnd = ref({ x: 0, y: 0 })
 
 const handleMouseDown = (e) => {
+  if (e.button === 0 && isSelectionMode.value) {
+    const seatEl = findSeatElement(e.target)
+    const seatId = seatEl?.dataset?.seatId
+    if (seatId && !isGuardSeatId(seatId)) {
+      leftSelectionMouseDown = true
+      mouseMoved = false
+      leftSelectionStartX = e.clientX
+      leftSelectionStartY = e.clientY
+      startSelection(seatId)
+      setRightRailTab('selection')
+      e.preventDefault()
+      return
+    }
+  }
+
   if (e.button === 2) {
     // Shift+右键：矩形框选模式
     if (e.shiftKey) {
@@ -380,6 +405,19 @@ const handleMouseMove = (e) => {
     return
   }
 
+  if (leftSelectionMouseDown) {
+    const dx = e.clientX - leftSelectionStartX
+    const dy = e.clientY - leftSelectionStartY
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      mouseMoved = true
+    }
+    const seatEl = findSeatElement(e.target)
+    if (seatEl && seatEl.dataset.seatId && !isGuardSeatId(seatEl.dataset.seatId)) {
+      updateSelection(seatEl.dataset.seatId)
+    }
+    return
+  }
+
   if (rightMouseDown) {
     const dx = e.clientX - rightStartX
     const dy = e.clientY - rightStartY
@@ -405,11 +443,20 @@ const handleMouseMove = (e) => {
   schedulePanUpdate(pendingPanX, pendingPanY)
 }
 
-const handleMouseUp = () => {
+const handleMouseUp = (e) => {
   // 完成矩形框选
   if (isRectSelecting.value) {
     selectSeatsInRect()
     isRectSelecting.value = false
+    return
+  }
+
+  if (leftSelectionMouseDown) {
+    endSelection()
+    leftSelectionMouseDown = false
+    if (e?.type !== 'mouseleave') {
+      suppressNextClick = true
+    }
     return
   }
 
@@ -432,6 +479,15 @@ const handleMouseUp = () => {
 }
 
 const handleViewportClickCapture = (e) => {
+  if (
+    document.body?.classList.contains('student-dragging-from-candidate') ||
+    document.body?.classList.contains('student-drag-ended-from-candidate')
+  ) {
+    e.preventDefault()
+    e.stopPropagation()
+    return
+  }
+
   if (suppressNextClick) {
     suppressNextClick = false
     e.preventDefault()
@@ -441,6 +497,10 @@ const handleViewportClickCapture = (e) => {
 
   if (!findSeatElement(e.target) && selectedCount.value > 0) {
     clearSeatSelection()
+  }
+
+  if (isMobile.value && !findSeatElement(e.target)) {
+    closeMobileDrawer()
   }
 }
 
@@ -617,6 +677,7 @@ const handleDrop = (e) => {
 
     if (data.type === 'student') {
       handleAssignStudent(targetSeatId, data.studentId)
+      focusSeatContext(targetSeatId)
       endDragPreview([targetSeatId])
     } else if (data.type === 'seat') {
       if (data.selectedSeatIds && data.selectedSeatIds.length > 1) {
@@ -654,6 +715,7 @@ const handleDrop = (e) => {
         clearSeatSelection()
       } else if (data.seatId !== targetSeatId) {
         swapSeats(data.seatId, targetSeatId)
+        focusSeatContext(targetSeatId)
         endDragPreview([targetSeatId])
         clearSeatSelection()
       } else {
@@ -763,12 +825,14 @@ const handleTouchSeatDrop = (e) => {
     clearSeatSelection()
   } else if (sourceSeatId !== targetSeatId) {
     swapSeats(sourceSeatId, targetSeatId)
+    focusSeatContext(targetSeatId)
   }
 }
 
 const handleTouchStudentDrop = (e) => {
   const { studentId, targetSeatId } = e.detail
   handleAssignStudent(targetSeatId, studentId)
+  focusSeatContext(targetSeatId)
 }
 
 const handleTouchSeatToList = (e) => {
@@ -1183,20 +1247,17 @@ const rectSelectStyle = computed(() => {
 
 .drag-preview-seat {
   position: absolute;
+  box-sizing: border-box;
   border: 2px solid var(--color-primary);
   border-radius: 12px;
   background: var(--color-bg-selected);
   color: var(--color-text-primary);
-  font-size: 20px;
-  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  padding: 8px;
+  padding: 0;
   box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary) 35%, transparent);
   opacity: 0.95;
 }
@@ -1209,7 +1270,7 @@ const rectSelectStyle = computed(() => {
 
 .rect-select-overlay {
   position: fixed;
-  background: rgba(14, 165, 233, 0.15);
+  background: color-mix(in srgb, var(--color-info) 15%, transparent);
   border: 2px solid var(--color-info);
   border-radius: 4px;
   pointer-events: none;
@@ -1672,16 +1733,16 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
-    --seat-card-width: 100px;
-    --seat-card-height: 70px;
-    --chart-main-gap: 20px;
-    --chart-group-gap: 20px;
-    padding: 20px 12px;
+    --seat-card-width: 92px;
+    --seat-card-height: 62px;
+    --chart-main-gap: 16px;
+    --chart-group-gap: 16px;
+    padding: 16px 10px;
   }
 
   .podium-row {
-    grid-template-columns: var(--seat-card-width) minmax(180px, 260px) var(--seat-card-width);
-    gap: 12px;
+    grid-template-columns: var(--seat-card-width) minmax(156px, 220px) var(--seat-card-width);
+    gap: 10px;
   }
 
   .group-label {
@@ -1690,12 +1751,12 @@ const rectSelectStyle = computed(() => {
   }
 
   .group-content {
-    gap: 10px;
+    gap: 8px;
   }
 
   .row-number-column {
-    width: 28px;
-    gap: 8px;
+    width: 24px;
+    gap: 7px;
   }
 
   .row-number-item {
@@ -1704,7 +1765,7 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-column {
-    gap: 8px;
+    gap: 7px;
   }
 
   .drag-preview-seat {
@@ -1730,16 +1791,16 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
-    --seat-card-width: 90px;
-    --seat-card-height: 55px;
-    --chart-main-gap: 12px;
-    --chart-group-gap: 12px;
-    padding: 14px 8px;
+    --seat-card-width: 78px;
+    --seat-card-height: 50px;
+    --chart-main-gap: 10px;
+    --chart-group-gap: 10px;
+    padding: 12px 6px;
   }
 
   .podium-row {
-    grid-template-columns: var(--seat-card-width) minmax(150px, 220px) var(--seat-card-width);
-    gap: 8px;
+    grid-template-columns: var(--seat-card-width) minmax(128px, 180px) var(--seat-card-width);
+    gap: 6px;
   }
 
   .podium-block {

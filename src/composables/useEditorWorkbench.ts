@@ -4,7 +4,7 @@ export type EditorTool = 'normal' | 'swap' | 'clear' | 'empty'
 export type WorkbenchDialog = 'seatConfig' | 'shiftRotation' | 'zoneRotation' | 'assignment' | 'rules' | null
 export type AssignmentWorkbenchPanel = 'run' | 'rules' | 'guide'
 export type RightRailTab = 'candidates' | 'selection' | 'activity'
-export type MobileDrawer = 'candidates' | 'selection' | 'activity' | 'tools' | null
+export type MobileDrawer = 'candidates' | 'selection' | 'tools' | null
 export type ZoneEditKind = 'assignment' | 'rotation'
 
 export interface ZoneEditSession {
@@ -24,6 +24,9 @@ const isWorkbenchDialogHidden = ref(false)
 const zoneEditSession = ref<ZoneEditSession | null>(null)
 const rightRailTab = ref<RightRailTab>('candidates')
 const mobileDrawer = ref<MobileDrawer>(null)
+const suspendedMobileDrawer = ref<MobileDrawer>(null)
+const dragOpenedMobileDrawer = ref<MobileDrawer>(null)
+const drawerBeforeDragOpen = ref<MobileDrawer>(null)
 
 const validTools = new Set<EditorTool>(['normal', 'swap', 'clear', 'empty'])
 const validDialogs = new Set<Exclude<WorkbenchDialog, null>>([
@@ -37,7 +40,6 @@ const validRightTabs = new Set<RightRailTab>(['candidates', 'selection', 'activi
 const validMobileDrawers = new Set<Exclude<MobileDrawer, null>>([
   'candidates',
   'selection',
-  'activity',
   'tools'
 ])
 
@@ -68,6 +70,9 @@ export function useEditorWorkbench() {
     isWorkbenchDialogHidden.value = false
     zoneEditSession.value = null
     mobileDrawer.value = null
+    suspendedMobileDrawer.value = null
+    dragOpenedMobileDrawer.value = null
+    drawerBeforeDragOpen.value = null
   }
 
   const closeDialog = () => {
@@ -75,6 +80,9 @@ export function useEditorWorkbench() {
     isWorkbenchDialogHidden.value = false
     zoneEditSession.value = null
     focusedRuleId.value = ''
+    suspendedMobileDrawer.value = null
+    dragOpenedMobileDrawer.value = null
+    drawerBeforeDragOpen.value = null
   }
 
   const startZoneEditSession = (session: ZoneEditSession) => {
@@ -86,6 +94,9 @@ export function useEditorWorkbench() {
     isWorkbenchDialogHidden.value = true
     rightRailTab.value = 'selection'
     mobileDrawer.value = null
+    suspendedMobileDrawer.value = null
+    dragOpenedMobileDrawer.value = null
+    drawerBeforeDragOpen.value = null
   }
 
   const finishZoneEditSession = () => {
@@ -100,7 +111,21 @@ export function useEditorWorkbench() {
 
   const openMobileDrawer = (drawer: Exclude<MobileDrawer, null>) => {
     if (!validMobileDrawers.has(drawer)) return
+    suspendedMobileDrawer.value = null
+    dragOpenedMobileDrawer.value = null
+    drawerBeforeDragOpen.value = null
     mobileDrawer.value = mobileDrawer.value === drawer ? null : drawer
+    activeWorkbenchDialog.value = null
+    isWorkbenchDialogHidden.value = false
+    zoneEditSession.value = null
+  }
+
+  const showMobileDrawer = (drawer: Exclude<MobileDrawer, null>) => {
+    if (!validMobileDrawers.has(drawer)) return
+    suspendedMobileDrawer.value = null
+    dragOpenedMobileDrawer.value = null
+    drawerBeforeDragOpen.value = null
+    mobileDrawer.value = drawer
     activeWorkbenchDialog.value = null
     isWorkbenchDialogHidden.value = false
     zoneEditSession.value = null
@@ -108,6 +133,36 @@ export function useEditorWorkbench() {
 
   const closeMobileDrawer = () => {
     mobileDrawer.value = null
+    suspendedMobileDrawer.value = null
+    dragOpenedMobileDrawer.value = null
+    drawerBeforeDragOpen.value = null
+  }
+
+  const suspendMobileDrawerForDrag = (drawer: Exclude<MobileDrawer, null>) => {
+    if (!validMobileDrawers.has(drawer)) return
+    if (mobileDrawer.value !== drawer) return
+    suspendedMobileDrawer.value = drawer
+  }
+
+  const restoreMobileDrawerAfterDrag = () => {
+    if (!suspendedMobileDrawer.value) return
+    suspendedMobileDrawer.value = null
+  }
+
+  const openMobileDrawerForDrag = (drawer: Exclude<MobileDrawer, null>) => {
+    if (!validMobileDrawers.has(drawer)) return
+    if (dragOpenedMobileDrawer.value === drawer) return
+    drawerBeforeDragOpen.value = mobileDrawer.value
+    dragOpenedMobileDrawer.value = drawer
+    suspendedMobileDrawer.value = null
+    mobileDrawer.value = drawer
+  }
+
+  const restoreMobileDrawerOpenedForDrag = () => {
+    if (!dragOpenedMobileDrawer.value) return
+    mobileDrawer.value = drawerBeforeDragOpen.value
+    dragOpenedMobileDrawer.value = null
+    drawerBeforeDragOpen.value = null
   }
 
   return {
@@ -119,6 +174,8 @@ export function useEditorWorkbench() {
     zoneEditSession,
     rightRailTab,
     mobileDrawer,
+    suspendedMobileDrawer,
+    dragOpenedMobileDrawer,
     setTool,
     resetTool,
     openDialog,
@@ -126,7 +183,12 @@ export function useEditorWorkbench() {
     startZoneEditSession,
     finishZoneEditSession,
     setRightRailTab,
+    showMobileDrawer,
     openMobileDrawer,
-    closeMobileDrawer
+    closeMobileDrawer,
+    suspendMobileDrawerForDrag,
+    restoreMobileDrawerAfterDrag,
+    openMobileDrawerForDrag,
+    restoreMobileDrawerOpenedForDrag
   }
 }

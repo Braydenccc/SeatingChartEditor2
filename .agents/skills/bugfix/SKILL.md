@@ -48,7 +48,7 @@ description: 座位表编辑器 v2 的 Codex 专用 Bug 修复工作流。用于
 - 区域轮换：`src/composables/useZoneRotation.js`
 - 座位组件：`src/components/seat/SeatChart.vue`、`src/components/seat/SeatItem.vue`
 - 学生组件：`src/components/student/StudentList.vue`、`src/components/student/StudentItem.vue`
-- 布局组件：`src/App.vue`、`src/components/layout/EditorPanel.vue`、`src/components/layout/SidebarPanel.vue`
+- 布局组件：`src/App.vue`、`src/views/EditorView.vue`、`src/components/workbench/EditorWorkbench.vue`
 
 复杂模块先按需阅读 `.agents/features/`：
 

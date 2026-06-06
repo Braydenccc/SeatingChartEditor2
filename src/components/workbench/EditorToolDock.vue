@@ -13,13 +13,9 @@
         <Users :size="17" stroke-width="2" />
         <span>学生</span>
       </button>
-      <button class="tool-button" title="上下文" @click="openWorkbenchDrawer('selection')">
-        <PanelRight :size="17" stroke-width="2" />
-        <span>上下文</span>
-      </button>
-      <button class="tool-button" title="状态" @click="openWorkbenchDrawer('activity')">
-        <ListChecks :size="17" stroke-width="2" />
-        <span>状态</span>
+      <button class="tool-button" title="更多工具" @click="openWorkbenchDrawer('tools')">
+        <MoreHorizontal :size="17" stroke-width="2" />
+        <span>工具</span>
       </button>
     </div>
 
@@ -79,7 +75,7 @@
         <RefreshCcw :size="17" stroke-width="2" />
         <span>轮换</span>
       </button>
-      <button class="tool-button primary" title="智能排位" @click="openWorkbenchDialog('assignment')">
+      <button class="tool-button" title="智能排位" @click="openWorkbenchDialog('assignment')">
         <Shuffle :size="17" stroke-width="2" />
         <span>排位</span>
       </button>
@@ -116,11 +112,10 @@ import {
   Check,
   FileOutput,
   LayoutGrid,
-  ListChecks,
   Minus,
+  MoreHorizontal,
   MousePointer2,
   MoveDiagonal2,
-  PanelRight,
   Plus,
   Redo2,
   RefreshCcw,
@@ -138,24 +133,26 @@ import { useUndo } from '@/composables/useUndo'
 import { useZoom } from '@/composables/useZoom'
 import { useZoneData } from '@/composables/useZoneData'
 import { useZoneRotation } from '@/composables/useZoneRotation'
+import { useLogger } from '@/composables/useLogger'
 
 const router = useRouter()
-const { setTool, openDialog, openMobileDrawer, zoneEditSession, finishZoneEditSession } = useEditorWorkbench()
+const { setTool, openDialog, showMobileDrawer, openMobileDrawer, closeMobileDrawer, zoneEditSession, finishZoneEditSession } = useEditorWorkbench()
 const { currentMode, setMode, clearFirstSelectedSeat, EditMode } = useEditMode()
 const { isSelectionMode, selectedCount, toggleSelectionMode: toggleRawSelectionMode, clearSelection } = useSelection()
 const { undo, redo, canUndo, canRedo } = useUndo()
 const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom()
 const { clearZoneSelection } = useZoneData()
 const { clearEditingZone } = useZoneRotation()
+const { info } = useLogger()
 
 const selectionModeHint = computed(() => {
   if (selectedCount.value > 0) return `已选 ${selectedCount.value} 个座位`
-  return '右键座位进行多选'
+  return '按住左键涂抹多选'
 })
 
 const selectionToolTitle = computed(() => {
   if (isSelectionMode.value) return `${selectionModeHint.value}，再次点击退出多选`
-  return '多选座位：右键座位加入选择，右键拖过可连续选择，Shift+右键框选'
+  return '多选座位：按住左键拖过座位连续选择，Shift+右键框选'
 })
 
 const activateTool = (tool) => {
@@ -168,6 +165,7 @@ const activateTool = (tool) => {
     if (isSelectionMode.value) toggleRawSelectionMode()
     return
   }
+  closeMobileDrawer()
   if (isSelectionMode.value) toggleRawSelectionMode()
   const modeMap = {
     swap: EditMode.SWAP,
@@ -179,6 +177,12 @@ const activateTool = (tool) => {
     setTool('normal')
   } else {
     setMode(modeMap[tool])
+    const hints = {
+      swap: '交换模式：依次点击两个座位交换学生',
+      clear: '清空模式：点击有学生的座位移出学生',
+      empty: '空置编辑：点击座位切换是否可用'
+    }
+    info(hints[tool])
   }
 }
 
@@ -189,6 +193,12 @@ const toggleSelectionMode = () => {
     setTool('normal')
   }
   toggleRawSelectionMode()
+  if (isSelectionMode.value) {
+    showMobileDrawer('selection')
+    info('多选模式：按住左键涂抹选择座位，再从上下文面板执行操作')
+  } else {
+    closeMobileDrawer()
+  }
 }
 
 const finishZoneEditing = () => {
@@ -221,6 +231,8 @@ const openWorkbenchDrawer = (drawer) => {
   box-shadow: var(--shadow-sm);
   overflow-x: auto;
   scrollbar-gutter: stable;
+  position: relative;
+  z-index: 20;
 }
 
 .tool-group {
@@ -329,16 +341,6 @@ const openWorkbenchDrawer = (drawer) => {
   border-color: color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
-.tool-button.primary {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.tool-button.primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  color: var(--color-text-inverse);
-}
-
 .tool-button:disabled {
   color: var(--color-text-disabled);
   cursor: not-allowed;
@@ -385,8 +387,52 @@ const openWorkbenchDrawer = (drawer) => {
 
 @media (max-width: 1024px) {
   .editor-tool-dock {
-    min-height: 56px;
-    padding: 7px 8px;
+    height: var(--mobile-tool-dock-height, calc(56px + env(safe-area-inset-bottom, 0px)));
+    min-height: var(--mobile-tool-dock-height, calc(56px + env(safe-area-inset-bottom, 0px)));
+    align-items: center;
+    gap: 5px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    box-shadow: 0 -6px 18px var(--shadow-md);
+    scrollbar-width: none;
+  }
+
+  .editor-tool-dock::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tool-group {
+    min-height: 44px;
+    padding-right: 5px;
+    gap: 3px;
+  }
+
+  .tool-button {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 7px;
+  }
+
+  .tool-button.icon-only {
+    width: 44px;
+  }
+
+  .zoom-label {
+    width: 56px;
+    min-width: 56px;
+  }
+
+  .selection-mode-hint {
+    min-height: 36px;
+    display: inline-flex;
+    padding: 0 9px;
+    border-left: none;
+    border-radius: 7px;
+    background: var(--color-bg-subtle);
+    color: var(--color-primary);
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .mobile-only {
@@ -399,6 +445,11 @@ const openWorkbenchDrawer = (drawer) => {
 
   .zoom-tools {
     order: 5;
+  }
+
+  :global(body.student-dragging-from-candidate) .workflows,
+  :global(body.seat-dragging-from-chart) .workflows {
+    display: none;
   }
 }
 </style>

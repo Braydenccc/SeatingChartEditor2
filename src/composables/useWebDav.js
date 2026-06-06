@@ -1,19 +1,53 @@
-import { ref } from 'vue'
 import { fetchWithRetry } from '@/utils/fetchHelpers'
-
-const WEBDAV_CONFIG_KEY = 'sce_webdav_config'
+import { getOrCreateCsrfToken, useAuth } from './useAuth'
 
 export function useWebDav() {
+  const bytesToBinaryString = (bytes) => {
+    const chunkSize = 0x8000
+    let result = ''
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      result += String.fromCodePoint(...bytes.subarray(i, i + chunkSize))
+    }
+    return result
+  }
+
   const getAuthHeader = (username, password) => {
     const credentials = `${username}:${password}`
     // Support UTF-8 encoding for base64
     const bytes = new TextEncoder().encode(credentials)
-    const binString = String.fromCodePoint(...bytes)
+    const binString = bytesToBinaryString(bytes)
     return 'Basic ' + btoa(binString)
   }
 
   const normalizeUrl = (url) => {
     return url.endsWith('/') ? url.slice(0, -1) : url
+  }
+
+  const buildDirectUrl = (config, path) => {
+    const baseUrl = normalizeUrl(config.url)
+    return path.startsWith('http') ? path : baseUrl + (path.startsWith('/') ? path : '/' + path)
+  }
+
+  const buildHeaders = (config, options = {}) => {
+    const username = config.username || ''
+    const password = config.password || ''
+    const headers = {
+      ...options.headers
+    }
+
+    if (username || password) {
+      headers['Authorization'] = getAuthHeader(username, password)
+    }
+
+    return headers
+  }
+
+  const isNetworkOrCorsError = (error) => {
+    return error?.name === 'TypeError' || error?.message?.includes('Failed to fetch')
+  }
+
+  const describeProxyFallback = () => {
+    return 'WebDAV 服务器连接失败或不允许浏览器跨域访问。可登录 SCE 账号后启用安全中转，或使用桌面版/支持 CORS 的 WebDAV 服务。'
   }
 
   /**
@@ -22,51 +56,74 @@ export function useWebDav() {
   const request = async (config, path, options = {}, requestOptions = {}) => {
     if (!config || !config.url) throw new Error('WebDAV配置无效')
 
-    const baseUrl = normalizeUrl(config.url)
-    const fullUrl = path.startsWith('http') ? path : baseUrl + (path.startsWith('/') ? path : '/' + path)
-    const username = config.username || ''
-    const password = config.password || ''
-
-    const headers = {
-      ...options.headers,
-      'x-dav-url': fullUrl
-    }
-
-    if (username || password) {
-      headers['Authorization'] = getAuthHeader(username, password)
-    }
-
     const { noThrowStatuses = [] } = requestOptions
+    const directUrl = buildDirectUrl(config, path)
 
-    try {
-      const response = await fetchWithRetry('/api/dav-proxy', {
+    const handleResponse = (response) => {
+      if (response.ok || noThrowStatuses.includes(response.status)) {
+        return response
+      }
+      if (response.status === 401) {
+        const authError = new Error('WebDAV 认证失败，请检查用户名和密码')
+        authError.status = response.status
+        throw authError
+      }
+      if (response.status === 403) {
+        const permissionError = new Error('WebDAV 权限不足，请检查账户权限')
+        permissionError.status = response.status
+        throw permissionError
+      }
+      const requestError = new Error(`WebDAV 请求失败 (${response.status})`)
+      requestError.status = response.status
+      throw requestError
+    }
+
+    const fetchDirect = async () => {
+      const response = await fetchWithRetry(directUrl, {
         ...options,
-        headers
+        headers: buildHeaders(config, options)
       }, 2)
 
-      if (!response.ok) {
-        if (noThrowStatuses.includes(response.status)) {
-          return response
-        }
-        if (response.status === 401) {
-          const authError = new Error('WebDAV 认证失败，请检查用户名和密码')
-          authError.status = response.status
-          throw authError
-        }
-        if (response.status === 403) {
-          const permissionError = new Error('WebDAV 权限不足，请检查账户权限')
-          permissionError.status = response.status
-          throw permissionError
-        }
-        const requestError = new Error(`WebDAV 请求失败 (${response.status})`)
-        requestError.status = response.status
-        throw requestError
+      return handleResponse(response)
+    }
+
+    const fetchViaProxy = async () => {
+      const { token } = useAuth()
+      if (!token.value) {
+        throw new Error(describeProxyFallback())
       }
 
-      return response
+      const csrfToken = getOrCreateCsrfToken()
+      const response = await fetchWithRetry('/api/dav-proxy.php', {
+        ...options,
+        credentials: 'same-origin',
+        headers: {
+          ...buildHeaders(config, options),
+          'x-dav-base-url': normalizeUrl(config.url),
+          'x-dav-path': path.startsWith('http') ? `${new URL(path).pathname}${new URL(path).search}` : path,
+          'X-CSRF-Token': csrfToken
+        }
+      }, 2)
+
+      return handleResponse(response)
+    }
+
+    try {
+      if (config.useProxy) {
+        return await fetchViaProxy()
+      }
+
+      try {
+        return await fetchDirect()
+      } catch (error) {
+        if (!isNetworkOrCorsError(error)) {
+          throw error
+        }
+        return await fetchViaProxy()
+      }
     } catch (error) {
-      if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
-        throw new Error('WebDAV 服务器连接失败，请检查网络或 CORS 配置')
+      if (isNetworkOrCorsError(error)) {
+        throw new Error(describeProxyFallback())
       }
       throw error
     }

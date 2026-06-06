@@ -2,7 +2,7 @@
 trigger: conditional
 globs:
   - "src/components/zone/**"
-  - "src/composables/useZoneData.js"
+  - "src/composables/useZoneData.ts"
   - "src/composables/useZoneRotation.js"
 ---
 

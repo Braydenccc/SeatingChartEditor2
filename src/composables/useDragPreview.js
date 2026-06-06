@@ -23,6 +23,13 @@ let cachedChartRect = null
 let previewEl = null
 let updateRafId = null
 
+const escapeSelectorValue = (value) => {
+  if (typeof window !== 'undefined' && window.CSS?.escape) {
+    return window.CSS.escape(value)
+  }
+  return String(value).replace(/["\\]/g, '\\$&')
+}
+
 export function useDragPreview() {
   const { seatConfig, getSeat } = useSeatChart()
   const { scale } = useZoom()
@@ -148,6 +155,12 @@ export function useDragPreview() {
   const previewItems = computed(() => {
     if (!state.isActive || !state.anchorSeatId) return []
 
+    const getSeatContentHtml = (seatId) => {
+      if (!chartEl) return ''
+      const seatEl = chartEl.querySelector(`.seat-item[data-seat-id="${escapeSelectorValue(seatId)}"]`)
+      return seatEl?.innerHTML || ''
+    }
+
     if (isGuardSeatId(state.anchorSeatId)) {
       const seat = getSeat(state.anchorSeatId)
       const student = students.value.find(s => s.id === seat?.studentId)
@@ -155,6 +168,7 @@ export function useDragPreview() {
         seatId: state.anchorSeatId,
         studentId: seat?.studentId ?? null,
         studentName: student?.name || '',
+        contentHtml: getSeatContentHtml(state.anchorSeatId),
         isAnchor: true,
         style: {
           left: '50%',
@@ -222,6 +236,7 @@ export function useDragPreview() {
         seatId: sid,
         studentId: seat?.studentId ?? null,
         studentName: student?.name || '',
+        contentHtml: getSeatContentHtml(sid),
         isAnchor,
         style: {
           left: `calc(50% + ${dx}px)`,

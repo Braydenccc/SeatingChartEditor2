@@ -78,7 +78,7 @@
 
           <section class="panel-section">
             <div class="section-heading">
-              <h3>排位参数</h3>
+              <h3>迭代次数</h3>
               <span class="iteration-badge">{{ (assignConfig.maxIterations / 10000).toFixed(0) }}w</span>
             </div>
             <input v-model.number="assignConfig.maxIterations" type="range" min="10000" max="1000000" step="10000" />

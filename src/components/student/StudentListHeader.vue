@@ -20,7 +20,7 @@
             <X :size="14" stroke-width="2.5" />
             <span>{{ currentMode === EditMode.ZONE_EDIT ? '完成' : '取消' }}</span>
           </button>
-          <button v-else class="icon-btn btn-primary-light" title="开始导出" @click="openExportView">
+          <button v-else class="icon-btn" title="开始导出" @click="openExportView">
             <FileOutput :size="14" stroke-width="2.5" />
             <span>导出</span>
           </button>
@@ -29,7 +29,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-right">
-      <button v-if="unassignedCount > 0" class="icon-btn btn-primary" title="随机排位" @click="handleRandomAssign">
+      <button v-if="unassignedCount > 0" class="icon-btn" title="随机排位" @click="handleRandomAssign">
         <Shuffle :size="15" stroke-width="2.5" />
         <span>一键排入</span>
       </button>
@@ -253,37 +253,6 @@ const openExportView = () => router.push({ path: '/export', query: { tab: 'image
 
 .icon-btn:active {
   transform: scale(0.97);
-}
-
-.icon-btn.btn-primary {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border-color: transparent;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-primary) 20%, transparent);
-}
-
-.icon-btn.btn-primary:hover {
-  background: var(--color-primary-hover);
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 30%, transparent);
-  color: var(--color-text-inverse);
-  border-color: transparent;
-  transform: translateY(-1px);
-}
-
-.icon-btn.btn-primary:active {
-  transform: translateY(0) scale(0.97);
-}
-
-.icon-btn.btn-primary-light {
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-  color: var(--color-primary);
-  border: 1px solid color-mix(in srgb, var(--color-primary) 15%, transparent);
-}
-
-.icon-btn.btn-primary-light:hover {
-  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
-  border-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
-  color: var(--color-primary-hover);
 }
 
 .icon-btn.btn-ghost {

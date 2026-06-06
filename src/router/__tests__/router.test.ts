@@ -11,6 +11,7 @@ describe('router', () => {
   it('resolves full-screen routes', () => {
     expect(router.resolve('/editor').name).toBe('editor')
     expect(router.resolve('/files').name).toBe('files')
+    expect(router.resolve('/user').name).toBe('user')
     expect(router.resolve('/students').name).toBe('students')
     expect(router.resolve('/export').name).toBe('export')
     expect(router.resolve('/settings').name).toBe('settings')

@@ -120,4 +120,24 @@ const formatLogTime = (timestamp) => {
   color: var(--color-text-muted);
   font-size: 13px;
 }
+
+@media (max-width: 768px) {
+  .panel-header {
+    padding: 10px 12px;
+  }
+
+  .panel-header h2 {
+    font-size: 14px;
+  }
+
+  .activity-list {
+    padding: 8px 10px 12px;
+  }
+
+  .activity-item {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 7px;
+    margin-bottom: 7px;
+  }
+}
 </style>

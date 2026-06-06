@@ -82,22 +82,6 @@ function ensureHttps() {
         $isHttps = true;
     }
 
-    // 6. 检查 Origin 头（前端 fetch 请求会携带）
-    if (!$isHttps && isset($_SERVER['HTTP_ORIGIN'])) {
-        $origin = $_SERVER['HTTP_ORIGIN'];
-        if (strpos($origin, 'https://') === 0) {
-            $isHttps = true;
-        }
-    }
-
-    // 7. 检查 Referer 头
-    if (!$isHttps && isset($_SERVER['HTTP_REFERER'])) {
-        $referer = $_SERVER['HTTP_REFERER'];
-        if (strpos($referer, 'https://') === 0) {
-            $isHttps = true;
-        }
-    }
-
     if (!$isHttps) {
         respond(['success' => false, 'message' => '必须使用 HTTPS 连接'], 403);
     }
@@ -142,64 +126,9 @@ function checkIpRateLimit() {
 }
 
 function validatePassword($password) {
-    if (strlen($password) < 8) {
-        respond(['success' => false, 'message' => '密码至少需要 8 个字符']);
-    }
-
-    if (!preg_match('/[A-Z]/', $password)) {
-        respond(['success' => false, 'message' => '密码必须包含至少一个大写字母']);
-    }
-
-    if (!preg_match('/[a-z]/', $password)) {
-        respond(['success' => false, 'message' => '密码必须包含至少一个小写字母']);
-    }
-
-    if (!preg_match('/[0-9]/', $password)) {
-        respond(['success' => false, 'message' => '密码必须包含至少一个数字']);
-    }
-}
-
-/**
- * 解密客户端加密的密码
- * @param string $encryptedPassword Base64 编码的加密数据
- * @param string $username 用户名（用作密钥派生）
- * @return string|null 明文密码或 null（解密失败）
- */
-function decryptPasswordFromTransport($encryptedPassword, $username) {
-    try {
-        // Base64 解码
-        $combined = base64_decode($encryptedPassword, true);
-        if ($combined === false) {
-            return null;
-        }
-
-        // 分离 IV (12 字节)、密文和 tag (16 字节)
-        $iv = substr($combined, 0, 12);
-        $ciphertextWithTag = substr($combined, 12);
-
-        // AES-GCM: tag 在密文末尾 16 字节
-        $tag = substr($ciphertextWithTag, -16);
-        $ciphertext = substr($ciphertextWithTag, 0, -16);
-
-        // 派生密钥（与客户端相同的算法）
-        $keyMaterial = "sce-auth-{$username}";
-        $salt = "sce-transport-salt-v1";
-        $key = hash_pbkdf2('sha256', $keyMaterial, $salt, 100000, 32, true);
-
-        // 解密（AES-256-GCM）
-        $decrypted = openssl_decrypt(
-            $ciphertext,
-            'aes-256-gcm',
-            $key,
-            OPENSSL_RAW_DATA,
-            $iv,
-            $tag
-        );
-
-        return $decrypted !== false ? $decrypted : null;
-    } catch (Exception $e) {
-        error_log("Password decryption failed: " . $e->getMessage());
-        return null;
+    $validation = validatePasswordStrength($password);
+    if (!$validation['valid']) {
+        respond(['success' => false, 'message' => $validation['message']]);
     }
 }
 
@@ -213,7 +142,30 @@ function issueSessionToken($sessionDb, $username, $rememberMe = false) {
     $sessionData = json_encode(['tokenHash' => $tokenHash, 'expiry' => $expiry]);
     $sessionDb->set($username, $sessionData);
 
-    return $token;
+    return ['token' => $token, 'expiryDays' => $expiryDays];
+}
+
+function setAuthCookies($username, $tokenData) {
+    setAppCookie('sce_username', $username, $tokenData['expiryDays'], true);
+    setAppCookie('sce_token', $tokenData['token'], $tokenData['expiryDays'], true);
+}
+
+function clearAuthCookies() {
+    clearAppCookie('sce_username', true);
+    clearAppCookie('sce_token', true);
+}
+
+function sanitizeUserSettings($settings) {
+    if (!is_array($settings)) {
+        return [];
+    }
+
+    if (isset($settings['webdav']) && is_array($settings['webdav'])) {
+        unset($settings['webdav']['password']);
+        unset($settings['webdav']['authorization']);
+    }
+
+    return $settings;
 }
 
 try {
@@ -221,26 +173,11 @@ try {
 
     $action = $input['action'];
     $username = isset($input['username']) ? trim($input['username']) : '';
-
-    // 支持加密密码和明文密码（向后兼容）
-    $encryptedPassword = isset($input['encryptedPassword']) && is_string($input['encryptedPassword']) ? $input['encryptedPassword'] : '';
     $password = isset($input['password']) && is_string($input['password']) ? $input['password'] : '';
+    $currentPassword = isset($input['currentPassword']) && is_string($input['currentPassword']) ? $input['currentPassword'] : '';
+    $newPassword = isset($input['newPassword']) && is_string($input['newPassword']) ? $input['newPassword'] : '';
 
-    // 如果提供了加密密码，尝试解密
-    if ($encryptedPassword !== '' && $username !== '') {
-        $decrypted = decryptPasswordFromTransport($encryptedPassword, $username);
-        if ($decrypted !== null) {
-            $password = $decrypted;
-        } else {
-            // 解密失败，记录日志但不暴露详细信息
-            error_log("Failed to decrypt password for user: {$username}");
-            respond(['success' => false, 'message' => '密码格式错误，请重试'], 400);
-        }
-    }
-
-    $token = isset($input['token']) ? trim($input['token']) : '';
-
-    $allowedActions = ['register', 'login', 'logout', 'set_settings', 'get_settings'];
+    $allowedActions = ['register', 'login', 'verify', 'logout', 'change_password', 'set_settings', 'get_settings'];
     if (!in_array($action, $allowedActions, true)) {
         respond(['success' => false, 'message' => 'Unknown action'], 400);
     }
@@ -251,6 +188,7 @@ try {
 
     $db = new Database("users");
     $sessionDb = new Database("users_sessions");
+    $profileDb = new Database("user_profiles");
     if ($action === 'register') {
         ensureHttps();
         checkIpRateLimit();
@@ -270,15 +208,20 @@ try {
 
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $db->set($username, $hash);
+        $profileDb->set($username, json_encode([
+            'status' => 'active',
+            'createdAt' => date('c'),
+            'updatedAt' => date('c')
+        ], JSON_UNESCAPED_UNICODE));
 
         $issuedToken = issueSessionToken($sessionDb, $username);
+        setAuthCookies($username, $issuedToken);
         logSecurityEvent('register_success', $username);
         respond([
             'success' => true,
             'message' => '注册成功',
             'data' => [
-                'username' => $username,
-                'token' => $issuedToken
+                'username' => $username
             ]
         ]);
 
@@ -299,42 +242,80 @@ try {
         }
 
         if (password_verify($password, $existingHash)) {
+            if (isUserDisabled($profileDb, $username)) {
+                logSecurityEvent('login_failed', $username, ['reason' => 'user_disabled']);
+                respond(['success' => false, 'message' => '账号已被禁用'], 403);
+            }
+
             $issuedToken = issueSessionToken($sessionDb, $username);
+            setAuthCookies($username, $issuedToken);
             logSecurityEvent('login_success', $username);
             respond([
                 'success' => true,
                 'message' => '登录成功',
                 'data' => [
-                    'username' => $username,
-                    'token' => $issuedToken
+                    'username' => $username
                 ]
             ]);
         } else {
             logSecurityEvent('login_failed', $username, ['reason' => 'invalid_password']);
             respond(['success' => false, 'message' => '用户名或密码不正确']);
         }
+    } elseif ($action === 'verify') {
+        $authUsername = getAuthenticatedUsername($sessionDb);
+        if ($authUsername === null) {
+            respond(['success' => false, 'message' => '未登录'], 401);
+        }
+        respond([
+            'success' => true,
+            'data' => [
+                'username' => $authUsername
+            ]
+        ]);
     } elseif ($action === 'logout') {
-        if (!isValidUsername($username) || !isAuthorized($sessionDb, $username, $token)) {
+        $authUsername = getAuthenticatedUsername($sessionDb);
+        if ($authUsername === null) {
             logSecurityEvent('logout_failed', $username, ['reason' => 'invalid_token']);
+            clearAuthCookies();
             respond(['success' => false, 'message' => 'Token过期或无效'], 401);
         }
-        $sessionDb->delete($username);
-        logSecurityEvent('logout_success', $username);
+        $sessionDb->delete($authUsername);
+        clearAuthCookies();
+        logSecurityEvent('logout_success', $authUsername);
         respond(['success' => true, 'message' => '登出成功']);
-    } elseif ($action === 'set_settings') {
-        if (!isValidUsername($username) || !isAuthorized($sessionDb, $username, $token)) {
-            respond(['success' => false, 'message' => 'Token过期或无效'], 401);
+    } elseif ($action === 'change_password') {
+        ensureHttps();
+        $authUsername = requireAuthenticatedUsername($sessionDb);
+        checkRateLimitGeneric('change_password_' . $authUsername, MAX_ATTEMPTS, '密码修改尝试次数过多', 'change_password_rate_limit', $authUsername);
+
+        if ($currentPassword === '' || $newPassword === '') {
+            respond(['success' => false, 'message' => '当前密码和新密码不能为空']);
         }
+
+        validatePassword($newPassword);
+
+        $existingHash = $db->get($authUsername);
+        if ($existingHash === null || !password_verify($currentPassword, $existingHash)) {
+            logSecurityEvent('change_password_failed', $authUsername, ['reason' => 'invalid_current_password']);
+            respond(['success' => false, 'message' => '当前密码不正确']);
+        }
+
+        $db->set($authUsername, password_hash($newPassword, PASSWORD_DEFAULT));
+        $issuedToken = issueSessionToken($sessionDb, $authUsername);
+        setAuthCookies($authUsername, $issuedToken);
+        logSecurityEvent('change_password_success', $authUsername);
+        respond(['success' => true, 'message' => '密码已修改']);
+    } elseif ($action === 'set_settings') {
+        $authUsername = requireAuthenticatedUsername($sessionDb);
         $settingsDb = new Database("users_settings");
-        $settingsStr = isset($input['settings']) ? json_encode($input['settings'], JSON_UNESCAPED_UNICODE) : '{}';
-        $settingsDb->set($username, $settingsStr);
+        $settings = isset($input['settings']) ? sanitizeUserSettings($input['settings']) : [];
+        $settingsStr = json_encode($settings, JSON_UNESCAPED_UNICODE);
+        $settingsDb->set($authUsername, $settingsStr);
         respond(['success' => true, 'message' => '设置已保存']);
     } elseif ($action === 'get_settings') {
-        if (!isValidUsername($username) || !isAuthorized($sessionDb, $username, $token)) {
-            respond(['success' => false, 'message' => 'Token过期或无效'], 401);
-        }
+        $authUsername = requireAuthenticatedUsername($sessionDb);
         $settingsDb = new Database("users_settings");
-        $settingsStr = $settingsDb->get($username);
+        $settingsStr = $settingsDb->get($authUsername);
         $settings = $settingsStr ? json_decode($settingsStr, true) : null;
         respond(['success' => true, 'data' => $settings]);
     }

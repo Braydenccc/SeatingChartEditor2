@@ -49,7 +49,7 @@ const {
   closeDialog
 } = useEditorWorkbench()
 const { requestConfirm, isConfirming } = useConfirmAction()
-const { updateConfig, clearAllSeats } = useSeatChart()
+const { updateConfig } = useSeatChart()
 const { success, warning } = useLogger()
 
 const handleDialogVisible = (visible) => {
@@ -59,13 +59,12 @@ const handleDialogVisible = (visible) => {
 const handleSeatConfigConfirm = (newConfig) => {
   const confirmed = requestConfirm('applyConfig', () => {
     updateConfig(newConfig)
-    clearAllSeats(false)
     closeDialog()
     success('座位配置已更新')
-  }, '再次点击确认清空')
+  }, '再次点击确认应用')
 
   if (!confirmed) {
-    warning('再次点击"应用配置并清空"按钮以确认清空所有座位')
+    warning('再次点击"应用配置"按钮以确认更新座位布局')
   }
 }
 </script>

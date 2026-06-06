@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { safeStorageGet as storageGet, safeStorageSet as storageSet, safeStorageRemove as storageRemove } from '@/utils/storage'
-import { encrypt, decrypt, encryptPasswordForTransport } from '@/utils/crypto'
+import { encrypt, decrypt } from '@/utils/crypto'
 
 const currentUser = ref(null)
 const token = ref(null)
@@ -12,6 +12,7 @@ const webdavConfig = ref(null)
 const backupMode = ref(false)
 
 const COOKIE_EXPIRY_DAYS = 7
+const cookieSessionToken = 'cookie-session'
 
 // 包装存储函数以支持认证相关数据的 sessionStorage 优先策略
 const safeStorageGet = (key) => {
@@ -84,25 +85,81 @@ const getOrCreateCsrfToken = () => {
 
 export { getOrCreateCsrfToken }
 
+const sanitizeWebdavSettings = (webdav) => {
+    if (!webdav) return null
+    const { password, encryptedPassword, authorization, ...safeWebdav } = webdav
+    return safeWebdav
+}
+
+const decryptWebdavPassword = async (encryptedPassword, legacyKey = null) => {
+    if (!encryptedPassword) return null
+
+    const keys = legacyKey ? [null, legacyKey] : [null]
+    for (const key of keys) {
+        const decryptedPassword = await decrypt(encryptedPassword, key)
+        if (decryptedPassword) return decryptedPassword
+    }
+
+    return null
+}
+
+const preparePersistedWebdavConfig = async (webdav) => {
+    if (!webdav) return null
+
+    const safeWebdav = sanitizeWebdavSettings(webdav)
+    if (webdav.password) {
+        const encryptedPassword = await encrypt(webdav.password, null)
+        if (encryptedPassword) {
+            safeWebdav.encryptedPassword = encryptedPassword
+        }
+    } else if (webdav.encryptedPassword) {
+        safeWebdav.encryptedPassword = webdav.encryptedPassword
+    }
+
+    return safeWebdav
+}
+
+const persistLocalWebdavConfig = (config) => {
+    if (!config) {
+        eraseCookie('sce_webdav_config')
+        return
+    }
+
+    const configJson = JSON.stringify(config)
+    if (getCookie('sce_webdav_config') !== configJson) {
+        setCookie('sce_webdav_config', configJson)
+    }
+}
+
+const verifyRetieheSession = async () => {
+    try {
+        const csrfToken = getOrCreateCsrfToken()
+        const response = await fetch('/api/auth.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify({ action: 'verify', _csrf: csrfToken })
+        })
+        const result = await response.json().catch(() => null)
+        if (response.ok && result?.success && result.data?.username) {
+            currentUser.value = { username: result.data.username }
+            token.value = cookieSessionToken
+            authType.value = 'retiehe'
+            return true
+        }
+    } catch (e) {
+        console.error('Failed to verify session:', e)
+    }
+
+    token.value = null
+    return false
+}
+
 // Initialize from cookies
 const initAuth = async () => {
-    const savedUser = getCookie('sce_user')
-    const savedToken = getCookie('sce_token')
-    if (savedUser && savedToken) {
-        try {
-            const parsed = JSON.parse(savedUser)
-            if (parsed && typeof parsed === 'object' && typeof parsed.username === 'string') {
-                currentUser.value = parsed
-                token.value = savedToken
-            } else {
-                eraseCookie('sce_user')
-                eraseCookie('sce_token')
-            }
-        } catch (e) {
-            eraseCookie('sce_user')
-            eraseCookie('sce_token')
-        }
-    }
+    const legacyToken = getCookie('sce_token')
+    await verifyRetieheSession()
+    eraseCookie('sce_user')
 
     // 初始化 WebDAV 访客配置
     const savedWebdav = getCookie('sce_webdav_config')
@@ -112,8 +169,7 @@ const initAuth = async () => {
 
             // 如果有加密的密码，尝试解密
             if (config.encryptedPassword) {
-                const userKey = token.value || null // 使用 SCE token 或通用密钥
-                const decryptedPassword = await decrypt(config.encryptedPassword, userKey)
+                const decryptedPassword = await decryptWebdavPassword(config.encryptedPassword, legacyToken)
                 if (decryptedPassword) {
                     config.password = decryptedPassword
                     delete config.encryptedPassword
@@ -148,25 +204,35 @@ const initAuth = async () => {
 
     // 初始化后如果本身是受信任状态，则拉取后台同步数据
     // 延迟执行，避免阻塞应用初始加载
-    if (currentUser.value && token.value) {
+    if (currentUser.value && token.value === cookieSessionToken) {
         setTimeout(() => fetchSyncSettings(), 100)
     }
 }
 
 const fetchSyncSettings = async () => {
-    if (!currentUser.value || !token.value) return;
+    if (!currentUser.value || token.value !== cookieSessionToken) return;
     try {
         const csrfToken = getOrCreateCsrfToken()
         const response = await fetch('/api/auth.php', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-            body: JSON.stringify({ action: 'get_settings', username: currentUser.value.username, token: token.value, _csrf: csrfToken })
+            body: JSON.stringify({ action: 'get_settings', _csrf: csrfToken })
         })
         const result = await response.json()
         if (result.success && result.data) {
             if (result.data.webdav) {
-                webdavConfig.value = result.data.webdav
+                const savedWebdav = result.data.webdav
+                const existingPassword = webdavConfig.value?.url === result.data.webdav.url &&
+                    webdavConfig.value?.username === result.data.webdav.username
+                    ? webdavConfig.value?.password
+                    : undefined
+                const decryptedPassword = existingPassword || await decryptWebdavPassword(savedWebdav.encryptedPassword)
+                webdavConfig.value = {
+                    ...savedWebdav,
+                    password: decryptedPassword
+                }
+                persistLocalWebdavConfig(savedWebdav)
             }
             backupMode.value = !!result.data.backupMode
             const newBackupMode = backupMode.value ? 'true' : 'false'
@@ -185,38 +251,13 @@ export function useAuth() {
     })
     const callAuthApi = async (action, username, password) => {
         try {
-            // 检查是否在本地开发环境（localhost 或 127.0.0.1）
-            const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
-            
-            // 本地开发环境：直接发送明文密码（mock 插件会处理）
-            // 生产环境：加密密码传输
-            let requestBody
-            
-            if (isLocalDev) {
-                const csrfToken = getOrCreateCsrfToken()
-                requestBody = {
-                    action,
-                    username,
-                    password, // 本地开发直接发送明文密码
-                    _csrf: csrfToken
-                }
-            } else {
-                // 加密密码用于传输（额外的安全层）
-                const encryptedPassword = await encryptPasswordForTransport(password, username)
-                if (!encryptedPassword) {
-                    return { success: false, message: '密码加密失败，请重试' }
-                }
-
-                const csrfToken = getOrCreateCsrfToken()
-                requestBody = {
-                    action,
-                    username,
-                    encryptedPassword,
-                    _csrf: csrfToken
-                }
-            }
-
             const csrfToken = getOrCreateCsrfToken()
+            const requestBody = {
+                action,
+                username,
+                password,
+                _csrf: csrfToken
+            }
             const response = await fetch('/api/auth.php', {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -247,15 +288,9 @@ export function useAuth() {
         const result = await callAuthApi('login', username, password)
         if (result.success) {
             currentUser.value = { username: result.data.username }
-            token.value = result.data.token
+            token.value = cookieSessionToken
             authType.value = 'retiehe'
-            const userJson = JSON.stringify(currentUser.value)
-            if (getCookie('sce_user') !== userJson) {
-                setCookie('sce_user', userJson)
-            }
-            if (getCookie('sce_token') !== token.value) {
-                setCookie('sce_token', token.value)
-            }
+            eraseCookie('sce_user')
             safeStorageSet('sce_auth_type', 'retiehe')
             await fetchSyncSettings()
         }
@@ -266,25 +301,54 @@ export function useAuth() {
         const result = await callAuthApi('register', username, password)
         if (result.success) {
             currentUser.value = { username: result.data.username }
-            token.value = result.data.token
+            token.value = cookieSessionToken
             authType.value = 'retiehe'
-            const userJson = JSON.stringify(currentUser.value)
-            if (getCookie('sce_user') !== userJson) {
-                setCookie('sce_user', userJson)
-            }
-            if (getCookie('sce_token') !== token.value) {
-                setCookie('sce_token', token.value)
-            }
+            eraseCookie('sce_user')
             safeStorageSet('sce_auth_type', 'retiehe')
             await fetchSyncSettings()
         }
         return result
     }
 
+    const changePassword = async (currentPassword, newPassword) => {
+        if (!currentUser.value || token.value !== cookieSessionToken) {
+            return { success: false, message: '请先登录 SCE 账号' }
+        }
+
+        try {
+            const csrfToken = getOrCreateCsrfToken()
+            const response = await fetch('/api/auth.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({
+                    action: 'change_password',
+                    currentPassword,
+                    newPassword,
+                    _csrf: csrfToken
+                })
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => null)
+                const message = errorData?.message || `服务器错误 (${response.status})`
+                return { success: false, message }
+            }
+
+            return await response.json()
+        } catch (err) {
+            console.error('Change Password API Network Error:', err)
+            return { success: false, message: '网络请求失败，请检查连接' }
+        }
+    }
+
     const logout = async (target = 'all') => {
         if (target === 'all' || target === 'retiehe') {
             // 调用后端 API 失效 token
-            if (currentUser.value && token.value) {
+            if (currentUser.value && token.value === cookieSessionToken) {
                 try {
                     const csrfToken = getOrCreateCsrfToken()
                     await fetch('/api/auth.php', {
@@ -293,8 +357,6 @@ export function useAuth() {
                         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                         body: JSON.stringify({
                             action: 'logout',
-                            username: currentUser.value.username,
-                            token: token.value,
                             _csrf: csrfToken
                         })
                     })
@@ -306,7 +368,6 @@ export function useAuth() {
             currentUser.value = null
             token.value = null
             eraseCookie('sce_user')
-            eraseCookie('sce_token')
             // 退出 SCE 账号后若还有 WebDAV，切换到 WebDAV 模式
             if (authType.value === 'retiehe') {
                 authType.value = webdavConfig.value ? 'webdav' : 'retiehe'
@@ -346,27 +407,12 @@ export function useAuth() {
             currentUser.value = { username: config.username }
         }
 
-        // 准备存储的配置
-        const safeConfig = {
-            url: config.url,
-            username: config.username,
-            path: config.path
-        }
-
-        // 如果用户选择记住密码，则加密存储
-        if (rememberPassword && config.password) {
-            const userKey = token.value || null // 使用 SCE token 或通用密钥
-            const encryptedPassword = await encrypt(config.password, userKey)
-            if (encryptedPassword) {
-                safeConfig.encryptedPassword = encryptedPassword
-            }
-        }
+        const safeConfig = rememberPassword
+            ? await preparePersistedWebdavConfig(config)
+            : sanitizeWebdavSettings(config)
 
         // Cookie 中存储配置（可能包含加密密码）
-        const safeConfigJson = JSON.stringify(safeConfig)
-        if (getCookie('sce_webdav_config') !== safeConfigJson) {
-            setCookie('sce_webdav_config', safeConfigJson)
-        }
+        persistLocalWebdavConfig(safeConfig)
         safeStorageSet('sce_auth_type', 'webdav')
 
         // Remove old local item if any
@@ -374,8 +420,9 @@ export function useAuth() {
     }
 
     const updateSyncSettings = async (webdav, backup) => {
-        if (!currentUser.value || !token.value) return { success: false, message: '未登录' }
+        if (!currentUser.value || token.value !== cookieSessionToken) return { success: false, message: '未登录' }
         try {
+            const persistedWebdav = await preparePersistedWebdavConfig(webdav)
             const csrfToken = getOrCreateCsrfToken()
             const response = await fetch('/api/auth.php', {
                 method: 'POST',
@@ -383,9 +430,7 @@ export function useAuth() {
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ 
                     action: 'set_settings', 
-                    username: currentUser.value.username, 
-                    token: token.value, 
-                    settings: { webdav, backupMode: backup },
+                    settings: { webdav: persistedWebdav, backupMode: backup },
                     _csrf: csrfToken
                 })
             })
@@ -393,6 +438,7 @@ export function useAuth() {
             if (result.success) {
                 webdavConfig.value = webdav
                 backupMode.value = backup
+                persistLocalWebdavConfig(persistedWebdav)
                 // 持久化备份模式到 Cookie
                 setCookie('sce_backup_mode', backup ? 'true' : 'false', 30)
             }
@@ -417,6 +463,7 @@ export function useAuth() {
         isLoginDialogVisible,
         login,
         register,
+        changePassword,
         setWebdavLogin,
         updateSyncSettings,
         setAuthType,

@@ -123,5 +123,5 @@ const handleApply = () => {
 参考以下组件了解正确的使用方式：
 
 - `src/components/student/TagManager.vue` - 删除标签
-- `src/components/layout/SidebarPanel.vue` - 应用座位配置
+- `src/components/settings/panels/SeatConfigPanel.vue` - 应用座位配置
 - `src/components/rule/RuleList.vue` - 删除规则

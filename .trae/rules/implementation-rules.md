@@ -7,7 +7,7 @@ trigger: always_on
 ## 命名
 
 - 组件：PascalCase（SeatChart.vue）
-- Composable：camelCase + use 前缀（useStudentData.js）
+- Composable：camelCase + use 前缀（useStudentData.ts）
 - 常量：camelCase
 
 ## 目录

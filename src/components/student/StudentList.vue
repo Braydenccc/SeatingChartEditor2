@@ -34,18 +34,21 @@
           </div>
         </div>
 
+        <input ref="excelInput" type="file" accept=".xlsx,.xls" class="hidden-input" @change="handleImportExcel" />
+        <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" class="hidden-input" @change="handleLoadWorkspace" />
+
         <!-- 操作按钮组 - 仅在高度足够时显示 -->
         <div v-if="!isHeightConstrained" class="empty-actions">
-          <button class="empty-action-btn primary" @click="router.push({ path: '/files', query: { section: 'students' } })">
+          <button class="empty-action-btn outline" @click="excelInput?.click()">
             <FileInput :size="16" stroke-width="2" />
             <span>导入 Excel 名单</span>
           </button>
           <div class="empty-action-row">
-            <button class="empty-action-btn outline" @click="router.push({ path: '/files', query: { section: 'workspace' } })">
+            <button class="empty-action-btn outline" @click="workspaceInput?.click()">
               <FolderOpen :size="14" stroke-width="2" />
               <span>本地工作区</span>
             </button>
-            <button class="empty-action-btn outline" @click="router.push({ path: '/files', query: { section: 'workspace' } })">
+            <button class="empty-action-btn outline" @click="openCloudLoad">
               <CloudDownload :size="14" stroke-width="2" />
               <span>云端工作区</span>
             </button>
@@ -97,7 +100,6 @@
 
 <script setup>
 import { computed, ref, defineAsyncComponent, onBeforeUnmount, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
 import { Users, FileInput, FolderOpen, CloudDownload, CheckCircle, SearchX, LogOut } from 'lucide-vue-next'
 import CandidateItem from './CandidateItem.vue'
@@ -136,12 +138,11 @@ const props = defineProps({
     default: true
   }
 })
-const router = useRouter()
 const showStudentEditDialog = ref(false)
 const editingStudentId = ref(null)
 
 const { tags, addTag, clearAllTags } = useTagData()
-const { students, updateStudent, deleteStudent, clearAllStudents, addStudent } = useStudentData()
+const { students, updateStudent, deleteStudent, clearAllStudents, addStudent, selectedStudentId, selectStudent } = useStudentData()
 const { findSeatByStudent, getEmptySeats, assignStudent, clearSeat, getStudentAtSeat } = useSeatChart()
 const { success, warning, error } = useLogger()
 const { loadWorkspace, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
@@ -289,6 +290,19 @@ const isAllAssignedEmpty = computed(() => {
 
 const showEmptyPlaceholder = computed(() => {
   return students.value.length === 0 || (visibleStudents.value.length === 0 && students.value.length > 0)
+})
+
+const hasFocusedFilter = computed(() => (
+  props.searchText.trim().length > 0 ||
+  (props.activeTagIds || []).length > 0 ||
+  props.filterMode !== 'unassigned'
+))
+
+watch(visibleStudents, (items) => {
+  if (!isMobile.value || props.displayMode !== 'compact') return
+  if (!hasFocusedFilter.value || items.length !== 1) return
+  if (selectedStudentId.value === items[0].id) return
+  selectStudent(items[0].id)
 })
 
 // ==================== 触摸移出处理 ====================
@@ -517,7 +531,7 @@ const getDragData = (e) => {
   height: 48px;
   min-width: 48px;
   opacity: 0.5;
-  color: var(--color-text-muted, #9ca3af);
+  color: var(--color-text-muted);
 }
 
 .empty-icon svg {
@@ -550,14 +564,14 @@ const getDragData = (e) => {
 .empty-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-text-muted, #6b7280);
+  color: var(--color-text-muted);
   margin: 0;
   line-height: 1.6;
 }
 
 .empty-hint {
   font-size: 12px;
-  color: var(--color-text-muted, #9ca3af);
+  color: var(--color-text-muted);
   opacity: 0.7;
   margin: 0;
   line-height: 1.6;
@@ -570,6 +584,10 @@ const getDragData = (e) => {
   gap: 10px;
   width: 100%;
   max-width: 280px;
+}
+
+.hidden-input {
+  display: none;
 }
 
 .empty-action-btn {
@@ -586,21 +604,6 @@ const getDragData = (e) => {
   min-height: 44px;
   border: none;
   width: 100%;
-}
-
-.empty-action-btn.primary {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 25%, transparent);
-}
-
-.empty-action-btn.primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 30%, transparent);
-}
-
-.empty-action-btn.primary:active {
-  transform: translateY(0);
 }
 
 .empty-action-btn.outline {
@@ -637,32 +640,6 @@ const getDragData = (e) => {
   position: relative;
   border: 2px solid transparent;
   border-radius: 8px;
-}
-
-.primary-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-}
-
-.primary-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12);
-}
-
-.primary-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .student-items::-webkit-scrollbar {

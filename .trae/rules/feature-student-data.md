@@ -2,9 +2,9 @@
 trigger: conditional
 globs:
   - "src/components/student/**"
-  - "src/composables/useStudentData.js"
+  - "src/composables/useStudentData.ts"
   - "src/composables/useExcelData.js"
-  - "src/composables/useTagData.js"
+  - "src/composables/useTagData.ts"
 ---
 
 # 学生与数据处理

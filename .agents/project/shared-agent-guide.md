@@ -1,25 +1,3 @@
----
-alwaysApply: true
----
-
-# 项目架构与核心规范
-
-本文件是 Trae 的薄入口。公共项目规则统一维护在 `.agents/project/shared-agent-guide.md`，功能知识统一维护在 `.agents/features/`。
-
-Trae 执行任务前请优先读取：
-
-- `.agents/project/shared-agent-guide.md`
-- `.agents/rules/项目规范.md`
-- `.agents/features/README.md`
-
-## Trae 专属规则
-
-- Trae 的 `.trae/rules/*` 作为薄入口使用，公共项目知识以 `.agents/project/shared-agent-guide.md` 和 `.agents/features/` 为准。
-- Trae 规则里的 `globs` 只负责触发范围，不代表唯一知识来源；复杂模块仍需读取对应 `.agents/features/*.md`。
-- 修改既有文件优先使用局部编辑工具，不要用全文件覆盖替代小 diff。
-- 不自动运行 `npm run dev`、构建、部署或 Git 提交；只有用户明确要求时才执行。
-- 旧 `.trae/documents/` 和 `.trae/specs/` 视为历史计划，除非用户点名，不作为当前实现依据。
-
 # 多 Agent 共享指南
 
 本文件是本项目 agent 文档的公共真源。`AGENTS.md`、`CLAUDE.md`、`.trae/rules/project-architecture.md` 等入口文档应由 `npm run docs:sync` 生成或同步，不要手动维护多份完整规则。
@@ -179,4 +157,3 @@ EditorView.vue
 - `Bug` 或 `功能建议`
 
 标题格式：`[<严重程度>] <简短描述>`，严重程度使用 `严重`、`高危`、`中等`、`低`。
-

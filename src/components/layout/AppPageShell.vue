@@ -7,7 +7,7 @@
       </div>
       <div class="page-actions">
         <slot name="actions"></slot>
-        <button class="back-button" type="button" @click="goEditor">
+        <button class="back-button" type="button" aria-label="返回编辑器" title="返回编辑器" @click="goEditor">
           <ArrowLeft :size="17" stroke-width="2.2" />
           <span>返回编辑器</span>
         </button>
@@ -119,7 +119,7 @@ const goEditor = () => router.push('/editor')
     min-height: 52px;
     align-items: center;
     flex-direction: row;
-    padding: 8px 10px;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px;
     gap: 8px;
   }
 
@@ -135,10 +135,24 @@ const goEditor = () => router.push('/editor')
 
   .page-title-group h1 {
     font-size: 17px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .back-button span {
     display: none;
+  }
+
+  .back-button {
+    min-width: 44px;
+    min-height: 40px;
+    padding: 0 10px;
+  }
+
+  .page-body {
+    min-height: 0;
+    overscroll-behavior: contain;
   }
 }
 </style>

@@ -160,9 +160,17 @@
       </div>
 
       <div class="context-section recent-section">
-        <div class="section-title">最近状态</div>
-        <p v-if="latestLog">{{ latestLog.message }}</p>
-        <p v-else>暂无日志</p>
+        <div class="section-title-row">
+          <div class="section-title">最近操作与提示</div>
+          <button v-if="logs.length > 0" class="text-action" type="button" @click="clearLogs">清空</button>
+        </div>
+        <div v-if="recentLogs.length > 0" class="recent-list">
+          <div v-for="log in recentLogs" :key="log.id" class="recent-item" :class="`type-${log.type}`">
+            <span class="recent-time">{{ formatLogTime(log.timestamp) }}</span>
+            <span class="recent-message">{{ log.message }}</span>
+          </div>
+        </div>
+        <p v-else>所有状态正常</p>
       </div>
     </div>
 
@@ -193,7 +201,7 @@ import { useTagData } from '@/composables/useTagData'
 import { useUndo } from '@/composables/useUndo'
 
 const { currentMode, EditMode } = useEditMode()
-const { logs, success, warning } = useLogger()
+const { logs, clearLogs, success, warning } = useLogger()
 const { seats, seatConfig, getSeat, clearSeat, toggleEmpty, getStudentAtSeat, findSeatByStudent, assignStudent, swapSeats } = useSeatChart()
 const { selectedCount, selectedSeatsArray, clearSelection, isSelectionMode } = useSelection()
 const { students, selectedStudentId, updateStudent, clearSelection: clearStudentSelection } = useStudentData()
@@ -225,7 +233,7 @@ const totalSeats = computed(() => {
 
 const assignedCount = computed(() => seats.value.filter(seat => seat.studentId != null).length)
 const unassignedCount = computed(() => students.value.filter(student => !findSeatByStudent(student.id)).length)
-const latestLog = computed(() => logs.value[0] || null)
+const recentLogs = computed(() => logs.value.slice(0, 5))
 
 const selectedStudent = computed(() => students.value.find(student => student.id === selectedStudentId.value) || null)
 const selectedStudentSeat = computed(() => selectedStudent.value ? findSeatByStudent(selectedStudent.value.id) : null)
@@ -272,6 +280,14 @@ const headerText = computed(() => {
   if (selectedStudent.value) return selectedStudent.value.name || '未命名学生'
   return modeLabel.value
 })
+
+const formatLogTime = (timestamp) => {
+  const date = new Date(timestamp)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${hours}:${minutes}:${seconds}`
+}
 
 const handleSelectedStudentNameChange = (value) => {
   if (!selectedStudent.value) return
@@ -480,6 +496,27 @@ const assignSelectedSeats = () => {
   color: var(--color-text-primary);
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.section-title-row .section-title {
+  margin-bottom: 0;
+}
+
+.text-action {
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .detail-list {
   display: flex;
   flex-direction: column;
@@ -671,5 +708,87 @@ const assignSelectedSeats = () => {
   color: var(--color-text-secondary);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.recent-item {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 7px;
+  padding: 7px;
+  border-left: 3px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.recent-item.type-success {
+  border-left-color: var(--color-success);
+}
+
+.recent-item.type-warning {
+  border-left-color: var(--color-warning);
+}
+
+.recent-item.type-error {
+  border-left-color: var(--color-danger);
+}
+
+.recent-time {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.recent-message {
+  min-width: 0;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  .panel-header {
+    padding: 10px 12px;
+  }
+
+  .panel-header h2 {
+    font-size: 14px;
+  }
+
+  .context-body {
+    padding: 10px;
+  }
+
+  .context-section {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 7px;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .context-input {
+    min-height: 40px;
+    font-size: 15px;
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .action-grid button,
+  .full-action {
+    min-height: 40px;
+    padding: 0 8px;
+  }
 }
 </style>

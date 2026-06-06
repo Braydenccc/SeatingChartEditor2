@@ -112,6 +112,15 @@ function createGuardSeat(side) {
   }
 }
 
+function shouldPreserveGuardSeatStudent(seat, config) {
+  if (!seat || (seat.kind !== 'guard' && !isGuardSeatId(seat.id))) return false
+  if (!config.enabled) return false
+  return (
+    (seat.guardSide === 'left' && config.leftEnabled) ||
+    (seat.guardSide === 'right' && config.rightEnabled)
+  )
+}
+
 // 从 seats.value（响应式代理）重建索引，确保 Map 持有代理对象
 function rebuildSeatMap() {
   const newMap = new Map()
@@ -207,6 +216,46 @@ function initializeSeats() {
   }
 
   newSeats.push(createGuardSeat('left'), createGuardSeat('right'))
+
+  seats.value = newSeats
+  rebuildSeatMap()
+}
+
+// 根据最新配置重建座位，保留仍存在且可见的座位状态
+function reconcileSeatsWithConfig() {
+  const previousSeats = new Map(seats.value.map(seat => [seat.id, seat]))
+  const newSeats = []
+  const { groupCount } = seatConfig.value
+  ensureGroupsArray()
+  const guardConfig = ensureGuardSeatsConfig()
+
+  for (let g = 0; g < groupCount; g++) {
+    const groupConfig = getGroupConfig(g)
+    for (let c = 0; c < groupConfig.columns; c++) {
+      for (let r = 0; r < groupConfig.rows; r++) {
+        const id = generateSeatId(g, c, r)
+        const previousSeat = previousSeats.get(id)
+        newSeats.push({
+          id,
+          groupIndex: g,
+          columnIndex: c,
+          rowIndex: r,
+          studentId: previousSeat?.studentId ?? null,
+          isEmpty: previousSeat?.isEmpty ?? false,
+          kind: 'regular'
+        })
+      }
+    }
+  }
+
+  for (const side of ['left', 'right']) {
+    const guardSeat = createGuardSeat(side)
+    const previousSeat = previousSeats.get(guardSeat.id)
+    guardSeat.studentId = shouldPreserveGuardSeatStudent(previousSeat, guardConfig)
+      ? previousSeat.studentId
+      : null
+    newSeats.push(guardSeat)
+  }
 
   seats.value = newSeats
   rebuildSeatMap()
@@ -494,7 +543,7 @@ export function useSeatChart() {
     delete seatConfig.value.seatAlignment
     ensureGroupsArray()
     ensureGuardSeatsConfig()
-    initializeSeats()  // 重新初始化座位
+    reconcileSeatsWithConfig()
     // 清理选区中已失效的座位引用
     cleanupInvalidSeats(seats.value.filter(s => s.kind !== 'guard').map(s => s.id))
   }

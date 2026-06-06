@@ -247,6 +247,28 @@ const handleReset = () => {
 }
 
 @media (max-width: 820px) {
+  .settings-action {
+    min-height: 40px;
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+
+  .settings-tabs {
+    overflow-x: auto;
+    padding: 8px 10px 0;
+    scrollbar-width: none;
+  }
+
+  .settings-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-tabs button {
+    min-height: 40px;
+    padding: 0 14px;
+    white-space: nowrap;
+  }
+
   .settings-layout {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
@@ -257,10 +279,26 @@ const handleReset = () => {
     border-bottom: 1px solid var(--color-border);
     flex-direction: row;
     overflow-x: auto;
+    padding: 10px;
+    scrollbar-width: none;
+  }
+
+  .settings-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .settings-nav button {
+    min-height: 40px;
     white-space: nowrap;
+  }
+
+  .settings-content {
+    padding: 14px 12px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .settings-content h2 {
+    margin-bottom: 12px;
+    font-size: 18px;
   }
 }
 </style>

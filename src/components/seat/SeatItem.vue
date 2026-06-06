@@ -20,7 +20,7 @@
     @dragstart="handleDragStart" @dragend="handleDragEnd" @dragover.prevent="handleDragOverSeat"
     @dragenter.prevent="handleDragEnter" @dragleave="handleDragLeave" @drop.prevent="handleDrop"
     @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd"
-    @touchcancel="handleTouchCancel" @contextmenu.prevent @pointerdown="handlePointerDown">
+    @touchcancel="handleTouchCancel" @contextmenu.prevent="handleContextMenuAction" @pointerdown="handlePointerDown">
     <div v-if="seat.isEmpty" class="empty-indicator">
       <span class="empty-text">空置</span>
     </div>
@@ -102,6 +102,7 @@ import { useDragPreview } from '@/composables/useDragPreview'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
+import { useZoom } from '@/composables/useZoom'
 
 const props = defineProps({
   seat: {
@@ -130,14 +131,16 @@ const {
   startDraggingSelection,
   endDraggingSelection,
   isSelectionMode,
+  addSeatToSelection,
   toggleSeatInSelection,
   selectSingleSeat,
   clearSelection
 } = useSelection()
 const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
 const { settings } = useGlobalSettings()
+const { panX, panY, setPan } = useZoom()
 const { enabledAttributeDefinitions, formatNumericValue, showNumericAttributesInEditor } = useStudentAttributes()
-const { setRightRailTab } = useEditorWorkbench()
+const { setRightRailTab, showMobileDrawer, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDrag } = useEditorWorkbench()
 
 const showStudentName = computed(() => settings.value.ui.showStudentName !== false)
 const showStudentNumber = computed(() => settings.value.ui.showStudentNumber !== false)
@@ -165,6 +168,8 @@ let touchSelectionActive = false
 let touchSelectionMode = null
 let touchSelectionVisited = new Set()
 let touchMoveRafId = null
+let autoPanRafId = null
+let autoPanPoint = null
 let touchStartX = 0
 let touchStartY = 0
 // 当前是否通过触摸交互（动态判断，解决触摸屏笔记本问题）
@@ -253,6 +258,7 @@ const zoneHighlightStyle = computed(() => {
 const isClickable = computed(() => {
   // 手机端选择模式：所有座位都可点击
   if (isMobile.value && isSelectionMode.value) return !isGuardSeat.value
+  if (isSelectionMode.value) return !isGuardSeat.value
 
   if (currentMode.value === EditMode.NORMAL) {
     return selectedStudentId.value !== null && !props.seat.isEmpty
@@ -298,6 +304,7 @@ const canTouchDrag = computed(() => {
 // 使用动态 lastPointerWasTouch 而非静态 maxTouchPoints，避免触摸屏笔记本问题
 const isDraggable = computed(() => {
   if (lastPointerWasTouch.value) return false
+  if (isSelectionMode.value) return false
   if (isInSelection.value && hasStudent.value) return true
   return canTouchDrag.value
 })
@@ -313,6 +320,13 @@ const handleClick = () => {
   // 手机端选择模式：点击切换选中状态
   if (isMobile.value && isSelectionMode.value && !isGuardSeat.value) {
     toggleSeatInSelection(props.seat.id)
+    showMobileDrawer('selection')
+    return
+  }
+
+  if (isSelectionMode.value && !isGuardSeat.value) {
+    addSeatToSelection(props.seat.id)
+    setRightRailTab('selection')
     return
   }
 
@@ -327,6 +341,7 @@ const handleClick = () => {
     } else {
       selectSingleSeat(props.seat.id)
       setRightRailTab('selection')
+      if (isMobile.value) showMobileDrawer('selection')
     }
     return
   }
@@ -357,6 +372,13 @@ const handleClick = () => {
   }
 }
 
+const handleContextMenuAction = () => {
+  if (!isMobile.value || isGuardSeat.value) return
+  selectSingleSeat(props.seat.id)
+  setRightRailTab('selection')
+  showMobileDrawer('selection')
+}
+
 // 双击处理
 const handleDoubleClick = () => {
   if (!hasStudent.value) return
@@ -380,6 +402,8 @@ const handleDragStart = (e) => {
     return
   }
   isDragging.value = true
+  document.body?.classList.add('seat-dragging-from-chart')
+  if (isMobile.value) openMobileDrawerForDrag('candidates')
   startDragFromSeat()
   e.dataTransfer.effectAllowed = 'move'
 
@@ -424,6 +448,8 @@ const getTransparentDragImage = () => {
 
 const handleDragEnd = () => {
   isDragging.value = false
+  document.body?.classList.remove('seat-dragging-from-chart')
+  restoreMobileDrawerOpenedForDrag()
   endDragFromSeat()
   endDraggingSelection()
   endDragPreview()
@@ -474,6 +500,8 @@ const handleTouchStart = (e) => {
   touchDragTimer = setTimeout(() => {
     touchDragActive = true
     isDragging.value = true
+    document.body?.classList.add('seat-dragging-from-chart')
+    openMobileDrawerForDrag('candidates')
     startTouchDragFromSeat()
     if (navigator.vibrate) navigator.vibrate(50)
 
@@ -507,6 +535,7 @@ const handleTouchMove = (e) => {
 
     touchSelectionVisited.add(props.seat.id)
     toggleSeatInSelection(props.seat.id)
+    showMobileDrawer('selection')
   }
 
   if (touchSelectionActive) {
@@ -558,6 +587,7 @@ const handleTouchMove = (e) => {
   const clientY = touch.clientY
 
   updateDragPreview(clientX, clientY)
+  autoPanNearEdge(clientX, clientY)
 
   if (touchMoveRafId) {
     cancelAnimationFrame(touchMoveRafId)
@@ -586,10 +616,14 @@ const handleTouchMove = (e) => {
 const cleanupTouchDrag = () => {
   if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
   if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
+  if (autoPanRafId) { cancelAnimationFrame(autoPanRafId); autoPanRafId = null }
+  autoPanPoint = null
   clearAllTouchHighlights()
+  document.body?.classList.remove('seat-dragging-from-chart')
   isDragging.value = false
   if (touchDragActive) {
     endTouchDragFromSeat()  // 重置全局触摸拖拽状态
+    restoreMobileDrawerOpenedForDrag()
     endDraggingSelection()
     endDragPreview()
   }
@@ -633,8 +667,10 @@ const handleTouchEnd = (e) => {
   const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)
 
   clearAllTouchHighlights()
+  document.body?.classList.remove('seat-dragging-from-chart')
   isDragging.value = false
   endTouchDragFromSeat()  // 重置全局触摸拖拽状态，隐藏覆盖层
+  restoreMobileDrawerOpenedForDrag()
   endDraggingSelection()
   endDragPreview()
   touchDragActive = false
@@ -706,6 +742,42 @@ const clearAllTouchHighlights = () => {
   })
 }
 
+const autoPanNearEdge = (clientX, clientY) => {
+  autoPanPoint = { clientX, clientY }
+  if (!autoPanRafId) {
+    autoPanRafId = requestAnimationFrame(runAutoPanNearEdge)
+  }
+}
+
+const runAutoPanNearEdge = () => {
+  autoPanRafId = null
+  if (!touchDragActive || !autoPanPoint) return
+
+  const { clientX, clientY } = autoPanPoint
+  const margin = 54
+  const step = 12 * (settings.value.editor.dragSensitivity || 1)
+  const width = window.innerWidth
+  const height = window.innerHeight
+  let nextX = panX.value
+  let nextY = panY.value
+
+  if (clientX < margin) nextX += step
+  else if (clientX > width - margin) nextX -= step
+
+  if (clientY < margin) nextY += step
+  else if (clientY > height - margin) nextY -= step
+
+  if (nextX === panX.value && nextY === panY.value) {
+    autoPanPoint = null
+    return
+  }
+
+  setPan(nextX, nextY)
+  autoPanRafId = requestAnimationFrame(() => {
+    runAutoPanNearEdge()
+  })
+}
+
 onUnmounted(() => {
   cleanupTouchDrag()
   if (touchMoveRafId) {
@@ -740,7 +812,7 @@ onUnmounted(() => {
 }
 
 .seat-item:not(.dragging):hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px var(--shadow-lg);
   transition: all 0.2s ease;
 }
 
@@ -879,7 +951,7 @@ onUnmounted(() => {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 2px var(--shadow-lg);
 }
 
 .tag-dot-hollow {
@@ -902,7 +974,7 @@ onUnmounted(() => {
   color: var(--color-text-inverse);
   padding: 1px 4px;
   border-radius: 3px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 1px var(--shadow-lg);
   line-height: 1.2;
 }
 
@@ -949,7 +1021,7 @@ onUnmounted(() => {
   color: var(--color-text-inverse);
   padding: 1px 4px;
   border-radius: 3px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 1px var(--shadow-lg);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -1295,7 +1367,7 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .seat-item {
-    height: 70px;
+    height: 62px;
     border-radius: 10px;
   }
 
@@ -1309,7 +1381,7 @@ onUnmounted(() => {
   }
 
   .student-display.large-name .student-name {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .student-display.large-number .student-number {
@@ -1354,7 +1426,7 @@ onUnmounted(() => {
 
 @media (max-width: 480px) {
   .seat-item {
-    height: 55px;
+    height: 50px;
     border-radius: 8px;
   }
 
@@ -1364,11 +1436,12 @@ onUnmounted(() => {
   }
 
   .student-name {
-    font-size: 11px;
+    font-size: 10px;
+    line-height: 1.2;
   }
 
   .student-number {
-    font-size: 10px;
+    font-size: 9px;
     padding: 1px 6px;
     min-width: 30px;
   }

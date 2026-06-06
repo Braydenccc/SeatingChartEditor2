@@ -35,7 +35,8 @@
       <div class="hint-group">
         <span class="hint-label">鼠标:</span>
         <span class="hint-item">左键 单选座位</span>
-        <span class="hint-item">右键 多选/菜单</span>
+        <span class="hint-item">多选模式左键涂抹</span>
+        <span class="hint-item">右键 菜单</span>
         <span class="hint-item">滚轮 平移</span>
         <span class="hint-item"><kbd>Ctrl</kbd>+滚轮 缩放</span>
       </div>
@@ -194,7 +195,7 @@ const candidatePanelStyle = computed(() => {
   }
 }
 
-/* 响应式设计 - 平板和移动设备（SidebarPanel 固定底部） */
+/* 响应式设计 - 平板和移动设备（底部工具栏固定） */
 @media (max-width: 1024px) {
   .editor-panel {
     width: 100%;

@@ -20,6 +20,29 @@ export function useUndo() {
     }))
   }
 
+  const cloneSnapshot = (snapshot) => {
+    if (!Array.isArray(snapshot)) return snapshot
+    return snapshot.map(item => ({ ...item }))
+  }
+
+  const cloneCommand = (command) => {
+    if (!command) return command
+    if (command.type === 'batch') {
+      return {
+        ...command,
+        beforeSnapshot: cloneSnapshot(command.beforeSnapshot),
+        afterSnapshot: cloneSnapshot(command.afterSnapshot)
+      }
+    }
+    if (command.type === 'redo_wrapper' || command.type === 'undo_wrapper') {
+      return {
+        ...command,
+        snapshot: cloneSnapshot(command.snapshot)
+      }
+    }
+    return { ...command }
+  }
+
   const restoreSnapshot = (snapshot) => {
     snapshot.forEach(data => {
       const seat = seats.value.find(s => s.id === data.id)
@@ -109,12 +132,8 @@ export function useUndo() {
   const undo = () => {
     if (!canUndo.value) return false
     const command = undoStack.value.pop()
-    const beforeSnapshot = createSnapshot()
     executeUndo(command)
-    redoStack.value.push({
-      type: 'redo_wrapper',
-      snapshot: beforeSnapshot
-    })
+    redoStack.value.push(cloneCommand(command))
 
     const affectedSeats = getAffectedSeats(command)
     highlightSeats(affectedSeats)
@@ -126,12 +145,8 @@ export function useUndo() {
   const redo = () => {
     if (!canRedo.value) return false
     const command = redoStack.value.pop()
-    const beforeSnapshot = createSnapshot()
     executeRedo(command)
-    undoStack.value.push({
-      type: 'undo_wrapper',
-      snapshot: beforeSnapshot
-    })
+    undoStack.value.push(cloneCommand(command))
 
     const affectedSeats = getAffectedSeats(command)
     highlightSeats(affectedSeats)

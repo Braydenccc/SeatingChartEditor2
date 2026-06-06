@@ -141,9 +141,9 @@ const handleToggleVisible = (zoneId) => {
 
 .add-zone-btn {
   padding: 6px 12px;
-  background: var(--color-primary);
-  color: var(--color-surface);
-  border: none;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
@@ -152,8 +152,9 @@ const handleToggleVisible = (zoneId) => {
 }
 
 .add-zone-btn:hover {
-  background: var(--color-primary-hover);
-  transform: translateY(-1px);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-bg-secondary);
 }
 
 .zone-list-content {
