@@ -13,6 +13,7 @@ const clearCookies = () => {
 describe('useAuth', () => {
   beforeEach(() => {
     vi.resetModules()
+    vi.doUnmock('@/utils/crypto')
     vi.clearAllMocks()
     clearCookies()
     globalThis.fetch = vi.fn()
@@ -88,6 +89,42 @@ describe('useAuth', () => {
     expect(requestBody.newPassword).toBeUndefined()
     expect(requestBody.encryptedCurrentPassword).toEqual(expect.any(String))
     expect(requestBody.encryptedNewPassword).toEqual(expect.any(String))
+  })
+
+  it('falls back to plaintext password fields when transport encryption is unavailable', async () => {
+    vi.doMock('@/utils/crypto', async (importOriginal) => {
+      const actual = await importOriginal()
+      return {
+        ...actual,
+        encryptPasswordForTransport: vi.fn().mockResolvedValue(null)
+      }
+    })
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: { username: 'teacher' }
+      })
+    })
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ success: true, data: {} })
+    })
+
+    const { useAuth } = await import('../useAuth')
+    const auth = useAuth()
+    const result = await auth.login('teacher', 'Pass1234')
+
+    expect(result.success).toBe(true)
+    const requestBody = JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)
+    expect(requestBody).toMatchObject({
+      action: 'login',
+      username: 'teacher',
+      password: 'Pass1234'
+    })
+    expect(requestBody.encryptedPassword).toBeUndefined()
   })
 
   it('passes through change_password failure responses', async () => {
