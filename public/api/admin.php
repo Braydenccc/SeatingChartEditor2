@@ -208,6 +208,16 @@ function adminParseRequest() {
                 ];
             }
 
+            $payloadHeaderInput = adminParseUrlEncodedInput(adminGetHeaderValue('X-Admin-Payload'));
+            if (!empty($payloadHeaderInput) && isset($payloadHeaderInput['action']) && is_string($payloadHeaderInput['action'])) {
+                return [
+                    'input' => $payloadHeaderInput,
+                    'error' => null,
+                    'status' => 200,
+                    'requestSummary' => adminCreateRequestSummary($rawInput, json_last_error_msg())
+                ];
+            }
+
             return [
                 'input' => [],
                 'error' => 'Invalid JSON request body',
@@ -217,6 +227,13 @@ function adminParseRequest() {
         }
     } elseif (!empty($_POST)) {
         $input = adminNormalizePostInput($_POST);
+    }
+
+    if ((!is_array($input) || !isset($input['action']) || !is_string($input['action']))) {
+        $payloadHeaderInput = adminParseUrlEncodedInput(adminGetHeaderValue('X-Admin-Payload'));
+        if (!empty($payloadHeaderInput) && isset($payloadHeaderInput['action']) && is_string($payloadHeaderInput['action'])) {
+            $input = $payloadHeaderInput;
+        }
     }
 
     if (!is_array($input) || !isset($input['action']) || !is_string($input['action'])) {
