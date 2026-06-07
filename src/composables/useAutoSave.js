@@ -2,6 +2,7 @@ import { ref, watch } from 'vue'
 import { useGlobalSettings } from './useGlobalSettings'
 import { useWorkspace } from './useWorkspace'
 import { useLogger } from './useLogger'
+import { readStoredText, removeStoredText, writeStoredText } from '@/platform/nativeStorage'
 
 let autoSaveTimer = null
 let lastSavedJson = null
@@ -14,15 +15,15 @@ export function useAutoSave() {
   const isAutoSaveEnabled = ref(false)
   const lastSaveTime = ref(null)
 
-  const performAutoSave = () => {
+  const performAutoSave = async () => {
     try {
       const json = getWorkspaceJson()
       if (!json) return
 
       if (lastSavedJson !== null && json === lastSavedJson) return
 
-      localStorage.setItem('sce-autosave-backup', json)
-      localStorage.setItem('sce-autosave-time', new Date().toISOString())
+      await writeStoredText('sce-autosave-backup', json)
+      await writeStoredText('sce-autosave-time', new Date().toISOString())
 
       lastSavedJson = json
       lastSaveTime.value = new Date()
@@ -63,10 +64,10 @@ export function useAutoSave() {
   })
 
   // 恢复自动保存的数据
-  const getAutoSaveBackup = () => {
+  const getAutoSaveBackup = async () => {
     try {
-      const backup = localStorage.getItem('sce-autosave-backup')
-      const time = localStorage.getItem('sce-autosave-time')
+      const backup = await readStoredText('sce-autosave-backup')
+      const time = await readStoredText('sce-autosave-time')
 
       if (backup && time) {
         return {
@@ -84,9 +85,9 @@ export function useAutoSave() {
     lastSavedJson = getWorkspaceJson()
   }
 
-  const clearAutoSaveBackup = () => {
-    localStorage.removeItem('sce-autosave-backup')
-    localStorage.removeItem('sce-autosave-time')
+  const clearAutoSaveBackup = async () => {
+    await removeStoredText('sce-autosave-backup')
+    await removeStoredText('sce-autosave-time')
   }
 
   return {

@@ -34,17 +34,14 @@
           </div>
         </div>
 
-        <input ref="excelInput" type="file" accept=".xlsx,.xls" class="hidden-input" @change="handleImportExcel" />
-        <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" class="hidden-input" @change="handleLoadWorkspace" />
-
         <!-- 操作按钮组 - 仅在高度足够时显示 -->
         <div v-if="!isHeightConstrained" class="empty-actions">
-          <button class="empty-action-btn outline" @click="excelInput?.click()">
+          <button class="empty-action-btn outline" @click="handleImportExcel">
             <FileInput :size="16" stroke-width="2" />
             <span>导入 Excel 名单</span>
           </button>
           <div class="empty-action-row">
-            <button class="empty-action-btn outline" @click="workspaceInput?.click()">
+            <button class="empty-action-btn outline" @click="handleLoadWorkspace">
               <FolderOpen :size="14" stroke-width="2" />
               <span>本地工作区</span>
             </button>
@@ -114,6 +111,7 @@ import { useDragState } from '@/composables/useDragState'
 import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useResizablePanel } from '@/composables/useResizablePanel'
+import { excelFileFilters, openBinaryFile } from '@/platform/files'
 
 const StudentEditDialog = defineAsyncComponent(() => import('./StudentEditDialog.vue'))
 const props = defineProps({
@@ -171,11 +169,12 @@ const handleEditStudent = (studentId) => {
   showStudentEditDialog.value = true
 }
 
-const excelInput = ref(null)
-const workspaceInput = ref(null)
-
-const handleImportExcel = async (event) => {
-  const file = event.target.files[0]
+const handleImportExcel = async (event = null) => {
+  const file = event?.target?.files?.[0] || await openBinaryFile({
+    title: '导入学生名单',
+    accept: '.xlsx,.xls',
+    filters: excelFileFilters
+  })
   if (!file) return
 
   try {
@@ -183,7 +182,7 @@ const handleImportExcel = async (event) => {
 
     if (result.warning) {
       warning(result.warning + '，请减少数据量后重试')
-      event.target.value = ''
+      if (event?.target) event.target.value = ''
       return
     }
 
@@ -218,23 +217,22 @@ const handleImportExcel = async (event) => {
     })
 
     success(`成功导入 ${result.students.length} 个学生，${result.tagNames.length} 个标签`)
-    event.target.value = ''
+    if (event?.target) event.target.value = ''
   } catch (err) {
     error(`导入失败: ${err.message}`)
-    event.target.value = ''
+    if (event?.target) event.target.value = ''
   }
 }
 
-const handleLoadWorkspace = async (event) => {
-  const file = event.target.files[0]
-  if (!file) return
-
+const handleLoadWorkspace = async (event = null) => {
+  const file = event?.target?.files?.[0] || null
   try {
     const workspace = await loadWorkspace(file)
+    if (!workspace) return
 
     if (!workspace || !workspace.students || !workspace.tags) {
       error('工作区文件内容不完整或格式不正确')
-      event.target.value = ''
+      if (event?.target) event.target.value = ''
       return
     }
 
@@ -242,7 +240,7 @@ const handleLoadWorkspace = async (event) => {
       const isSuccess = await applyWorkspaceData(workspace)
       if (isSuccess) {
         success('工作区加载并恢复成功！')
-        saveLastWorkspace({ type: 'local', name: file.name })
+        saveLastWorkspace({ type: 'local', name: file?.name || '本地工作区' })
       }
     } catch (err) {
       error('恢复工作区时发生错误: ' + (err.message || err))
@@ -250,7 +248,7 @@ const handleLoadWorkspace = async (event) => {
   } catch (err) {
     error(`加载失败: ${err.message}`)
   } finally {
-    event.target.value = ''
+    if (event?.target) event.target.value = ''
   }
 }
 
@@ -712,6 +710,39 @@ const getDragData = (e) => {
     flex: 1;
     padding: 10px 12px;
     font-size: 13px;
+  }
+}
+
+@media (max-width: 1024px) and (orientation: landscape) and (max-height: 540px) {
+  .student-items {
+    padding: 6px 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .student-list-container.display-compact .student-items {
+    padding: 6px 8px;
+    grid-template-columns: 1fr;
+    grid-auto-rows: 50px;
+    gap: 6px;
+  }
+
+  .empty-placeholder {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .empty-icon {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+  }
+
+  .empty-title {
+    font-size: 13px;
+  }
+
+  .empty-hint {
+    font-size: 11px;
   }
 }
 

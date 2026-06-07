@@ -76,6 +76,11 @@
           </Transition>
         </button>
       </div>
+
+      <button class="header-btn mobile-theme-btn" :title="`主题：${currentThemeMode.label}`" @click="cycleTheme">
+        <component :is="currentThemeMode.icon" :size="18" stroke-width="2" />
+        <span class="btn-text">主题</span>
+      </button>
     </div>
 
     <div class="header-right"></div>
@@ -111,12 +116,21 @@ const themeModes = [
 ]
 
 const currentColorScheme = computed(() => settings.value.ui.colorScheme)
+const currentThemeMode = computed(() => (
+  themeModes.find(mode => mode.value === currentColorScheme.value) || themeModes[2]
+))
 
 const switchTheme = (mode) => {
   settings.value.ui.colorScheme = mode
   applyColorScheme()
   applyThemeColor()
   saveToLocalStorage()
+}
+
+const cycleTheme = () => {
+  const currentIndex = themeModes.findIndex(mode => mode.value === currentColorScheme.value)
+  const nextMode = themeModes[(currentIndex + 1 + themeModes.length) % themeModes.length]
+  switchTheme(nextMode.value)
 }
 
 const toggleDropdown = () => {
@@ -367,6 +381,10 @@ onBeforeUnmount(() => {
   max-width: 60px;
 }
 
+.mobile-theme-btn {
+  display: none;
+}
+
 /* ===== 响应式 - 中等屏幕 ===== */
 @media (max-width: 1366px) and (min-width: 1025px) {
   .app-header {
@@ -419,36 +437,36 @@ onBeforeUnmount(() => {
 }
 
 /* ===== 响应式 - 移动设备 ===== */
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-width: 1024px) and (orientation: landscape) and (max-height: 540px) {
   .app-header {
-    height: var(--app-header-height, calc(78px + env(safe-area-inset-top, 0px)));
-    min-height: var(--app-header-height, calc(78px + env(safe-area-inset-top, 0px)));
-    padding: env(safe-area-inset-top, 0px) 0 0;
+    height: var(--app-header-height, calc(54px + env(safe-area-inset-top, 0px)));
+    min-height: var(--app-header-height, calc(54px + env(safe-area-inset-top, 0px)));
+    padding: env(safe-area-inset-top, 0px) 6px 0;
     gap: 0;
     display: flex;
-    align-items: stretch;
-    justify-content: flex-start;
-    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
     box-sizing: border-box;
     box-shadow: 0 4px 14px var(--shadow-md);
   }
 
   /* 操作层 */
   .header-left {
-    order: 2;
+    order: 1;
     width: 100%;
-    height: 44px;
-    flex: 0 0 44px;
-    flex-shrink: 0;
+    height: calc(var(--app-header-height, 54px) - env(safe-area-inset-top, 0px));
+    flex: 1 1 auto;
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    overflow-x: auto;
+    justify-content: space-between;
+    gap: 3px;
+    padding: 4px 0;
+    overflow-x: hidden;
     overflow-y: visible;
     scrollbar-width: none;
-    background: color-mix(in srgb, var(--color-primary-dark) 44%, var(--color-primary));
-    border-top: 1px solid color-mix(in srgb, var(--color-text-inverse) 12%, transparent);
+    background: transparent;
+    border-top: none;
     box-sizing: border-box;
   }
 
@@ -462,60 +480,45 @@ onBeforeUnmount(() => {
 
   /* 标题层 */
   .header-right {
-    order: 1;
-    flex: 0 0 34px;
-    width: 100%;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 14px;
-    min-width: 0;
-    box-sizing: border-box;
-  }
-
-  .header-right::before {
-    content: 'BraydenSCE V2';
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: none;
   }
 
   /* 分层工具按钮 */
   .user-menu-container,
   .login-btn,
   .header-btn {
-    height: 40px;
-    flex-shrink: 0;
+    height: 42px;
+    min-width: 0;
+    flex: 1 1 0;
   }
 
   .user-menu-container {
     display: flex;
     align-items: center;
+    min-width: 0;
   }
 
   .header-btn {
-    min-width: 44px;
-    min-height: 40px;
-    height: 40px;
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--color-text-inverse) 9%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-text-inverse) 12%, transparent);
-    padding: 0 9px;
-    gap: 5px;
+    width: 100%;
+    min-height: 42px;
+    height: 42px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    gap: 0;
     box-shadow: none;
+    justify-content: center;
   }
 
   .header-btn:hover {
     transform: none;
-    background: color-mix(in srgb, var(--color-text-inverse) 14%, transparent);
+    background: color-mix(in srgb, var(--color-text-inverse) 10%, transparent);
   }
 
   .header-btn:active {
     transform: none;
+    background: color-mix(in srgb, var(--color-text-inverse) 16%, transparent);
   }
 
   .btn-text {
@@ -523,15 +526,11 @@ onBeforeUnmount(() => {
   }
 
   .user-btn .btn-text {
-    display: inline-block;
-    font-size: 12px;
-    max-width: 72px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: none;
   }
 
   .user-btn .dropdown-icon {
-    display: inline-flex;
+    display: none;
   }
 
   .user-dropdown {
@@ -545,6 +544,10 @@ onBeforeUnmount(() => {
 
   .theme-switcher {
     display: none;
+  }
+
+  .mobile-theme-btn {
+    display: flex;
   }
 }
 </style>

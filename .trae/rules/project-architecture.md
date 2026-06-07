@@ -29,9 +29,10 @@ Trae 执行任务前请优先读取：
 | 命令 | 说明 |
 | --- | --- |
 | `npm run dev` | 启动 Vite 开发服务器，默认 `localhost:5173` |
+| `npm run build` | 等同于 `npm run build:web`，构建 Web 版本 |
 | `npm run build:web` | 类型检查并构建 Web 版本，产物在 `dist/` |
 | `npm run build:desktop` | 构建 Tauri 桌面版 |
-| `npm run build` | 完整构建：Vite + pkg + NSIS 安装包 |
+| `npm run build:desktop:win` | 构建 Tauri Windows 安装包（NSIS/MSI） |
 | `npm run build:test` | 构建测试环境版本，会临时 patch 指定文件并自动还原 |
 | `npm run preview` | 预览构建结果 |
 | `npm run deploy:main` | 合并到 `main` 并推送生产分支 |
@@ -46,7 +47,7 @@ Node.js >= 20.0.0。项目没有统一 linter/formatter；测试框架使用 Vit
 
 ## 当前架构
 
-本项目是 Vue 3 + Vite 的教室座位表编辑器，支持 Web、Tauri 桌面端、Electron 备选和 Retinbox Web Hosting。当前应用使用 `vue-router` 的 hash 路由，不再是无路由单页结构。
+本项目是 Vue 3 + Vite 的教室座位表编辑器，支持 Web、Tauri 桌面端和 Retinbox Web Hosting。当前应用使用 `vue-router` 的 hash 路由，不再是无路由单页结构。
 
 ```text
 src/main.js

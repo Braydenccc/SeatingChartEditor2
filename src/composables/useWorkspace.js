@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import { useStudentData } from './useStudentData'
 import { useTagData } from './useTagData'
 import { useSeatChart } from './useSeatChart'
@@ -13,11 +14,14 @@ import { useEditMode } from './useEditMode'
 import { useZoneRotation } from './useZoneRotation'
 import { initializeTags } from './useTagData'
 import { parseSeatId, isGuardSeatId } from '@/utils/seatHelpers'
+import { isTauriRuntime } from '@/platform/runtime'
+import { openTextFile, saveTextFile, workspaceFileFilters, writeTextFilePath } from '@/platform/files'
 
 const LAST_WORKSPACE_COOKIE = 'sce_last_workspace'
 
 const FILE_EXT = '.sce'
 const CURRENT_VERSION = '2.2'
+const currentLocalWorkspacePath = ref(null)
 
 const createDefaultSeatConfig = () => ({
   groupCount: 4,
@@ -201,31 +205,82 @@ export function useWorkspace() {
     }
   }
 
-  // 保存工作区 (本地下载)
-  const saveWorkspace = () => {
+  const buildDefaultWorkspaceName = () => {
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+    return `座位表_${timestamp}${FILE_EXT}`
+  }
+
+  // 保存工作区
+  const saveWorkspace = async (options = {}) => {
     try {
       const json = getWorkspaceJson()
       if (!json) return false
 
-      const blob = new Blob([json], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-      link.download = `座位表_${timestamp}${FILE_EXT}`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
+      if (isTauriRuntime() && currentLocalWorkspacePath.value && !options.saveAs) {
+        await writeTextFilePath(currentLocalWorkspacePath.value, json)
+        return true
+      }
 
-      return true
+      const result = await saveTextFile(json, {
+        title: options.saveAs ? '另存工作区' : '保存工作区',
+        defaultPath: buildDefaultWorkspaceName(),
+        filters: workspaceFileFilters,
+        extension: FILE_EXT,
+        mimeType: 'application/json;charset=utf-8'
+      })
+
+      if (result.success && result.path) {
+        currentLocalWorkspacePath.value = result.path
+      }
+
+      return result.success
     } catch (error) {
       return false
     }
   }
 
+  const saveWorkspaceAs = () => saveWorkspace({ saveAs: true })
+
   // 加载工作区
-  const loadWorkspace = (file) => {
+  const parseWorkspaceText = (text, name = '') => {
+    try {
+      if (name) {
+        const lowerName = name.toLowerCase()
+        if (!lowerName.endsWith(FILE_EXT) && !lowerName.endsWith('.bydsce.json')) {
+          throw new Error(`请选择 ${FILE_EXT} 格式的工作区文件`)
+        }
+      }
+
+      const workspace = JSON.parse(text)
+
+      // 验证基本结构
+      if (!workspace.students || !workspace.tags) {
+        throw new Error('工作区文件格式不正确')
+      }
+
+      // 版本迁移
+      return migrateWorkspace(workspace)
+    } catch (error) {
+      if (error.message?.startsWith('请选择') || error.message === '工作区文件格式不正确') {
+        throw error
+      }
+      throw new Error(`解析工作区文件失败: ${error.message}`)
+    }
+  }
+
+  const loadWorkspace = async (file = null) => {
+    if (!file) {
+      const selected = await openTextFile({
+        title: '加载工作区',
+        accept: '.sce,.bydsce.json',
+        filters: workspaceFileFilters
+      })
+      if (!selected) return null
+      const workspace = parseWorkspaceText(selected.text, selected.name)
+      currentLocalWorkspacePath.value = selected.path
+      return workspace
+    }
+
     return new Promise((resolve, reject) => {
       // 支持 .sce 和旧格式 .bydsce.json
       const name = file.name.toLowerCase()
@@ -238,20 +293,9 @@ export function useWorkspace() {
 
       reader.onload = (e) => {
         try {
-          const workspace = JSON.parse(e.target.result)
-
-          // 验证基本结构
-          if (!workspace.students || !workspace.tags) {
-            reject(new Error('工作区文件格式不正确'))
-            return
-          }
-
-          // 版本迁移
-          const migrated = migrateWorkspace(workspace)
-
-          resolve(migrated)
+          resolve(parseWorkspaceText(e.target.result, file.name))
         } catch (error) {
-          reject(new Error(`解析工作区文件失败: ${error.message}`))
+          reject(error)
         }
       }
 
@@ -530,6 +574,7 @@ export function useWorkspace() {
       updateConfig(createDefaultSeatConfig())
       clearAllSeats()
 
+      currentLocalWorkspacePath.value = null
       eraseCookie(LAST_WORKSPACE_COOKIE)
       success('已新建空白工作区')
       return true
@@ -662,6 +707,7 @@ export function useWorkspace() {
     getLastWorkspace,
     clearLastWorkspace,
     saveWorkspace,
+    saveWorkspaceAs,
     loadWorkspace,
     getWorkspaceJson,
     createNewWorkspace,

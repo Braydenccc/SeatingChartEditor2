@@ -1,6 +1,7 @@
 import { shallowRef } from 'vue'
 import { getEffectivePodiumPosition, getGuardSideForVisualSlot, getOrderedIndices, getRowNumber, getSourceRowIndex } from '@/utils/exportLayout'
 import { useStudentAttributes } from './useStudentAttributes'
+import { saveBinaryFile } from '@/platform/files'
 
 export const xlsxInstance = shallowRef(null)
 export const loadXlsx = async () => {
@@ -719,6 +720,17 @@ const getTagNamesForCell = (tagName, cellValue) => {
 }
 
 export function useExcelData() {
+  const saveWorkbook = async (XLSX, wb, filename) => {
+    const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+    return await saveBinaryFile(buffer, {
+      title: '保存 Excel 文件',
+      defaultPath: filename,
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
+      extension: '.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+  }
+
   const downloadTemplate = async () => {
     const XLSX = await loadXlsx()
     const templateData = [
@@ -732,170 +744,156 @@ export function useExcelData() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '学生名单')
 
-    XLSX.writeFile(wb, '学生名单模板.xlsx')
+    return await saveWorkbook(XLSX, wb, '学生名单模板.xlsx')
   }
 
   const importFromExcel = async (file) => {
     const XLSX = await loadXlsx()
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
+    try {
+      const data = file instanceof Uint8Array
+        ? file
+        : file?.bytes instanceof Uint8Array
+          ? file.bytes
+          : new Uint8Array(await file.arrayBuffer())
+      const workbook = XLSX.read(data, { type: 'array' })
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
 
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result)
-          const workbook = XLSX.read(data, { type: 'array' })
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
+      if (!jsonData || jsonData.length < 2) {
+        throw new Error('Excel文件格式不正确，至少需要标题行和一行数据')
+      }
 
-          if (!jsonData || jsonData.length < 2) {
-            reject(new Error('Excel文件格式不正确，至少需要标题行和一行数据'))
-            return
-          }
+      const headers = jsonData[0]
+      if (!headers || headers.length < 2) {
+        throw new Error('Excel文件格式不正确，至少需要学号和姓名列')
+      }
 
-          const headers = jsonData[0]
-          if (!headers || headers.length < 2) {
-            reject(new Error('Excel文件格式不正确，至少需要学号和姓名列'))
-            return
-          }
+      const firstColName = String(headers[0] || '').trim()
+      const secondColName = String(headers[1] || '').trim()
 
-          const firstColName = String(headers[0] || '').trim()
-          const secondColName = String(headers[1] || '').trim()
+      const hasStudentId = firstColName.includes('学号') || secondColName.includes('学号')
+      const hasName = firstColName.includes('姓名') || secondColName.includes('姓名')
 
-          const hasStudentId = firstColName.includes('学号') || secondColName.includes('学号')
-          const hasName = firstColName.includes('姓名') || secondColName.includes('姓名')
+      if (!hasStudentId || !hasName) {
+        throw new Error('缺少必要字段：学号、姓名。请确保 Excel 第一行包含这些列名。')
+      }
 
-          if (!hasStudentId || !hasName) {
-            reject(new Error('缺少必要字段：学号、姓名。请确保 Excel 第一行包含这些列名。'))
-            return
-          }
-
-          const invalidRows = []
-          for (let i = 1; i < jsonData.length; i++) {
-            const row = jsonData[i]
-            const nameValue = row[1]
-            if (!nameValue || String(nameValue).trim() === '') {
-              invalidRows.push(i + 1)
-            }
-          }
-
-          if (invalidRows.length > 0) {
-            const rowList = invalidRows.slice(0, 5).join('、')
-            const more = invalidRows.length > 5 ? ` 等 ${invalidRows.length} 行` : ''
-            reject(new Error(`第 ${rowList}${more} 的姓名为空，请检查数据`))
-            return
-          }
-
-          const tagHeaders = headers
-            .map((h, index) => ({
-              name: h == null ? '' : String(h).trim(),
-              colIndex: index
-            }))
-            .filter(header => header.colIndex >= 2 && header.name.length > 0)
-
-          const { ensureAttributeForHeader, parseNumericValue } = useStudentAttributes()
-          const attributeColumns = []
-          const tagColumns = []
-
-          tagHeaders.forEach(header => {
-            const explicitAttribute = ensureAttributeForHeader(header.name)
-            const attribute = explicitAttribute || (
-              shouldInferNumericAttributeColumn(header.name, jsonData, header.colIndex, parseNumericValue)
-                ? ensureAttributeForHeader(header.name, { allowImplicit: true })
-                : null
-            )
-            if (attribute) {
-              attributeColumns.push({ ...header, attribute })
-            } else {
-              tagColumns.push(header)
-            }
-          })
-
-          const studentCount = jsonData.length - 1
-          if (studentCount > 100) {
-            resolve({
-              students: [],
-              tagNames: [],
-              warning: `检测到 ${studentCount} 个学生，数量较多可能影响性能`
-            })
-            return
-          }
-
-          const validTagIndices = []
-          const tagMap = {}
-          const allTagNames = new Set()
-
-          tagColumns.forEach(({ name: tagName, colIndex }) => {
-            let hasValidData = false
-
-            for (let i = 1; i < jsonData.length; i++) {
-              const cellValue = jsonData[i][colIndex]
-              const cellTagNames = getTagNamesForCell(tagName, cellValue)
-              if (cellTagNames.length === 0) continue
-              hasValidData = true
-              cellTagNames.forEach(name => allTagNames.add(name))
-            }
-
-            if (hasValidData) {
-              validTagIndices.push(colIndex)
-              tagMap[colIndex] = tagName
-            }
-          })
-
-          if (validTagIndices.length > 20) {
-            resolve({
-              students: [],
-              tagNames: [],
-              warning: `检测到 ${validTagIndices.length} 个标签，数量较多可能影响性能`
-            })
-            return
-          }
-
-          const studentsData = []
-          for (let i = 1; i < jsonData.length; i++) {
-            const row = jsonData[i]
-            if (!row || row.length < 2) continue
-
-            const studentNumber = row[0]
-            const name = row[1]
-
-            if (!name || !name.toString().trim()) continue
-
-            const studentTagNames = []
-            const numericAttributes = {}
-
-            validTagIndices.forEach(colIndex => {
-              const cellValue = row[colIndex]
-              studentTagNames.push(...getTagNamesForCell(tagMap[colIndex], cellValue))
-            })
-
-            attributeColumns.forEach(({ colIndex, attribute }) => {
-              const numericValue = parseNumericValue(row[colIndex], attribute)
-              numericAttributes[attribute.id] = numericValue
-            })
-
-            studentsData.push({
-              studentNumber: studentNumber ? studentNumber.toString() : null,
-              name: name.toString().trim(),
-              tagNames: studentTagNames,
-              numericAttributes
-            })
-          }
-
-          resolve({
-            students: studentsData,
-            tagNames: Array.from(allTagNames)
-          })
-        } catch (error) {
-          reject(new Error(`解析Excel文件失败: ${error.message}`))
+      const invalidRows = []
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i]
+        const nameValue = row[1]
+        if (!nameValue || String(nameValue).trim() === '') {
+          invalidRows.push(i + 1)
         }
       }
 
-      reader.onerror = () => {
-        reject(new Error('读取文件失败'))
+      if (invalidRows.length > 0) {
+        const rowList = invalidRows.slice(0, 5).join('、')
+        const more = invalidRows.length > 5 ? ` 等 ${invalidRows.length} 行` : ''
+        throw new Error(`第 ${rowList}${more} 的姓名为空，请检查数据`)
       }
 
-      reader.readAsArrayBuffer(file)
-    })
+      const tagHeaders = headers
+        .map((h, index) => ({
+          name: h == null ? '' : String(h).trim(),
+          colIndex: index
+        }))
+        .filter(header => header.colIndex >= 2 && header.name.length > 0)
+
+      const { ensureAttributeForHeader, parseNumericValue } = useStudentAttributes()
+      const attributeColumns = []
+      const tagColumns = []
+
+      tagHeaders.forEach(header => {
+        const explicitAttribute = ensureAttributeForHeader(header.name)
+        const attribute = explicitAttribute || (
+          shouldInferNumericAttributeColumn(header.name, jsonData, header.colIndex, parseNumericValue)
+            ? ensureAttributeForHeader(header.name, { allowImplicit: true })
+            : null
+        )
+        if (attribute) {
+          attributeColumns.push({ ...header, attribute })
+        } else {
+          tagColumns.push(header)
+        }
+      })
+
+      const studentCount = jsonData.length - 1
+      if (studentCount > 100) {
+        return {
+          students: [],
+          tagNames: [],
+          warning: `检测到 ${studentCount} 个学生，数量较多可能影响性能`
+        }
+      }
+
+      const validTagIndices = []
+      const tagMap = {}
+      const allTagNames = new Set()
+
+      tagColumns.forEach(({ name: tagName, colIndex }) => {
+        let hasValidData = false
+
+        for (let i = 1; i < jsonData.length; i++) {
+          const cellValue = jsonData[i][colIndex]
+          const cellTagNames = getTagNamesForCell(tagName, cellValue)
+          if (cellTagNames.length === 0) continue
+          hasValidData = true
+          cellTagNames.forEach(name => allTagNames.add(name))
+        }
+
+        if (hasValidData) {
+          validTagIndices.push(colIndex)
+          tagMap[colIndex] = tagName
+        }
+      })
+
+      if (validTagIndices.length > 20) {
+        return {
+          students: [],
+          tagNames: [],
+          warning: `检测到 ${validTagIndices.length} 个标签，数量较多可能影响性能`
+        }
+      }
+
+      const studentsData = []
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i]
+        if (!row || row.length < 2) continue
+
+        const studentNumber = row[0]
+        const name = row[1]
+
+        if (!name || !name.toString().trim()) continue
+
+        const studentTagNames = []
+        const numericAttributes = {}
+
+        validTagIndices.forEach(colIndex => {
+          const cellValue = row[colIndex]
+          studentTagNames.push(...getTagNamesForCell(tagMap[colIndex], cellValue))
+        })
+
+        attributeColumns.forEach(({ colIndex, attribute }) => {
+          const numericValue = parseNumericValue(row[colIndex], attribute)
+          numericAttributes[attribute.id] = numericValue
+        })
+
+        studentsData.push({
+          studentNumber: studentNumber ? studentNumber.toString() : null,
+          name: name.toString().trim(),
+          tagNames: studentTagNames,
+          numericAttributes
+        })
+      }
+
+      return {
+        students: studentsData,
+        tagNames: Array.from(allTagNames)
+      }
+    } catch (error) {
+      throw new Error(`解析Excel文件失败: ${error.message}`)
+    }
   }
 
   const exportToExcel = async (students, tags, numericAttributes = null) => {
@@ -942,7 +940,7 @@ export function useExcelData() {
     XLSX.utils.book_append_sheet(wb, ws, '学生名单')
 
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-    XLSX.writeFile(wb, `学生名单_${timestamp}.xlsx`)
+    return await saveWorkbook(XLSX, wb, `学生名单_${timestamp}.xlsx`)
   }
 
   const generateSeatChartWorkbook = async (organizedSeats, students, tags = [], seatConfig, userOptions = {}) => {
@@ -1187,7 +1185,7 @@ export function useExcelData() {
     const XLSX = await loadXlsx()
     const { wb } = await generateSeatChartWorkbook(organizedSeats, students, tags, seatConfig, options)
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-    XLSX.writeFile(wb, `座位表_${timestamp}.xlsx`)
+    return await saveWorkbook(XLSX, wb, `座位表_${timestamp}.xlsx`)
   }
 
   const exportSeatChartToExcelBuffer = async (organizedSeats, students, tags = [], seatConfig, options = {}) => {

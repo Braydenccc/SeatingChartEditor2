@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 
 export type EditorTool = 'normal' | 'swap' | 'clear' | 'empty'
 export type WorkbenchDialog = 'seatConfig' | 'shiftRotation' | 'zoneRotation' | 'assignment' | 'rules' | null
@@ -30,6 +30,7 @@ const mobileViewMode = ref<MobileViewMode>('normal')
 const suspendedMobileDrawer = ref<MobileDrawer>(null)
 const dragOpenedMobileDrawer = ref<MobileDrawer>(null)
 const drawerBeforeDragOpen = ref<MobileDrawer>(null)
+const requestedFullscreenElement = ref<Element | null>(null)
 const isSeatFullscreen = computed(() => mobileViewMode.value === 'seatFullscreen')
 
 const validTools = new Set<EditorTool>(['normal', 'swap', 'clear', 'empty'])
@@ -59,6 +60,51 @@ const drawerToSheet = (drawer: Exclude<MobileDrawer, null>): Exclude<MobileSheet
 const sheetToDrawer = (sheet: MobileSheet): MobileDrawer => (
   sheet === 'context' ? 'selection' : sheet
 )
+
+const requestLandscapeFullscreen = async () => {
+  if (typeof document === 'undefined') return
+
+  await nextTick()
+  const fullscreenTarget = document.querySelector('.editor-workbench') || document.documentElement
+  try {
+    if (!document.fullscreenElement && fullscreenTarget.requestFullscreen) {
+      await fullscreenTarget.requestFullscreen()
+      requestedFullscreenElement.value = fullscreenTarget
+    }
+  } catch {
+    requestedFullscreenElement.value = null
+  }
+
+  try {
+    await window.screen?.orientation?.lock?.('landscape')
+  } catch {
+    // Direction locking is best-effort and unsupported on some mobile browsers.
+  }
+}
+
+const releaseLandscapeFullscreen = async () => {
+  if (typeof document === 'undefined') return
+
+  try {
+    window.screen?.orientation?.unlock?.()
+  } catch {
+    // Ignore unsupported unlock calls.
+  }
+
+  const fullscreenElement = document.fullscreenElement
+  const shouldExitFullscreen = requestedFullscreenElement.value &&
+    fullscreenElement === requestedFullscreenElement.value &&
+    document.exitFullscreen
+
+  requestedFullscreenElement.value = null
+  if (!shouldExitFullscreen) return
+
+  try {
+    await document.exitFullscreen()
+  } catch {
+    // Ignore browsers that reject exitFullscreen after a state change.
+  }
+}
 
 const mobileDrawer = computed<MobileDrawer>({
   get: () => sheetToDrawer(mobileSheet.value),
@@ -157,11 +203,13 @@ export function useEditorWorkbench() {
   const enterSeatFullscreen = () => {
     mobileViewMode.value = 'seatFullscreen'
     closeMobileSheet()
+    void requestLandscapeFullscreen()
   }
 
   const exitSeatFullscreen = () => {
     mobileViewMode.value = 'normal'
     closeMobileSheet()
+    void releaseLandscapeFullscreen()
   }
 
   const toggleSeatFullscreen = () => {

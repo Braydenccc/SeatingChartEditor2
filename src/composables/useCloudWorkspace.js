@@ -2,8 +2,8 @@ import { ref, computed } from 'vue'
 import { useAuth } from './useAuth'
 import { useWebDav } from './useWebDav'
 import { getOrCreateCsrfToken } from './useAuth'
-import { fetchWithRetry } from '@/utils/fetchHelpers'
 import { useLogger } from './useLogger'
+import { apiFetch } from '@/platform/apiClient'
 
 const workspaceFormatErrorMessage = '工作区数据格式错误'
 
@@ -56,7 +56,7 @@ export function useCloudWorkspace() {
         try {
             startFetch()
             const csrfToken = getOrCreateCsrfToken()
-            const response = await fetchWithRetry('/api/workspace.php', {
+            const response = await apiFetch('/api/workspace.php', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {

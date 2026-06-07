@@ -157,8 +157,8 @@
     <Teleport v-if="dragPreviewState.isActive" to="body">
       <div ref="dragPreviewRef" class="drag-preview-overlay">
         <div v-for="item in previewItems" :key="item.seatId"
-          class="drag-preview-seat" :class="{ 'is-anchor': item.isAnchor }" :style="item.style"
-          v-html="item.contentHtml">
+          class="drag-preview-seat" :class="{ 'is-anchor': item.isAnchor }" :style="item.style">
+          <span class="drag-preview-name">{{ item.studentName || '空位' }}</span>
         </div>
       </div>
     </Teleport>
@@ -1249,6 +1249,7 @@ const rectSelectStyle = computed(() => {
   position: fixed;
   pointer-events: none;
   z-index: 9999;
+  will-change: transform;
 }
 
 .drag-preview-seat {
@@ -1266,6 +1267,17 @@ const rectSelectStyle = computed(() => {
   padding: 0;
   box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary) 35%, transparent);
   opacity: 0.95;
+}
+
+.drag-preview-name {
+  max-width: 100%;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-all;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .drag-preview-seat.is-anchor {

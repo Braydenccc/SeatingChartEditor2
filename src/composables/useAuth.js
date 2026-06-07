@@ -1,6 +1,8 @@
 import { ref, computed } from 'vue'
 import { safeStorageGet as storageGet, safeStorageSet as storageSet, safeStorageRemove as storageRemove } from '@/utils/storage'
 import { encrypt, decrypt, encryptPasswordForTransport } from '@/utils/crypto'
+import { apiFetch, clearRetieheSessionCookies } from '@/platform/apiClient'
+import { isTauriRuntime } from '@/platform/runtime'
 
 const currentUser = ref(null)
 const token = ref(null)
@@ -134,12 +136,12 @@ const persistLocalWebdavConfig = (config) => {
 const verifyRetieheSession = async () => {
     try {
         const csrfToken = getOrCreateCsrfToken()
-        const response = await fetch('/api/auth.php', {
+        const response = await apiFetch('/api/auth.php', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
             body: JSON.stringify({ action: 'verify', _csrf: csrfToken })
-        })
+        }, 0)
         const result = await response.json().catch(() => null)
         if (response.ok && result?.success && result.data?.username) {
             currentUser.value = { username: result.data.username }
@@ -205,12 +207,12 @@ const initAuth = async () => {
     // 初始化后如果本身是受信任状态，则拉取后台同步数据
     // 延迟执行，避免阻塞应用初始加载
     if (currentUser.value && token.value === cookieSessionToken) {
-        const fetchApi = globalThis.fetch
+        const fetchApi = isTauriRuntime() ? apiFetch : globalThis.fetch
         setTimeout(() => fetchSyncSettings(fetchApi), 100)
     }
 }
 
-const fetchSyncSettings = async (fetchApi = fetch) => {
+const fetchSyncSettings = async (fetchApi = apiFetch) => {
     if (!currentUser.value || token.value !== cookieSessionToken) return;
     try {
         const csrfToken = getOrCreateCsrfToken()
@@ -262,7 +264,7 @@ export function useAuth() {
     const isLoggedIn = computed(() => {
         return !!currentUser.value || !!webdavConfig.value
     })
-    const callAuthApi = async (action, username, password) => {
+        const callAuthApi = async (action, username, password) => {
         try {
             const csrfToken = getOrCreateCsrfToken()
             const requestBody = {
@@ -275,7 +277,7 @@ export function useAuth() {
                 await attachPasswordField(requestBody, 'password', 'encryptedPassword', password, username)
             }
 
-            const response = await fetch('/api/auth.php', {
+            const response = await apiFetch('/api/auth.php', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
@@ -283,7 +285,7 @@ export function useAuth() {
                     'X-CSRF-Token': csrfToken
                 },
                 body: JSON.stringify(requestBody)
-            })
+            }, 0)
 
             if (!response.ok) {
                 // Read actual server error message instead of throwing generic error
@@ -341,7 +343,7 @@ export function useAuth() {
             await attachPasswordField(requestBody, 'currentPassword', 'encryptedCurrentPassword', currentPassword, currentUser.value.username)
             await attachPasswordField(requestBody, 'newPassword', 'encryptedNewPassword', newPassword, currentUser.value.username)
 
-            const response = await fetch('/api/auth.php', {
+            const response = await apiFetch('/api/auth.php', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
@@ -349,7 +351,7 @@ export function useAuth() {
                     'X-CSRF-Token': csrfToken
                 },
                 body: JSON.stringify(requestBody)
-            })
+            }, 0)
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => null)
@@ -370,7 +372,7 @@ export function useAuth() {
             if (currentUser.value && token.value === cookieSessionToken) {
                 try {
                     const csrfToken = getOrCreateCsrfToken()
-                    await fetch('/api/auth.php', {
+                    await apiFetch('/api/auth.php', {
                         method: 'POST',
                         credentials: 'same-origin',
                         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
@@ -378,7 +380,7 @@ export function useAuth() {
                             action: 'logout',
                             _csrf: csrfToken
                         })
-                    })
+                    }, 0)
                 } catch (e) {
                     console.error('Logout API error:', e)
                 }
@@ -386,6 +388,7 @@ export function useAuth() {
 
             currentUser.value = null
             token.value = null
+            clearRetieheSessionCookies()
             eraseCookie('sce_user')
             // 退出 SCE 账号后若还有 WebDAV，切换到 WebDAV 模式
             if (authType.value === 'retiehe') {
@@ -443,7 +446,7 @@ export function useAuth() {
         try {
             const persistedWebdav = await preparePersistedWebdavConfig(webdav)
             const csrfToken = getOrCreateCsrfToken()
-            const response = await fetch('/api/auth.php', {
+            const response = await apiFetch('/api/auth.php', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
@@ -452,7 +455,7 @@ export function useAuth() {
                     settings: { webdav: persistedWebdav, backupMode: backup },
                     _csrf: csrfToken
                 })
-            })
+            }, 0)
             const result = await response.json()
             if (result.success) {
                 webdavConfig.value = webdav

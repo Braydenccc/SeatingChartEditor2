@@ -9,6 +9,18 @@
         <span>当前同步状态：{{ syncStatusText }}</span>
       </div>
 
+      <div v-if="isDesktopRuntime" class="setting-item">
+        <label class="setting-label">SCE 云服务地址</label>
+        <input
+          v-model="retieheApiBase"
+          type="url"
+          class="setting-input"
+          placeholder="例如: https://your-site.example.com"
+          autocomplete="off"
+        />
+        <p class="hint-text">桌面版会通过此地址访问 /api/auth.php 与 /api/workspace.php。</p>
+      </div>
+
       <div class="setting-item">
         <label class="setting-label">服务器地址 (URL)</label>
         <input
@@ -113,6 +125,8 @@ import { Info } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { useWebDav } from '@/composables/useWebDav'
 import { useLogger } from '@/composables/useLogger'
+import { getRetieheApiBase, setRetieheApiBase } from '@/platform/apiClient'
+import { isTauriRuntime } from '@/platform/runtime'
 
 const { webdavConfig, backupMode, updateSyncSettings, authType, setAuthType, token } = useAuth()
 const { mkcol } = useWebDav()
@@ -121,11 +135,13 @@ const { success: showSuccess, error: showError } = useLogger()
 const webdavUrl = ref('')
 const webdavUser = ref('')
 const webdavPass = ref('')
+const retieheApiBase = ref(getRetieheApiBase())
 const enableBackup = ref(false)
 const preferredSync = ref('retiehe')
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const isDesktopRuntime = isTauriRuntime()
 
 const hasRetiehe = computed(() => !!token.value)
 const hasWebdavConfigured = computed(() => !!webdavConfig.value)
@@ -207,6 +223,10 @@ const handleSave = async () => {
   loading.value = true
 
   try {
+    if (isDesktopRuntime) {
+      setRetieheApiBase(retieheApiBase.value)
+    }
+
     let finalConfig = null
 
     if (isComplete) {

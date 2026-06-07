@@ -193,6 +193,7 @@ import { useSeatRules } from '@/composables/useSeatRules'
 import { useStudentData } from '@/composables/useStudentData'
 import { useZoneData } from '@/composables/useZoneData'
 import { createAssignmentPrecheck } from '@/utils/assignmentPrecheck'
+import { openTextFile, saveTextFile } from '@/platform/files'
 
 const props = defineProps({
   visible: {
@@ -361,25 +362,26 @@ const handleFocusRule = (item) => {
   success(`已定位规则：${renderRuleText(item.rule)}`)
 }
 
-const handleExportRules = () => {
+const handleExportRules = async () => {
   const json = exportRules()
-  const blob = new Blob([json], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `seat_rules_${new Date().toISOString().slice(0, 10)}.json`
-  a.click()
-  URL.revokeObjectURL(url)
+  await saveTextFile(json, {
+    title: '导出座位规则',
+    defaultPath: `seat_rules_${new Date().toISOString().slice(0, 10)}.json`,
+    filters: [{ name: 'JSON 文件', extensions: ['json'] }],
+    extension: '.json',
+    mimeType: 'application/json;charset=utf-8'
+  })
 }
 
-const handleImportRules = () => {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.json,application/json'
-  input.onchange = async (event) => {
-    const file = event.target?.files?.[0]
-    if (!file) return
-    const text = await file.text()
+const handleImportRules = async () => {
+  try {
+    const selected = await openTextFile({
+      title: '导入座位规则',
+      accept: '.json,application/json',
+      filters: [{ name: 'JSON 文件', extensions: ['json'] }]
+    })
+    if (!selected) return
+    const text = selected.text
     const result = importRules(text)
     if (!result.success) {
       const firstErr = result.errors?.[0]
@@ -396,8 +398,9 @@ const handleImportRules = () => {
     if (result.errors?.length) {
       warning(`有 ${result.errors.length} 条规则导入失败，请检查格式或参数`)
     }
+  } catch (err) {
+    error(err.message || '规则导入失败')
   }
-  input.click()
 }
 
 const handleEditRule = (ruleId) => {

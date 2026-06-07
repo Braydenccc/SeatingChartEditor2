@@ -10,7 +10,6 @@
           </div>
         </div>
 
-        <input ref="workspaceInput" type="file" accept=".sce,.bydsce.json" class="hidden-input" @change="handleLoadWorkspace" />
         <div class="cloud-summary">
           <div class="cloud-summary-main">
             <CloudDownload :size="18" stroke-width="2" />
@@ -41,13 +40,17 @@
             <FilePlus :size="18" stroke-width="2" />
             <span>{{ isConfirming('newWorkspace').value ? '再次点击确认新建' : '新建工作区' }}</span>
           </button>
-          <button class="action-button" type="button" @click="workspaceInput?.click()">
+          <button class="action-button" type="button" @click="handleLoadWorkspace">
             <FolderOpen :size="18" stroke-width="2" />
             <span>加载本地</span>
           </button>
           <button class="action-button" type="button" @click="handleSaveWorkspace">
             <Save :size="18" stroke-width="2" />
             <span>保存到本地</span>
+          </button>
+          <button class="action-button" type="button" @click="handleSaveWorkspaceAs">
+            <Save :size="18" stroke-width="2" />
+            <span>另存为</span>
           </button>
           <button class="action-button" type="button" @click="openCloudLoad">
             <CloudDownload :size="18" stroke-width="2" />
@@ -163,7 +166,6 @@
           </div>
         </div>
 
-        <input ref="excelInput" type="file" accept=".xlsx,.xls" class="hidden-input" @change="handleImportExcel" />
         <div class="action-grid">
           <button class="action-button" type="button" @click="router.push('/students')">
             <Users :size="18" stroke-width="2" />
@@ -173,7 +175,7 @@
             <Download :size="18" stroke-width="2" />
             <span>下载名单模板</span>
           </button>
-          <button class="action-button" type="button" @click="excelInput?.click()">
+          <button class="action-button" type="button" @click="handleImportExcel">
             <FileInput :size="18" stroke-width="2" />
             <span>从 Excel 导入名单</span>
           </button>
@@ -220,10 +222,9 @@ import { useLogger } from '@/composables/useLogger'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useWorkspace } from '@/composables/useWorkspace'
+import { excelFileFilters, openBinaryFile } from '@/platform/files'
 
 const router = useRouter()
-const workspaceInput = ref(null)
-const excelInput = ref(null)
 const newCloudWorkspaceName = ref('')
 const editingWorkspaceId = ref(null)
 const editingWorkspaceName = ref('')
@@ -232,6 +233,7 @@ const { requestConfirm, isConfirming } = useConfirmAction()
 const {
   createNewWorkspace,
   saveWorkspace,
+  saveWorkspaceAs,
   loadWorkspace,
   applyWorkspaceData,
   saveLastWorkspace,
@@ -307,8 +309,8 @@ const handleNewWorkspace = () => {
   }
 }
 
-const handleSaveWorkspace = () => {
-  const isSuccess = saveWorkspace()
+const handleSaveWorkspace = async () => {
+  const isSuccess = await saveWorkspace()
   if (isSuccess) {
     markSaved()
     success('工作区已成功保存到本地！')
@@ -317,12 +319,22 @@ const handleSaveWorkspace = () => {
   }
 }
 
-const handleLoadWorkspace = async (event) => {
-  const file = event.target.files[0]
-  if (!file) return
+const handleSaveWorkspaceAs = async () => {
+  const isSuccess = await saveWorkspaceAs()
+  if (isSuccess) {
+    markSaved()
+    success('工作区已成功另存到本地！')
+  } else {
+    error('工作区另存到本地失败，请查看控制台了解详情')
+  }
+}
+
+const handleLoadWorkspace = async (event = null) => {
+  const file = event?.target?.files?.[0] || null
 
   try {
     const workspace = await loadWorkspace(file)
+    if (!workspace) return
     if (!workspace || !workspace.students || !workspace.tags) {
       error('工作区文件内容不完整或格式不正确')
       return
@@ -331,13 +343,15 @@ const handleLoadWorkspace = async (event) => {
     const isSuccess = await applyWorkspaceData(workspace)
     if (isSuccess) {
       success('工作区加载并恢复成功！')
-      saveLastWorkspace({ type: 'local', name: file.name })
+      saveLastWorkspace({ type: 'local', name: file?.name || '本地工作区' })
       goEditorAfterSuccess()
     }
   } catch (err) {
     error(`加载失败: ${err.message}`)
   } finally {
-    event.target.value = ''
+    if (event?.target) {
+      event.target.value = ''
+    }
   }
 }
 
@@ -455,12 +469,16 @@ const handleRemoveCloudWorkspace = (workspace) => {
   }
 }
 
-const handleDownloadTemplate = () => {
-  downloadTemplate()
+const handleDownloadTemplate = async () => {
+  await downloadTemplate()
 }
 
-const handleImportExcel = async (event) => {
-  const file = event.target.files[0]
+const handleImportExcel = async (event = null) => {
+  const file = event?.target?.files?.[0] || await openBinaryFile({
+    title: '导入学生名单',
+    accept: '.xlsx,.xls',
+    filters: excelFileFilters
+  })
   if (!file) return
 
   try {
@@ -509,13 +527,15 @@ const handleImportExcel = async (event) => {
   } catch (err) {
     error(`导入失败: ${err.message}`)
   } finally {
-    event.target.value = ''
+    if (event?.target) {
+      event.target.value = ''
+    }
   }
 }
 
-const handleExportExcel = () => {
+const handleExportExcel = async () => {
   try {
-    exportToExcel(students.value, tags.value)
+    await exportToExcel(students.value, tags.value)
     success('Excel导出成功！')
   } catch (err) {
     error(`导出失败: ${err.message}`)

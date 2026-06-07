@@ -282,12 +282,17 @@ const handleDrawerPointerCancel = () => {
 
   .editor-workbench.seat-fullscreen {
     --mobile-drawer-limit: calc(100dvh - var(--mobile-tool-dock-height) - 8px);
+    display: grid;
     position: fixed;
     inset: 0;
     z-index: 3000;
     width: 100vw;
+    min-width: 100vw;
+    max-width: none;
     height: 100vh;
     height: 100dvh;
+    min-height: 100dvh;
+    max-height: none;
     background: var(--color-bg-secondary);
   }
 
@@ -312,6 +317,10 @@ const handleDrawerPointerCancel = () => {
     min-height: 0;
     border-left: 1px solid var(--color-border);
     background: var(--color-surface);
+  }
+
+  .editor-workbench.seat-fullscreen.fullscreen-landscape .student-rail :deep(.student-pool-panel) {
+    border-left: none;
   }
 
   .editor-workbench.seat-fullscreen.fullscreen-landscape .tool-dock {
@@ -399,6 +408,21 @@ const handleDrawerPointerCancel = () => {
   .mobile-drawer-body {
     flex: 1;
     min-height: 0;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 1024px) and (orientation: landscape) and (max-height: 540px) {
+  .editor-workbench {
+    --mobile-tool-dock-height: calc(50px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .editor-workbench.seat-fullscreen.fullscreen-landscape {
+    grid-template-columns: minmax(0, 1fr) clamp(220px, 34vw, 300px);
+  }
+
+  .editor-workbench.seat-fullscreen.fullscreen-landscape .student-rail {
+    grid-row: 1 / 3;
     overflow: hidden;
   }
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { useEditorWorkbench } from '../useEditorWorkbench'
 
 describe('useEditorWorkbench', () => {
@@ -182,5 +182,83 @@ describe('useEditorWorkbench', () => {
 
     workbench.toggleSeatFullscreen()
     expect(workbench.isSeatFullscreen.value).toBe(false)
+  })
+
+  it('attempts native fullscreen and landscape locking when entering seat fullscreen', async () => {
+    let fullscreenElement: Element | null = null
+    const originalRequestFullscreen = document.documentElement.requestFullscreen
+    const originalExitFullscreen = document.exitFullscreen
+    const fullscreenDescriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenElement')
+    const orientationDescriptor = Object.getOwnPropertyDescriptor(window.screen, 'orientation')
+    const lock = vi.fn().mockResolvedValue(undefined)
+    const unlock = vi.fn()
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement
+    })
+    document.documentElement.requestFullscreen = vi.fn(async () => {
+      fullscreenElement = document.documentElement
+    })
+    document.exitFullscreen = vi.fn(async () => {
+      fullscreenElement = null
+    })
+    Object.defineProperty(window.screen, 'orientation', {
+      configurable: true,
+      value: { lock, unlock }
+    })
+
+    workbench.enterSeatFullscreen()
+
+    await vi.waitFor(() => {
+      expect(document.documentElement.requestFullscreen).toHaveBeenCalled()
+      expect(lock).toHaveBeenCalledWith('landscape')
+    })
+
+    workbench.exitSeatFullscreen()
+
+    await vi.waitFor(() => {
+      expect(unlock).toHaveBeenCalled()
+      expect(document.exitFullscreen).toHaveBeenCalled()
+    })
+
+    document.documentElement.requestFullscreen = originalRequestFullscreen
+    document.exitFullscreen = originalExitFullscreen
+    if (fullscreenDescriptor) {
+      Object.defineProperty(document, 'fullscreenElement', fullscreenDescriptor)
+    }
+    if (orientationDescriptor) {
+      Object.defineProperty(window.screen, 'orientation', orientationDescriptor)
+    }
+  })
+
+  it('keeps css fullscreen state when native fullscreen or orientation locking fails', async () => {
+    const originalRequestFullscreen = document.documentElement.requestFullscreen
+    const orientationDescriptor = Object.getOwnPropertyDescriptor(window.screen, 'orientation')
+
+    document.documentElement.requestFullscreen = vi.fn().mockRejectedValue(new Error('not supported'))
+    Object.defineProperty(window.screen, 'orientation', {
+      configurable: true,
+      value: {
+        lock: vi.fn().mockRejectedValue(new Error('lock failed')),
+        unlock: vi.fn()
+      }
+    })
+
+    workbench.enterSeatFullscreen()
+
+    expect(workbench.mobileViewMode.value).toBe('seatFullscreen')
+    expect(workbench.isSeatFullscreen.value).toBe(true)
+    await vi.waitFor(() => {
+      expect(document.documentElement.requestFullscreen).toHaveBeenCalled()
+    })
+
+    workbench.exitSeatFullscreen()
+    expect(workbench.mobileViewMode.value).toBe('normal')
+
+    document.documentElement.requestFullscreen = originalRequestFullscreen
+    if (orientationDescriptor) {
+      Object.defineProperty(window.screen, 'orientation', orientationDescriptor)
+    }
   })
 })

@@ -271,4 +271,45 @@ const toggleTag = (tagId) => {
     min-height: 34px;
   }
 }
+
+@media (max-width: 1024px) and (orientation: landscape) and (max-height: 540px) {
+  .student-pool-panel {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .pool-header {
+    padding: 8px 10px 6px;
+  }
+
+  .pool-header h2 {
+    font-size: 13px;
+  }
+
+  .pool-header p {
+    font-size: 11px;
+  }
+
+  .icon-action {
+    width: 30px;
+    height: 30px;
+  }
+
+  .pool-controls {
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .search-field {
+    min-height: 32px;
+  }
+
+  .filter-tabs button {
+    min-height: 30px;
+  }
+
+  .tag-filter {
+    min-height: 28px;
+  }
+}
 </style>

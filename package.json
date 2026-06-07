@@ -8,15 +8,12 @@
   },
   "scripts": {
     "dev": "cross-env EDITOR=antigravity vite --host 0.0.0.0",
+    "build": "npm run build:web",
     "build:web": "vue-tsc --noEmit && vite build",
     "build:test": "node scripts/patch-test-env.js && vite build && git checkout -- index.html src/components/auth/LoginDialog.vue src/components/layout/AppHeader.vue",
-    "build": "vite build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin && \"C:\\Program Files (x86)\\NSIS\\makensis.exe\" installer.nsi",
-    "build:full": "npm run build && electron-builder --win",
     "build:desktop": "tauri build",
-    "build:lite": "npm run build:desktop",
+    "build:desktop:win": "tauri build --bundles nsis,msi",
     "preview": "vite preview",
-    "build:nsis": "vite build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin && makensis installer.nsi",
-    "build:exe": "npm run build && pkg server.cjs --targets node18-win-x64 --out-path dist/bin",
     "deploy:main": "git checkout main && git merge @{-1} --no-edit && git push origin main && git checkout @{-1}",
     "type-check": "vue-tsc --noEmit",
     "type-check:watch": "vue-tsc --noEmit --watch",
@@ -36,6 +33,9 @@
   },
   "dependencies": {
     "@playwright/test": "^1.59.1",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-fs": "^2.5.1",
+    "@tauri-apps/plugin-http": "^2.5.9",
     "@vueuse/core": "^14.2.1",
     "bcryptjs": "^3.0.3",
     "lucide-vue-next": "^1.0.0",
@@ -50,10 +50,7 @@
     "@vitest/coverage-v8": "^2.1.9",
     "@vitest/ui": "^2.1.9",
     "@vue/test-utils": "^2.4.6",
-    "@yao-pkg/pkg": "^6.15.0",
     "cross-env": "^10.1.0",
-    "electron": "^40.8.0",
-    "electron-builder": "^26.8.1",
     "happy-dom": "^14.12.3",
     "typescript": "^6.0.3",
     "vite": "^7.3.2",
@@ -63,24 +60,7 @@
     "vue-tsc": "^3.2.7"
   },
   "description": "This template should help get you started developing with Vue 3 in Vite.",
-  "main": "electron-main.cjs",
-  "bin": "server.cjs",
-  "build": {
-    "appId": "com.braydensce.app",
-    "productName": "BraydenSCE",
-    "directories": {
-      "output": "dist_electron"
-    },
-    "win": {
-      "target": "nsis"
-    }
-  },
   "keywords": [],
   "author": "Braydenccc",
-  "license": "GPL-3.0-or-later",
-  "pkg": {
-    "assets": [
-      "dist/**/*"
-    ]
-  }
+  "license": "GPL-3.0-or-later"
 }

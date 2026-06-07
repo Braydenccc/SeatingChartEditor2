@@ -1,5 +1,7 @@
 import { fetchWithRetry } from '@/utils/fetchHelpers'
 import { getOrCreateCsrfToken, useAuth } from './useAuth'
+import { isTauriRuntime } from '@/platform/runtime'
+import { webdavFetch } from '@/platform/webdavTransport'
 
 export function useWebDav() {
   const bytesToBinaryString = (bytes) => {
@@ -79,10 +81,10 @@ export function useWebDav() {
     }
 
     const fetchDirect = async () => {
-      const response = await fetchWithRetry(directUrl, {
+      const response = await webdavFetch(directUrl, {
         ...options,
         headers: buildHeaders(config, options)
-      }, 2)
+      })
 
       return handleResponse(response)
     }
@@ -109,6 +111,10 @@ export function useWebDav() {
     }
 
     try {
+      if (isTauriRuntime()) {
+        return await fetchDirect()
+      }
+
       if (config.useProxy) {
         return await fetchViaProxy()
       }

@@ -360,6 +360,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useWebDav } from '@/composables/useWebDav'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
 import { escapeHtmlWithBreaks } from '@/utils/xss'
+import { saveBinaryFile } from '@/platform/files'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -812,18 +813,20 @@ const handleDownload = async () => {
     catch { return }
     finally { isGenerating.value = false }
   }
-  const link = document.createElement('a')
-  link.href = url
   const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-  link.download = `座位表_${ts}.png`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+  const filename = `座位表_${ts}.png`
   try {
     const exportedBlob = await fetch(url).then((res) => res.blob())
+    await saveBinaryFile(exportedBlob, {
+      title: '保存座位表图片',
+      defaultPath: filename,
+      filters: [{ name: 'PNG 图片', extensions: ['png'] }],
+      extension: '.png',
+      mimeType: 'image/png'
+    })
     emit('exported', exportedBlob)
   } catch (err) {
-    console.warn('导出后更新侧边栏预览失败:', err)
+    console.warn('图片导出失败:', err)
     emit('exported', null)
   }
 }

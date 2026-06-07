@@ -56,7 +56,7 @@ const emit = defineEmits(['open-login'])
 
 @media (max-width: 768px) {
   .app-shell {
-    --app-header-height: calc(78px + env(safe-area-inset-top, 0px));
+    --app-header-height: calc(54px + env(safe-area-inset-top, 0px));
   }
 
   .main-content {
@@ -68,6 +68,12 @@ const emit = defineEmits(['open-login'])
     max-height: calc(100dvh - var(--app-header-height));
     overflow: hidden;
     padding-bottom: 0;
+  }
+}
+
+@media (max-width: 1024px) and (orientation: landscape) and (max-height: 540px) {
+  .app-shell {
+    --app-header-height: calc(50px + env(safe-area-inset-top, 0px));
   }
 }
 </style>
