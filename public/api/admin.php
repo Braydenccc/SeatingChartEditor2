@@ -1,5 +1,84 @@
 <?php
-function adminApplyCorsForDev() {
+require_once "api/common.php";
+require_once "api/file-permissions.php";
+
+const ADMIN_DB_NAME = 'admin';
+const ADMIN_ENABLE_KEY = 'is_enable';
+const ADMIN_TOKEN_HASH_KEY = 'api_token_hash';
+const ADMIN_CORS_ALLOWED_ORIGINS_KEY = 'cors_allowed_origins';
+const ADMIN_AUDIT_LOG_KEY = 'audit_logs';
+const ADMIN_AUDIT_FAILURE_KEY = 'audit_failures';
+const ADMIN_MAX_LOG_LIMIT = 200;
+const ADMIN_UNVERIFIED_RATE_WINDOW = 300;
+const ADMIN_UNVERIFIED_RATE_MAX = 30;
+
+function adminNormalizeCorsOrigin($origin) {
+    if (!is_string($origin)) {
+        return '';
+    }
+
+    $origin = rtrim(trim($origin), '/');
+    if ($origin === '' || $origin === '*') {
+        return '';
+    }
+
+    $parts = parse_url($origin);
+    if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+        return '';
+    }
+
+    if (strtolower($parts['scheme']) !== 'https') {
+        return '';
+    }
+
+    if (isset($parts['path']) || isset($parts['query']) || isset($parts['fragment']) || isset($parts['user']) || isset($parts['pass'])) {
+        return '';
+    }
+
+    $normalized = 'https://' . strtolower($parts['host']);
+    if (isset($parts['port'])) {
+        $normalized .= ':' . (int)$parts['port'];
+    }
+
+    return $normalized;
+}
+
+function adminParseCorsAllowedOrigins($rawOrigins) {
+    if (!is_string($rawOrigins) || trim($rawOrigins) === '') {
+        return [];
+    }
+
+    $decoded = json_decode($rawOrigins, true);
+    $originItems = is_array($decoded) ? $decoded : preg_split('/[\r\n,]+/', $rawOrigins);
+    if (!is_array($originItems)) {
+        return [];
+    }
+
+    $allowedOrigins = [];
+    foreach ($originItems as $originItem) {
+        $origin = adminNormalizeCorsOrigin($originItem);
+        if ($origin !== '') {
+            $allowedOrigins[] = $origin;
+        }
+    }
+
+    return array_values(array_unique($allowedOrigins));
+}
+
+function adminGetConfiguredCorsAllowedOrigins() {
+    if (!class_exists('Database')) {
+        return [];
+    }
+
+    try {
+        $adminDb = new Database(ADMIN_DB_NAME);
+        return adminParseCorsAllowedOrigins($adminDb->get(ADMIN_CORS_ALLOWED_ORIGINS_KEY));
+    } catch (Exception $error) {
+        return [];
+    }
+}
+
+function adminApplyCors() {
     $origin = isset($_SERVER['HTTP_ORIGIN']) && is_string($_SERVER['HTTP_ORIGIN']) ? trim($_SERVER['HTTP_ORIGIN']) : '';
     $allowedOrigins = [
         'http://localhost:5173',
@@ -7,6 +86,8 @@ function adminApplyCorsForDev() {
         'http://localhost:5174',
         'http://127.0.0.1:5174'
     ];
+    $allowedOrigins = array_merge($allowedOrigins, adminGetConfiguredCorsAllowedOrigins());
+
     $isAllowedOrigin = $origin !== '' && in_array($origin, $allowedOrigins, true);
 
     if ($isAllowedOrigin) {
@@ -23,10 +104,7 @@ function adminApplyCorsForDev() {
     }
 }
 
-adminApplyCorsForDev();
-
-require_once "api/common.php";
-require_once "api/file-permissions.php";
+adminApplyCors();
 header('Content-Type: application/json; charset=utf-8');
 
 if (!class_exists('Database')) {
@@ -34,15 +112,6 @@ if (!class_exists('Database')) {
     echo json_encode(['success' => false, 'message' => 'Environment error: Database not supported.'], JSON_UNESCAPED_UNICODE);
     exit(1);
 }
-
-const ADMIN_DB_NAME = 'admin';
-const ADMIN_ENABLE_KEY = 'is_enable';
-const ADMIN_TOKEN_HASH_KEY = 'api_token_hash';
-const ADMIN_AUDIT_LOG_KEY = 'audit_logs';
-const ADMIN_AUDIT_FAILURE_KEY = 'audit_failures';
-const ADMIN_MAX_LOG_LIMIT = 200;
-const ADMIN_UNVERIFIED_RATE_WINDOW = 300;
-const ADMIN_UNVERIFIED_RATE_MAX = 30;
 
 function adminGetHeaderValue($name) {
     $key = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
