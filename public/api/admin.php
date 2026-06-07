@@ -162,6 +162,16 @@ function adminNormalizePostInput($post) {
     return $input;
 }
 
+function adminParseUrlEncodedInput($rawInput) {
+    if (!is_string($rawInput) || trim($rawInput) === '') {
+        return [];
+    }
+
+    $parsed = [];
+    parse_str($rawInput, $parsed);
+    return adminNormalizePostInput($parsed);
+}
+
 function adminParseRequest() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         return [
@@ -182,6 +192,16 @@ function adminParseRequest() {
             if (!empty($postInput) && isset($postInput['action']) && is_string($postInput['action'])) {
                 return [
                     'input' => $postInput,
+                    'error' => null,
+                    'status' => 200,
+                    'requestSummary' => adminCreateRequestSummary($rawInput, json_last_error_msg())
+                ];
+            }
+
+            $urlEncodedInput = adminParseUrlEncodedInput($rawInput);
+            if (!empty($urlEncodedInput) && isset($urlEncodedInput['action']) && is_string($urlEncodedInput['action'])) {
+                return [
+                    'input' => $urlEncodedInput,
                     'error' => null,
                     'status' => 200,
                     'requestSummary' => adminCreateRequestSummary($rawInput, json_last_error_msg())
