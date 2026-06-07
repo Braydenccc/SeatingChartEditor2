@@ -2,6 +2,7 @@ const http = require('http');
 const https = require('https');
 const path = require('path');
 const { readFile } = require('fs').promises;
+const { isAllowedFuckSeatsProxyTarget } = require('./fuckseatsProxyHelper.cjs');
 
 // dist 目录（构建输出）
 // 当打包为 exe 时，需要从 exe 所在目录向上查找 dist 目录
@@ -58,14 +59,6 @@ function safeJoin(base, target) {
   return resolved;
 }
 
-function isLocalProxyTarget(targetUrl) {
-  const host = String(targetUrl.hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
-  const localHosts = new Set(['localhost', '127.0.0.1', '::1']);
-  const port = Number(targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80));
-  const allowedPorts = new Set([23948, 8000, 8001, 8080, 5000, 3000]);
-  return targetUrl.protocol === 'http:' && localHosts.has(host) && allowedPorts.has(port);
-}
-
 function handleFuckSeatsProxy(req, res) {
   if (req.method !== 'GET') {
     res.statusCode = 405;
@@ -77,7 +70,7 @@ function handleFuckSeatsProxy(req, res) {
     const target = currentUrl.searchParams.get('target') || '';
     const targetUrl = new URL(target);
 
-    if (!isLocalProxyTarget(targetUrl)) {
+    if (!isAllowedFuckSeatsProxyTarget(targetUrl)) {
       res.statusCode = 400;
       return res.end('Invalid local target');
     }

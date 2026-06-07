@@ -75,13 +75,14 @@
           </button>
           <button
             class="fs-primary-btn"
+            :class="{ confirming: isImportConfirming }"
             type="button"
             :disabled="!selectedClassroom || isLoading || isImporting"
             @click="handleImport"
           >
             <Loader2 v-if="isImporting" class="fs-spin" :size="15" />
             <Download v-else :size="15" />
-            <span>{{ isImporting ? 'fuckseats导入中' : 'fuckseats导入' }}</span>
+            <span>{{ importButtonText }}</span>
           </button>
         </footer>
       </section>
@@ -93,7 +94,11 @@
 import { computed, ref, watch } from 'vue'
 import { Download, FileInput, Loader2, RefreshCcw, Server, ServerOff, X } from 'lucide-vue-next'
 import { useFuckSeatsImport } from '@/composables/useFuckSeatsImport'
+import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
+import { useSeatChart } from '@/composables/useSeatChart'
+import { useStudentData } from '@/composables/useStudentData'
+import { useTagData } from '@/composables/useTagData'
 
 const props = defineProps({
   visible: Boolean,
@@ -106,7 +111,11 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'fallback-excel', 'imported'])
 
 const { discoverLocalFuckSeats, importClassroom } = useFuckSeatsImport()
-const { success, error } = useLogger()
+const { requestConfirm, isConfirming, cancelConfirm } = useConfirmAction()
+const { success, warning, error } = useLogger()
+const { seats } = useSeatChart()
+const { students } = useStudentData()
+const { tags } = useTagData()
 
 const isLoading = ref(false)
 const isImporting = ref(false)
@@ -114,6 +123,9 @@ const errorText = ref('')
 const serviceBaseUrl = ref('')
 const classrooms = ref([])
 const selectedKey = ref('')
+const importConfirmKey = 'fuckSeatsImportOverwrite'
+const isImportConfirming = isConfirming(importConfirmKey)
+let loadRequestId = 0
 
 const getClassroomKey = (classroom) => `${classroom.baseUrl}:${classroom.id}`
 
@@ -128,6 +140,18 @@ const headerText = computed(() => {
   return `已连接 ${formatBaseUrl(serviceBaseUrl.value)}`
 })
 
+const hasCurrentWorkspaceData = computed(() => (
+  students.value.length > 0 ||
+  tags.value.length > 0 ||
+  seats.value.some(seat => seat.studentId != null || seat.isEmpty)
+))
+
+const importButtonText = computed(() => {
+  if (isImporting.value) return 'fuckseats导入中'
+  if (isImportConfirming.value) return '再次点击确认覆盖'
+  return 'fuckseats导入'
+})
+
 const formatBaseUrl = (value) => String(value || '').replace(/^https?:\/\//, '')
 
 const formatCount = (value, label) => {
@@ -136,6 +160,8 @@ const formatCount = (value, label) => {
 }
 
 const close = () => {
+  loadRequestId += 1
+  cancelConfirm(importConfirmKey)
   emit('update:visible', false)
 }
 
@@ -145,6 +171,7 @@ const fallbackExcel = () => {
 }
 
 const loadClassrooms = async () => {
+  const requestId = ++loadRequestId
   isLoading.value = true
   errorText.value = ''
   serviceBaseUrl.value = ''
@@ -153,8 +180,15 @@ const loadClassrooms = async () => {
 
   try {
     const result = await discoverLocalFuckSeats()
+    if (requestId !== loadRequestId || !props.visible) return
     if (!result.available) {
-      errorText.value = '未检测到本地 fuckseats 服务'
+      const errors = Array.isArray(result.errors) ? result.errors : []
+      errorText.value = errors[0]
+        ? `未检测到本地 fuckseats 服务：${errors[0]}`
+        : '未检测到本地 fuckseats 服务'
+      if (errors.length > 0) {
+        warning(`fuckseats探测失败：${errors.join('；')}`)
+      }
       return
     }
 
@@ -164,13 +198,16 @@ const loadClassrooms = async () => {
       selectedKey.value = getClassroomKey(classrooms.value[0])
     }
   } catch (err) {
+    if (requestId !== loadRequestId || !props.visible) return
     errorText.value = err?.message || '检测本地服务失败'
   } finally {
-    isLoading.value = false
+    if (requestId === loadRequestId) {
+      isLoading.value = false
+    }
   }
 }
 
-const handleImport = async () => {
+const executeImport = async () => {
   if (!selectedClassroom.value || isImporting.value) return
   isImporting.value = true
 
@@ -186,9 +223,30 @@ const handleImport = async () => {
   }
 }
 
+const handleImport = async () => {
+  if (!selectedClassroom.value || isImporting.value) return
+
+  if (hasCurrentWorkspaceData.value) {
+    const confirmed = requestConfirm(
+      importConfirmKey,
+      null,
+      'fuckseats导入会覆盖当前名单、标签、座位配置和座位分配'
+    )
+    if (!confirmed) {
+      warning('fuckseats导入会覆盖当前数据，请再次点击导入确认')
+      return
+    }
+  }
+
+  await executeImport()
+}
+
 watch(() => props.visible, (visible) => {
   if (visible) {
     loadClassrooms()
+  } else {
+    loadRequestId += 1
+    cancelConfirm(importConfirmKey)
   }
 })
 </script>
@@ -408,6 +466,11 @@ watch(() => props.visible, (visible) => {
 
 .fs-primary-btn:not(:disabled):hover {
   background: var(--color-primary-hover);
+}
+
+.fs-primary-btn.confirming {
+  background: var(--color-warning);
+  color: var(--color-surface);
 }
 
 .fs-secondary-btn:not(:disabled):hover {

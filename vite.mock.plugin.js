@@ -1,3 +1,8 @@
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const { isAllowedFuckSeatsProxyTarget } = require('./fuckseatsProxyHelper.cjs')
+
 export function authMockPlugin() {
     return {
         name: 'auth-mock-plugin',
@@ -409,14 +414,6 @@ async function handleDavProxy(req, res) {
     }
 }
 
-function isLocalProxyTarget(targetUrl) {
-    const host = String(targetUrl.hostname || '').replace(/^\[|\]$/g, '').toLowerCase()
-    const localHosts = new Set(['localhost', '127.0.0.1', '::1'])
-    const port = Number(targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80))
-    const allowedPorts = new Set([23948, 8000, 8001, 8080, 5000, 3000])
-    return targetUrl.protocol === 'http:' && localHosts.has(host) && allowedPorts.has(port)
-}
-
 async function handleFuckSeatsProxy(req, res) {
     if (req.method !== 'GET') {
         res.statusCode = 405
@@ -428,7 +425,7 @@ async function handleFuckSeatsProxy(req, res) {
         const target = currentUrl.searchParams.get('target') || ''
         const targetUrl = new URL(target)
 
-        if (!isLocalProxyTarget(targetUrl)) {
+        if (!isAllowedFuckSeatsProxyTarget(targetUrl)) {
             res.statusCode = 400
             return res.end('Invalid local target')
         }

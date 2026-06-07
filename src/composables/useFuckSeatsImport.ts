@@ -1,12 +1,9 @@
 import { useWorkspace } from './useWorkspace'
+import { generateGuardSeatId, generateSeatId } from '@/utils/seatHelpers'
+import proxyConfig from '../../fuckseats-proxy.config.json'
 
 const proxyEndpoint = '/api/fuckseats-proxy'
-const defaultBaseUrls = [
-  'http://127.0.0.1:23948',
-  'http://localhost:23948',
-  'http://127.0.0.1:8000',
-  'http://localhost:8000'
-]
+const defaultBaseUrls = proxyConfig.defaultBaseUrls || []
 
 const scoreAttributeDefinition = {
   id: 'score',
@@ -66,6 +63,21 @@ interface ImportResult {
   assignedSeats: number
   emptySeats: number
 }
+
+interface DiscoveryAvailableResult {
+  available: true
+  baseUrl: string
+  classrooms: FuckSeatsClassroomSummary[]
+}
+
+interface DiscoveryUnavailableResult {
+  available: false
+  baseUrl: string
+  classrooms: FuckSeatsClassroomSummary[]
+  errors: string[]
+}
+
+type DiscoveryResult = DiscoveryAvailableResult | DiscoveryUnavailableResult
 
 const unique = <T>(items: T[]): T[] => [...new Set(items)]
 
@@ -206,10 +218,10 @@ const looksLikeFuckSeats = (html: string): boolean => {
     text.includes('新建班级')
 }
 
-export const discoverLocalFuckSeats = async () => {
+export const discoverLocalFuckSeats = async (): Promise<DiscoveryResult> => {
   const baseUrls = getConfiguredBaseUrls()
   const errors: string[] = []
-  let firstAvailable: { available: true; baseUrl: string; classrooms: FuckSeatsClassroomSummary[] } | null = null
+  let firstAvailable: DiscoveryAvailableResult | null = null
 
   for (const baseUrl of baseUrls) {
     try {
@@ -240,7 +252,7 @@ export const discoverLocalFuckSeats = async () => {
     baseUrl: '',
     classrooms: [],
     errors
-  }
+  } satisfies DiscoveryUnavailableResult
 }
 
 const normalizeTagColor = (value: unknown): string => {
@@ -289,10 +301,36 @@ const getStudentTagIds = (student: FuckSeatsStudentProfile | undefined | null, t
   return unique(ids)
 }
 
+const normalizeSeatPosition = (seat: FuckSeatsSeat) => {
+  const row = Number(seat.row)
+  const col = Number(seat.col)
+  if (!Number.isInteger(row) || row <= 0 || !Number.isInteger(col) || col <= 0) {
+    throw new Error('fuckseats座位坐标无效')
+  }
+  return {
+    rowIndex: row - 1,
+    colIndex: col - 1
+  }
+}
+
+const createEmptySeatItem = (colIndex: number, rowIndex: number) => ({
+  id: generateSeatId(0, colIndex, rowIndex),
+  kind: 'regular',
+  group: 0,
+  col: colIndex,
+  row: rowIndex,
+  studentId: null,
+  empty: true
+})
+
 export const buildWorkspaceFromFuckSeatsState = (
   classroom: FuckSeatsClassroomSummary,
   state: FuckSeatsStatePayload
 ) => {
+  if (!state || typeof state !== 'object') {
+    throw new Error('fuckseats班级数据格式不正确')
+  }
+
   const seats = Array.isArray(state.seats) ? state.seats : []
   const tagMap = new Map<number, any>()
   const students = new Map<number, any>()
@@ -329,19 +367,25 @@ export const buildWorkspaceFromFuckSeatsState = (
     return next
   }
 
-  const maxRow = Math.max(1, ...seats.map(seat => Number(seat.row) || 0))
-  const maxCol = Math.max(1, ...seats.map(seat => Number(seat.col) || 0))
+  const positions = seats.map(normalizeSeatPosition)
+  const maxRow = Math.max(1, ...positions.map(position => position.rowIndex + 1))
+  const maxCol = Math.max(1, ...positions.map(position => position.colIndex + 1))
   const seatItems: any[] = []
+  const seenPositions = new Set<string>()
 
-  seats.forEach(seat => {
-    const rowIndex = Math.max(0, Number(seat.row || 1) - 1)
-    const colIndex = Math.max(0, Number(seat.col || 1) - 1)
+  seats.forEach((seat, index) => {
+    const { rowIndex, colIndex } = positions[index]
+    const positionKey = `${colIndex}:${rowIndex}`
+    if (seenPositions.has(positionKey)) {
+      throw new Error(`fuckseats座位坐标重复：第 ${rowIndex + 1} 行第 ${colIndex + 1} 列`)
+    }
+    seenPositions.add(positionKey)
     const student = addStudent(seat.student)
     const studentId = student?.id ?? null
     if (studentId !== null) physicalSeatByStudentId.set(studentId, true)
 
     seatItems.push({
-      id: `seat-0-${colIndex}-${rowIndex}`,
+      id: generateSeatId(0, colIndex, rowIndex),
       kind: 'regular',
       group: 0,
       col: colIndex,
@@ -351,6 +395,15 @@ export const buildWorkspaceFromFuckSeatsState = (
     })
   })
 
+  for (let colIndex = 0; colIndex < maxCol; colIndex++) {
+    for (let rowIndex = 0; rowIndex < maxRow; rowIndex++) {
+      const positionKey = `${colIndex}:${rowIndex}`
+      if (!seenPositions.has(positionKey)) {
+        seatItems.push(createEmptySeatItem(colIndex, rowIndex))
+      }
+    }
+  }
+
   ;(state.unseated || []).forEach(student => addStudent(student))
 
   const podiumGuards = state.podium_guards || {}
@@ -358,7 +411,7 @@ export const buildWorkspaceFromFuckSeatsState = (
     const student = addStudent(podiumGuards[side])
     if (!student || physicalSeatByStudentId.has(student.id)) return
     seatItems.push({
-      id: side === 'left' ? 'guard-left' : 'guard-right',
+      id: generateGuardSeatId(side),
       kind: 'guard',
       guardSide: side,
       group: -1,

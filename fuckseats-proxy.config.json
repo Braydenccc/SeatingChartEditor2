@@ -1,0 +1,14 @@
+{
+  "localHosts": ["localhost", "127.0.0.1", "::1"],
+  "allowedPorts": [23948, 8000],
+  "defaultBaseUrls": [
+    "http://127.0.0.1:23948",
+    "http://localhost:23948",
+    "http://127.0.0.1:8000",
+    "http://localhost:8000"
+  ],
+  "allowedPathPatterns": [
+    "^/$",
+    "^/classroom/\\d+/state/?$"
+  ]
+}

@@ -1,11 +1,28 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createRequire } from 'node:module'
 import {
   buildWorkspaceFromFuckSeatsState,
+  discoverLocalFuckSeats,
   parseClassroomsFromIndexHtml,
   type FuckSeatsClassroomSummary
 } from '../useFuckSeatsImport'
 
+const require = createRequire(import.meta.url)
+const { isAllowedFuckSeatsProxyTarget } = require('../../../fuckseatsProxyHelper.cjs')
+
 describe('useFuckSeatsImport', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('only allows the constrained local fuckseats proxy targets', () => {
+    expect(isAllowedFuckSeatsProxyTarget(new URL('http://127.0.0.1:23948/'))).toBe(true)
+    expect(isAllowedFuckSeatsProxyTarget(new URL('http://localhost:8000/classroom/7/state/'))).toBe(true)
+    expect(isAllowedFuckSeatsProxyTarget(new URL('http://localhost:3000/'))).toBe(false)
+    expect(isAllowedFuckSeatsProxyTarget(new URL('http://localhost:23948/api/private'))).toBe(false)
+    expect(isAllowedFuckSeatsProxyTarget(new URL('http://localhost:23948/classroom/7/state/?debug=1'))).toBe(false)
+  })
+
   it('parses classroom summaries from fuckseats index html', () => {
     const html = `
       <section class="classrooms-grid">
@@ -37,6 +54,19 @@ describe('useFuckSeatsImport', () => {
         seatCount: 48
       }
     ])
+  })
+
+  it('returns discovery errors when local service probing fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('proxy failed', { status: 502 })))
+
+    const result = await discoverLocalFuckSeats()
+
+    if (result.available === true) {
+      throw new Error('expected local fuckseats discovery to fail')
+    }
+    expect(result.errors).toHaveLength(4)
+    expect(result.errors[0]).toContain('http://127.0.0.1:23948')
+    expect(result.errors[0]).toContain('请求失败：502')
   })
 
   it('builds a workspace payload from fuckseats classroom state', () => {
@@ -146,5 +176,62 @@ describe('useFuckSeatsImport', () => {
         empty: false
       }
     ])
+  })
+
+  it('marks missing sparse seat coordinates as unavailable', () => {
+    const classroom: FuckSeatsClassroomSummary = {
+      id: 8,
+      name: '稀疏班级',
+      baseUrl: 'http://127.0.0.1:23948',
+      href: '/classroom/8/',
+      gridLabel: '2 × 2',
+      studentCount: 1,
+      seatCount: 1
+    }
+
+    const workspace = buildWorkspaceFromFuckSeatsState(classroom, {
+      seats: [
+        {
+          row: 2,
+          col: 2,
+          cell_type: 'seat',
+          student: {
+            id: 21,
+            name: '王五'
+          }
+        }
+      ]
+    })
+
+    expect(workspace.layout.seats).toHaveLength(4)
+    expect(workspace.layout.seats).toContainEqual({
+      id: 'seat-0-1-1',
+      kind: 'regular',
+      group: 0,
+      col: 1,
+      row: 1,
+      studentId: 21,
+      empty: false
+    })
+    expect(workspace.layout.seats.filter(seat => seat.empty)).toHaveLength(3)
+  })
+
+  it('rejects duplicate fuckseats seat coordinates', () => {
+    const classroom: FuckSeatsClassroomSummary = {
+      id: 9,
+      name: '重复坐标班级',
+      baseUrl: 'http://127.0.0.1:23948',
+      href: '/classroom/9/',
+      gridLabel: '1 × 1',
+      studentCount: 0,
+      seatCount: 2
+    }
+
+    expect(() => buildWorkspaceFromFuckSeatsState(classroom, {
+      seats: [
+        { row: 1, col: 1, cell_type: 'seat', student: null },
+        { row: 1, col: 1, cell_type: 'seat', student: null }
+      ]
+    })).toThrow('fuckseats座位坐标重复')
   })
 })
