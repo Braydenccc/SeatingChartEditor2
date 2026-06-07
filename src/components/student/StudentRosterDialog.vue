@@ -226,6 +226,10 @@
                 />
                 <label>人</label>
               </div>
+              <button class="import-student-btn" @click="openFuckSeatsImport">
+                <FileInput :size="15" />
+                <span>fuckseats导入</span>
+              </button>
               <button class="add-student-btn" @click="handleAddStudent">
                 <Plus :size="15" />
                 <span>添加学生</span>
@@ -336,14 +340,16 @@
           </section>
         </div>
       </div>
+      <FuckSeatsImportDialog v-model:visible="showFuckSeatsImportDialog" />
     </div>
   </transition>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { BarChart3, Check, PanelLeft, Plus, Settings, Tag, Trash2, X } from 'lucide-vue-next'
+import { BarChart3, Check, FileInput, PanelLeft, Plus, Settings, Tag, Trash2, X } from 'lucide-vue-next'
 import TagStudentSelector from './TagStudentSelector.vue'
+import FuckSeatsImportDialog from './FuckSeatsImportDialog.vue'
 import { getNextColor } from '@/constants/tagColors'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
@@ -390,6 +396,7 @@ const isCountError = ref(false)
 const numericDrafts = ref({})
 const activeContext = ref({ type: 'overview', id: null })
 const selectedTagStudentIds = ref([])
+const showFuckSeatsImportDialog = ref(false)
 const enabledAttributes = computed(() => enabledAttributeDefinitions.value)
 const sheetColumnCount = computed(() => 4 + enabledAttributes.value.length + tags.value.length)
 const activeAttribute = computed(() => {
@@ -585,6 +592,10 @@ const handleStudentCountChange = () => {
 const handleAddStudent = () => {
   addStudent()
   isCountError.value = false
+}
+
+const openFuckSeatsImport = () => {
+  showFuckSeatsImportDialog.value = true
 }
 
 const handleStudentNameChange = (student, value) => {
@@ -1139,12 +1150,10 @@ const close = () => {
   opacity: 1;
 }
 
+.import-student-btn,
 .add-student-btn {
   min-height: 34px;
   padding: 0 12px;
-  background: var(--color-primary);
-  color: var(--color-surface);
-  border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
@@ -1153,6 +1162,23 @@ const close = () => {
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+.import-student-btn {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.import-student-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.add-student-btn {
+  background: var(--color-primary);
+  color: var(--color-surface);
+  border: none;
 }
 
 .add-student-btn:hover {

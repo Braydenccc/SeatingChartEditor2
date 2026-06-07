@@ -17,6 +17,11 @@ export function authMockPlugin() {
                     handleDavProxy(req, res)
                     return
                 }
+
+                if (req.url.startsWith('/api/fuckseats-proxy')) {
+                    handleFuckSeatsProxy(req, res)
+                    return
+                }
                 
                 next()
             })
@@ -401,5 +406,62 @@ async function handleDavProxy(req, res) {
         console.error('Invalid URL:', err)
         res.statusCode = 400
         res.end('Invalid URL')
+    }
+}
+
+function isLocalProxyTarget(targetUrl) {
+    const host = String(targetUrl.hostname || '').replace(/^\[|\]$/g, '').toLowerCase()
+    const localHosts = new Set(['localhost', '127.0.0.1', '::1'])
+    const port = Number(targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80))
+    const allowedPorts = new Set([23948, 8000, 8001, 8080, 5000, 3000])
+    return targetUrl.protocol === 'http:' && localHosts.has(host) && allowedPorts.has(port)
+}
+
+async function handleFuckSeatsProxy(req, res) {
+    if (req.method !== 'GET') {
+        res.statusCode = 405
+        return res.end('Method Not Allowed')
+    }
+
+    try {
+        const currentUrl = new URL(req.url, 'http://127.0.0.1')
+        const target = currentUrl.searchParams.get('target') || ''
+        const targetUrl = new URL(target)
+
+        if (!isLocalProxyTarget(targetUrl)) {
+            res.statusCode = 400
+            return res.end('Invalid local target')
+        }
+
+        const http = await import('http')
+        const proxyReq = http.request({
+            hostname: targetUrl.hostname,
+            port: targetUrl.port,
+            path: targetUrl.pathname + targetUrl.search,
+            method: 'GET',
+            headers: {
+                Accept: req.headers.accept || 'application/json, text/plain, */*',
+                'User-Agent': 'SeatingChartEditor-local-import'
+            }
+        }, (proxyRes) => {
+            res.statusCode = proxyRes.statusCode || 502
+            res.setHeader('Content-Type', proxyRes.headers['content-type'] || 'text/plain; charset=utf-8')
+            proxyRes.pipe(res, { end: true })
+        })
+
+        proxyReq.setTimeout(3500, () => {
+            proxyReq.destroy(new Error('Local proxy timeout'))
+        })
+        proxyReq.on('error', (err) => {
+            if (res.headersSent) return
+            res.statusCode = 502
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+            res.end('Proxy error: ' + err.message)
+        })
+        proxyReq.end()
+    } catch (err) {
+        res.statusCode = 400
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+        res.end('Invalid local proxy request')
     }
 }

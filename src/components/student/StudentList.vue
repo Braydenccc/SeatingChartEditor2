@@ -30,7 +30,7 @@
           </div>
           <div class="empty-text-group">
             <p class="empty-title">还没有学生数据</p>
-            <p class="empty-hint">导入 Excel 或打开工作区开始使用</p>
+            <p class="empty-hint">fuckseats导入、Excel 或工作区开始使用</p>
           </div>
         </div>
 
@@ -39,9 +39,9 @@
 
         <!-- 操作按钮组 - 仅在高度足够时显示 -->
         <div v-if="!isHeightConstrained" class="empty-actions">
-          <button class="empty-action-btn outline" @click="excelInput?.click()">
+          <button class="empty-action-btn outline" @click="openFuckSeatsImport">
             <FileInput :size="16" stroke-width="2" />
-            <span>导入 Excel 名单</span>
+            <span>fuckseats导入</span>
           </button>
           <div class="empty-action-row">
             <button class="empty-action-btn outline" @click="workspaceInput?.click()">
@@ -95,6 +95,11 @@
 
     <!-- 学生编辑弹窗 -->
     <StudentEditDialog v-if="showStudentEditDialog" v-model:visible="showStudentEditDialog" :studentId="editingStudentId" />
+    <FuckSeatsImportDialog
+      v-model:visible="showFuckSeatsImportDialog"
+      :show-excel-fallback="true"
+      @fallback-excel="openExcelImport"
+    />
   </div>
 </template>
 
@@ -114,6 +119,7 @@ import { useDragState } from '@/composables/useDragState'
 import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useResizablePanel } from '@/composables/useResizablePanel'
+import FuckSeatsImportDialog from './FuckSeatsImportDialog.vue'
 
 const StudentEditDialog = defineAsyncComponent(() => import('./StudentEditDialog.vue'))
 const props = defineProps({
@@ -139,6 +145,7 @@ const props = defineProps({
   }
 })
 const showStudentEditDialog = ref(false)
+const showFuckSeatsImportDialog = ref(false)
 const editingStudentId = ref(null)
 
 const { tags, addTag, clearAllTags } = useTagData()
@@ -173,6 +180,14 @@ const handleEditStudent = (studentId) => {
 
 const excelInput = ref(null)
 const workspaceInput = ref(null)
+
+const openExcelImport = () => {
+  excelInput.value?.click()
+}
+
+const openFuckSeatsImport = () => {
+  showFuckSeatsImportDialog.value = true
+}
 
 const handleImportExcel = async (event) => {
   const file = event.target.files[0]
