@@ -39,9 +39,9 @@
 
         <!-- 操作按钮组 - 仅在高度足够时显示 -->
         <div v-if="!isHeightConstrained" class="empty-actions">
-          <button class="empty-action-btn outline" @click="openFuckSeatsImport">
+          <button class="empty-action-btn outline" @click="excelInput?.click()">
             <FileInput :size="16" stroke-width="2" />
-            <span>fuckseats导入</span>
+            <span>导入 Excel 名单</span>
           </button>
           <div class="empty-action-row">
             <button class="empty-action-btn outline" @click="workspaceInput?.click()">
