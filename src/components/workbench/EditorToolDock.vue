@@ -9,11 +9,6 @@
     </div>
 
     <div class="tool-group mobile-only">
-      <button class="tool-button" :title="isSeatFullscreen ? '退出全屏座位表' : '全屏座位表'" @click="toggleSeatFullscreen">
-        <Minimize2 v-if="isSeatFullscreen" :size="17" stroke-width="2" />
-        <Maximize2 v-else :size="17" stroke-width="2" />
-        <span>{{ isSeatFullscreen ? '退出' : '全屏' }}</span>
-      </button>
       <button class="tool-button" title="候选学生" @click="openWorkbenchDrawer('candidates')">
         <Users :size="17" stroke-width="2" />
         <span>学生</span>
@@ -22,11 +17,6 @@
         <MoreHorizontal :size="17" stroke-width="2" />
         <span>工具</span>
       </button>
-    </div>
-
-    <div v-if="selectedStudent" class="placement-strip mobile-placement">
-      <span>正在放置：{{ selectedStudent.name || '未命名' }}</span>
-      <button type="button" @click="clearStudentSelection">取消</button>
     </div>
 
     <div class="tool-group">
@@ -105,7 +95,7 @@
       <button class="tool-button icon-only" title="放大" :disabled="scale >= MAX_SCALE" @click="zoomIn">
         <Plus :size="17" stroke-width="2" />
       </button>
-      <button class="tool-button export-tool" title="导出" @click="router.push({ path: '/export', query: { tab: 'image' } })">
+      <button class="tool-button" title="导出" @click="router.push({ path: '/export', query: { tab: 'image' } })">
         <FileOutput :size="17" stroke-width="2" />
         <span>导出</span>
       </button>
@@ -122,9 +112,7 @@ import {
   Check,
   FileOutput,
   LayoutGrid,
-  Maximize2,
   Minus,
-  Minimize2,
   MoreHorizontal,
   MousePointer2,
   MoveDiagonal2,
@@ -138,11 +126,9 @@ import {
   Undo2,
   Users
 } from 'lucide-vue-next'
-import { useMediaQuery } from '@vueuse/core'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import { useEditMode } from '@/composables/useEditMode'
 import { useSelection } from '@/composables/useSelection'
-import { useStudentData } from '@/composables/useStudentData'
 import { useUndo } from '@/composables/useUndo'
 import { useZoom } from '@/composables/useZoom'
 import { useZoneData } from '@/composables/useZoneData'
@@ -150,32 +136,14 @@ import { useZoneRotation } from '@/composables/useZoneRotation'
 import { useLogger } from '@/composables/useLogger'
 
 const router = useRouter()
-const {
-  setTool,
-  openDialog,
-  showMobileSheet,
-  openMobileDrawer,
-  closeMobileDrawer,
-  zoneEditSession,
-  finishZoneEditSession,
-  isSeatFullscreen,
-  toggleSeatFullscreen
-} = useEditorWorkbench()
+const { setTool, openDialog, showMobileDrawer, openMobileDrawer, closeMobileDrawer, zoneEditSession, finishZoneEditSession } = useEditorWorkbench()
 const { currentMode, setMode, clearFirstSelectedSeat, EditMode } = useEditMode()
 const { isSelectionMode, selectedCount, toggleSelectionMode: toggleRawSelectionMode, clearSelection } = useSelection()
-const { students, selectedStudentId, clearSelection: clearStudentSelection } = useStudentData()
 const { undo, redo, canUndo, canRedo } = useUndo()
 const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom()
 const { clearZoneSelection } = useZoneData()
 const { clearEditingZone } = useZoneRotation()
 const { info } = useLogger()
-const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
-const isLandscape = useMediaQuery('(orientation: landscape)')
-const isFullscreenLandscape = computed(() => isSeatFullscreen.value && isMobileWorkbench.value && isLandscape.value)
-
-const selectedStudent = computed(() => (
-  students.value.find(student => student.id === selectedStudentId.value) || null
-))
 
 const selectionModeHint = computed(() => {
   if (selectedCount.value > 0) return `已选 ${selectedCount.value} 个座位`
@@ -226,7 +194,7 @@ const toggleSelectionMode = () => {
   }
   toggleRawSelectionMode()
   if (isSelectionMode.value) {
-    showMobileSheet('context')
+    showMobileDrawer('selection')
     info('多选模式：按住左键涂抹选择座位，再从上下文面板执行操作')
   } else {
     closeMobileDrawer()
@@ -247,10 +215,6 @@ const openWorkbenchDialog = (dialog) => {
 
 const openWorkbenchDrawer = (drawer) => {
   finishZoneEditing()
-  if (drawer === 'candidates' && isFullscreenLandscape.value) {
-    closeMobileDrawer()
-    return
-  }
   openMobileDrawer(drawer)
 }
 </script>
@@ -307,34 +271,6 @@ const openWorkbenchDrawer = (drawer) => {
   border-radius: 5px;
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.placement-strip {
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px 0 12px;
-  border: 1px solid var(--color-primary);
-  border-radius: 6px;
-  background: var(--color-info-bg);
-  color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.placement-strip button {
-  min-height: 28px;
-  border: 1px solid var(--color-border);
-  border-radius: 5px;
-  background: var(--color-surface);
-  color: var(--color-primary);
-  padding: 0 8px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -416,10 +352,6 @@ const openWorkbenchDrawer = (drawer) => {
 }
 
 .mobile-only {
-  display: none;
-}
-
-.mobile-placement {
   display: none;
 }
 
@@ -507,10 +439,6 @@ const openWorkbenchDrawer = (drawer) => {
     display: flex;
   }
 
-  .mobile-placement {
-    display: inline-flex;
-  }
-
   .workflows {
     order: 4;
   }
@@ -522,19 +450,6 @@ const openWorkbenchDrawer = (drawer) => {
   :global(body.student-dragging-from-candidate) .workflows,
   :global(body.seat-dragging-from-chart) .workflows {
     display: none;
-  }
-
-  :global(.editor-workbench.seat-fullscreen) .workflows,
-  :global(.editor-workbench.seat-fullscreen) .export-tool {
-    display: none;
-  }
-
-  :global(.editor-workbench.seat-fullscreen.fullscreen-landscape) .tool-button span {
-    display: none;
-  }
-
-  :global(.editor-workbench.seat-fullscreen.fullscreen-landscape) .mobile-placement {
-    max-width: 220px;
   }
 }
 </style>

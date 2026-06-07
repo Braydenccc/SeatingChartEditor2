@@ -1,12 +1,5 @@
 <template>
-  <div
-    class="editor-workbench"
-    :class="{
-      'zone-editing': zoneEditSession,
-      'seat-fullscreen': isSeatFullscreen,
-      'fullscreen-landscape': isFullscreenLandscape
-    }"
-  >
+  <div class="editor-workbench" :class="{ 'zone-editing': zoneEditSession }">
     <main class="chart-region">
       <SeatChart />
     </main>
@@ -33,7 +26,7 @@
 
     <Transition :name="suspendedMobileDrawer ? '' : 'drawer'">
       <div
-        v-if="activeMobileSheet"
+        v-if="floatingMobileDrawer"
         class="mobile-drawer-shell"
         :class="{ 'is-drag-suspended': suspendedMobileDrawer }"
       >
@@ -49,14 +42,13 @@
         </div>
         <div class="mobile-drawer-body">
           <ZoneEditContextPanel v-if="zoneEditSession" />
-          <ContextInspector v-else-if="mobileSheet === 'context'" />
-          <StudentPoolPanel v-else-if="mobileSheet === 'candidates'" />
-          <MobileToolsPanel v-else-if="mobileSheet === 'tools'" />
+          <StudentPoolPanel v-else-if="mobileDrawer === 'candidates'" />
+          <MobileToolsPanel v-else-if="mobileDrawer === 'tools'" />
         </div>
       </div>
     </Transition>
 
-    <div v-if="activeMobileSheet && !suspendedMobileDrawer" class="mobile-drawer-backdrop" @click="closeMobileSheet"></div>
+    <div v-if="floatingMobileDrawer && !suspendedMobileDrawer" class="mobile-drawer-backdrop" @click="closeMobileDrawer"></div>
 
     <WorkbenchDialogs />
   </div>
@@ -75,35 +67,18 @@ import WorkbenchDialogs from './WorkbenchDialogs.vue'
 import ZoneEditContextPanel from './ZoneEditContextPanel.vue'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
+const { rightRailTab, mobileDrawer, suspendedMobileDrawer, zoneEditSession, setRightRailTab, closeMobileDrawer } = useEditorWorkbench()
 const isWideDesktop = useMediaQuery('(min-width: 1440px)')
 const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
-const isLandscape = useMediaQuery('(orientation: landscape)')
-const {
-  rightRailTab,
-  mobileDrawer,
-  mobileSheet,
-  suspendedMobileDrawer,
-  zoneEditSession,
-  isSeatFullscreen,
-  setRightRailTab,
-  closeMobileDrawer,
-  closeMobileSheet
-} = useEditorWorkbench()
-const isFullscreenLandscape = computed(() => isSeatFullscreen.value && isMobileWorkbench.value && isLandscape.value)
-const activeMobileSheet = computed(() => {
-  if (!mobileSheet.value) return null
-  if (isFullscreenLandscape.value && mobileSheet.value === 'candidates') return null
-  return mobileSheet.value
-})
+const floatingMobileDrawer = computed(() => mobileDrawer.value === 'candidates' || mobileDrawer.value === 'tools')
 
 const mobileDrawerTitle = computed(() => {
   const titles = {
     candidates: '学生',
-    context: '上下文',
     selection: '上下文',
     tools: '工具'
   }
-  return titles[mobileSheet.value] || titles[mobileDrawer.value] || ''
+  return titles[mobileDrawer.value] || ''
 })
 
 let drawerStartY = 0
@@ -250,7 +225,7 @@ const handleDrawerPointerCancel = () => {
     --mobile-drawer-limit: calc(100dvh - var(--app-header-height, 78px) - var(--mobile-tool-dock-height) - 8px);
     display: grid;
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) var(--mobile-tool-dock-height);
+    grid-template-rows: minmax(0, 1fr) minmax(220px, 1fr) var(--mobile-tool-dock-height);
   }
 
   .chart-region {
@@ -264,9 +239,9 @@ const handleDrawerPointerCancel = () => {
 
   .context-rail {
     grid-column: 1;
-    grid-row: 1;
+    grid-row: 2;
     min-height: 0;
-    display: none;
+    display: flex;
     border-left: none;
     border-top: 1px solid var(--color-border);
   }
@@ -277,46 +252,7 @@ const handleDrawerPointerCancel = () => {
 
   .tool-dock {
     grid-column: 1;
-    grid-row: 2;
-  }
-
-  .editor-workbench.seat-fullscreen {
-    --mobile-drawer-limit: calc(100dvh - var(--mobile-tool-dock-height) - 8px);
-    position: fixed;
-    inset: 0;
-    z-index: 3000;
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    background: var(--color-bg-secondary);
-  }
-
-  .editor-workbench.seat-fullscreen .mobile-drawer-backdrop {
-    inset: 0 0 var(--mobile-tool-dock-height) 0;
-  }
-
-  .editor-workbench.seat-fullscreen.fullscreen-landscape {
-    grid-template-columns: minmax(0, 1fr) clamp(260px, 30vw, 360px);
-    grid-template-rows: minmax(0, 1fr) var(--mobile-tool-dock-height);
-  }
-
-  .editor-workbench.seat-fullscreen.fullscreen-landscape .chart-region {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .editor-workbench.seat-fullscreen.fullscreen-landscape .student-rail {
-    display: block;
-    grid-column: 2;
-    grid-row: 1 / 3;
-    min-height: 0;
-    border-left: 1px solid var(--color-border);
-    background: var(--color-surface);
-  }
-
-  .editor-workbench.seat-fullscreen.fullscreen-landscape .tool-dock {
-    grid-column: 1;
-    grid-row: 2;
+    grid-row: 3;
   }
 
   .mobile-drawer-backdrop {
@@ -359,11 +295,11 @@ const handleDrawerPointerCancel = () => {
   }
 
   :global(body.student-dragging-from-candidate) .editor-workbench {
-    grid-template-rows: minmax(0, 1fr) var(--mobile-tool-dock-height);
+    grid-template-rows: minmax(0, 1fr) 0 var(--mobile-tool-dock-height);
   }
 
   :global(body.student-dragging-from-candidate) .chart-region {
-    grid-row: 1;
+    grid-row: 1 / 3;
   }
 
   :global(body.student-dragging-from-candidate) .context-rail {

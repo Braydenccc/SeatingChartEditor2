@@ -241,7 +241,7 @@ const {
   updateDragPreview,
   endDragPreview
 } = useDragPreview()
-const { setRightRailTab, showMobileSheet, closeMobileDrawer } = useEditorWorkbench()
+const { setRightRailTab, showMobileDrawer, closeMobileDrawer } = useEditorWorkbench()
 
 const dragPreviewRef = ref(null)
 const viewportRef = ref(null)
@@ -296,7 +296,7 @@ const focusSeatContext = (seatId) => {
   if (!seatId || isGuardSeatId(seatId)) return
   selectSingleSeat(seatId)
   setRightRailTab('selection')
-  if (isMobile.value) showMobileSheet('context')
+  if (isMobile.value) showMobileDrawer('selection')
 }
 
 // ==================== 变换样式 ====================

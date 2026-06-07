@@ -246,18 +246,6 @@ const fetchSyncSettings = async (fetchApi = fetch) => {
     }
 }
 
-const attachPasswordField = async (requestBody, plainKey, encryptedKey, password, username) => {
-    if (!password) return
-
-    const encryptedPassword = await encryptPasswordForTransport(password, username)
-    if (encryptedPassword) {
-        requestBody[encryptedKey] = encryptedPassword
-        return
-    }
-
-    requestBody[plainKey] = password
-}
-
 export function useAuth() {
     const isLoggedIn = computed(() => {
         return !!currentUser.value || !!webdavConfig.value
@@ -272,7 +260,11 @@ export function useAuth() {
             }
 
             if (password) {
-                await attachPasswordField(requestBody, 'password', 'encryptedPassword', password, username)
+                const encryptedPassword = await encryptPasswordForTransport(password, username)
+                if (!encryptedPassword) {
+                    return { success: false, message: '密码加密失败，请使用现代浏览器重试' }
+                }
+                requestBody.encryptedPassword = encryptedPassword
             }
 
             const response = await fetch('/api/auth.php', {
@@ -334,12 +326,11 @@ export function useAuth() {
 
         try {
             const csrfToken = getOrCreateCsrfToken()
-            const requestBody = {
-                action: 'change_password',
-                _csrf: csrfToken
+            const encryptedCurrentPassword = await encryptPasswordForTransport(currentPassword, currentUser.value.username)
+            const encryptedNewPassword = await encryptPasswordForTransport(newPassword, currentUser.value.username)
+            if (!encryptedCurrentPassword || !encryptedNewPassword) {
+                return { success: false, message: '密码加密失败，请使用现代浏览器重试' }
             }
-            await attachPasswordField(requestBody, 'currentPassword', 'encryptedCurrentPassword', currentPassword, currentUser.value.username)
-            await attachPasswordField(requestBody, 'newPassword', 'encryptedNewPassword', newPassword, currentUser.value.username)
 
             const response = await fetch('/api/auth.php', {
                 method: 'POST',
@@ -348,7 +339,12 @@ export function useAuth() {
                     'Content-Type': 'application/json',
                     'X-CSRF-Token': csrfToken
                 },
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify({
+                    action: 'change_password',
+                    encryptedCurrentPassword,
+                    encryptedNewPassword,
+                    _csrf: csrfToken
+                })
             })
 
             if (!response.ok) {
