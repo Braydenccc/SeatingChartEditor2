@@ -1,5 +1,87 @@
 <?php
-function adminApplyCorsForDev() {
+require_once "api/common.php";
+require_once "api/file-permissions.php";
+
+const ADMIN_DB_NAME = 'admin';
+const ADMIN_ENABLE_KEY = 'is_enable';
+const ADMIN_TOKEN_HASH_KEY = 'api_token_hash';
+const ADMIN_CORS_ALLOWED_ORIGINS_KEY = 'cors_allowed_origins';
+const ADMIN_AUDIT_LOG_KEY = 'audit_logs';
+const ADMIN_AUDIT_FAILURE_KEY = 'audit_failures';
+const ADMIN_MAX_LOG_LIMIT = 200;
+const ADMIN_UNVERIFIED_RATE_WINDOW = 300;
+const ADMIN_UNVERIFIED_RATE_MAX = 30;
+
+function adminNormalizeCorsOrigin($origin) {
+    if (!is_string($origin)) {
+        return '';
+    }
+
+    $origin = rtrim(trim($origin), '/');
+    if ($origin === '' || $origin === '*') {
+        return '';
+    }
+
+    $parts = parse_url($origin);
+    if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+        return '';
+    }
+
+    if (strtolower($parts['scheme']) !== 'https') {
+        return '';
+    }
+
+    if (isset($parts['path']) || isset($parts['query']) || isset($parts['fragment']) || isset($parts['user']) || isset($parts['pass'])) {
+        return '';
+    }
+
+    $normalized = 'https://' . strtolower($parts['host']);
+    if (isset($parts['port'])) {
+        $normalized .= ':' . (int)$parts['port'];
+    }
+
+    return $normalized;
+}
+
+function adminParseCorsAllowedOrigins($rawOrigins) {
+    if (is_array($rawOrigins)) {
+        $originItems = $rawOrigins;
+    } elseif (is_string($rawOrigins) && trim($rawOrigins) !== '') {
+        $decoded = json_decode($rawOrigins, true);
+        $originItems = is_array($decoded) ? $decoded : preg_split('/[\r\n,]+/', $rawOrigins);
+    } else {
+        return [];
+    }
+
+    if (!is_array($originItems)) {
+        return [];
+    }
+
+    $allowedOrigins = [];
+    foreach ($originItems as $originItem) {
+        $origin = adminNormalizeCorsOrigin($originItem);
+        if ($origin !== '') {
+            $allowedOrigins[] = $origin;
+        }
+    }
+
+    return array_values(array_unique($allowedOrigins));
+}
+
+function adminGetConfiguredCorsAllowedOrigins() {
+    if (!class_exists('Database')) {
+        return [];
+    }
+
+    try {
+        $adminDb = new Database(ADMIN_DB_NAME);
+        return adminParseCorsAllowedOrigins($adminDb->get(ADMIN_CORS_ALLOWED_ORIGINS_KEY));
+    } catch (Throwable $error) {
+        return [];
+    }
+}
+
+function adminApplyCors() {
     $origin = isset($_SERVER['HTTP_ORIGIN']) && is_string($_SERVER['HTTP_ORIGIN']) ? trim($_SERVER['HTTP_ORIGIN']) : '';
     $allowedOrigins = [
         'http://localhost:5173',
@@ -7,6 +89,8 @@ function adminApplyCorsForDev() {
         'http://localhost:5174',
         'http://127.0.0.1:5174'
     ];
+    $allowedOrigins = array_merge($allowedOrigins, adminGetConfiguredCorsAllowedOrigins());
+
     $isAllowedOrigin = $origin !== '' && in_array($origin, $allowedOrigins, true);
 
     if ($isAllowedOrigin) {
@@ -23,10 +107,7 @@ function adminApplyCorsForDev() {
     }
 }
 
-adminApplyCorsForDev();
-
-require_once "api/common.php";
-require_once "api/file-permissions.php";
+adminApplyCors();
 header('Content-Type: application/json; charset=utf-8');
 
 if (!class_exists('Database')) {
@@ -34,15 +115,6 @@ if (!class_exists('Database')) {
     echo json_encode(['success' => false, 'message' => 'Environment error: Database not supported.'], JSON_UNESCAPED_UNICODE);
     exit(1);
 }
-
-const ADMIN_DB_NAME = 'admin';
-const ADMIN_ENABLE_KEY = 'is_enable';
-const ADMIN_TOKEN_HASH_KEY = 'api_token_hash';
-const ADMIN_AUDIT_LOG_KEY = 'audit_logs';
-const ADMIN_AUDIT_FAILURE_KEY = 'audit_failures';
-const ADMIN_MAX_LOG_LIMIT = 200;
-const ADMIN_UNVERIFIED_RATE_WINDOW = 300;
-const ADMIN_UNVERIFIED_RATE_MAX = 30;
 
 function adminGetHeaderValue($name) {
     $key = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
@@ -90,6 +162,16 @@ function adminNormalizePostInput($post) {
     return $input;
 }
 
+function adminParseUrlEncodedInput($rawInput) {
+    if (!is_string($rawInput) || trim($rawInput) === '') {
+        return [];
+    }
+
+    $parsed = [];
+    parse_str($rawInput, $parsed);
+    return adminNormalizePostInput($parsed);
+}
+
 function adminParseRequest() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         return [
@@ -116,6 +198,26 @@ function adminParseRequest() {
                 ];
             }
 
+            $urlEncodedInput = adminParseUrlEncodedInput($rawInput);
+            if (!empty($urlEncodedInput) && isset($urlEncodedInput['action']) && is_string($urlEncodedInput['action'])) {
+                return [
+                    'input' => $urlEncodedInput,
+                    'error' => null,
+                    'status' => 200,
+                    'requestSummary' => adminCreateRequestSummary($rawInput, json_last_error_msg())
+                ];
+            }
+
+            $payloadHeaderInput = adminParseUrlEncodedInput(adminGetHeaderValue('X-Admin-Payload'));
+            if (!empty($payloadHeaderInput) && isset($payloadHeaderInput['action']) && is_string($payloadHeaderInput['action'])) {
+                return [
+                    'input' => $payloadHeaderInput,
+                    'error' => null,
+                    'status' => 200,
+                    'requestSummary' => adminCreateRequestSummary($rawInput, json_last_error_msg())
+                ];
+            }
+
             return [
                 'input' => [],
                 'error' => 'Invalid JSON request body',
@@ -125,6 +227,13 @@ function adminParseRequest() {
         }
     } elseif (!empty($_POST)) {
         $input = adminNormalizePostInput($_POST);
+    }
+
+    if ((!is_array($input) || !isset($input['action']) || !is_string($input['action']))) {
+        $payloadHeaderInput = adminParseUrlEncodedInput(adminGetHeaderValue('X-Admin-Payload'));
+        if (!empty($payloadHeaderInput) && isset($payloadHeaderInput['action']) && is_string($payloadHeaderInput['action'])) {
+            $input = $payloadHeaderInput;
+        }
     }
 
     if (!is_array($input) || !isset($input['action']) || !is_string($input['action'])) {
@@ -163,14 +272,8 @@ function adminIsVerified($adminDb) {
     return hash_equals(strtolower(trim($savedHash)), hash('sha256', $token));
 }
 
-function adminEnsureHttps() {
-    if (isHttpsRequest() || isLocalRequestHost() || envFlagEnabled('ADMIN_ALLOW_HTTP')) {
-        return;
-    }
-
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => '管理接口必须使用 HTTPS 连接'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
-    exit(1);
+function adminIsHttpsAllowed() {
+    return isHttpsRequest() || isLocalRequestHost() || envFlagEnabled('ADMIN_ALLOW_HTTP');
 }
 
 function adminCheckUnverifiedRateLimit() {
@@ -430,7 +533,20 @@ $adminDb = new Database(ADMIN_DB_NAME);
 $parseResult = adminParseRequest();
 $input = $parseResult['input'];
 $action = isset($input['action']) && is_string($input['action']) ? $input['action'] : 'unknown';
-adminEnsureHttps();
+if (!adminIsHttpsAllowed()) {
+    adminRespond(
+        $adminDb,
+        $input,
+        $action,
+        ['success' => false, 'message' => '管理接口必须使用 HTTPS 连接'],
+        403,
+        false,
+        false,
+        'https_required',
+        null,
+        isset($parseResult['requestSummary']) ? $parseResult['requestSummary'] : null
+    );
+}
 $verified = adminIsVerified($adminDb);
 
 if (!$verified) {

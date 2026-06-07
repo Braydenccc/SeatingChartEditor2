@@ -1,10 +1,12 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 export type EditorTool = 'normal' | 'swap' | 'clear' | 'empty'
 export type WorkbenchDialog = 'seatConfig' | 'shiftRotation' | 'zoneRotation' | 'assignment' | 'rules' | null
 export type AssignmentWorkbenchPanel = 'run' | 'rules' | 'guide'
 export type RightRailTab = 'candidates' | 'selection' | 'activity'
 export type MobileDrawer = 'candidates' | 'selection' | 'tools' | null
+export type MobileSheet = 'candidates' | 'context' | 'tools' | null
+export type MobileViewMode = 'normal' | 'seatFullscreen'
 export type ZoneEditKind = 'assignment' | 'rotation'
 
 export interface ZoneEditSession {
@@ -23,10 +25,12 @@ const focusedRuleId = ref('')
 const isWorkbenchDialogHidden = ref(false)
 const zoneEditSession = ref<ZoneEditSession | null>(null)
 const rightRailTab = ref<RightRailTab>('candidates')
-const mobileDrawer = ref<MobileDrawer>(null)
+const mobileSheet = ref<MobileSheet>(null)
+const mobileViewMode = ref<MobileViewMode>('normal')
 const suspendedMobileDrawer = ref<MobileDrawer>(null)
 const dragOpenedMobileDrawer = ref<MobileDrawer>(null)
 const drawerBeforeDragOpen = ref<MobileDrawer>(null)
+const isSeatFullscreen = computed(() => mobileViewMode.value === 'seatFullscreen')
 
 const validTools = new Set<EditorTool>(['normal', 'swap', 'clear', 'empty'])
 const validDialogs = new Set<Exclude<WorkbenchDialog, null>>([
@@ -42,8 +46,39 @@ const validMobileDrawers = new Set<Exclude<MobileDrawer, null>>([
   'selection',
   'tools'
 ])
+const validMobileSheets = new Set<Exclude<MobileSheet, null>>([
+  'candidates',
+  'context',
+  'tools'
+])
+
+const drawerToSheet = (drawer: Exclude<MobileDrawer, null>): Exclude<MobileSheet, null> => (
+  drawer === 'selection' ? 'context' : drawer
+)
+
+const sheetToDrawer = (sheet: MobileSheet): MobileDrawer => (
+  sheet === 'context' ? 'selection' : sheet
+)
+
+const mobileDrawer = computed<MobileDrawer>({
+  get: () => sheetToDrawer(mobileSheet.value),
+  set: (drawer) => {
+    mobileSheet.value = drawer ? drawerToSheet(drawer) : null
+  }
+})
 
 export function useEditorWorkbench() {
+  const resetMobileDragState = () => {
+    suspendedMobileDrawer.value = null
+    dragOpenedMobileDrawer.value = null
+    drawerBeforeDragOpen.value = null
+  }
+
+  const closeMobileSheet = () => {
+    mobileSheet.value = null
+    resetMobileDragState()
+  }
+
   const setTool = (tool: EditorTool) => {
     if (!validTools.has(tool)) return
     activeTool.value = tool
@@ -69,10 +104,7 @@ export function useEditorWorkbench() {
     }
     isWorkbenchDialogHidden.value = false
     zoneEditSession.value = null
-    mobileDrawer.value = null
-    suspendedMobileDrawer.value = null
-    dragOpenedMobileDrawer.value = null
-    drawerBeforeDragOpen.value = null
+    closeMobileSheet()
   }
 
   const closeDialog = () => {
@@ -80,9 +112,7 @@ export function useEditorWorkbench() {
     isWorkbenchDialogHidden.value = false
     zoneEditSession.value = null
     focusedRuleId.value = ''
-    suspendedMobileDrawer.value = null
-    dragOpenedMobileDrawer.value = null
-    drawerBeforeDragOpen.value = null
+    closeMobileSheet()
   }
 
   const startZoneEditSession = (session: ZoneEditSession) => {
@@ -93,10 +123,7 @@ export function useEditorWorkbench() {
     zoneEditSession.value = session
     isWorkbenchDialogHidden.value = true
     rightRailTab.value = 'selection'
-    mobileDrawer.value = null
-    suspendedMobileDrawer.value = null
-    dragOpenedMobileDrawer.value = null
-    drawerBeforeDragOpen.value = null
+    closeMobileSheet()
   }
 
   const finishZoneEditSession = () => {
@@ -109,33 +136,54 @@ export function useEditorWorkbench() {
     rightRailTab.value = tab
   }
 
-  const openMobileDrawer = (drawer: Exclude<MobileDrawer, null>) => {
-    if (!validMobileDrawers.has(drawer)) return
-    suspendedMobileDrawer.value = null
-    dragOpenedMobileDrawer.value = null
-    drawerBeforeDragOpen.value = null
-    mobileDrawer.value = mobileDrawer.value === drawer ? null : drawer
+  const showMobileSheet = (sheet: Exclude<MobileSheet, null>) => {
+    if (!validMobileSheets.has(sheet)) return
+    resetMobileDragState()
+    mobileSheet.value = sheet
     activeWorkbenchDialog.value = null
     isWorkbenchDialogHidden.value = false
     zoneEditSession.value = null
+  }
+
+  const openMobileSheet = (sheet: Exclude<MobileSheet, null>) => {
+    if (!validMobileSheets.has(sheet)) return
+    resetMobileDragState()
+    mobileSheet.value = mobileSheet.value === sheet ? null : sheet
+    activeWorkbenchDialog.value = null
+    isWorkbenchDialogHidden.value = false
+    zoneEditSession.value = null
+  }
+
+  const enterSeatFullscreen = () => {
+    mobileViewMode.value = 'seatFullscreen'
+    closeMobileSheet()
+  }
+
+  const exitSeatFullscreen = () => {
+    mobileViewMode.value = 'normal'
+    closeMobileSheet()
+  }
+
+  const toggleSeatFullscreen = () => {
+    if (isSeatFullscreen.value) {
+      exitSeatFullscreen()
+      return
+    }
+    enterSeatFullscreen()
+  }
+
+  const openMobileDrawer = (drawer: Exclude<MobileDrawer, null>) => {
+    if (!validMobileDrawers.has(drawer)) return
+    openMobileSheet(drawerToSheet(drawer))
   }
 
   const showMobileDrawer = (drawer: Exclude<MobileDrawer, null>) => {
     if (!validMobileDrawers.has(drawer)) return
-    suspendedMobileDrawer.value = null
-    dragOpenedMobileDrawer.value = null
-    drawerBeforeDragOpen.value = null
-    mobileDrawer.value = drawer
-    activeWorkbenchDialog.value = null
-    isWorkbenchDialogHidden.value = false
-    zoneEditSession.value = null
+    showMobileSheet(drawerToSheet(drawer))
   }
 
   const closeMobileDrawer = () => {
-    mobileDrawer.value = null
-    suspendedMobileDrawer.value = null
-    dragOpenedMobileDrawer.value = null
-    drawerBeforeDragOpen.value = null
+    closeMobileSheet()
   }
 
   const suspendMobileDrawerForDrag = (drawer: Exclude<MobileDrawer, null>) => {
@@ -155,12 +203,12 @@ export function useEditorWorkbench() {
     drawerBeforeDragOpen.value = mobileDrawer.value
     dragOpenedMobileDrawer.value = drawer
     suspendedMobileDrawer.value = null
-    mobileDrawer.value = drawer
+    mobileSheet.value = drawerToSheet(drawer)
   }
 
   const restoreMobileDrawerOpenedForDrag = () => {
     if (!dragOpenedMobileDrawer.value) return
-    mobileDrawer.value = drawerBeforeDragOpen.value
+    mobileSheet.value = drawerBeforeDragOpen.value ? drawerToSheet(drawerBeforeDragOpen.value) : null
     dragOpenedMobileDrawer.value = null
     drawerBeforeDragOpen.value = null
   }
@@ -173,6 +221,9 @@ export function useEditorWorkbench() {
     isWorkbenchDialogHidden,
     zoneEditSession,
     rightRailTab,
+    mobileSheet,
+    mobileViewMode,
+    isSeatFullscreen,
     mobileDrawer,
     suspendedMobileDrawer,
     dragOpenedMobileDrawer,
@@ -183,6 +234,12 @@ export function useEditorWorkbench() {
     startZoneEditSession,
     finishZoneEditSession,
     setRightRailTab,
+    showMobileSheet,
+    openMobileSheet,
+    closeMobileSheet,
+    enterSeatFullscreen,
+    exitSeatFullscreen,
+    toggleSeatFullscreen,
     showMobileDrawer,
     openMobileDrawer,
     closeMobileDrawer,

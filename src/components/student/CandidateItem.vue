@@ -65,6 +65,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import { useStudentDragging } from '@/composables/useStudentDragging'
 import { useTagData } from '@/composables/useTagData'
 import { useSeatChart } from '@/composables/useSeatChart'
@@ -96,7 +97,17 @@ const { currentMode, setMode, EditMode } = useEditMode()
 const { settings } = useGlobalSettings()
 const { success, warning } = useLogger()
 const { enabledAttributeDefinitions, formatNumericValue, showNumericAttributesInEditor } = useStudentAttributes()
-const { setRightRailTab, showMobileDrawer, suspendMobileDrawerForDrag, restoreMobileDrawerAfterDrag } = useEditorWorkbench()
+const {
+  setRightRailTab,
+  showMobileSheet,
+  closeMobileSheet,
+  suspendMobileDrawerForDrag,
+  restoreMobileDrawerAfterDrag,
+  isSeatFullscreen
+} = useEditorWorkbench()
+const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
+const isLandscape = useMediaQuery('(orientation: landscape)')
+const isFullscreenLandscape = computed(() => isSeatFullscreen.value && isMobileWorkbench.value && isLandscape.value)
 
 const isSelected = computed(() => selectedStudentId.value === props.student.id)
 
@@ -173,13 +184,16 @@ const handleClick = () => {
   }
   selectStudent(props.student.id)
   setRightRailTab('selection')
+  if (isMobileWorkbench.value && !isFullscreenLandscape.value) {
+    closeMobileSheet()
+  }
 }
 
 const handleContextMenu = () => {
   selectStudent(props.student.id)
   setRightRailTab('selection')
   if (window.matchMedia('(max-width: 768px)').matches) {
-    showMobileDrawer('selection')
+    showMobileSheet('context')
   }
 }
 

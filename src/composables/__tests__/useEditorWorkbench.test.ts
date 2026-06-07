@@ -11,6 +11,7 @@ describe('useEditorWorkbench', () => {
     workbench.finishZoneEditSession()
     workbench.setRightRailTab('candidates')
     workbench.closeMobileDrawer()
+    workbench.exitSeatFullscreen()
   })
 
   it('tracks active tool', () => {
@@ -26,6 +27,7 @@ describe('useEditorWorkbench', () => {
     expect(workbench.activeWorkbenchDialog.value).toBe('assignment')
     expect(workbench.assignmentWorkbenchPanel.value).toBe('run')
     expect(workbench.mobileDrawer.value).toBeNull()
+    expect(workbench.mobileSheet.value).toBeNull()
 
     workbench.closeDialog()
     expect(workbench.activeWorkbenchDialog.value).toBeNull()
@@ -84,10 +86,36 @@ describe('useEditorWorkbench', () => {
     workbench.openDialog('rules')
     workbench.openMobileDrawer('candidates')
     expect(workbench.mobileDrawer.value).toBe('candidates')
+    expect(workbench.mobileSheet.value).toBe('candidates')
     expect(workbench.activeWorkbenchDialog.value).toBeNull()
 
     workbench.openMobileDrawer('candidates')
     expect(workbench.mobileDrawer.value).toBeNull()
+    expect(workbench.mobileSheet.value).toBeNull()
+  })
+
+  it('maps the legacy selection drawer to the context sheet', () => {
+    workbench.showMobileDrawer('selection')
+    expect(workbench.mobileDrawer.value).toBe('selection')
+    expect(workbench.mobileSheet.value).toBe('context')
+
+    workbench.closeMobileSheet()
+    expect(workbench.mobileDrawer.value).toBeNull()
+    expect(workbench.mobileSheet.value).toBeNull()
+  })
+
+  it('switches mobile sheets exclusively and closes them when opening dialogs', () => {
+    workbench.showMobileSheet('context')
+    expect(workbench.mobileSheet.value).toBe('context')
+    expect(workbench.mobileDrawer.value).toBe('selection')
+
+    workbench.showMobileSheet('tools')
+    expect(workbench.mobileSheet.value).toBe('tools')
+    expect(workbench.mobileDrawer.value).toBe('tools')
+
+    workbench.openDialog('seatConfig')
+    expect(workbench.activeWorkbenchDialog.value).toBe('seatConfig')
+    expect(workbench.mobileSheet.value).toBeNull()
   })
 
   it('temporarily hides and restores the candidates drawer while dragging', () => {
@@ -107,6 +135,7 @@ describe('useEditorWorkbench', () => {
 
     workbench.suspendMobileDrawerForDrag('candidates')
     expect(workbench.mobileDrawer.value).toBe('selection')
+    expect(workbench.mobileSheet.value).toBe('context')
 
     workbench.restoreMobileDrawerAfterDrag()
     expect(workbench.mobileDrawer.value).toBe('selection')
@@ -130,5 +159,28 @@ describe('useEditorWorkbench', () => {
 
     workbench.restoreMobileDrawerOpenedForDrag()
     expect(workbench.mobileDrawer.value).toBeNull()
+  })
+
+  it('enters and exits seat fullscreen while closing mobile sheets', () => {
+    workbench.showMobileSheet('candidates')
+
+    workbench.enterSeatFullscreen()
+    expect(workbench.mobileViewMode.value).toBe('seatFullscreen')
+    expect(workbench.isSeatFullscreen.value).toBe(true)
+    expect(workbench.mobileSheet.value).toBeNull()
+
+    workbench.showMobileSheet('tools')
+    workbench.exitSeatFullscreen()
+    expect(workbench.mobileViewMode.value).toBe('normal')
+    expect(workbench.isSeatFullscreen.value).toBe(false)
+    expect(workbench.mobileSheet.value).toBeNull()
+  })
+
+  it('toggles seat fullscreen', () => {
+    workbench.toggleSeatFullscreen()
+    expect(workbench.isSeatFullscreen.value).toBe(true)
+
+    workbench.toggleSeatFullscreen()
+    expect(workbench.isSeatFullscreen.value).toBe(false)
   })
 })
