@@ -226,9 +226,9 @@
                 />
                 <label>人</label>
               </div>
-              <button class="import-student-btn" @click="openFuckSeatsImport">
+              <button class="import-student-btn" type="button" @click="goFilesView">
                 <FileInput :size="15" />
-                <span>fuckseats导入</span>
+                <span>到文件页导入</span>
               </button>
               <button class="add-student-btn" @click="handleAddStudent">
                 <Plus :size="15" />
@@ -340,7 +340,6 @@
           </section>
         </div>
       </div>
-      <FuckSeatsImportDialog v-model:visible="showFuckSeatsImportDialog" />
     </div>
   </transition>
 </template>
@@ -349,10 +348,10 @@
 import { computed, ref, watch } from 'vue'
 import { BarChart3, Check, FileInput, PanelLeft, Plus, Settings, Tag, Trash2, X } from 'lucide-vue-next'
 import TagStudentSelector from './TagStudentSelector.vue'
-import FuckSeatsImportDialog from './FuckSeatsImportDialog.vue'
 import { getNextColor } from '@/constants/tagColors'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
+import { useRouter } from 'vue-router'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
 import { useZoneData } from '@/composables/useZoneData'
@@ -389,14 +388,17 @@ const {
 const { openSettings } = useSettingsDialog()
 const { requestConfirm, isPending } = useConfirmAction()
 const { warning, success } = useLogger()
+const router = useRouter()
 
+const goFilesView = () => {
+  router.push('/files')
+}
 // 学生人数控制
 const targetStudentCount = ref(0)
 const isCountError = ref(false)
 const numericDrafts = ref({})
 const activeContext = ref({ type: 'overview', id: null })
 const selectedTagStudentIds = ref([])
-const showFuckSeatsImportDialog = ref(false)
 const enabledAttributes = computed(() => enabledAttributeDefinitions.value)
 const sheetColumnCount = computed(() => 4 + enabledAttributes.value.length + tags.value.length)
 const activeAttribute = computed(() => {
@@ -592,10 +594,6 @@ const handleStudentCountChange = () => {
 const handleAddStudent = () => {
   addStudent()
   isCountError.value = false
-}
-
-const openFuckSeatsImport = () => {
-  showFuckSeatsImportDialog.value = true
 }
 
 const handleStudentNameChange = (student, value) => {
