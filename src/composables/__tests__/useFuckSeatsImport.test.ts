@@ -216,6 +216,49 @@ describe('useFuckSeatsImport', () => {
     expect(workspace.layout.seats.filter(seat => seat.empty)).toHaveLength(3)
   })
 
+  it('keeps students from unavailable cells unseated', () => {
+    const classroom: FuckSeatsClassroomSummary = {
+      id: 10,
+      name: '非座位学生',
+      baseUrl: 'http://127.0.0.1:23948',
+      href: '/classroom/10/',
+      gridLabel: '1 × 1',
+      studentCount: 1,
+      seatCount: 1
+    }
+
+    const workspace = buildWorkspaceFromFuckSeatsState(classroom, {
+      seats: [
+        {
+          row: 1,
+          col: 1,
+          cell_type: 'aisle',
+          student: {
+            id: 31,
+            name: '赵六'
+          }
+        }
+      ]
+    })
+
+    expect(workspace.students).toContainEqual({
+      id: 31,
+      name: '赵六',
+      studentNumber: null,
+      tags: [],
+      numericAttributes: {}
+    })
+    expect(workspace.layout.seats).toContainEqual({
+      id: 'seat-0-0-0',
+      kind: 'regular',
+      group: 0,
+      col: 0,
+      row: 0,
+      studentId: null,
+      empty: true
+    })
+  })
+
   it('rejects duplicate fuckseats seat coordinates', () => {
     const classroom: FuckSeatsClassroomSummary = {
       id: 9,
@@ -232,6 +275,6 @@ describe('useFuckSeatsImport', () => {
         { row: 1, col: 1, cell_type: 'seat', student: null },
         { row: 1, col: 1, cell_type: 'seat', student: null }
       ]
-    })).toThrow('fuckseats座位坐标重复')
+    })).toThrow('不想排座位座位坐标重复')
   })
 })

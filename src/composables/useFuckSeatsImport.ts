@@ -305,7 +305,7 @@ const normalizeSeatPosition = (seat: FuckSeatsSeat) => {
   const row = Number(seat.row)
   const col = Number(seat.col)
   if (!Number.isInteger(row) || row <= 0 || !Number.isInteger(col) || col <= 0) {
-    throw new Error('fuckseats座位坐标无效')
+    throw new Error('不想排座位座位坐标无效')
   }
   return {
     rowIndex: row - 1,
@@ -328,7 +328,7 @@ export const buildWorkspaceFromFuckSeatsState = (
   state: FuckSeatsStatePayload
 ) => {
   if (!state || typeof state !== 'object') {
-    throw new Error('fuckseats班级数据格式不正确')
+    throw new Error('不想排座位班级数据格式不正确')
   }
 
   const seats = Array.isArray(state.seats) ? state.seats : []
@@ -377,11 +377,12 @@ export const buildWorkspaceFromFuckSeatsState = (
     const { rowIndex, colIndex } = positions[index]
     const positionKey = `${colIndex}:${rowIndex}`
     if (seenPositions.has(positionKey)) {
-      throw new Error(`fuckseats座位坐标重复：第 ${rowIndex + 1} 行第 ${colIndex + 1} 列`)
+      throw new Error(`不想排座位座位坐标重复：第 ${rowIndex + 1} 行第 ${colIndex + 1} 列`)
     }
     seenPositions.add(positionKey)
     const student = addStudent(seat.student)
-    const studentId = student?.id ?? null
+    const isSeatCell = seat.cell_type === 'seat'
+    const studentId = isSeatCell ? (student?.id ?? null) : null
     if (studentId !== null) physicalSeatByStudentId.set(studentId, true)
 
     seatItems.push({
@@ -391,7 +392,7 @@ export const buildWorkspaceFromFuckSeatsState = (
       col: colIndex,
       row: rowIndex,
       studentId,
-      empty: seat.cell_type !== 'seat'
+      empty: !isSeatCell
     })
   })
 
@@ -480,7 +481,7 @@ export function useFuckSeatsImport() {
     const workspace = buildWorkspaceFromFuckSeatsState(classroom, state)
     const imported = await applyWorkspaceData(workspace)
     if (!imported) {
-      throw new Error('fuckseats班级数据导入失败')
+      throw new Error('不想排座位班级数据导入失败')
     }
 
     saveLastWorkspace({

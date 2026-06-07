@@ -4,7 +4,7 @@
       <section class="fs-import-dialog" role="dialog" aria-modal="true" aria-labelledby="fuckseats-import-title">
         <header class="fs-import-header">
           <div>
-            <h3 id="fuckseats-import-title">fuckseats导入</h3>
+            <h3 id="fuckseats-import-title">从不想排座位导入</h3>
             <p>{{ headerText }}</p>
           </div>
           <button class="fs-icon-btn" type="button" aria-label="关闭" @click="close">
@@ -22,7 +22,7 @@
           <div v-else-if="errorText" class="fs-import-state">
             <ServerOff :size="24" />
             <strong>{{ errorText }}</strong>
-            <span>请先启动 fuckseats，再重新检测</span>
+            <span>请先启动不想排座位，再重新检测</span>
             <div class="fs-state-actions">
               <button class="fs-secondary-btn" type="button" @click="loadClassrooms">
                 <RefreshCcw :size="15" />
@@ -38,7 +38,7 @@
           <div v-else-if="classrooms.length === 0" class="fs-import-state">
             <Server :size="24" />
             <strong>已连接本地服务</strong>
-            <span>当前 fuckseats 没有可导入的班级</span>
+            <span>当前不想排座位没有可导入的班级</span>
             <button class="fs-secondary-btn" type="button" @click="loadClassrooms">
               <RefreshCcw :size="15" />
               <span>刷新</span>
@@ -97,8 +97,12 @@ import { useFuckSeatsImport } from '@/composables/useFuckSeatsImport'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
 import { useSeatChart } from '@/composables/useSeatChart'
+import { useSeatRules } from '@/composables/useSeatRules'
+import { useExportSettings, normalizeExportSettings } from '@/composables/useExportSettings'
 import { useStudentData } from '@/composables/useStudentData'
+import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useTagData } from '@/composables/useTagData'
+import { useZoneData } from '@/composables/useZoneData'
 
 const props = defineProps({
   visible: Boolean,
@@ -113,9 +117,13 @@ const emit = defineEmits(['update:visible', 'fallback-excel', 'imported'])
 const { discoverLocalFuckSeats, importClassroom } = useFuckSeatsImport()
 const { requestConfirm, isConfirming, cancelConfirm } = useConfirmAction()
 const { success, warning, error } = useLogger()
-const { seats } = useSeatChart()
+const { seats, seatConfig } = useSeatChart()
+const { rules } = useSeatRules()
+const { exportSettings } = useExportSettings()
 const { students } = useStudentData()
+const { attributeDefinitions, showNumericAttributesInEditor } = useStudentAttributes()
 const { tags } = useTagData()
+const { zones } = useZoneData()
 
 const isLoading = ref(false)
 const isImporting = ref(false)
@@ -134,22 +142,105 @@ const selectedClassroom = computed(() => (
 ))
 
 const headerText = computed(() => {
-  if (isLoading.value) return '检测本机是否正在运行 fuckseats'
+  if (isLoading.value) return '检测本机是否正在运行不想排座位'
   if (errorText.value) return '未检测到可读取的本地服务'
-  if (!serviceBaseUrl.value) return '选择一个本地班级进行 fuckseats导入'
+  if (!serviceBaseUrl.value) return '选择一个本地班级，从不想排座位导入'
   return `已连接 ${formatBaseUrl(serviceBaseUrl.value)}`
 })
+
+const defaultSeatConfig = {
+  groupCount: 4,
+  columnsPerGroup: 2,
+  seatsPerColumn: 7,
+  groups: [
+    { columns: 2, rows: 7 },
+    { columns: 2, rows: 7 },
+    { columns: 2, rows: 7 },
+    { columns: 2, rows: 7 }
+  ],
+  shiftDistance: 4,
+  podiumPosition: 'bottom',
+  guardSeats: {
+    enabled: true,
+    leftEnabled: true,
+    rightEnabled: true,
+    includeInAutoAssignment: false,
+    hideEmptyOnExport: true
+  }
+}
+
+const defaultAttributeDefinitions = [
+  { id: 'height', name: '身高', unit: 'cm', min: 80, max: 220, precision: 0, enabled: true, showInEditor: true },
+  { id: 'score', name: '成绩', unit: '分', min: 0, max: 150, precision: 1, enabled: true, showInEditor: true }
+]
+
+const toComparableSeatConfig = (config) => {
+  const groups = Array.isArray(config?.groups) ? config.groups : []
+  return {
+    groupCount: Number(config?.groupCount ?? defaultSeatConfig.groupCount),
+    columnsPerGroup: Number(config?.columnsPerGroup ?? defaultSeatConfig.columnsPerGroup),
+    seatsPerColumn: Number(config?.seatsPerColumn ?? defaultSeatConfig.seatsPerColumn),
+    groups: groups.map(group => ({
+      columns: Number(group?.columns ?? defaultSeatConfig.columnsPerGroup),
+      rows: Number(group?.rows ?? defaultSeatConfig.seatsPerColumn)
+    })),
+    shiftDistance: Number(config?.shiftDistance ?? defaultSeatConfig.shiftDistance),
+    podiumPosition: config?.podiumPosition || defaultSeatConfig.podiumPosition,
+    guardSeats: {
+      ...defaultSeatConfig.guardSeats,
+      ...(config?.guardSeats || {})
+    }
+  }
+}
+
+const toComparableAttributeDefinitions = (definitions) => (
+  (definitions || []).map(def => ({
+    id: def.id,
+    name: def.name,
+    unit: def.unit || '',
+    min: def.min ?? null,
+    max: def.max ?? null,
+    precision: Number(def.precision ?? 0),
+    enabled: def.enabled !== false,
+    showInEditor: def.showInEditor !== false
+  }))
+)
+
+const isSameJson = (left, right) => JSON.stringify(left) === JSON.stringify(right)
+
+const hasCustomSeatConfig = computed(() => !isSameJson(
+  toComparableSeatConfig(seatConfig.value),
+  toComparableSeatConfig(defaultSeatConfig)
+))
+
+const hasCustomAttributeSettings = computed(() => (
+  showNumericAttributesInEditor.value !== true ||
+  !isSameJson(
+    toComparableAttributeDefinitions(attributeDefinitions.value),
+    toComparableAttributeDefinitions(defaultAttributeDefinitions)
+  )
+))
+
+const hasCustomExportSettings = computed(() => !isSameJson(
+  normalizeExportSettings(exportSettings.value),
+  normalizeExportSettings()
+))
 
 const hasCurrentWorkspaceData = computed(() => (
   students.value.length > 0 ||
   tags.value.length > 0 ||
-  seats.value.some(seat => seat.studentId != null || seat.isEmpty)
+  seats.value.some(seat => seat.studentId != null || seat.isEmpty) ||
+  hasCustomSeatConfig.value ||
+  hasCustomAttributeSettings.value ||
+  zones.value.length > 0 ||
+  rules.value.length > 0 ||
+  hasCustomExportSettings.value
 ))
 
 const importButtonText = computed(() => {
-  if (isImporting.value) return 'fuckseats导入中'
+  if (isImporting.value) return '正在从不想排座位导入'
   if (isImportConfirming.value) return '再次点击确认覆盖'
-  return 'fuckseats导入'
+  return '从不想排座位导入'
 })
 
 const formatBaseUrl = (value) => String(value || '').replace(/^https?:\/\//, '')
@@ -184,10 +275,10 @@ const loadClassrooms = async () => {
     if (!result.available) {
       const errors = Array.isArray(result.errors) ? result.errors : []
       errorText.value = errors[0]
-        ? `未检测到本地 fuckseats 服务：${errors[0]}`
-        : '未检测到本地 fuckseats 服务'
+        ? `未检测到本地不想排座位服务：${errors[0]}`
+        : '未检测到本地不想排座位服务'
       if (errors.length > 0) {
-        warning(`fuckseats探测失败：${errors.join('；')}`)
+        warning(`不想排座位探测失败：${errors.join('；')}`)
       }
       return
     }
@@ -213,11 +304,11 @@ const executeImport = async () => {
 
   try {
     const result = await importClassroom(selectedClassroom.value)
-    success(`fuckseats导入完成：${selectedClassroom.value.name}，${result.students} 名学生，${result.assignedSeats} 个座位`)
+    success(`从不想排座位导入完成：${selectedClassroom.value.name}，${result.students} 名学生，${result.assignedSeats} 个座位`)
     emit('imported', result)
     close()
   } catch (err) {
-    error(err?.message || 'fuckseats导入失败')
+    error(err?.message || '从不想排座位导入失败')
   } finally {
     isImporting.value = false
   }
@@ -230,10 +321,10 @@ const handleImport = async () => {
     const confirmed = requestConfirm(
       importConfirmKey,
       null,
-      'fuckseats导入会覆盖当前名单、标签、座位配置和座位分配'
+      '从不想排座位导入会覆盖当前名单、标签、座位配置和座位分配'
     )
     if (!confirmed) {
-      warning('fuckseats导入会覆盖当前数据，请再次点击导入确认')
+      warning('从不想排座位导入会覆盖当前数据，请再次点击导入确认')
       return
     }
   }

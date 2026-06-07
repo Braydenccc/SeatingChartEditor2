@@ -179,7 +179,7 @@
           </button>
           <button class="action-button" type="button" @click="openFuckSeatsImport">
             <FileInput :size="18" stroke-width="2" />
-            <span>fuckseats导入</span>
+            <span>从不想排座位导入</span>
           </button>
           <button class="action-button" type="button" @click="handleExportExcel">
             <FileOutput :size="18" stroke-width="2" />
