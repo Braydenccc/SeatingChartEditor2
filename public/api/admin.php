@@ -44,12 +44,15 @@ function adminNormalizeCorsOrigin($origin) {
 }
 
 function adminParseCorsAllowedOrigins($rawOrigins) {
-    if (!is_string($rawOrigins) || trim($rawOrigins) === '') {
+    if (is_array($rawOrigins)) {
+        $originItems = $rawOrigins;
+    } elseif (is_string($rawOrigins) && trim($rawOrigins) !== '') {
+        $decoded = json_decode($rawOrigins, true);
+        $originItems = is_array($decoded) ? $decoded : preg_split('/[\r\n,]+/', $rawOrigins);
+    } else {
         return [];
     }
 
-    $decoded = json_decode($rawOrigins, true);
-    $originItems = is_array($decoded) ? $decoded : preg_split('/[\r\n,]+/', $rawOrigins);
     if (!is_array($originItems)) {
         return [];
     }
@@ -73,7 +76,7 @@ function adminGetConfiguredCorsAllowedOrigins() {
     try {
         $adminDb = new Database(ADMIN_DB_NAME);
         return adminParseCorsAllowedOrigins($adminDb->get(ADMIN_CORS_ALLOWED_ORIGINS_KEY));
-    } catch (Exception $error) {
+    } catch (Throwable $error) {
         return [];
     }
 }
