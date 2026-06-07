@@ -5,7 +5,7 @@ const RETIEHE_API_BASE_KEY = 'sce-retiehe-api-base'
 const cookieJar = new Map<string, string>()
 
 export const getRetieheApiBase = () => {
-  const envBase = import.meta.env.VITE_RETIEHE_API_BASE
+  const envBase = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_RETIEHE_API_BASE
   const storedBase = safeStorageGet(RETIEHE_API_BASE_KEY)
   return String(envBase || storedBase || '').trim().replace(/\/+$/, '')
 }

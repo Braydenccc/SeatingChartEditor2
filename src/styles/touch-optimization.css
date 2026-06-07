@@ -7,7 +7,7 @@
   justify-content: center;
   pointer-events: none;
   z-index: 9999;
-  will-change: transform, opacity;
+  will-change: transform, left, top;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease;
 }
 

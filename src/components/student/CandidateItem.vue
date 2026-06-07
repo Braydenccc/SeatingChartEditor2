@@ -101,6 +101,8 @@ const {
   setRightRailTab,
   showMobileSheet,
   closeMobileSheet,
+  suspendMobileDrawerForDrag,
+  restoreMobileDrawerAfterDrag,
   isSeatFullscreen
 } = useEditorWorkbench()
 const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
@@ -167,7 +169,10 @@ const {
   handleTouchStart,
   handleDragStart,
   handleDragEnd
-} = useStudentDragging(itemRef, computed(() => props.student))
+} = useStudentDragging(itemRef, computed(() => props.student), {
+  onStartDrag: () => suspendMobileDrawerForDrag('candidates'),
+  onEndDrag: restoreMobileDrawerAfterDrag
+})
 
 const handleClick = () => {
   if (isSelected.value) {
@@ -528,20 +533,6 @@ const handleDoubleClick = () => {
   .corner-tag-item { font-size: 8px; padding: 1px 3px; }
   .attribute-text-item,
   .corner-attribute-item { font-size: 7px; padding: 1px 3px; }
-}
-
-@media (max-width: 1024px) and (orientation: landscape) and (max-height: 540px) {
-  .candidate-item.compact {
-    height: 50px;
-  }
-
-  .candidate-item.compact .student-display {
-    padding: 5px 8px;
-  }
-
-  .candidate-item.compact .student-name {
-    font-size: 13px;
-  }
 }
 
 @media (max-width: 480px) {

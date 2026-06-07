@@ -219,9 +219,19 @@ export const saveBinaryFile = async (
     return { success: true, canceled: false, path }
   }
 
-  const blob = content instanceof Blob
-    ? content
-    : new Blob([content], { type: options.mimeType || 'application/octet-stream' })
+  let binaryContent: ArrayBuffer | Blob
+  if (content instanceof Blob) {
+    binaryContent = content
+  } else if (content instanceof Uint8Array) {
+    const copy = new ArrayBuffer(content.byteLength)
+    new Uint8Array(copy).set(content)
+    binaryContent = copy
+  } else {
+    binaryContent = content
+  }
+  const blob = binaryContent instanceof Blob
+    ? binaryContent
+    : new Blob([binaryContent], { type: options.mimeType || 'application/octet-stream' })
   downloadBlob(blob, ensureExtension(options.defaultPath, options.extension))
   return { success: true, canceled: false, path: null }
 }

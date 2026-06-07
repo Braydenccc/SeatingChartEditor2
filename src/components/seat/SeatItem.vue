@@ -155,7 +155,6 @@ let transparentDragImageEl = null
 
 // 响应式断点检测
 const isMobile = useMediaQuery('(max-width: 768px)')
-const isCoarsePointer = useMediaQuery('(hover: none) and (pointer: coarse)')
 
 // 触摸拖拽状态
 let touchDragTimer = null
@@ -304,7 +303,6 @@ const canTouchDrag = computed(() => {
 // HTML5 draggable 属性：通过触摸交互时禁用，防止幽灵拖拽图
 // 使用动态 lastPointerWasTouch 而非静态 maxTouchPoints，避免触摸屏笔记本问题
 const isDraggable = computed(() => {
-  if (isCoarsePointer.value) return false
   if (lastPointerWasTouch.value) return false
   if (isSelectionMode.value) return false
   if (isInSelection.value && hasStudent.value) return true
@@ -404,7 +402,9 @@ const handleDragStart = (e) => {
     return
   }
   isDragging.value = true
-  document.body?.classList.add('seat-dragging-from-chart')
+  if (!lastPointerWasTouch.value) {
+    document.body?.classList.add('seat-dragging-from-chart')
+  }
   if (isMobile.value) openMobileDrawerForDrag('candidates')
   startDragFromSeat()
   e.dataTransfer.effectAllowed = 'move'
@@ -502,7 +502,7 @@ const handleTouchStart = (e) => {
   touchDragTimer = setTimeout(() => {
     touchDragActive = true
     isDragging.value = true
-    document.body?.classList.add('seat-dragging-from-chart')
+    openMobileDrawerForDrag('candidates')
     startTouchDragFromSeat()
     if (navigator.vibrate) navigator.vibrate(50)
 
@@ -513,9 +513,7 @@ const handleTouchStart = (e) => {
       startDraggingSelection()
     }
 
-    if (!isCoarsePointer.value) {
-      startDragPreview(props.seat.id, selectionData, startX, startY)
-    }
+    startDragPreview(props.seat.id, selectionData, startX, startY)
   }, 300)
 }
 

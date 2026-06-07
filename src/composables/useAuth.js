@@ -15,6 +15,7 @@ const backupMode = ref(false)
 
 const COOKIE_EXPIRY_DAYS = 7
 const cookieSessionToken = 'cookie-session'
+let syncSettingsTimer = null
 
 // 包装存储函数以支持认证相关数据的 sessionStorage 优先策略
 const safeStorageGet = (key) => {
@@ -208,7 +209,7 @@ const initAuth = async () => {
     // 延迟执行，避免阻塞应用初始加载
     if (currentUser.value && token.value === cookieSessionToken) {
         const fetchApi = isTauriRuntime() ? apiFetch : globalThis.fetch
-        setTimeout(() => fetchSyncSettings(fetchApi), 100)
+        scheduleFetchSyncSettings(fetchApi)
     }
 }
 
@@ -248,6 +249,23 @@ const fetchSyncSettings = async (fetchApi = apiFetch) => {
     }
 }
 
+const scheduleFetchSyncSettings = (fetchApi) => {
+    if (syncSettingsTimer) {
+        clearTimeout(syncSettingsTimer)
+    }
+    syncSettingsTimer = setTimeout(() => {
+        syncSettingsTimer = null
+        fetchSyncSettings(fetchApi)
+    }, 100)
+}
+
+const cancelScheduledFetchSyncSettings = () => {
+    if (syncSettingsTimer) {
+        clearTimeout(syncSettingsTimer)
+        syncSettingsTimer = null
+    }
+}
+
 const attachPasswordField = async (requestBody, plainKey, encryptedKey, password, username) => {
     if (!password) return
 
@@ -264,8 +282,9 @@ export function useAuth() {
     const isLoggedIn = computed(() => {
         return !!currentUser.value || !!webdavConfig.value
     })
-        const callAuthApi = async (action, username, password) => {
+    const callAuthApi = async (action, username, password) => {
         try {
+            cancelScheduledFetchSyncSettings()
             const csrfToken = getOrCreateCsrfToken()
             const requestBody = {
                 action,
@@ -330,6 +349,7 @@ export function useAuth() {
     }
 
     const changePassword = async (currentPassword, newPassword) => {
+        cancelScheduledFetchSyncSettings()
         if (!currentUser.value || token.value !== cookieSessionToken) {
             return { success: false, message: '请先登录 SCE 账号' }
         }
@@ -367,6 +387,7 @@ export function useAuth() {
     }
 
     const logout = async (target = 'all') => {
+        cancelScheduledFetchSyncSettings()
         if (target === 'all' || target === 'retiehe') {
             // 调用后端 API 失效 token
             if (currentUser.value && token.value === cookieSessionToken) {
@@ -442,6 +463,7 @@ export function useAuth() {
     }
 
     const updateSyncSettings = async (webdav, backup) => {
+        cancelScheduledFetchSyncSettings()
         if (!currentUser.value || token.value !== cookieSessionToken) return { success: false, message: '未登录' }
         try {
             const persistedWebdav = await preparePersistedWebdavConfig(webdav)

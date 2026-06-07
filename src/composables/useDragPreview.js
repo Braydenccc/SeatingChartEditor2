@@ -1,9 +1,9 @@
-import { computed, reactive } from 'vue'
+import { ref, computed, reactive } from 'vue'
 import { useSeatChart } from './useSeatChart'
 import { useZoom } from './useZoom'
 import { useStudentData } from './useStudentData'
 import { useLayoutConstants } from './useLayoutConstants'
-import { parseSeatId, isGuardSeatId } from '@/utils/seatHelpers'
+import { parseSeatId, generateSeatId, isGuardSeatId } from '@/utils/seatHelpers'
 
 const { LAYOUT: L } = useLayoutConstants()
 
@@ -23,17 +23,20 @@ let cachedChartRect = null
 let previewEl = null
 let updateRafId = null
 
-const getPreviewTransform = (clientX, clientY) => (
-  `translate3d(${clientX}px, ${clientY}px, 0) translate(-50%, -50%)`
-)
-
 const positionPreviewElement = () => {
   if (!previewEl || !state.isActive) return
 
-  previewEl.style.left = '0'
-  previewEl.style.top = '0'
-  previewEl.style.transform = getPreviewTransform(state.mouseX, state.mouseY)
+  previewEl.style.left = `${state.mouseX}px`
+  previewEl.style.top = `${state.mouseY}px`
+  previewEl.style.transform = 'translate(-50%, -50%)'
   previewEl.style.transition = 'none'
+}
+
+const escapeSelectorValue = (value) => {
+  if (typeof window !== 'undefined' && window.CSS?.escape) {
+    return window.CSS.escape(value)
+  }
+  return String(value).replace(/["\\]/g, '\\$&')
 }
 
 export function useDragPreview() {
@@ -107,7 +110,8 @@ export function useDragPreview() {
     state.mouseY = clientY
 
     if (previewEl) {
-      previewEl.style.transform = getPreviewTransform(clientX, clientY)
+      previewEl.style.left = `${clientX}px`
+      previewEl.style.top = `${clientY}px`
     }
 
     if (updateRafId) {
@@ -156,6 +160,12 @@ export function useDragPreview() {
   const previewItems = computed(() => {
     if (!state.isActive || !state.anchorSeatId) return []
 
+    const getSeatContentHtml = (seatId) => {
+      if (!chartEl) return ''
+      const seatEl = chartEl.querySelector(`.seat-item[data-seat-id="${escapeSelectorValue(seatId)}"]`)
+      return seatEl?.innerHTML || ''
+    }
+
     if (isGuardSeatId(state.anchorSeatId)) {
       const seat = getSeat(state.anchorSeatId)
       const student = students.value.find(s => s.id === seat?.studentId)
@@ -163,6 +173,7 @@ export function useDragPreview() {
         seatId: state.anchorSeatId,
         studentId: seat?.studentId ?? null,
         studentName: student?.name || '',
+        contentHtml: getSeatContentHtml(state.anchorSeatId),
         isAnchor: true,
         style: {
           left: '50%',
@@ -230,6 +241,7 @@ export function useDragPreview() {
         seatId: sid,
         studentId: seat?.studentId ?? null,
         studentName: student?.name || '',
+        contentHtml: getSeatContentHtml(sid),
         isAnchor,
         style: {
           left: `calc(50% + ${dx}px)`,

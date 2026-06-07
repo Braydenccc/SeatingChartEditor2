@@ -1,5 +1,5 @@
 import { ref, unref, onUnmounted } from 'vue'
-import { onLongPress } from '@vueuse/core'
+import { onLongPress, useEventListener } from '@vueuse/core'
 import { useEditMode } from '@/composables/useEditMode'
 
 export function useStudentDragging(studentRef, studentDataProp, options = {}) {
@@ -8,19 +8,30 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
   const lastPointerWasTouch = ref(false)
   const { currentMode, EditMode } = useEditMode()
   let dragEndClassTimer = null
+  let candidateBodyClassActive = false
+
+  const shouldUseCandidateBodyClass = () => {
+    if (lastPointerWasTouch.value) return false
+    return typeof window === 'undefined' ||
+      !window.matchMedia?.('(hover: none) and (pointer: coarse)').matches
+  }
 
   const setCandidateDragClass = (active) => {
     if (!document.body) return
     if (active) {
+      if (!shouldUseCandidateBodyClass()) return
       if (dragEndClassTimer) {
         clearTimeout(dragEndClassTimer)
         dragEndClassTimer = null
       }
+      candidateBodyClassActive = true
       document.body.classList.add('student-dragging-from-candidate')
       document.body.classList.remove('student-drag-ended-from-candidate')
       return
     }
     document.body.classList.remove('student-dragging-from-candidate')
+    if (!candidateBodyClassActive) return
+    candidateBodyClassActive = false
     document.body.classList.add('student-drag-ended-from-candidate')
     dragEndClassTimer = setTimeout(() => {
       document.body?.classList.remove('student-drag-ended-from-candidate')
@@ -132,17 +143,12 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
   }
 
   // ============== Touch Dragging (using VueUse) ==============
+  let touchPreviewEl = null
   let touchMoveRafId = null
-  let removeDocumentTouchListeners = null
-
-  const removeActiveTouchListeners = () => {
-    if (!removeDocumentTouchListeners) return
-    removeDocumentTouchListeners()
-    removeDocumentTouchListeners = null
-  }
 
   const cleanupVisuals = () => {
     if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
+    if (touchPreviewEl) { touchPreviewEl.remove(); touchPreviewEl = null }
     cleanupHtmlDragImage()
     document.querySelectorAll('.seat-item.drag-over').forEach(s => s.classList.remove('drag-over'))
     setCandidateDragClass(false)
@@ -150,11 +156,51 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
       isStudentDragging.value = false
       if (onEndDrag) onEndDrag()
     }
-    removeActiveTouchListeners()
   }
 
-  const handleDocumentTouchMove = (e) => {
-    if (!unref(isStudentDragging) || !lastPointerWasTouch.value) return
+  // 核心优化：使用 VueUse 的 onLongPress 替代原生 setTimeout 与距离防抖计算
+  onLongPress(
+    studentRef,
+    (e) => {
+      // 仅在指定模式下激活触摸拖拽
+      if (!canTouchDrag() || !lastPointerWasTouch.value) return
+
+      const preview = createCardClone()
+      if (!preview) return
+
+      const startPoint = getEventPoint(e)
+      if (!startPoint) return
+
+      isStudentDragging.value = true
+      setCandidateDragClass(true)
+      if (onStartDrag) onStartDrag()
+
+      touchPreviewEl = document.createElement('div')
+      touchPreviewEl.className = 'touch-drag-preview'
+      touchPreviewEl.appendChild(preview.clone)
+      touchPreviewEl.style.cssText = `
+        left: ${startPoint.clientX}px;
+        top: ${startPoint.clientY}px;
+        transform: translate(-50%, -50%) scale(0.92);
+        opacity: 0;
+      `
+      document.body.appendChild(touchPreviewEl)
+
+      requestAnimationFrame(() => {
+        if (touchPreviewEl) {
+          touchPreviewEl.style.transform = 'translate(-50%, -50%) scale(1)'
+          touchPreviewEl.style.opacity = '1'
+        }
+      })
+
+      if (navigator.vibrate) navigator.vibrate(30)
+    },
+    { delay: 300, distanceThreshold: 8 }
+  )
+
+  // 使用 VueUse 的生命周期安全版事件监听
+  useEventListener(document, 'touchmove', (e) => {
+    if (!unref(isStudentDragging) || !touchPreviewEl || !lastPointerWasTouch.value) return
 
     // 拖拽激活后接管滚动，防止屏幕滑动
     e.preventDefault()
@@ -167,6 +213,11 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
     if (touchMoveRafId) cancelAnimationFrame(touchMoveRafId)
     touchMoveRafId = requestAnimationFrame(() => {
       touchMoveRafId = null
+      if (touchPreviewEl) {
+        touchPreviewEl.style.transition = 'none'
+        touchPreviewEl.style.left = `${cx}px`
+        touchPreviewEl.style.top = `${cy}px`
+      }
 
       const el = document.elementFromPoint(cx, cy)
       document.querySelectorAll('.seat-item.drag-over').forEach(s => s.classList.remove('drag-over'))
@@ -176,9 +227,9 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
         if (cur) cur.classList.add('drag-over')
       }
     })
-  }
+  }, { passive: false })
 
-  const handleDocumentTouchEnd = (e) => {
+  useEventListener(document, 'touchend', (e) => {
     if (!unref(isStudentDragging) || !lastPointerWasTouch.value) {
       cleanupVisuals()
       return
@@ -189,6 +240,7 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
       cleanupVisuals()
       return
     }
+    if (touchPreviewEl) touchPreviewEl.style.display = 'none'
     const targetEl = document.elementFromPoint(point.clientX, point.clientY)
     cleanupVisuals()
 
@@ -202,46 +254,11 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
       detail: { studentId: unref(studentDataProp).id, targetSeatId: cur.dataset.seatId }
     })
     cur.dispatchEvent(event)
-  }
+  })
 
-  const handleDocumentTouchCancel = () => {
+  useEventListener(document, 'touchcancel', () => {
     cleanupVisuals()
-  }
-
-  const addActiveTouchListeners = () => {
-    if (removeDocumentTouchListeners) return
-
-    document.addEventListener('touchmove', handleDocumentTouchMove, { passive: false })
-    document.addEventListener('touchend', handleDocumentTouchEnd)
-    document.addEventListener('touchcancel', handleDocumentTouchCancel)
-
-    removeDocumentTouchListeners = () => {
-      document.removeEventListener('touchmove', handleDocumentTouchMove)
-      document.removeEventListener('touchend', handleDocumentTouchEnd)
-      document.removeEventListener('touchcancel', handleDocumentTouchCancel)
-    }
-  }
-
-  // 核心优化：使用 VueUse 的 onLongPress 替代原生 setTimeout 与距离防抖计算
-  onLongPress(
-    studentRef,
-    (e) => {
-      // 仅在指定模式下激活触摸拖拽
-      if (!canTouchDrag() || !lastPointerWasTouch.value) return
-
-      const startPoint = getEventPoint(e)
-      if (!startPoint) return
-
-      isStudentDragging.value = true
-      setCandidateDragClass(true)
-      if (onStartDrag) onStartDrag()
-
-      addActiveTouchListeners()
-
-      if (navigator.vibrate) navigator.vibrate(30)
-    },
-    { delay: 300, distanceThreshold: 8 }
-  )
+  })
 
   onUnmounted(() => {
     if (dragEndClassTimer) {
