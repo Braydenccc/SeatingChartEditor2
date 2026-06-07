@@ -299,7 +299,7 @@ export function useAuth() {
             return result
         } catch (err) {
             console.error('Auth API Network Error:', err)
-            return { success: false, message: '网络请求失败，请检查连接' }
+            return { success: false, message: err.message || '网络请求失败，请检查连接' }
         }
     }
 
@@ -362,7 +362,7 @@ export function useAuth() {
             return await response.json()
         } catch (err) {
             console.error('Change Password API Network Error:', err)
-            return { success: false, message: '网络请求失败，请检查连接' }
+            return { success: false, message: err.message || '网络请求失败，请检查连接' }
         }
     }
 
