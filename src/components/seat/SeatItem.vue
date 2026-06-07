@@ -140,7 +140,7 @@ const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = use
 const { settings } = useGlobalSettings()
 const { panX, panY, setPan } = useZoom()
 const { enabledAttributeDefinitions, formatNumericValue, showNumericAttributesInEditor } = useStudentAttributes()
-const { setRightRailTab, showMobileDrawer, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDrag } = useEditorWorkbench()
+const { setRightRailTab, showMobileSheet, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDrag } = useEditorWorkbench()
 
 const showStudentName = computed(() => settings.value.ui.showStudentName !== false)
 const showStudentNumber = computed(() => settings.value.ui.showStudentNumber !== false)
@@ -320,7 +320,7 @@ const handleClick = () => {
   // 手机端选择模式：点击切换选中状态
   if (isMobile.value && isSelectionMode.value && !isGuardSeat.value) {
     toggleSeatInSelection(props.seat.id)
-    showMobileDrawer('selection')
+    showMobileSheet('context')
     return
   }
 
@@ -341,7 +341,7 @@ const handleClick = () => {
     } else {
       selectSingleSeat(props.seat.id)
       setRightRailTab('selection')
-      if (isMobile.value) showMobileDrawer('selection')
+      if (isMobile.value) showMobileSheet('context')
     }
     return
   }
@@ -376,7 +376,7 @@ const handleContextMenuAction = () => {
   if (!isMobile.value || isGuardSeat.value) return
   selectSingleSeat(props.seat.id)
   setRightRailTab('selection')
-  showMobileDrawer('selection')
+  showMobileSheet('context')
 }
 
 // 双击处理
@@ -535,7 +535,7 @@ const handleTouchMove = (e) => {
 
     touchSelectionVisited.add(props.seat.id)
     toggleSeatInSelection(props.seat.id)
-    showMobileDrawer('selection')
+    showMobileSheet('context')
   }
 
   if (touchSelectionActive) {
