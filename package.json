@@ -80,7 +80,8 @@
   "license": "GPL-3.0-or-later",
   "pkg": {
     "assets": [
-      "dist/**/*"
+      "dist/**/*",
+      "fuckseats-proxy.config.json"
     ]
   }
 }

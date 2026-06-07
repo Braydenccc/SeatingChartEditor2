@@ -226,6 +226,10 @@
                 />
                 <label>人</label>
               </div>
+              <button class="import-student-btn" type="button" @click="goFilesView">
+                <FileInput :size="15" />
+                <span>到文件页导入</span>
+              </button>
               <button class="add-student-btn" @click="handleAddStudent">
                 <Plus :size="15" />
                 <span>添加学生</span>
@@ -342,11 +346,12 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { BarChart3, Check, PanelLeft, Plus, Settings, Tag, Trash2, X } from 'lucide-vue-next'
+import { BarChart3, Check, FileInput, PanelLeft, Plus, Settings, Tag, Trash2, X } from 'lucide-vue-next'
 import TagStudentSelector from './TagStudentSelector.vue'
 import { getNextColor } from '@/constants/tagColors'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
+import { useRouter } from 'vue-router'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
 import { useZoneData } from '@/composables/useZoneData'
@@ -383,7 +388,11 @@ const {
 const { openSettings } = useSettingsDialog()
 const { requestConfirm, isPending } = useConfirmAction()
 const { warning, success } = useLogger()
+const router = useRouter()
 
+const goFilesView = () => {
+  router.push('/files')
+}
 // 学生人数控制
 const targetStudentCount = ref(0)
 const isCountError = ref(false)
@@ -1139,12 +1148,10 @@ const close = () => {
   opacity: 1;
 }
 
+.import-student-btn,
 .add-student-btn {
   min-height: 34px;
   padding: 0 12px;
-  background: var(--color-primary);
-  color: var(--color-surface);
-  border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
@@ -1153,6 +1160,23 @@ const close = () => {
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+.import-student-btn {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.import-student-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.add-student-btn {
+  background: var(--color-primary);
+  color: var(--color-surface);
+  border: none;
 }
 
 .add-student-btn:hover {

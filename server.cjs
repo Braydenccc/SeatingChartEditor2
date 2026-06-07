@@ -2,6 +2,7 @@ const http = require('http');
 const https = require('https');
 const path = require('path');
 const { readFile } = require('fs').promises;
+const { isAllowedFuckSeatsProxyTarget } = require('./fuckseatsProxyHelper.cjs');
 
 // dist 目录（构建输出）
 // 当打包为 exe 时，需要从 exe 所在目录向上查找 dist 目录
@@ -58,11 +59,64 @@ function safeJoin(base, target) {
   return resolved;
 }
 
+function handleFuckSeatsProxy(req, res) {
+  if (req.method !== 'GET') {
+    res.statusCode = 405;
+    return res.end('Method Not Allowed');
+  }
+
+  try {
+    const currentUrl = new URL(req.url, 'http://127.0.0.1');
+    const target = currentUrl.searchParams.get('target') || '';
+    const targetUrl = new URL(target);
+
+    if (!isAllowedFuckSeatsProxyTarget(targetUrl)) {
+      res.statusCode = 400;
+      return res.end('Invalid local target');
+    }
+
+    const proxyReq = http.request({
+      hostname: targetUrl.hostname,
+      port: targetUrl.port,
+      path: targetUrl.pathname + targetUrl.search,
+      method: 'GET',
+      headers: {
+        Accept: req.headers.accept || 'application/json, text/plain, */*',
+        'User-Agent': 'SeatingChartEditor-local-import'
+      }
+    }, (proxyRes) => {
+      res.statusCode = proxyRes.statusCode || 502;
+      res.setHeader('Content-Type', proxyRes.headers['content-type'] || 'text/plain; charset=utf-8');
+      proxyRes.pipe(res, { end: true });
+    });
+
+    proxyReq.setTimeout(3500, () => {
+      proxyReq.destroy(new Error('Local proxy timeout'));
+    });
+    proxyReq.on('error', (err) => {
+      if (res.headersSent) return;
+      res.statusCode = 502;
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.end('Proxy error: ' + err.message);
+    });
+    proxyReq.end();
+  } catch (err) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.end('Invalid local proxy request');
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   // Security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
+
+  if (req.url.startsWith('/api/fuckseats-proxy')) {
+    handleFuckSeatsProxy(req, res);
+    return;
+  }
 
   // Intercept WebDAV proxy requests to bypass CORS
   if (req.url.startsWith('/api/dav-proxy')) {
