@@ -2,13 +2,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 vi.mock('../useAuth')
 vi.mock('../useWebDav')
-vi.mock('@/utils/fetchHelpers')
+vi.mock('@/platform/apiClient', () => ({
+  apiFetch: vi.fn()
+}))
 vi.mock('../useLogger')
 
 import { useCloudWorkspace } from '../useCloudWorkspace'
 import { useAuth } from '../useAuth'
 import { useWebDav } from '../useWebDav'
-import { fetchWithRetry } from '@/utils/fetchHelpers'
+import { apiFetch } from '@/platform/apiClient'
 import { useLogger } from '../useLogger'
 
 const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0))
@@ -69,7 +71,7 @@ describe('useCloudWorkspace', () => {
       error: mockLoggerError
     })
 
-    vi.mocked(fetchWithRetry).mockReset()
+    vi.mocked(apiFetch).mockReset()
   })
 
   it('keeps isFetching true until overlapping WebDAV and API list calls both settle', async () => {
@@ -78,7 +80,7 @@ describe('useCloudWorkspace', () => {
     const apiDeferred = createDeferred()
 
     mockListFiles.mockReturnValueOnce(webdavDeferred.promise)
-    vi.mocked(fetchWithRetry).mockReturnValueOnce(apiDeferred.promise)
+    vi.mocked(apiFetch).mockReturnValueOnce(apiDeferred.promise)
 
     const listPromise = workspace.listWorkspaces()
     expect(workspace.isFetching.value).toBe(true)
@@ -108,14 +110,14 @@ describe('useCloudWorkspace', () => {
     })
 
     expect(mockLoggerError).toHaveBeenCalledWith('工作区数据格式错误')
-    expect(fetchWithRetry).not.toHaveBeenCalled()
+    expect(apiFetch).not.toHaveBeenCalled()
     expect(mockPutFile).not.toHaveBeenCalled()
   })
 
   it('sends trimmed workspace name when renaming Retiehe workspace', async () => {
     const workspace = useCloudWorkspace()
 
-    vi.mocked(fetchWithRetry).mockResolvedValueOnce({
+    vi.mocked(apiFetch).mockResolvedValueOnce({
       ok: true,
       json: vi.fn().mockResolvedValue({
         success: true,
@@ -136,7 +138,7 @@ describe('useCloudWorkspace', () => {
       }
     })
 
-    const [, options] = vi.mocked(fetchWithRetry).mock.calls[0]
+    const [, options] = vi.mocked(apiFetch).mock.calls[0]
     expect(JSON.parse(options.body)).toMatchObject({
       action: 'rename',
       fileId: 'abc123',
