@@ -13,6 +13,10 @@
         <span>更新日期</span>
         <strong>{{ userManual.updatedAt }}</strong>
       </div>
+      <button class="welcome-link" type="button" @click="openIntro">
+        <Compass :size="17" />
+        <span>查看入门简介</span>
+      </button>
     </header>
 
     <div class="manual-layout">
@@ -35,8 +39,9 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { BookOpen } from 'lucide-vue-next'
+import { BookOpen, Compass } from 'lucide-vue-next'
 import { userManual, type UserManualSection } from '@/constants/userManual'
+import { openWelcomeIntro } from '@/composables/useWelcomeOnboarding'
 
 const panelRef = ref<HTMLElement | null>(null)
 const activeSectionId = ref(userManual.sections[0]?.id || '')
@@ -218,6 +223,10 @@ const scrollToSection = (sectionId: string) => {
   })
 }
 
+const openIntro = () => {
+  openWelcomeIntro()
+}
+
 const updateActiveSection = () => {
   if (!panelRef.value) return
 
@@ -334,6 +343,29 @@ onBeforeUnmount(() => {
 .manual-meta strong {
   color: var(--color-text-primary);
   font-size: 13px;
+}
+
+.welcome-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.welcome-link:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .manual-layout {
@@ -515,6 +547,10 @@ onBeforeUnmount(() => {
   }
 
   .manual-meta {
+    width: 100%;
+  }
+
+  .welcome-link {
     width: 100%;
   }
 

@@ -10,6 +10,7 @@ const LoginDialog = defineAsyncComponent({
   delay: 200
 })
 const CloudWorkspaceDialog = defineAsyncComponent(() => import('./components/workspace/CloudWorkspaceDialog.vue'))
+const WelcomeIntroDialog = defineAsyncComponent(() => import('./components/onboarding/WelcomeIntroDialog.vue'))
 
 import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
@@ -20,6 +21,7 @@ import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useRouteLoading } from '@/composables/useRouteLoading'
+import { useWelcomeOnboarding } from '@/composables/useWelcomeOnboarding'
 import { initializeTags } from '@/composables/useTagData'
 
 const { isLoginDialogVisible, initAuth, isLoggedIn } = useAuth()
@@ -31,6 +33,7 @@ const { showCloudDialog, cloudDialogMode, handleCloudSuccess } = useCloudWorkspa
 const { settings, applyThemeColor, applyColorScheme } = useGlobalSettings()
 const { startAutoSave } = useAutoSave()
 const { isRouteLoading } = useRouteLoading()
+const { isWelcomeIntroVisible, showWelcomeIntroIfNeeded } = useWelcomeOnboarding()
 
 const loginDialogInitialTab = ref('login')
 const handleOpenLogin = (tab = 'login') => {
@@ -54,6 +57,7 @@ onMounted(async () => {
   }
 
   startAutoSave()
+  showWelcomeIntroIfNeeded()
 
   const lastWs = getLastWorkspace()
 
@@ -142,6 +146,8 @@ onMounted(async () => {
       @update:visible="showCloudDialog = $event"
       @success="handleCloudSuccess"
     />
+
+    <WelcomeIntroDialog v-if="isWelcomeIntroVisible" />
   </div>
 </template>
 
