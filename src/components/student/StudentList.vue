@@ -30,15 +30,15 @@
           </div>
           <div class="empty-text-group">
             <p class="empty-title">还没有学生数据</p>
-            <p class="empty-hint">导入 Excel 或打开工作区开始使用</p>
+            <p class="empty-hint">导入文件或打开工作区以开始使用</p>
           </div>
         </div>
 
         <!-- 操作按钮组 - 仅在高度足够时显示 -->
         <div v-if="!isHeightConstrained" class="empty-actions">
-          <button class="empty-action-btn outline" @click="handleImportExcel">
-            <FileInput :size="16" stroke-width="2" />
-            <span>导入 Excel 名单</span>
+          <button class="empty-action-btn outline" type="button" @click="goFilesView">
+            <FolderOpen :size="16" stroke-width="2" />
+            <span>到文件页导入</span>
           </button>
           <div class="empty-action-row">
             <button class="empty-action-btn outline" @click="handleLoadWorkspace">
@@ -96,9 +96,10 @@
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
 import { computed, ref, defineAsyncComponent, onBeforeUnmount, onMounted, onUnmounted, watch } from 'vue'
 import { useWindowSize } from '@vueuse/core'
-import { Users, FileInput, FolderOpen, CloudDownload, CheckCircle, SearchX, LogOut } from 'lucide-vue-next'
+import { Users, FolderOpen, CloudDownload, CheckCircle, SearchX, LogOut } from 'lucide-vue-next'
 import CandidateItem from './CandidateItem.vue'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
@@ -111,7 +112,6 @@ import { useDragState } from '@/composables/useDragState'
 import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useResizablePanel } from '@/composables/useResizablePanel'
-import { excelFileFilters, openBinaryFile } from '@/platform/files'
 
 const StudentEditDialog = defineAsyncComponent(() => import('./StudentEditDialog.vue'))
 const props = defineProps({
@@ -151,6 +151,7 @@ const { recordBatch, createSnapshot } = useUndo()
 const { width: windowWidth } = useWindowSize()
 const { openCloudLoad } = useCloudWorkspaceDialog()
 const { userHeight, getEffectiveHeight } = useResizablePanel()
+const router = useRouter()
 
 const isMobile = computed(() => windowWidth.value <= 1024)
 
@@ -163,65 +164,14 @@ const isHeightConstrained = computed(() => {
   return effectiveHeight < 200 // 高度小于 200px 时隐藏操作按钮
 })
 
+const goFilesView = () => {
+  router.push('/files')
+}
+
 // 处理双击编辑学生
 const handleEditStudent = (studentId) => {
   editingStudentId.value = studentId
   showStudentEditDialog.value = true
-}
-
-const handleImportExcel = async (event = null) => {
-  const file = event?.target?.files?.[0] || await openBinaryFile({
-    title: '导入学生名单',
-    accept: '.xlsx,.xls',
-    filters: excelFileFilters
-  })
-  if (!file) return
-
-  try {
-    const result = await importFromExcel(file)
-
-    if (result.warning) {
-      warning(result.warning + '，请减少数据量后重试')
-      if (event?.target) event.target.value = ''
-      return
-    }
-
-    clearAllStudents()
-    clearAllTags()
-    const colors = [
-      'var(--tag-color-1)', 'var(--tag-color-2)', 'var(--tag-color-3)',
-      'var(--tag-color-4)', 'var(--tag-color-5)', 'var(--tag-color-6)',
-      'var(--tag-color-7)', 'var(--tag-color-8)', 'var(--tag-color-9)',
-      'var(--tag-color-10)'
-    ]
-    const tagNameToId = {}
-
-    result.tagNames.forEach((tagName, index) => {
-      const color = colors[index % colors.length]
-      const newTagId = addTag({ name: tagName, color })
-      tagNameToId[tagName] = newTagId
-    })
-
-    result.students.forEach(studentData => {
-      const studentTags = studentData.tagNames
-        .map(tagName => tagNameToId[tagName])
-        .filter(id => id != null)
-
-      const newStudentId = addStudent()
-      updateStudent(newStudentId, {
-        name: studentData.name,
-        studentNumber: studentData.studentNumber,
-        tags: studentTags,
-        numericAttributes: studentData.numericAttributes || {}
-      })
-    })
-
-    success(`成功导入 ${result.students.length} 个学生，${result.tagNames.length} 个标签`)
-    if (event?.target) event.target.value = ''
-  } catch (err) {
-    error(`导入失败: ${err.message}`)
-    if (event?.target) event.target.value = ''
-  }
 }
 
 const handleLoadWorkspace = async (event = null) => {

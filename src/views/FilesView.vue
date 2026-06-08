@@ -179,6 +179,10 @@
             <FileInput :size="18" stroke-width="2" />
             <span>从 Excel 导入名单</span>
           </button>
+          <button class="action-button" type="button" @click="openFuckSeatsImport">
+            <FileInput :size="18" stroke-width="2" />
+            <span>从不想排座位导入</span>
+          </button>
           <button class="action-button" type="button" @click="handleExportExcel">
             <FileOutput :size="18" stroke-width="2" />
             <span>导出名单到 Excel</span>
@@ -186,6 +190,10 @@
         </div>
       </section>
     </div>
+    <FuckSeatsImportDialog
+      v-model:visible="showFuckSeatsImportDialog"
+      @imported="handleFuckSeatsImported"
+    />
   </AppPageShell>
 </template>
 
@@ -211,6 +219,7 @@ import {
   Users
 } from 'lucide-vue-next'
 import AppPageShell from '@/components/layout/AppPageShell.vue'
+import FuckSeatsImportDialog from '@/components/student/FuckSeatsImportDialog.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
@@ -228,6 +237,7 @@ const router = useRouter()
 const newCloudWorkspaceName = ref('')
 const editingWorkspaceId = ref(null)
 const editingWorkspaceName = ref('')
+const showFuckSeatsImportDialog = ref(false)
 
 const { requestConfirm, isConfirming } = useConfirmAction()
 const {
@@ -471,6 +481,14 @@ const handleRemoveCloudWorkspace = (workspace) => {
 
 const handleDownloadTemplate = async () => {
   await downloadTemplate()
+}
+
+const openFuckSeatsImport = () => {
+  showFuckSeatsImportDialog.value = true
+}
+
+const handleFuckSeatsImported = () => {
+  goEditorAfterSuccess()
 }
 
 const handleImportExcel = async (event = null) => {
