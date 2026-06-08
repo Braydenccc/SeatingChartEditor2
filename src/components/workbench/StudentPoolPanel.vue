@@ -42,7 +42,6 @@
         :filter-mode="filterMode"
         :search-text="searchText"
         :active-tag-ids="activeTagIds"
-        :collapsible="false"
       />
     </div>
   </section>

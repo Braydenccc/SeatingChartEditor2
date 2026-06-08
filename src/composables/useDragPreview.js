@@ -32,13 +32,6 @@ const positionPreviewElement = () => {
   previewEl.style.transition = 'none'
 }
 
-const escapeSelectorValue = (value) => {
-  if (typeof window !== 'undefined' && window.CSS?.escape) {
-    return window.CSS.escape(value)
-  }
-  return String(value).replace(/["\\]/g, '\\$&')
-}
-
 export function useDragPreview() {
   const { seatConfig, getSeat } = useSeatChart()
   const { scale } = useZoom()
@@ -160,27 +153,33 @@ export function useDragPreview() {
   const previewItems = computed(() => {
     if (!state.isActive || !state.anchorSeatId) return []
 
-    const getSeatContentHtml = (seatId) => {
-      if (!chartEl) return ''
-      const seatEl = chartEl.querySelector(`.seat-item[data-seat-id="${escapeSelectorValue(seatId)}"]`)
-      return seatEl?.innerHTML || ''
+    const getMeasuredSeatSize = () => {
+      if (!chartEl) return { seatW: L.SEAT_W, seatH: L.SEAT_H }
+      const seatEl = chartEl.querySelector('.seat-item')
+      if (!seatEl) return { seatW: L.SEAT_W, seatH: L.SEAT_H }
+      const rect = seatEl.getBoundingClientRect()
+      return {
+        seatW: rect.width > 0 ? rect.width : L.SEAT_W,
+        seatH: rect.height > 0 ? rect.height : L.SEAT_H
+      }
     }
 
     if (isGuardSeatId(state.anchorSeatId)) {
       const seat = getSeat(state.anchorSeatId)
       const student = students.value.find(s => s.id === seat?.studentId)
+      const { seatW, seatH } = getMeasuredSeatSize()
       return [{
         seatId: state.anchorSeatId,
         studentId: seat?.studentId ?? null,
-        studentName: student?.name || '',
-        contentHtml: getSeatContentHtml(state.anchorSeatId),
+        student: student || null,
+        isEmptySeat: !student,
         isAnchor: true,
         style: {
           left: '50%',
           top: '50%',
           transform: 'translate(-50%, -50%)',
-          width: `${L.SEAT_W}px`,
-          height: `${L.SEAT_H}px`
+          width: `${seatW}px`,
+          height: `${seatH}px`
         }
       }]
     }
@@ -198,8 +197,8 @@ export function useDragPreview() {
       const seatEl = chartEl.querySelector('.seat-item')
       if (seatEl) {
         const rect = seatEl.getBoundingClientRect()
-        seatW = rect.width
-        seatH = rect.height
+        seatW = rect.width > 0 ? rect.width : L.SEAT_W
+        seatH = rect.height > 0 ? rect.height : L.SEAT_H
       }
 
       const columnEl = chartEl.querySelector('.seat-column')
@@ -240,8 +239,8 @@ export function useDragPreview() {
       return {
         seatId: sid,
         studentId: seat?.studentId ?? null,
-        studentName: student?.name || '',
-        contentHtml: getSeatContentHtml(sid),
+        student: student || null,
+        isEmptySeat: !student,
         isAnchor,
         style: {
           left: `calc(50% + ${dx}px)`,

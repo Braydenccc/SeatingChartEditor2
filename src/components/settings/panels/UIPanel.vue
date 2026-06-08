@@ -99,7 +99,10 @@
                 class="scheme-radio"
               />
               <div class="scheme-card">
-                <Monitor :size="20" />
+                <span class="scheme-icon auto">
+                  <component :is="autoSchemeIcon" :size="20" />
+                  <span class="scheme-auto-mark">A</span>
+                </span>
                 <span>跟随浏览器</span>
               </div>
             </label>
@@ -747,8 +750,8 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
-import { RotateCcw, Sun, Moon, Monitor } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RotateCcw, Sun, Moon } from 'lucide-vue-next'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
@@ -784,6 +787,14 @@ const localShowNumericAttributes = computed({
   get: () => showNumericAttributesInEditor.value,
   set: (val) => setShowNumericAttributesInEditor(val)
 })
+const prefersDarkMode = ref(false)
+let prefersDarkQuery = null
+
+const updatePrefersDarkMode = () => {
+  prefersDarkMode.value = Boolean(prefersDarkQuery?.matches)
+}
+
+const autoSchemeIcon = computed(() => prefersDarkMode.value ? Moon : Sun)
 
 const hasHiddenElement = computed(() => {
   return !localSettings.value.showStudentName ||
@@ -806,6 +817,18 @@ watch(canEnableLargeName, (val) => {
 
 watch(canEnableLargeNumber, (val) => {
   if (!val) localSettings.value.largeNumberMode = false
+})
+
+onMounted(() => {
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    updatePrefersDarkMode()
+    prefersDarkQuery.addEventListener('change', updatePrefersDarkMode)
+  }
+})
+
+onBeforeUnmount(() => {
+  prefersDarkQuery?.removeEventListener('change', updatePrefersDarkMode)
 })
 
 // 判断是否为默认值
@@ -1068,6 +1091,34 @@ watch(() => localSettings.value.customColors, () => {
   border-radius: 8px;
   transition: all 0.2s;
   color: var(--color-text-muted);
+}
+
+.scheme-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.scheme-auto-mark {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-primary-light);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .scheme-option:hover .scheme-card {

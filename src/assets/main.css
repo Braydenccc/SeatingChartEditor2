@@ -83,6 +83,29 @@
   --shadow-lg: rgba(0, 0, 0, 0.15);
   --shadow-primary: rgba(35, 88, 123, 0.28);
 
+  /* 学生卡片 */
+  --seat-card-width: 120px;
+  --seat-card-height: 80px;
+  --seat-card-radius: 12px;
+  --seat-card-border-width: 2px;
+  --seat-card-outer-height: calc(var(--seat-card-height) + var(--seat-card-border-width) * 2);
+  --seat-card-transition: 0.18s ease;
+  --seat-card-shadow-hover: 0 4px 12px var(--shadow-lg);
+  --seat-card-shadow-drag: 0 8px 24px color-mix(in srgb, var(--color-primary) 35%, transparent);
+  --candidate-card-height: 56px;
+  --candidate-card-radius: 8px;
+  --student-card-face-gap: 4px;
+  --student-card-face-padding: 8px;
+  --student-card-name-size: 20px;
+  --student-card-candidate-name-size: 15px;
+  --student-card-name-large-size: 28px;
+  --student-card-number-size: 12px;
+  --student-card-number-large-size: 18px;
+  --student-card-number-corner-size: 9px;
+  --student-card-tag-dot-size: 6px;
+  --student-card-tag-text-size: 9px;
+  --student-card-attribute-size: 8px;
+
   /* 特定组件颜色 */
   --color-header-bg: #ffffff;
   --color-sidebar-bg: #fafbfc;
@@ -458,6 +481,97 @@ a:hover,
 @media (max-width: 480px) {
   body {
     font-size: 13px;
+  }
+}
+
+@media (max-width: 1366px) and (min-width: 1025px) {
+  :root {
+    --seat-card-width: 102px;
+    --seat-card-height: 68px;
+    --seat-card-radius: 10px;
+    --student-card-face-gap: 3px;
+    --student-card-face-padding: 5px;
+    --student-card-name-size: 14px;
+    --student-card-name-large-size: 20px;
+    --student-card-number-size: 11px;
+    --student-card-number-large-size: 14px;
+    --student-card-number-corner-size: 8px;
+    --student-card-tag-dot-size: 5px;
+    --student-card-tag-text-size: 8px;
+    --student-card-attribute-size: 7px;
+  }
+}
+
+@media (max-height: 820px) and (min-width: 1025px) {
+  :root {
+    --seat-card-width: 96px;
+    --seat-card-height: 64px;
+    --seat-card-radius: 9px;
+    --student-card-face-gap: 2px;
+    --student-card-face-padding: 4px;
+    --student-card-name-size: 13px;
+    --student-card-name-large-size: 18px;
+    --student-card-number-size: 10px;
+    --student-card-number-large-size: 13px;
+    --student-card-number-corner-size: 7px;
+    --student-card-tag-dot-size: 4px;
+    --student-card-tag-text-size: 7px;
+    --student-card-attribute-size: 6px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --seat-card-width: 92px;
+    --seat-card-height: 62px;
+    --seat-card-radius: 10px;
+    --student-card-face-gap: 3px;
+    --student-card-face-padding: 5px;
+    --student-card-name-size: 12px;
+    --student-card-name-large-size: 15px;
+    --student-card-number-size: 11px;
+    --student-card-number-large-size: 14px;
+    --student-card-number-corner-size: 8px;
+    --student-card-tag-dot-size: 4px;
+    --student-card-tag-text-size: 7px;
+    --student-card-attribute-size: 7px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --seat-card-width: 78px;
+    --seat-card-height: 50px;
+    --seat-card-radius: 8px;
+    --student-card-face-gap: 2px;
+    --student-card-face-padding: 4px;
+    --student-card-name-size: 10px;
+    --student-card-name-large-size: 13px;
+    --student-card-number-size: 9px;
+    --student-card-number-large-size: 12px;
+    --student-card-number-corner-size: 7px;
+    --student-card-tag-dot-size: 3px;
+    --student-card-tag-text-size: 6px;
+    --student-card-attribute-size: 6px;
+  }
+}
+
+.disable-animations *,
+.disable-animations *::before,
+.disable-animations *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
   }
 }
 

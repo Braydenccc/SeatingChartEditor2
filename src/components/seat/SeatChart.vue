@@ -158,8 +158,13 @@
       <div ref="dragPreviewRef" class="drag-preview-overlay">
         <div v-for="item in previewItems" :key="item.seatId"
           class="drag-preview-seat" :class="{ 'is-anchor': item.isAnchor }" :style="item.style">
-          <div v-if="item.contentHtml" class="drag-preview-content" v-html="item.contentHtml"></div>
-          <span v-else class="drag-preview-name">{{ item.studentName || '空位' }}</span>
+          <StudentCardFace
+            v-if="item.student"
+            :student="item.student"
+            variant="preview"
+            density="standard"
+          />
+          <span v-else class="drag-preview-name">{{ item.isEmptySeat ? '空位' : '未命名' }}</span>
         </div>
       </div>
     </Teleport>
@@ -170,6 +175,7 @@
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import SeatItem from './SeatItem.vue'
+import StudentCardFace from '@/components/student/StudentCardFace.vue'
 import StudentEditDialog from '@/components/student/StudentEditDialog.vue'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useEditMode } from '@/composables/useEditMode'
@@ -219,7 +225,13 @@ const { firstSelectedSeat, setFirstSelectedSeat, clearFirstSelectedSeat } = useE
 const { clearSelection: clearStudentSelection, students } = useStudentData()
 const { scale, panX, panY, zoomIn, zoomOut, setScale, MIN_SCALE, MAX_SCALE, registerViewport, fitToViewport } = useZoom()
 const { recordAssign, recordBatch, createSnapshot, canUndo, canRedo, undo, redo } = useUndo()
-const { isDraggingFromSeat: globalIsDraggingFromSeat, endDragFromSeat } = useDragState()
+const {
+  isDraggingFromSeat: globalIsDraggingFromSeat,
+  isTouchDraggingFromSeat,
+  requestDragCleanup,
+  endDragFromSeat,
+  endTouchDragFromSeat
+} = useDragState()
 const {
   clearSelection: clearSeatSelection,
   selectedSeatIds,
@@ -550,12 +562,27 @@ const getTouchDistance = (touches) => {
   return Math.sqrt(dx * dx + dy * dy)
 }
 
+const cancelSeatTouchDragForPinch = () => {
+  if (isTouchDraggingFromSeat.value) {
+    endTouchDragFromSeat()
+  } else {
+    requestDragCleanup()
+  }
+}
+
+const startPinchTouch = (touches) => {
+  cancelSeatTouchDragForPinch()
+  touchMode = 'pinch'
+  lastTouchDistance = getTouchDistance(touches)
+  lastTouchScale = scale.value
+  touchPanMoved = false
+  isPanning.value = false
+}
+
 const handleTouchStart = (e) => {
-  if (e.touches.length === 2) {
+  if (e.touches.length >= 2) {
     // 双指缩放
-    touchMode = 'pinch'
-    lastTouchDistance = getTouchDistance(e.touches)
-    lastTouchScale = scale.value
+    startPinchTouch(e.touches)
   } else if (e.touches.length === 1 && canStartPanFromTarget(e.target)) {
     // 单指拖拽平移（空白区域或无学生座位）
     touchMode = 'pan'
@@ -570,6 +597,10 @@ const handleTouchStart = (e) => {
 }
 
 const handleTouchMove = (e) => {
+  if (e.touches.length >= 2 && touchMode !== 'pinch') {
+    startPinchTouch(e.touches)
+  }
+
   if (touchMode === 'pinch' && e.touches.length === 2) {
     const currentDistance = getTouchDistance(e.touches)
     const ratio = currentDistance / lastTouchDistance
@@ -1258,8 +1289,8 @@ const rectSelectStyle = computed(() => {
 .drag-preview-seat {
   position: absolute;
   box-sizing: border-box;
-  border: 2px solid var(--color-primary);
-  border-radius: 12px;
+  border: var(--seat-card-border-width) solid var(--color-primary);
+  border-radius: var(--seat-card-radius);
   background: var(--color-bg-selected);
   color: var(--color-text-primary);
   display: flex;
@@ -1268,14 +1299,8 @@ const rectSelectStyle = computed(() => {
   text-align: center;
   overflow: hidden;
   padding: 0;
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary) 35%, transparent);
+  box-shadow: var(--seat-card-shadow-drag);
   opacity: 0.95;
-}
-
-.drag-preview-content {
-  width: 100%;
-  height: 100%;
-  display: contents;
 }
 
 .drag-preview-name {
@@ -1363,10 +1388,6 @@ const rectSelectStyle = computed(() => {
 }
 
 .seat-chart {
-  --seat-card-width: 120px;
-  --seat-card-height: 80px;
-  --seat-card-border-width: 2px;
-  --seat-card-outer-height: calc(var(--seat-card-height) + var(--seat-card-border-width) * 2);
   --chart-main-gap: 18px;
   --chart-group-gap: 40px;
   --podium-row-height: 84px;
@@ -1588,8 +1609,6 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
-    --seat-card-width: 104px;
-    --seat-card-height: 68px;
     --chart-main-gap: 26px;
     --chart-group-gap: 26px;
     padding: 22px 14px;
@@ -1640,8 +1659,6 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
-    --seat-card-width: 100px;
-    --seat-card-height: 64px;
     --chart-main-gap: 24px;
     --chart-group-gap: 24px;
     padding: 18px 12px;
@@ -1760,8 +1777,6 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
-    --seat-card-width: 92px;
-    --seat-card-height: 62px;
     --chart-main-gap: 16px;
     --chart-group-gap: 16px;
     padding: 16px 10px;
@@ -1818,8 +1833,6 @@ const rectSelectStyle = computed(() => {
   }
 
   .seat-chart {
-    --seat-card-width: 78px;
-    --seat-card-height: 50px;
     --chart-main-gap: 10px;
     --chart-group-gap: 10px;
     padding: 12px 6px;

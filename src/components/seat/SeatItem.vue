@@ -24,63 +24,13 @@
     <div v-if="seat.isEmpty" class="empty-indicator">
       <span class="empty-text">空置</span>
     </div>
-    <template v-else-if="hasStudent">
-      <div class="student-display" :class="{ 'bottom-tag-mode': tagDisplayMode === 'bottom', 'name-hidden': !showStudentName, 'number-hidden': !showStudentNumber, 'large-name': largeNameMode, 'large-number': largeNumberMode }">
-        <div v-if="showStudentName" class="student-name">{{ studentInfo.name || '未命名' }}</div>
-        <!-- 颜色点模式：显示所有标签，用实心/空心区分 -->
-        <div v-if="hasTags && tagDisplayMode === 'dot'" class="student-tags">
-          <span v-for="tag in allVisibleTags" :key="tag.id"
-            :class="['tag-dot', { 'tag-dot-hollow': !hasTag(tag.id) }]"
-            :style="{ backgroundColor: hasTag(tag.id) ? tag.color : 'transparent', borderColor: tag.color }"
-            :title="tag.name">
-          </span>
-        </div>
-        <div v-if="hasNumericAttributes && tagDisplayMode === 'dot'" class="student-attributes-text">
-          <span v-for="attribute in visibleStudentAttributes" :key="attribute.id"
-            class="attribute-text-item"
-            :title="attribute.title">
-            {{ attribute.displayText }}
-          </span>
-        </div>
-        <!-- 座位下部文字模式：学号绝对定位到右上角 -->
-        <div v-if="showStudentNumber && tagDisplayMode === 'bottom'" class="student-number-corner">
-          {{ studentInfo.studentNumber || '-' }}
-        </div>
-        <div v-else-if="showStudentNumber" class="student-number">{{ studentInfo.studentNumber || '-' }}</div>
-        <!-- 座位下部文字模式：只显示学生拥有的标签 -->
-        <div v-if="hasTags && tagDisplayMode === 'bottom'" class="student-tags-text">
-          <span v-for="tag in studentTags" :key="tag.id"
-            class="tag-text-item"
-            :style="{ backgroundColor: tag.color }"
-            :title="tag.name">
-            {{ tag.name.substring(0, 2) }}
-          </span>
-        </div>
-        <div v-if="hasNumericAttributes && tagDisplayMode === 'bottom'" class="student-attributes-text">
-          <span v-for="attribute in visibleStudentAttributes" :key="attribute.id"
-            class="attribute-text-item"
-            :title="attribute.title">
-            {{ attribute.displayText }}
-          </span>
-        </div>
-      </div>
-      <!-- 右上角文字模式：只显示学生拥有的标签 -->
-      <div v-if="hasTags && tagDisplayMode === 'corner'" class="corner-tags">
-        <span v-for="tag in studentTags" :key="tag.id"
-          class="corner-tag-item"
-          :style="{ backgroundColor: tag.color }"
-          :title="tag.name">
-          {{ tag.name.substring(0, 2) }}
-        </span>
-      </div>
-      <div v-if="hasNumericAttributes && tagDisplayMode === 'corner'" class="corner-attributes">
-        <span v-for="attribute in visibleStudentAttributes" :key="attribute.id"
-          class="corner-attribute-item"
-          :title="attribute.title">
-          {{ attribute.displayText }}
-        </span>
-      </div>
-    </template>
+    <StudentCardFace
+      v-else-if="hasStudent"
+      :student="studentInfo"
+      variant="seat"
+      density="standard"
+      fallback-name="未知"
+    />
     <div v-else class="empty-seat">
       <span class="seat-placeholder">{{ isGuardSeat ? guardSeatLabel : '空位' }}</span>
     </div>
@@ -94,15 +44,14 @@ import { useStudentData } from '@/composables/useStudentData'
 import { useEditMode } from '@/composables/useEditMode'
 import { useZoneData } from '@/composables/useZoneData'
 import { useZoneRotation } from '@/composables/useZoneRotation'
-import { useTagData } from '@/composables/useTagData'
 import { useUndo } from '@/composables/useUndo'
 import { useDragState } from '@/composables/useDragState'
 import { useSelection } from '@/composables/useSelection'
 import { useDragPreview } from '@/composables/useDragPreview'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
-import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import { useZoom } from '@/composables/useZoom'
+import StudentCardFace from '@/components/student/StudentCardFace.vue'
 
 const props = defineProps({
   seat: {
@@ -121,7 +70,6 @@ const { students, selectedStudentId } = useStudentData()
 const { currentMode, firstSelectedSeat, EditMode } = useEditMode()
 const { visibleZoneSeats, selectedZoneId, toggleSeatInZone } = useZoneData()
 const { editingZoneId, getRotZoneHighlights, toggleSeatInEditingZone } = useZoneRotation()
-const { tags, showTagsInSeatChart, tagDisplayMode } = useTagData()
 const { isHighlighted } = useUndo()
 const { dragCleanupVersion, startDragFromSeat, endDragFromSeat, startTouchDragFromSeat, endTouchDragFromSeat } = useDragState()
 const {
@@ -139,14 +87,7 @@ const {
 const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
 const { settings } = useGlobalSettings()
 const { panX, panY, setPan } = useZoom()
-const { enabledAttributeDefinitions, formatNumericValue, showNumericAttributesInEditor } = useStudentAttributes()
 const { setRightRailTab, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDrag, isSeatFullscreen } = useEditorWorkbench()
-
-const showStudentName = computed(() => settings.value.ui.showStudentName !== false)
-const showStudentNumber = computed(() => settings.value.ui.showStudentNumber !== false)
-const hasHiddenElement = computed(() => !showStudentName.value || !showStudentNumber.value)
-const largeNameMode = computed(() => showStudentName.value && hasHiddenElement.value && settings.value.ui.largeNameMode)
-const largeNumberMode = computed(() => showStudentNumber.value && hasHiddenElement.value && settings.value.ui.largeNumberMode)
 
 const isDragOver = ref(false)
 const isDragging = ref(false)
@@ -193,52 +134,6 @@ const studentInfo = computed(() => {
   if (!hasStudent.value) return null
   return students.value.find(s => s.id === props.seat.studentId) || { name: '未知', studentNumber: null, tags: [] }
 })
-
-const allVisibleTags = computed(() => {
-  if (!showTagsInSeatChart.value || !studentInfo.value) return []
-  return tags.value.filter(tag => tag.showInSeatChart !== false)
-})
-
-const hasTag = (tagId) => {
-  if (!studentInfo.value || !studentInfo.value.tags) return false
-  return studentInfo.value.tags.includes(tagId)
-}
-
-const studentTags = computed(() => {
-  return allVisibleTags.value.filter(tag => hasTag(tag.id))
-})
-
-const hasTags = computed(() => {
-  if (tagDisplayMode.value === 'dot') {
-    return allVisibleTags.value.length > 0
-  }
-  return studentTags.value.length > 0
-})
-
-const visibleStudentAttributes = computed(() => {
-  if (!showNumericAttributesInEditor.value) return []
-  if (!studentInfo.value) return []
-  const numericAttributes = studentInfo.value.numericAttributes || {}
-  return enabledAttributeDefinitions.value
-    .filter(attribute => attribute.showInEditor !== false)
-    .map(attribute => {
-      const rawValue = numericAttributes[attribute.id]
-      if (rawValue === null || rawValue === undefined || rawValue === '') return null
-      const numberValue = Number(rawValue)
-      if (!Number.isFinite(numberValue)) return null
-      const formattedValue = formatNumericValue(numberValue, attribute.id)
-      if (!formattedValue) return null
-      const shortName = (attribute.name || '数值').substring(0, 2)
-      return {
-        id: attribute.id,
-        displayText: `${shortName}${formattedValue}`,
-        title: `${attribute.name}: ${formattedValue}`
-      }
-    })
-    .filter(Boolean)
-})
-
-const hasNumericAttributes = computed(() => visibleStudentAttributes.value.length > 0)
 
 const isFirstSelected = computed(() => {
   return currentMode.value === EditMode.SWAP && firstSelectedSeat.value === props.seat.id
@@ -523,17 +418,17 @@ const handleDrop = () => {
 }
 
 watch(dragCleanupVersion, () => {
-  isDragging.value = false
-  isDragOver.value = false
-  endDraggingSelection()
-  dragEnterCount = 0
+  cleanupTouchDrag({ notifyGlobal: false, clearHighlights: false })
 })
 
 // ==================== 触摸拖拽模拟 ====================
 
 const handleTouchStart = (e) => {
   lastPointerWasTouch.value = true
-  if (e.touches.length !== 1) return
+  if (e.touches.length !== 1) {
+    cleanupTouchDrag()
+    return
+  }
 
   const touch = e.touches[0]
   const startX = touch.clientX
@@ -562,7 +457,10 @@ const handleTouchStart = (e) => {
 }
 
 const handleTouchMove = (e) => {
-  if (e.touches.length !== 1) return
+  if (e.touches.length !== 1) {
+    cleanupTouchDrag()
+    return
+  }
 
   const touch = e.touches[0]
   const dx = touch.clientX - touchStartX
@@ -669,20 +567,28 @@ const handleTouchMove = (e) => {
 }
 
 // 公共清理函数：取消定时器、移除预览、重置所有状态
-const cleanupTouchDrag = () => {
+const cleanupTouchDrag = ({ notifyGlobal = true, clearHighlights = true } = {}) => {
   if (touchDragTimer) { clearTimeout(touchDragTimer); touchDragTimer = null }
   if (touchMoveRafId) { cancelAnimationFrame(touchMoveRafId); touchMoveRafId = null }
   if (autoPanRafId) { cancelAnimationFrame(autoPanRafId); autoPanRafId = null }
   autoPanPoint = null
-  clearAllTouchHighlights()
+  if (clearHighlights) {
+    clearAllTouchHighlights()
+  }
   document.body?.classList.remove('seat-dragging-from-chart')
   isDragging.value = false
+  isDragOver.value = false
+  dragEnterCount = 0
   if (touchDragActive) {
     suppressUpcomingClick()
-    endTouchDragFromSeat()  // 重置全局触摸拖拽状态
+    if (notifyGlobal) {
+      endTouchDragFromSeat()  // 重置全局触摸拖拽状态
+    }
     restoreMobileDrawerOpenedForDrag()
     endDraggingSelection()
     endDragPreview()
+  } else {
+    endDraggingSelection()
   }
   touchDragActive = false
   activeTouchDragData = null
@@ -857,16 +763,16 @@ onUnmounted(() => {
 <style scoped>
 .seat-item {
   width: 100%;
-  height: 80px;
+  height: var(--seat-card-height);
   box-sizing: border-box;
-  border: 2px solid var(--color-border);
+  border: var(--seat-card-border-width) solid var(--color-border);
   contain: layout style;
-  border-radius: 12px;
+  border-radius: var(--seat-card-radius);
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--color-surface);
-  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+  transition: border-color var(--seat-card-transition), background var(--seat-card-transition), box-shadow var(--seat-card-transition), transform var(--seat-card-transition), opacity var(--seat-card-transition);
   position: relative;
   overflow: hidden;
   user-select: none;
@@ -880,8 +786,7 @@ onUnmounted(() => {
 }
 
 .seat-item:not(.dragging):hover {
-  box-shadow: 0 4px 12px var(--shadow-lg);
-  transition: all 0.2s ease;
+  box-shadow: var(--seat-card-shadow-hover);
 }
 
 .seat-item.clickable:not(.selection-selected):hover {
@@ -999,192 +904,6 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-.student-display {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 8px;
-  width: 100%;
-}
-
-.student-display.name-hidden.number-hidden {
-  justify-content: center;
-}
-
-.student-display.name-hidden:not(.number-hidden) .student-number {
-  font-size: 16px;
-}
-
-.student-display.large-name .student-name {
-  font-size: 28px;
-}
-
-.student-display.large-number .student-number {
-  font-size: 18px;
-  padding: 4px 14px;
-}
-
-.student-display.large-number .student-number-corner {
-  font-size: 12px;
-  padding: 2px 7px;
-}
-
-.student-display.bottom-tag-mode {
-  gap: 2px;
-}
-
-.student-tags {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-top: 2px;
-}
-
-.tag-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  box-shadow: 0 1px 2px var(--shadow-lg);
-}
-
-.tag-dot-hollow {
-  border: 1.5px solid;
-  box-shadow: none;
-}
-
-.student-tags-text {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-top: 3px;
-}
-
-.tag-text-item {
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--color-text-inverse);
-  padding: 1px 4px;
-  border-radius: 3px;
-  text-shadow: 0 1px 1px var(--shadow-lg);
-  line-height: 1.2;
-}
-
-.student-attributes-text {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-top: 2px;
-  max-width: 100%;
-}
-
-.attribute-text-item {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 8px;
-  font-weight: 700;
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
-  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
-  padding: 1px 4px;
-  border-radius: 3px;
-  line-height: 1.2;
-}
-
-.corner-tags {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: flex;
-  gap: 2px;
-  flex-wrap: wrap;
-  max-width: 80%;
-  justify-content: flex-end;
-  z-index: 1;
-}
-
-.corner-tag-item {
-  font-size: 8px;
-  font-weight: 600;
-  color: var(--color-text-inverse);
-  padding: 1px 4px;
-  border-radius: 3px;
-  text-shadow: 0 1px 1px var(--shadow-lg);
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.corner-attributes {
-  position: absolute;
-  left: 4px;
-  bottom: 4px;
-  display: flex;
-  gap: 2px;
-  flex-wrap: wrap;
-  max-width: 82%;
-  z-index: 1;
-}
-
-.corner-attribute-item {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 8px;
-  font-weight: 700;
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
-  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
-  padding: 1px 4px;
-  border-radius: 3px;
-  line-height: 1.2;
-}
-
-.student-number {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-primary);
-  background: var(--color-surface);
-  padding: 2px 10px;
-  border-radius: 6px;
-  min-width: 40px;
-  text-align: center;
-}
-
-.student-number-corner {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-surface) 95%, var(--color-primary));
-  padding: 1px 5px;
-  border-radius: 3px;
-  line-height: 1.2;
-  z-index: 2;
-}
-
-.student-name {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  text-align: center;
-  word-break: break-all;
-  line-height: 1.3;
-  max-width: 100%;
-}
-
 /* 空座位 */
 .empty-seat {
   width: 100%;
@@ -1216,8 +935,8 @@ onUnmounted(() => {
   animation: undo-pulse 2s ease-in-out forwards;
 }
 
-.seat-item.undo-highlighted .student-name,
-.seat-item.undo-highlighted .student-number {
+.seat-item.undo-highlighted :deep(.student-name),
+.seat-item.undo-highlighted :deep(.student-number) {
   animation: undo-text-fade 2s ease-in-out forwards;
 }
 
@@ -1303,71 +1022,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 1366px) and (min-width: 1025px) {
-  .seat-item {
-    height: 68px;
-    border-radius: 10px;
-  }
-
-  .student-display {
-    gap: 3px;
-    padding: 5px;
-  }
-
-  .student-name {
-    font-size: 14px;
-    line-height: 1.2;
-  }
-
-  .student-number {
-    font-size: 11px;
-    min-width: 34px;
-    padding: 1px 8px;
-  }
-
-  .student-display.large-name .student-name {
-    font-size: 20px;
-  }
-
-  .student-display.large-number .student-number {
-    font-size: 14px;
-  }
-
-  .student-number-corner {
-    font-size: 8px;
-    padding: 1px 4px;
-  }
-
-  .tag-dot {
-    width: 5px;
-    height: 5px;
-  }
-
-  .tag-dot-hollow {
-    border-width: 1.2px;
-  }
-
-  .tag-text-item {
-    font-size: 8px;
-    padding: 1px 3px;
-  }
-
-  .corner-tag-item {
-    font-size: 7px;
-    padding: 1px 3px;
-  }
-
-  .attribute-text-item,
-  .corner-attribute-item {
-    font-size: 7px;
-    padding: 1px 3px;
-  }
-
-  .corner-attributes {
-    left: 3px;
-    bottom: 3px;
-    gap: 1px;
-  }
-
   .empty-text,
   .seat-placeholder {
     font-size: 11px;
@@ -1376,146 +1030,13 @@ onUnmounted(() => {
 
 /* 小高度屏幕优化 */
 @media (max-height: 820px) and (min-width: 1025px) {
-  .seat-item {
-    height: 64px;
-    border-radius: 9px;
-  }
-
-  .student-display {
-    gap: 2px;
-    padding: 4px;
-  }
-
-  .student-name {
-    font-size: 13px;
-    line-height: 1.2;
-  }
-
-  .student-number {
-    font-size: 10px;
-    min-width: 32px;
-    padding: 1px 7px;
-  }
-
-  .student-display.large-name .student-name {
-    font-size: 18px;
-  }
-
-  .student-display.large-number .student-number {
-    font-size: 13px;
-  }
-
-  .student-number-corner {
-    font-size: 7px;
-    padding: 1px 3px;
-  }
-
-  .tag-dot {
-    width: 4px;
-    height: 4px;
-  }
-
-  .tag-dot-hollow {
-    border-width: 1px;
-  }
-
-  .tag-text-item {
-    font-size: 7px;
-    padding: 1px 2px;
-  }
-
-  .corner-tag-item {
-    font-size: 6px;
-    padding: 1px 2px;
-  }
-
-  .attribute-text-item,
-  .corner-attribute-item {
-    font-size: 6px;
-    padding: 1px 2px;
-  }
-
-  .corner-attributes {
-    left: 2px;
-    bottom: 2px;
-    gap: 1px;
-  }
-
   .empty-text,
   .seat-placeholder {
     font-size: 10px;
   }
 }
 
-/* 响应式调整 */
-@media (max-width: 1200px) {
-  .student-number {
-    font-size: 14px;
-    padding: 3px 8px;
-  }
-
-  .student-number-corner {
-    font-size: 8px;
-  }
-
-  .student-name {
-    font-size: 13px;
-  }
-}
-
 @media (max-width: 768px) {
-  .seat-item {
-    height: 62px;
-    border-radius: 10px;
-  }
-
-  .student-name {
-    font-size: 12px;
-  }
-
-  .student-number {
-    font-size: 11px;
-    padding: 2px 6px;
-  }
-
-  .student-display.large-name .student-name {
-    font-size: 15px;
-  }
-
-  .student-display.large-number .student-number {
-    font-size: 14px;
-  }
-
-  .student-number-corner {
-    font-size: 8px;
-    padding: 1px 4px;
-  }
-
-  .tag-dot {
-    width: 4px;
-    height: 4px;
-  }
-
-  .tag-dot-hollow {
-    border-width: 1px;
-  }
-
-  .tag-text-item {
-    font-size: 7px;
-    padding: 1px 3px;
-  }
-
-  .corner-tag-item {
-    font-size: 6px;
-    padding: 1px 3px;
-  }
-
-  .attribute-text-item,
-  .corner-attribute-item {
-    font-size: 7px;
-    padding: 1px 3px;
-  }
-
   .empty-text,
   .seat-placeholder {
     font-size: 11px;
@@ -1523,62 +1044,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 480px) {
-  .seat-item {
-    height: 50px;
-    border-radius: 8px;
-  }
-
-  .student-display {
-    gap: 3px;
-    padding: 4px;
-  }
-
-  .student-name {
-    font-size: 10px;
-    line-height: 1.2;
-  }
-
-  .student-number {
-    font-size: 9px;
-    padding: 1px 6px;
-    min-width: 30px;
-  }
-
-  .student-number-corner {
-    font-size: 7px;
-    padding: 1px 3px;
-  }
-
-  .tag-dot {
-    width: 3px;
-    height: 3px;
-  }
-
-  .tag-dot-hollow {
-    border-width: 0.8px;
-  }
-
-  .tag-text-item {
-    font-size: 6px;
-    padding: 0 2px;
-  }
-
-  .corner-tag-item {
-    font-size: 5px;
-    padding: 0 2px;
-  }
-
-  .attribute-text-item,
-  .corner-attribute-item {
-    font-size: 6px;
-    padding: 0 2px;
-  }
-
-  .corner-attributes {
-    left: 2px;
-    bottom: 2px;
-  }
-
   .empty-text,
   .seat-placeholder {
     font-size: 10px;

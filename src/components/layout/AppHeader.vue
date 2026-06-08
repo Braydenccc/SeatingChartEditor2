@@ -68,9 +68,12 @@
           class="theme-btn"
           :class="{ active: currentColorScheme === mode.value }"
           @click="switchTheme(mode.value)"
-          :title="mode.label"
+          :title="themeTitleFor(mode)"
         >
-          <component :is="mode.icon" :size="16" stroke-width="2" />
+          <span class="theme-icon" :class="{ auto: mode.value === 'auto' }">
+            <component :is="themeIconFor(mode)" :size="16" stroke-width="2" />
+            <span v-if="mode.value === 'auto'" class="theme-auto-mark">A</span>
+          </span>
           <Transition name="theme-label">
             <span v-if="currentColorScheme === mode.value" class="theme-label">{{ mode.label }}</span>
           </Transition>
@@ -96,7 +99,7 @@
 
 <script setup>
 import { onMounted, ref, onBeforeUnmount, computed } from 'vue'
-import { ChevronDown, CircleQuestionMark, Cloud, FileOutput, FileText, LogIn, Monitor, Moon, Settings, Sun, User, Users } from 'lucide-vue-next'
+import { ChevronDown, CircleQuestionMark, Cloud, FileOutput, FileText, LogIn, Moon, Settings, Sun, User, Users } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
@@ -121,7 +124,7 @@ const hasWebdav = computed(() => !!webdavConfig.value)
 const themeModes = [
   { value: 'light', label: '浅色', icon: Sun },
   { value: 'dark', label: '深色', icon: Moon },
-  { value: 'auto', label: '自适应', icon: Monitor }
+  { value: 'auto', label: '自适应' }
 ]
 
 const currentColorScheme = computed(() => settings.value.ui.colorScheme)
@@ -135,14 +138,24 @@ const updatePrefersDarkMode = () => {
   prefersDarkMode.value = Boolean(prefersDarkQuery?.matches)
 }
 
+const autoThemeIcon = computed(() => prefersDarkMode.value ? Moon : Sun)
+
+const themeIconFor = (mode) => {
+  if (mode.value === 'auto') return autoThemeIcon.value
+  return mode.icon
+}
+
+const themeTitleFor = (mode) => {
+  if (mode.value !== 'auto') return mode.label
+  return `自适应（当前${prefersDarkMode.value ? '深色' : '浅色'}）`
+}
+
 const mobileThemeIcon = computed(() => {
-  if (currentColorScheme.value !== 'auto') return currentThemeMode.value.icon
-  return prefersDarkMode.value ? Moon : Sun
+  return themeIconFor(currentThemeMode.value)
 })
 
 const mobileThemeTitle = computed(() => {
-  if (currentColorScheme.value !== 'auto') return `主题：${currentThemeMode.value.label}`
-  return `主题：自适应（当前${prefersDarkMode.value ? '深色' : '浅色'}）`
+  return `主题：${themeTitleFor(currentThemeMode.value)}`
 })
 
 const switchTheme = (mode) => {
@@ -241,6 +254,8 @@ onBeforeUnmount(() => {
 /* ===== 基础布局 ===== */
 .app-header {
   --header-help-space: 56px;
+  --header-control-height: clamp(34px, calc(1.5vw + 18px), 38px);
+  --theme-control-height: var(--header-control-height);
   position: relative;
   display: flex;
   align-items: center;
@@ -291,12 +306,15 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   align-items: center;
+  height: var(--header-control-height);
+  min-height: var(--header-control-height);
+  box-sizing: border-box;
   gap: 8px;
   background: color-mix(in srgb, var(--color-text-inverse) 12%, transparent);
   backdrop-filter: blur(8px);
   border: 1px solid color-mix(in srgb, var(--color-text-inverse) 20%, transparent);
   color: var(--color-text-inverse);
-  padding: 8px 16px;
+  padding: 0 16px;
   border-radius: 24px;
   font-size: 14px;
   font-weight: 500;
@@ -336,8 +354,8 @@ onBeforeUnmount(() => {
 }
 
 .header-btn.icon-only {
-  width: 40px;
-  height: 40px;
+  width: var(--header-control-height);
+  height: var(--header-control-height);
   padding: 0;
   justify-content: center;
 }
@@ -422,12 +440,17 @@ onBeforeUnmount(() => {
 .theme-switcher {
   display: flex;
   align-items: center;
+  height: var(--theme-control-height);
+  min-height: var(--theme-control-height);
+  box-sizing: border-box;
   background: color-mix(in srgb, var(--color-text-inverse) 10%, transparent);
   border-radius: 24px;
-  padding: 4px;
+  padding: 0;
   gap: 2px;
-  border: 1px solid color-mix(in srgb, var(--color-text-inverse) 15%, transparent);
+  border: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-inverse) 15%, transparent);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .theme-btn {
@@ -435,7 +458,10 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 10px;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0 10px;
   border: none;
   background: transparent;
   color: color-mix(in srgb, var(--color-text-inverse) 60%, transparent);
@@ -456,10 +482,37 @@ onBeforeUnmount(() => {
   transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+.theme-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+
+.theme-auto-mark {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-primary-light);
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .theme-btn:hover {
   color: color-mix(in srgb, var(--color-text-inverse) 90%, transparent);
   background: color-mix(in srgb, var(--color-text-inverse) 12%, transparent);
-  transform: scale(1.04);
 }
 
 .theme-btn:hover svg {
@@ -469,7 +522,7 @@ onBeforeUnmount(() => {
 .theme-btn.active {
   background: color-mix(in srgb, var(--color-text-inverse) 20%, transparent);
   color: var(--color-text-inverse);
-  box-shadow: 0 2px 6px var(--shadow-md);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-inverse) 10%, transparent);
 }
 
 .theme-label {
@@ -541,7 +594,7 @@ onBeforeUnmount(() => {
   }
 
   .header-btn {
-    padding: 6px 14px;
+    padding: 0 14px;
     font-size: 13px;
   }
 }
@@ -561,7 +614,7 @@ onBeforeUnmount(() => {
   }
 
   .header-btn {
-    padding: 6px 12px;
+    padding: 0 12px;
   }
 }
 

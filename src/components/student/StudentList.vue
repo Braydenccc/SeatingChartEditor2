@@ -3,7 +3,6 @@
     class="student-list-container"
     :class="{
       'all-assigned': visibleStudents.length === 0,
-      'is-collapsed': isCollapsed,
       'display-compact': displayMode === 'compact'
     }"
   >
@@ -34,8 +33,8 @@
           </div>
         </div>
 
-        <!-- 操作按钮组 - 仅在高度足够时显示 -->
-        <div v-if="!isHeightConstrained" class="empty-actions">
+        <!-- 操作按钮组 -->
+        <div class="empty-actions">
           <button class="empty-action-btn outline" type="button" @click="goFilesView">
             <FolderOpen :size="16" stroke-width="2" />
             <span>到文件页导入</span>
@@ -97,21 +96,17 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-import { computed, ref, defineAsyncComponent, onBeforeUnmount, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, defineAsyncComponent, onMounted, onUnmounted, watch } from 'vue'
 import { useWindowSize } from '@vueuse/core'
 import { Users, FolderOpen, CloudDownload, CheckCircle, SearchX, LogOut } from 'lucide-vue-next'
 import CandidateItem from './CandidateItem.vue'
-import { useTagData } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useLogger } from '@/composables/useLogger'
 import { useWorkspace } from '@/composables/useWorkspace'
-import { useAuth } from '@/composables/useAuth'
-import { useExcelData } from '@/composables/useExcelData'
 import { useDragState } from '@/composables/useDragState'
 import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
-import { useResizablePanel } from '@/composables/useResizablePanel'
 
 const StudentEditDialog = defineAsyncComponent(() => import('./StudentEditDialog.vue'))
 const props = defineProps({
@@ -130,39 +125,22 @@ const props = defineProps({
   activeTagIds: {
     type: Array,
     default: () => []
-  },
-  collapsible: {
-    type: Boolean,
-    default: true
   }
 })
 const showStudentEditDialog = ref(false)
 const editingStudentId = ref(null)
 
-const { tags, addTag, clearAllTags } = useTagData()
-const { students, updateStudent, deleteStudent, clearAllStudents, addStudent, selectedStudentId, selectStudent } = useStudentData()
-const { findSeatByStudent, getEmptySeats, assignStudent, clearSeat, getStudentAtSeat } = useSeatChart()
-const { success, warning, error } = useLogger()
+const { students, selectedStudentId, selectStudent } = useStudentData()
+const { findSeatByStudent, clearSeat, getStudentAtSeat } = useSeatChart()
+const { success, error } = useLogger()
 const { loadWorkspace, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
-const { isLoggedIn, isLoginDialogVisible } = useAuth()
-const { importFromExcel, downloadTemplate } = useExcelData()
 const { isTouchDraggingFromSeat, endDragFromSeat } = useDragState()
 const { recordBatch, createSnapshot } = useUndo()
 const { width: windowWidth } = useWindowSize()
 const { openCloudLoad } = useCloudWorkspaceDialog()
-const { userHeight, getEffectiveHeight } = useResizablePanel()
 const router = useRouter()
 
 const isMobile = computed(() => windowWidth.value <= 1024)
-
-// 折叠状态检测
-const isCollapsed = computed(() => props.collapsible && userHeight.value === 0)
-
-// 检测高度是否受限（用于简化空状态占位符）
-const isHeightConstrained = computed(() => {
-  const effectiveHeight = getEffectiveHeight(unassignedStudents.value.length)
-  return effectiveHeight < 200 // 高度小于 200px 时隐藏操作按钮
-})
 
 const goFilesView = () => {
   router.push('/files')
@@ -339,11 +317,6 @@ const getDragData = (e) => {
   background: var(--color-bg-secondary);
 }
 
-/* 折叠时隐藏整个容器 */
-.student-list-container.is-collapsed {
-  display: none;
-}
-
 .student-list-container.all-assigned {
   height: auto;
 }
@@ -358,8 +331,8 @@ const getDragData = (e) => {
   min-height: 60px;
   display: grid;
   position: relative;  /* 覆盖层定位参照 */
-  grid-template-columns: repeat(auto-fill, 120px);
-  grid-auto-rows: 80px;
+  grid-template-columns: repeat(auto-fill, var(--seat-card-width));
+  grid-auto-rows: var(--seat-card-height);
   gap: 12px;
   align-content: start;
   justify-content: start;
@@ -373,7 +346,7 @@ const getDragData = (e) => {
 .student-list-container.display-compact .student-items {
   padding: 10px;
   grid-template-columns: 1fr;
-  grid-auto-rows: 56px;
+  grid-auto-rows: var(--candidate-card-height);
   gap: 8px;
 }
 
@@ -612,8 +585,8 @@ const getDragData = (e) => {
 @media (max-width: 1366px) and (min-width: 1025px) {
   .student-items {
     padding: 8px;
-    grid-template-columns: repeat(auto-fill, 102px);
-    grid-auto-rows: 68px;
+    grid-template-columns: repeat(auto-fill, var(--seat-card-width));
+    grid-auto-rows: var(--seat-card-height);
   }
 }
 
@@ -621,8 +594,8 @@ const getDragData = (e) => {
 @media (max-height: 820px) and (min-width: 1025px) {
   .student-items {
     padding: 6px;
-    grid-template-columns: repeat(auto-fill, 96px);
-    grid-auto-rows: 64px;
+    grid-template-columns: repeat(auto-fill, var(--seat-card-width));
+    grid-auto-rows: var(--seat-card-height);
   }
 }
 
@@ -634,8 +607,8 @@ const getDragData = (e) => {
   .student-items {
     padding: 6px 8px;
     -webkit-overflow-scrolling: touch;
-    grid-template-columns: repeat(auto-fill, 105px);
-    grid-auto-rows: 70px;
+    grid-template-columns: repeat(auto-fill, var(--seat-card-width));
+    grid-auto-rows: var(--seat-card-height);
   }
 
   /* 移动端空状态：显示占位符 */
@@ -670,9 +643,10 @@ const getDragData = (e) => {
   }
 
   .student-list-container.display-compact .student-items {
+    --candidate-card-height: 50px;
     padding: 6px 8px;
     grid-template-columns: 1fr;
-    grid-auto-rows: 50px;
+    grid-auto-rows: var(--candidate-card-height);
     gap: 6px;
   }
 
@@ -698,8 +672,8 @@ const getDragData = (e) => {
 
 @media (max-width: 480px) {
   .student-items {
-    grid-template-columns: repeat(auto-fill, 82.5px);
-    grid-auto-rows: 55px;
+    grid-template-columns: repeat(auto-fill, var(--seat-card-width));
+    grid-auto-rows: var(--seat-card-height);
   }
 }
 </style>

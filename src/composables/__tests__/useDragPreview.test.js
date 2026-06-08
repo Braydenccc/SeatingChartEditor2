@@ -40,7 +40,7 @@ describe('useDragPreview', () => {
     expect(previewEl.style.transition).toBe('none')
   })
 
-  it('keeps the original seat card content for preview items', () => {
+  it('returns structured student data for preview items', () => {
     const { assignStudent } = useSeatChart()
     const studentData = useStudentData()
     const { registerChartElement, startDragPreview, previewItems } = useDragPreview()
@@ -53,13 +53,14 @@ describe('useDragPreview', () => {
 
     seatEl.className = 'seat-item occupied'
     seatEl.dataset.seatId = 'seat-0-0-0'
-    seatEl.innerHTML = '<div class="student-display"><div class="student-name">张三</div><div class="student-number">7</div></div>'
     chartEl.appendChild(seatEl)
     registerChartElement(chartEl)
 
     startDragPreview('seat-0-0-0', ['seat-0-0-0'], 120, 80)
 
-    expect(previewItems.value[0].studentName).toBe('张三')
-    expect(previewItems.value[0].contentHtml).toBe(seatEl.innerHTML)
+    expect(previewItems.value[0].student).toMatchObject({ name: '张三', studentNumber: 7 })
+    expect(previewItems.value[0].studentId).toBe(studentId)
+    expect(previewItems.value[0].isEmptySeat).toBe(false)
+    expect(previewItems.value[0].contentHtml).toBeUndefined()
   })
 })
