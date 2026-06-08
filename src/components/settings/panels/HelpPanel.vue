@@ -15,27 +15,32 @@
       </div>
     </header>
 
-    <nav class="manual-toc" aria-label="用户手册目录">
-      <button
-        v-for="section in userManual.sections"
-        :key="section.id"
-        type="button"
-        @click="scrollToSection(section.id)"
-      >
-        {{ section.title }}
-      </button>
-    </nav>
+    <div class="manual-layout">
+      <nav class="manual-toc" aria-label="用户手册目录">
+        <button
+          v-for="section in userManual.sections"
+          :key="section.id"
+          :class="{ active: activeSectionId === section.id }"
+          type="button"
+          @click="scrollToSection(section.id)"
+        >
+          {{ section.title }}
+        </button>
+      </nav>
 
-    <article class="manual-doc" v-html="manualHtml"></article>
+      <article class="manual-doc" v-html="manualHtml"></article>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { BookOpen } from 'lucide-vue-next'
 import { userManual, type UserManualSection } from '@/constants/userManual'
 
 const panelRef = ref<HTMLElement | null>(null)
+const activeSectionId = ref(userManual.sections[0]?.id || '')
+let scrollParent: HTMLElement | null = null
 
 const escapeHtml = (value: string) => value
   .replace(/&/g, '&amp;')
@@ -202,6 +207,7 @@ const scrollToSection = (sectionId: string) => {
   const target = panelRef.value?.querySelector<HTMLElement>(`#manual-${sectionId}`)
   if (!target) return
 
+  activeSectionId.value = sectionId
   const scroller = getScrollParent(target)
   const scrollerRect = scroller.getBoundingClientRect()
   const targetRect = target.getBoundingClientRect()
@@ -211,6 +217,50 @@ const scrollToSection = (sectionId: string) => {
     behavior: 'auto'
   })
 }
+
+const updateActiveSection = () => {
+  if (!panelRef.value) return
+
+  const sections = userManual.sections
+    .map(section => ({
+      id: section.id,
+      element: panelRef.value?.querySelector<HTMLElement>(`#manual-${section.id}`) || null
+    }))
+    .filter((section): section is { id: string; element: HTMLElement } => Boolean(section.element))
+
+  if (!sections.length) return
+
+  const scroller = scrollParent || getScrollParent(sections[0].element)
+  const scrollerTop = scroller.getBoundingClientRect().top
+  const threshold = scrollerTop + 28
+  let currentId = sections[0].id
+
+  for (const section of sections) {
+    const top = section.element.getBoundingClientRect().top
+    if (top <= threshold) {
+      currentId = section.id
+    } else {
+      break
+    }
+  }
+
+  activeSectionId.value = currentId
+}
+
+onMounted(async () => {
+  await nextTick()
+  const firstSection = panelRef.value?.querySelector<HTMLElement>(`#manual-${userManual.sections[0]?.id}`)
+  if (!firstSection) return
+
+  scrollParent = getScrollParent(firstSection)
+  scrollParent.addEventListener('scroll', updateActiveSection, { passive: true })
+  updateActiveSection()
+})
+
+onBeforeUnmount(() => {
+  scrollParent?.removeEventListener('scroll', updateActiveSection)
+  scrollParent = null
+})
 </script>
 
 <style scoped>
@@ -218,12 +268,11 @@ const scrollToSection = (sectionId: string) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 960px;
+  max-width: 1180px;
   margin: 0 auto;
 }
 
 .manual-header,
-.manual-toc,
 .manual-doc {
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
@@ -287,19 +336,33 @@ const scrollToSection = (sectionId: string) => {
   font-size: 13px;
 }
 
+.manual-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
 .manual-toc {
+  position: sticky;
+  top: 12px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
   padding: 12px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
 }
 
 .manual-toc button {
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--color-border);
+  min-height: 36px;
+  padding: 0 10px;
+  border: none;
   border-radius: 6px;
-  background: var(--color-surface);
+  background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
   font: inherit;
@@ -308,13 +371,19 @@ const scrollToSection = (sectionId: string) => {
 }
 
 .manual-toc button:hover {
-  border-color: var(--color-primary);
   background: var(--color-bg-subtle);
   color: var(--color-primary);
 }
 
+.manual-toc button.active {
+  background: var(--color-bg-selected);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
 .manual-doc {
   padding: 26px 30px;
+  min-width: 0;
 }
 
 .manual-doc :deep(h1),
@@ -410,6 +479,30 @@ const scrollToSection = (sectionId: string) => {
   background: var(--color-bg-subtle);
   color: var(--color-text-primary);
   font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .manual-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-toc {
+    position: static;
+    flex-direction: row;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .manual-toc::-webkit-scrollbar {
+    display: none;
+  }
+
+  .manual-toc button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 640px) {
