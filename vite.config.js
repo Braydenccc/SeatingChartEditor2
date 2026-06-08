@@ -7,9 +7,14 @@ import viteCompression from 'vite-plugin-compression'
 
 import { authMockPlugin } from './vite.mock.plugin.js'
 
+const buildTime = process.env.VITE_APP_BUILD_TIME || new Date().toISOString()
+
 // https://vite.dev/config/
 export default defineConfig({
   base: './', // Allow relative paths for electron/tauri builds
+  define: {
+    __APP_BUILD_TIME__: JSON.stringify(buildTime)
+  },
   plugins: [
     vue(),
     vueDevTools(),

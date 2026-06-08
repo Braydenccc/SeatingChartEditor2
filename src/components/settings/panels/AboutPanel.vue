@@ -2,23 +2,23 @@
   <div class="about-panel">
     <div class="about-section">
       <h3>关于 BraydenSCE V2</h3>
-      <p class="about-desc">座位表编辑器 开发版本</p>
+      <p class="about-desc">{{ versionSummary }}</p>
     </div>
 
     <div class="about-section">
-      <h4>项目信息</h4>
+      <h4>版本信息</h4>
       <div class="info-grid">
         <div class="info-item">
-          <span class="info-label">版本</span>
-          <span class="info-value">开发版本</span>
+          <span class="info-label">运行版本</span>
+          <span class="info-value">{{ runtimeLabel }}</span>
         </div>
         <div class="info-item">
-          <span class="info-label">框架</span>
-          <span class="info-value">Vue 3 + Vite</span>
+          <span class="info-label">当前登录方式</span>
+          <span class="info-value">{{ loginMethodLabel }}</span>
         </div>
         <div class="info-item">
-          <span class="info-label">桌面端</span>
-          <span class="info-value">Tauri / Electron</span>
+          <span class="info-label">版本发布时间</span>
+          <span class="info-value">{{ appBuildInfo.buildTimeText }}</span>
         </div>
       </div>
     </div>
@@ -65,10 +65,25 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { BookOpen, Github, Heart, Cloud } from 'lucide-vue-next'
+import { appBuildInfo } from '@/constants/appBuildInfo'
+import { isTauriRuntime } from '@/platform/runtime'
+import { useAuth } from '@/composables/useAuth'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
 
 const { openSettings } = useSettingsDialog()
+const { authType, currentUser, token, webdavConfig } = useAuth()
+
+const isWeb = computed(() => !isTauriRuntime())
+const runtimeLabel = computed(() => (isWeb.value ? 'Web 版' : 'Tauri 桌面版'))
+const loginMethodLabel = computed(() => {
+  if (authType.value === 'webdav' && webdavConfig.value) return 'WebDAV'
+  if (currentUser.value && token.value) return 'SCE 账号'
+  if (webdavConfig.value) return 'WebDAV'
+  return '未登录'
+})
+const versionSummary = computed(() => runtimeLabel.value)
 
 const openHelp = () => {
   openSettings('about', 'help')

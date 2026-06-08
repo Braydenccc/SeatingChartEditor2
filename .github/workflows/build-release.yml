@@ -29,6 +29,12 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      - name: Set build time
+        shell: pwsh
+        run: |
+          $buildTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          "VITE_APP_BUILD_TIME=$buildTime" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Build Desktop (Tauri)
         run: npm run build:desktop
 
