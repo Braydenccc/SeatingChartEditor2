@@ -131,6 +131,7 @@ EditorView.vue
 - 禁止直接修改 `dist/`；所有修改应在源文件中完成。
 - 临时测试脚本放在 `test-scr/`，不要放在 `public/` 或 `src/`。
 - 功能变更优先更新 `.agents/features/` 中对应功能文档；不要在 `docs/` 新建 `*-UPDATE.md`、`*-REPORT.md`、`*-SUMMARY.md` 之类临时文档。
+- 任何会改变用户可见功能、入口、工作流、限制条件或排查步骤的变更，都必须同步更新 `src/constants/userManual.ts` 用户手册；该文件是应用内「设置 - 关于 - 帮助」与桌面端问号帮助入口的手册内容真源。
 
 ## 深度文档
 

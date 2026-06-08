@@ -87,7 +87,7 @@
     </div>
 
     <div class="header-right">
-      <button v-if="isDesktopRuntime" class="header-btn icon-only" @click="openHelp" title="帮助">
+      <button class="header-btn icon-only" @click="openHelp" title="帮助">
         <CircleQuestionMark :size="18" stroke-width="2" />
       </button>
     </div>
@@ -101,7 +101,6 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
-import { isTauriRuntime } from '@/platform/runtime'
 
 const emit = defineEmits(['open-login'])
 
@@ -115,7 +114,6 @@ const menuContainer = ref(null)
 
 const hasRetiehe = computed(() => !!token.value)
 const hasWebdav = computed(() => !!webdavConfig.value)
-const isDesktopRuntime = isTauriRuntime()
 
 // 主题切换
 const themeModes = [
@@ -211,6 +209,7 @@ onBeforeUnmount(() => {
 <style scoped>
 /* ===== 基础布局 ===== */
 .app-header {
+  --header-help-space: 56px;
   position: relative;
   display: flex;
   align-items: center;
@@ -219,10 +218,12 @@ onBeforeUnmount(() => {
   background: var(--color-primary);
   height: var(--app-header-height, 100px);
   color: var(--color-text-inverse);
-  padding: 0 30px;
+  padding: 0 calc(30px + var(--header-help-space)) 0 30px;
   box-shadow: var(--shadow-md);
   gap: 20px;
   z-index: 30;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .header-left {
@@ -230,14 +231,20 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .header-right {
+  position: absolute;
+  top: 50%;
+  right: 30px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   flex-shrink: 0;
+  transform: translateY(-50%);
 }
 
 .header-text {
@@ -494,7 +501,7 @@ onBeforeUnmount(() => {
 /* ===== 响应式 - 中等屏幕 ===== */
 @media (max-width: 1366px) and (min-width: 1025px) {
   .app-header {
-    padding: 0 20px;
+    padding: 0 calc(20px + var(--header-help-space)) 0 20px;
   }
 
   .header-left {
@@ -514,7 +521,7 @@ onBeforeUnmount(() => {
 /* ===== 响应式 - 小高度屏幕 ===== */
 @media (max-height: 820px) and (min-width: 1025px) {
   .app-header {
-    padding: 0 18px;
+    padding: 0 calc(18px + var(--header-help-space)) 0 18px;
   }
 
   .header-left {
@@ -533,7 +540,7 @@ onBeforeUnmount(() => {
 /* ===== 响应式 - 平板 ===== */
 @media (max-width: 1024px) {
   .app-header {
-    padding: 0 20px;
+    padding: 0 calc(20px + var(--header-help-space)) 0 20px;
     height: var(--app-header-height, 90px);
   }
 
