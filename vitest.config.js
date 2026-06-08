@@ -4,6 +4,10 @@ import { configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
+  define: {
+    __APP_BUILD_TIME__: JSON.stringify('2026-01-01T00:00:00.000Z'),
+    __APP_RELEASE_VERSION__: JSON.stringify('vtest')
+  },
   plugins: [vue()],
   resolve: {
     alias: {
