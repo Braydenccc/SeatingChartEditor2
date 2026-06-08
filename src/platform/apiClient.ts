@@ -2,12 +2,13 @@ import { safeStorageGet, safeStorageSet } from '@/utils/storage'
 import { isTauriRuntime } from './runtime'
 
 const RETIEHE_API_BASE_KEY = 'sce-retiehe-api-base'
+export const DEFAULT_RETIEHE_API_BASE = 'https://sce.jbyc.cc'
 const cookieJar = new Map<string, string>()
 
 export const getRetieheApiBase = () => {
   const envBase = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_RETIEHE_API_BASE
   const storedBase = safeStorageGet(RETIEHE_API_BASE_KEY)
-  return String(envBase || storedBase || '').trim().replace(/\/+$/, '')
+  return String(storedBase || envBase || DEFAULT_RETIEHE_API_BASE).trim().replace(/\/+$/, '')
 }
 
 export const setRetieheApiBase = (baseUrl: string) => {

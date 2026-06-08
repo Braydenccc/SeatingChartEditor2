@@ -164,6 +164,7 @@ const hasNumericAttributes = computed(() => visibleStudentAttributes.value.lengt
 
 const {
   isStudentDragging,
+  lastPointerWasTouch,
   canHtmlDrag,
   handlePointerDown,
   handleTouchStart,
@@ -173,6 +174,10 @@ const {
   onStartDrag: () => suspendMobileDrawerForDrag('candidates'),
   onEndDrag: restoreMobileDrawerAfterDrag
 })
+
+const isCoarsePointerContextMenu = () => {
+  return window.matchMedia?.('(hover: none) and (pointer: coarse)').matches
+}
 
 const handleClick = () => {
   if (isSelected.value) {
@@ -190,6 +195,8 @@ const handleClick = () => {
 }
 
 const handleContextMenu = () => {
+  if (isStudentDragging.value || lastPointerWasTouch.value || isCoarsePointerContextMenu()) return
+
   selectStudent(props.student.id)
   setRightRailTab('selection')
   if (window.matchMedia('(max-width: 768px)').matches) {

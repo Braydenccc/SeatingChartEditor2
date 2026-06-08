@@ -31,6 +31,15 @@
 
     <EditorToolDock class="tool-dock" />
 
+    <div
+      v-if="showMobileDropOutZone"
+      class="seat-touch-drop-out-zone"
+      aria-label="拖到此处移出学生"
+    >
+      <LogOut :size="18" stroke-width="2.2" />
+      <span>拖到此处移出学生</span>
+    </div>
+
     <Transition :name="suspendedMobileDrawer ? '' : 'drawer'">
       <div
         v-if="activeMobileSheet"
@@ -45,7 +54,7 @@
           @pointercancel="handleDrawerPointerCancel"
         >
           <strong>{{ mobileDrawerTitle }}</strong>
-          <button @pointerdown.stop @click="closeMobileDrawer">关闭</button>
+          <button type="button" @pointerdown.stop @click.stop="closeMobileDrawer">关闭</button>
         </div>
         <div class="mobile-drawer-body">
           <ZoneEditContextPanel v-if="zoneEditSession" />
@@ -65,6 +74,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
+import { LogOut } from 'lucide-vue-next'
 import SeatChart from '@/components/seat/SeatChart.vue'
 import ActivityPanel from './ActivityPanel.vue'
 import ContextInspector from './ContextInspector.vue'
@@ -73,6 +83,7 @@ import MobileToolsPanel from './MobileToolsPanel.vue'
 import StudentPoolPanel from './StudentPoolPanel.vue'
 import WorkbenchDialogs from './WorkbenchDialogs.vue'
 import ZoneEditContextPanel from './ZoneEditContextPanel.vue'
+import { useDragState } from '@/composables/useDragState'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
 const isWideDesktop = useMediaQuery('(min-width: 1440px)')
@@ -89,7 +100,9 @@ const {
   closeMobileDrawer,
   closeMobileSheet
 } = useEditorWorkbench()
+const { isTouchDraggingFromSeat } = useDragState()
 const isFullscreenLandscape = computed(() => isSeatFullscreen.value && isMobileWorkbench.value && isLandscape.value)
+const showMobileDropOutZone = computed(() => isMobileWorkbench.value && !isSeatFullscreen.value && isTouchDraggingFromSeat.value)
 const activeMobileSheet = computed(() => {
   if (!mobileSheet.value) return null
   if (isFullscreenLandscape.value && mobileSheet.value === 'candidates') return null
@@ -336,6 +349,35 @@ const handleDrawerPointerCancel = () => {
     background: var(--color-bg-overlay);
   }
 
+  .seat-touch-drop-out-zone {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--mobile-tool-dock-height) + 8px);
+    z-index: 1001;
+    min-height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 2px dashed var(--color-primary);
+    border-radius: 8px;
+    background: var(--color-info-bg);
+    color: var(--color-primary);
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: var(--shadow-lg);
+    pointer-events: auto;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  }
+
+  .seat-touch-drop-out-zone.is-touch-over {
+    border-style: solid;
+    background: var(--color-primary);
+    color: var(--color-text-inverse);
+    transform: translateY(-2px);
+  }
+
   .mobile-drawer-shell {
     display: flex;
     flex-direction: column;
@@ -354,7 +396,7 @@ const handleDrawerPointerCancel = () => {
     transition: transform 0.2s ease, opacity 0.16s ease;
   }
 
-  .mobile-drawer-shell:focus-within {
+  .mobile-drawer-shell:has(.mobile-drawer-body :focus) {
     max-height: min(78vh, var(--mobile-drawer-limit));
   }
 

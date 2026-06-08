@@ -71,23 +71,42 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
   // ============== Mouse Dragging ==============
   let htmlDragImageEl = null
 
+  const getCandidateCardSize = () => {
+    if (typeof window === 'undefined') return { width: 120, height: 80 }
+    if (window.matchMedia?.('(max-width: 480px)').matches) return { width: 82.5, height: 55 }
+    if (window.matchMedia?.('(max-width: 768px)').matches) return { width: 105, height: 70 }
+    if (window.matchMedia?.('(max-height: 820px) and (min-width: 1025px)').matches) return { width: 96, height: 64 }
+    if (window.matchMedia?.('(max-width: 1366px) and (min-width: 1025px)').matches) return { width: 102, height: 68 }
+    return { width: 120, height: 80 }
+  }
+
+  const getDragPreviewSize = (sourceEl, rect) => {
+    const cardSize = getCandidateCardSize()
+    if (sourceEl.classList.contains('compact') || rect.width > cardSize.width * 1.25) {
+      return cardSize
+    }
+    return { width: rect.width, height: rect.height }
+  }
+
   const createCardClone = () => {
     const sourceEl = unref(studentRef)
     if (!sourceEl) return null
 
     const rect = sourceEl.getBoundingClientRect()
+    const previewSize = getDragPreviewSize(sourceEl, rect)
     const clone = sourceEl.cloneNode(true)
-    clone.classList.remove('dragging')
+    clone.classList.remove('dragging', 'compact')
     clone.classList.add('touch-drag-preview-card')
     clone.removeAttribute('draggable')
-    clone.style.width = `${rect.width}px`
-    clone.style.height = `${rect.height}px`
+    clone.style.width = `${previewSize.width}px`
+    clone.style.height = `${previewSize.height}px`
     clone.style.margin = '0'
     clone.style.opacity = '1'
     clone.style.transform = 'none'
     clone.style.pointerEvents = 'none'
+    clone.style.boxSizing = 'border-box'
 
-    return { clone, rect }
+    return { clone, rect: previewSize }
   }
 
   const cleanupHtmlDragImage = () => {
@@ -271,6 +290,7 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
 
   return {
     isStudentDragging,
+    lastPointerWasTouch,
     canHtmlDrag,
     handlePointerDown,
     handleTouchStart,

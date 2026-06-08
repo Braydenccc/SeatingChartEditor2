@@ -140,7 +140,7 @@ const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = use
 const { settings } = useGlobalSettings()
 const { panX, panY, setPan } = useZoom()
 const { enabledAttributeDefinitions, formatNumericValue, showNumericAttributesInEditor } = useStudentAttributes()
-const { setRightRailTab, showMobileSheet, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDrag } = useEditorWorkbench()
+const { setRightRailTab, showMobileSheet, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDrag, isSeatFullscreen } = useEditorWorkbench()
 
 const showStudentName = computed(() => settings.value.ui.showStudentName !== false)
 const showStudentNumber = computed(() => settings.value.ui.showStudentNumber !== false)
@@ -309,6 +309,10 @@ const isDraggable = computed(() => {
   return canTouchDrag.value
 })
 
+const shouldOpenCandidateDrawerForSeatDrag = computed(() => {
+  return isMobile.value && isSeatFullscreen.value
+})
+
 // 记录指针类型，用于判断是否为触摸操作
 const handlePointerDown = (e) => {
   lastPointerWasTouch.value = e.pointerType === 'touch'
@@ -405,7 +409,7 @@ const handleDragStart = (e) => {
   if (!lastPointerWasTouch.value) {
     document.body?.classList.add('seat-dragging-from-chart')
   }
-  if (isMobile.value) openMobileDrawerForDrag('candidates')
+  if (shouldOpenCandidateDrawerForSeatDrag.value) openMobileDrawerForDrag('candidates')
   startDragFromSeat()
   e.dataTransfer.effectAllowed = 'move'
 
@@ -502,7 +506,7 @@ const handleTouchStart = (e) => {
   touchDragTimer = setTimeout(() => {
     touchDragActive = true
     isDragging.value = true
-    openMobileDrawerForDrag('candidates')
+    if (shouldOpenCandidateDrawerForSeatDrag.value) openMobileDrawerForDrag('candidates')
     startTouchDragFromSeat()
     if (navigator.vibrate) navigator.vibrate(50)
 
@@ -586,9 +590,16 @@ const handleTouchMove = (e) => {
 
   const clientX = touch.clientX
   const clientY = touch.clientY
+  const immediateTargetEl = document.elementFromPoint(clientX, clientY)
+  const isOverDropOutZone = Boolean(immediateTargetEl && findParentByClass(immediateTargetEl, 'seat-touch-drop-out-zone'))
 
   updateDragPreview(clientX, clientY)
-  autoPanNearEdge(clientX, clientY)
+  if (!isOverDropOutZone) {
+    autoPanNearEdge(clientX, clientY)
+  } else {
+    if (autoPanRafId) { cancelAnimationFrame(autoPanRafId); autoPanRafId = null }
+    autoPanPoint = null
+  }
 
   if (touchMoveRafId) {
     cancelAnimationFrame(touchMoveRafId)
@@ -604,6 +615,11 @@ const handleTouchMove = (e) => {
       if (seatEl && seatEl.dataset.seatId !== props.seat.id) {
         seatEl.classList.add('drag-over')
       } else {
+        const dropOutEl = findParentByClass(targetEl, 'seat-touch-drop-out-zone')
+        if (dropOutEl && props.seat.studentId != null) {
+          dropOutEl.classList.add('is-touch-over')
+          return
+        }
         const studentListEl = findParentByClass(targetEl, 'student-items')
         if (studentListEl && props.seat.studentId != null) {
           studentListEl.classList.add('drag-over')
@@ -680,8 +696,10 @@ const handleTouchEnd = (e) => {
   const seatEl = findParentSeat(targetEl)
   if (!seatEl || seatEl.dataset.seatId === props.seat.id) {
     // 检测是否拖到候选列表区域
+    const dropOutEl = findParentByClass(targetEl, 'seat-touch-drop-out-zone')
     const studentListEl = findParentByClass(targetEl, 'student-items')
-    if (studentListEl && props.seat.studentId != null) {
+    const dropTargetEl = dropOutEl || studentListEl
+    if (dropTargetEl && props.seat.studentId != null) {
       const isSelection = isInSelection.value && selectedSeatsArray.value.length > 1
       const event = new CustomEvent('touch-seat-to-list', {
         bubbles: true,
@@ -692,7 +710,7 @@ const handleTouchEnd = (e) => {
           selectedSeatIds: isSelection ? selectedSeatsArray.value : [props.seat.id]
         }
       })
-      studentListEl.dispatchEvent(event)
+      dropTargetEl.dispatchEvent(event)
     }
     return
   }
@@ -740,6 +758,9 @@ const clearAllTouchHighlights = () => {
   })
   document.querySelectorAll('.student-items.drag-over').forEach(el => {
     el.classList.remove('drag-over')
+  })
+  document.querySelectorAll('.seat-touch-drop-out-zone.is-touch-over').forEach(el => {
+    el.classList.remove('is-touch-over')
   })
 }
 
@@ -792,6 +813,7 @@ onUnmounted(() => {
 .seat-item {
   width: 100%;
   height: 80px;
+  box-sizing: border-box;
   border: 2px solid var(--color-border);
   contain: layout style;
   border-radius: 12px;

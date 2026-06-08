@@ -12,6 +12,8 @@
 }
 
 .touch-drag-preview-card {
+  flex: none;
+  contain: layout style paint;
   box-shadow: 0 8px 24px var(--shadow-lg);
 }
 
@@ -103,7 +105,8 @@
 
   /* 拖拽目标高亮增强 */
   .drag-over {
-    border-width: 4px !important;
+    outline: 2px solid color-mix(in srgb, var(--color-info) 50%, transparent);
+    outline-offset: -2px;
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-info) 30%, transparent) !important;
   }
 }
