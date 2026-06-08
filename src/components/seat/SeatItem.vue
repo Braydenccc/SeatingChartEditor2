@@ -82,7 +82,8 @@ const {
   addSeatToSelection,
   toggleSeatInSelection,
   selectSingleSeat,
-  clearSelection
+  clearSelection,
+  consumeContextSelectionSuppression
 } = useSelection()
 const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
 const { settings } = useGlobalSettings()
@@ -309,6 +310,7 @@ const handleClick = () => {
 }
 
 const handleContextMenuAction = () => {
+  if (consumeContextSelectionSuppression()) return
   if (lastPointerWasTouch.value || isMobile.value || isGuardSeat.value) return
   selectSingleSeat(props.seat.id)
   setRightRailTab('selection')

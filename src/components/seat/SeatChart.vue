@@ -242,6 +242,7 @@ const {
   startSelection,
   updateSelection,
   endSelection,
+  suppressContextSelectionOnce,
   isSelectionMode,
   toggleSelectionMode
 } = useSelection()
@@ -437,6 +438,7 @@ const handleMouseMove = (e) => {
     const dy = e.clientY - rightStartY
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
       mouseMoved = true
+      suppressContextSelectionOnce(5000)
     }
     const seatEl = findSeatElement(e.target)
     if (seatEl && seatEl.dataset.seatId && !isGuardSeatId(seatEl.dataset.seatId)) {
@@ -477,8 +479,13 @@ const handleMouseUp = (e) => {
   if (rightMouseDown) {
     if (!mouseMoved && rightStartSeatId && !isGuardSeatId(rightStartSeatId)) {
       addSeatToSelection(rightStartSeatId)
+    } else if (mouseMoved) {
+      suppressContextSelectionOnce()
     }
     endSelection()
+    if (selectedCount.value > 0) {
+      setRightRailTab('selection')
+    }
     rightMouseDown = false
     rightStartSeatId = null
     return

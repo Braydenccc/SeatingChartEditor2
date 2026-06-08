@@ -5,6 +5,14 @@ const isSelecting = ref(false)
 const isDraggingSelection = ref(false)
 const isSelectionMode = ref(false)
 const visitedSeatIds = new Set()
+const suppressingContextSelection = ref(false)
+let contextSelectionSuppressTimer = null
+
+const clearContextSelectionSuppressTimer = () => {
+  if (!contextSelectionSuppressTimer) return
+  clearTimeout(contextSelectionSuppressTimer)
+  contextSelectionSuppressTimer = null
+}
 
 export function useSelection() {
   const addSeatToSelection = (seatId) => {
@@ -77,6 +85,22 @@ export function useSelection() {
     visitedSeatIds.clear()
   }
 
+  const suppressContextSelectionOnce = (timeout = 600) => {
+    suppressingContextSelection.value = true
+    clearContextSelectionSuppressTimer()
+    contextSelectionSuppressTimer = setTimeout(() => {
+      suppressingContextSelection.value = false
+      contextSelectionSuppressTimer = null
+    }, timeout)
+  }
+
+  const consumeContextSelectionSuppression = () => {
+    if (!suppressingContextSelection.value) return false
+    suppressingContextSelection.value = false
+    clearContextSelectionSuppressTimer()
+    return true
+  }
+
   const startDraggingSelection = () => {
     isDraggingSelection.value = true
   }
@@ -103,6 +127,8 @@ export function useSelection() {
     startSelection,
     updateSelection,
     endSelection,
+    suppressContextSelectionOnce,
+    consumeContextSelectionSuppression,
     startDraggingSelection,
     endDraggingSelection
   }

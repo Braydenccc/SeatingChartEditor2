@@ -3,8 +3,9 @@ import { useSelection } from '../useSelection'
 
 describe('useSelection', () => {
   beforeEach(() => {
-    const { clearSelection } = useSelection()
+    const { clearSelection, consumeContextSelectionSuppression } = useSelection()
     clearSelection()
+    consumeContextSelectionSuppression()
   })
 
   describe('addSeatToSelection', () => {
@@ -251,6 +252,17 @@ describe('useSelection', () => {
       endSelection()
 
       expect(isSelecting.value).toBe(false)
+    })
+  })
+
+  describe('context menu selection suppression', () => {
+    it('should suppress the next context menu selection once', () => {
+      const { suppressContextSelectionOnce, consumeContextSelectionSuppression } = useSelection()
+
+      suppressContextSelectionOnce()
+
+      expect(consumeContextSelectionSuppression()).toBe(true)
+      expect(consumeContextSelectionSuppression()).toBe(false)
     })
   })
 
