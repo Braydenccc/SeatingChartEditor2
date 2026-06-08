@@ -208,7 +208,7 @@ const scrollToSection = (sectionId: string) => {
 
   scroller.scrollTo({
     top: scroller.scrollTop + targetRect.top - scrollerRect.top - 12,
-    behavior: 'smooth'
+    behavior: 'auto'
   })
 }
 </script>
