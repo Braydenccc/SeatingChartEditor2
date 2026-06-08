@@ -2,8 +2,9 @@ name: Build and Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,39 +23,53 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
 
-      - name: Set build time
+      - name: Set build metadata
         shell: pwsh
         run: |
-          $buildTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          $now = (Get-Date).ToUniversalTime()
+          $buildTime = $now.ToString("yyyy-MM-ddTHH:mm:ssZ")
+          $releaseVersion = "v$($now.ToString('yyyyMMdd-HHmmss'))"
           "VITE_APP_BUILD_TIME=$buildTime" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "VITE_APP_RELEASE_VERSION=$releaseVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RELEASE_VERSION=$releaseVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Build Desktop (Tauri)
-        run: npm run build:desktop
+        run: npm run build:desktop:win
 
-      - name: Rename Artifacts
+      - name: Stage Release Artifacts
         shell: pwsh
         run: |
-          $TAG = $env:GITHUB_REF_NAME
-          # Ensure target dir exists for release upload staging.
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $SOURCE = "src-tauri/target/release/app.exe"
-          if (-not (Test-Path $SOURCE)) {
-            throw "Tauri desktop executable not found: $SOURCE"
+          $releaseDir = "dist/release"
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+
+          $nsis = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.exe" -File | Select-Object -First 1
+          if ($null -eq $nsis) {
+            throw "Tauri NSIS installer not found."
           }
-          # 重命名 Tauri 桌面产物
-          Move-Item $SOURCE "dist/BraydenSCE-Desktop-$TAG.exe"
+
+          $msi = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.msi" -File | Select-Object -First 1
+          if ($null -eq $msi) {
+            throw "Tauri MSI installer not found."
+          }
+
+          Copy-Item -LiteralPath $nsis.FullName -Destination "$releaseDir/BraydenSCE-$env:RELEASE_VERSION-setup.exe"
+          Copy-Item -LiteralPath $msi.FullName -Destination "$releaseDir/BraydenSCE-$env:RELEASE_VERSION.msi"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_VERSION }}
+          name: ${{ env.RELEASE_VERSION }}
+          target_commitish: ${{ github.sha }}
           files: |
-            dist/BraydenSCE-Desktop-*.exe
+            dist/release/BraydenSCE-*.exe
+            dist/release/BraydenSCE-*.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

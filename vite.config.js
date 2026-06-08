@@ -8,12 +8,19 @@ import viteCompression from 'vite-plugin-compression'
 import { authMockPlugin } from './vite.mock.plugin.js'
 
 const buildTime = process.env.VITE_APP_BUILD_TIME || new Date().toISOString()
+const buildDate = new Date(buildTime)
+const releaseVersion = process.env.VITE_APP_RELEASE_VERSION || (
+  Number.isNaN(buildDate.getTime())
+    ? 'vunknown'
+    : `v${buildDate.getUTCFullYear()}${String(buildDate.getUTCMonth() + 1).padStart(2, '0')}${String(buildDate.getUTCDate()).padStart(2, '0')}-${String(buildDate.getUTCHours()).padStart(2, '0')}${String(buildDate.getUTCMinutes()).padStart(2, '0')}${String(buildDate.getUTCSeconds()).padStart(2, '0')}`
+)
 
 // https://vite.dev/config/
 export default defineConfig({
   base: './', // Allow relative paths for electron/tauri builds
   define: {
-    __APP_BUILD_TIME__: JSON.stringify(buildTime)
+    __APP_BUILD_TIME__: JSON.stringify(buildTime),
+    __APP_RELEASE_VERSION__: JSON.stringify(releaseVersion)
   },
   plugins: [
     vue(),

@@ -1,4 +1,5 @@
 declare const __APP_BUILD_TIME__: string
+declare const __APP_RELEASE_VERSION__: string
 
 const formatBuildTime = (value: string) => {
   const date = new Date(value)
@@ -20,5 +21,6 @@ const formatBuildTime = (value: string) => {
 
 export const appBuildInfo = {
   buildTime: __APP_BUILD_TIME__,
-  buildTimeText: formatBuildTime(__APP_BUILD_TIME__)
+  buildTimeText: formatBuildTime(__APP_BUILD_TIME__),
+  releaseVersion: __APP_RELEASE_VERSION__
 } as const

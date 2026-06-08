@@ -13,6 +13,10 @@
           <span class="info-value">{{ runtimeLabel }}</span>
         </div>
         <div class="info-item">
+          <span class="info-label">发布版本</span>
+          <span class="info-value">{{ appBuildInfo.releaseVersion }}</span>
+        </div>
+        <div class="info-item">
           <span class="info-label">当前登录方式</span>
           <span class="info-value">{{ loginMethodLabel }}</span>
         </div>
