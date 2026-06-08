@@ -7,255 +7,205 @@
 [![Vite](https://img.shields.io/badge/Vite-7.x-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
 [![在线体验](https://img.shields.io/badge/%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-sce.jbyc.cc-23587b)](https://sce.jbyc.cc/)
 
-> 一个跨平台、现代化的座位表可视化编辑器。  
-> 支持在浏览器直接使用，也可下载 Windows 纯净桌面版（主要使用 Tauri）。
+BraydenSCE V2 是一个面向教师日常排座的可视化座位表编辑器。它支持浏览器直接使用，也支持通过 Tauri 打包为 Windows 桌面版。
 
-**在线体验：** <https://sce.jbyc.cc/> 
+- 在线体验：<https://sce.jbyc.cc/>
+- 发布者：Braydenccc / Jbyccc
+- 开源协议：GPL-3.0-or-later
 
-**发布者：** Braydenccc / Jbyccc
-
----
-
-## 核心功能特性
+## 核心功能
 
 | 功能 | 说明 |
-|------|------|
-| **可视化座位表编辑** | 支持多分组布局，每组可独立配置行列数，灵活适配各类教室 |
-| **强大的智能排位功能** | 基于规则引擎的自动分配算法，支持吸引/排斥关系、位置偏好等复杂规则 |
-| **智能自动换位** | 支持周期性轮换座位，可按分区或全局轮换，确保公平性 |
-| **快捷标签与分区管理** | 内置彩色标签系统，圈选座位区域，限定指定标签学生只能排入划定区域 |
-| **极速名单录入** | 一键从内置 Excel 模板导入学生数据及批量打标签，支持全量导出 |
-| **可打印图片与精美 Excel 导出** | 专为学校打印优化：支持导出海报级高清 PNG，或高度还原排版与格式的高清 Excel 文件 |
-| **跨端云同步与 WebDAV 备份** | 免费内置跨设备云端存储，支持自定义 WebDAV（如坚果云、Alist等） |
-| **撤销/重做** | 支持操作历史记录（Ctrl+Z / Ctrl+Y），方便回退和恢复 |
-| **缩放与拖拽** | 支持座位图缩放、学生拖拽分配、多选操作等交互功能 |
-| **本地工作区** | 支持多工作区管理，数据本地存储，无需联网即可使用 |
+| --- | --- |
+| 可视化座位表编辑 | 支持多分组座位布局，每个分组可独立配置行数、列数、组间距和讲台方向。 |
+| 学生名单与属性 | 支持学生 CRUD、学号排序、标签、数值属性和 Excel 名单导入导出。 |
+| 标签与选区 | 可给学生打标签，也可圈选座位选区，用于规则限制、区域轮换和批量操作。 |
+| 手动排座 | 支持点击分配、拖拽分配、交换、清空、空置座位、多选和撤销重做。 |
+| 智能排位 | 基于规则引擎自动搜索座位方案，支持个人、标签、全体学生和数值属性规则。 |
+| 自动轮换 | 支持区域轮换和平移轮换，适合按周或按阶段调整座位。 |
+| 图片与 Excel 导出 | 可导出适合打印的高清 PNG，也可导出带格式的 Excel 座位表。 |
+| 工作区管理 | 支持本地工作区文件、SCE 云端工作区和 WebDAV 备份。 |
+| 多端适配 | Web 端和 Tauri 桌面端共用核心前端逻辑，平台能力通过适配层隔离。 |
 
-## Todo
+## 使用入口
 
-### 功能增强
+当前应用使用 `vue-router` hash 路由，主要页面如下：
 
-- [ ] 基于数值的排位规则（如：身高、成绩、视力等）
-- [ ] 增加更多导出格式（如：PDF、Word等）
-- [ ] 自动发布预览版本
-- [ ] 移动端编辑体验优化
-- [ ] 继续优化加载及资源占用
-- [ ] 引入更多排位规则类型
+| 路由 | 页面 | 用途 |
+| --- | --- | --- |
+| `#/editor` | 编辑 | 座位图、候选学生、规则排位、选区和轮换操作的核心工作台。 |
+| `#/files` | 文件 | 新建、保存、打开工作区，管理云端工作区，导入导出学生名单。 |
+| `#/students` | 名单与属性 | 维护学生、标签和数值属性。 |
+| `#/user` | 账号中心 | 登录 SCE 账号、查看云端状态、修改账号密码。 |
+| `#/export` | 导出 | 导出图片或 Excel 座位表。 |
+| `#/settings` | 设置 | 管理全局设置、工作区设置、云端同步、轮换、导出配置和帮助。 |
 
-### 已完成
+应用内完整用户手册位于「设置 - 关于 - 帮助」。桌面宽度的编辑页顶栏右上角也提供帮助入口。
 
-- [x] 移动端标签功能优化
-- [x] 界面重构，优化布局拥挤问题
-- [x] 规则引擎优化，支持更复杂的标签对比
+## 快速开始
 
----
-
-## 使用指南
-
-**在线体验** <https://sce.jbyc.cc>
-
-### 安全提示
-
-**WebDAV 密码存储：** 当使用 WebDAV 连接时，如果勾选"记住密码"选项，密码将使用 AES-GCM 加密后存储在浏览器 Cookie 中。请注意：
-
-- ⚠️ 此功能无法防止 XSS 攻击获取加密密钥
-- ⚠️ 未登录 SCE 账号时使用通用密钥加密，安全性较低
-- ✅ 已登录 SCE 账号时使用用户 Token 派生密钥，安全性较高
-- 💡 建议：使用 SCE 账号登录以获得更好的安全保护，或使用 WebDAV 应用专用密码
-
-### 1. 基础配置
-
-1. **录入学生** — 在侧边栏"学生管理"面板中，通过"导入/导出"按钮下载 Excel 模板。填入学号、姓名及标签后，一键导入。
-2. **设定标签与分区** — 为特殊学生（如需要前排）添加身份标签。在"分区管理"面板圈选座位区域，并限制这些座位仅允许包含指定标签的学生坐入。
-3. **设置座位布局** — 在"座位配置"面板中调节分组数量、每组的行列数以及组间间距。
-
-### 2. 智能化座位分配
-
-1. 切换到"规则管理"面板。
-2. 创建排位规则，可设置吸引关系、排斥关系、位置偏好等多种规则类型。
-3. 点击"一键分配"，算法将基于所有规则进行智能分配，输出最优解。
-
-### 3. 自动换位功能
-
-1. 在"轮换管理"面板配置轮换规则。
-2. 支持按指定间隔和规则进行座位轮换，可选择全局轮换或分区轮换。
-3. 系统会自动记录轮换历史，确保公平性。
-
-### 4. 微调与修饰
-
-你随时可以在顶部工具栏启用以下模式：
-
-- **常规模式** — 选中学生后点击座位进行分配。
-- **交换模式** — 快速互换两个座位上的学生。
-- **清空模式** — 将指定座位上的学生移除。
-- **空置编辑** — 标记座位为不可用（如讲台、过道）。
-- **选区编辑** — 圈选座位区域进行批量操作。
-
-完成后点击"导出"，可选择导出高清图片或 Excel 文件。
-
----
-
-## 技术栈
-
-- **前端框架**：Vue 3 (Composition API)
-- **构建工具**：Vite 7.x
-- **图标库**：lucide-vue-next
-- **Excel处理**：xlsx-js-style
-- **工具函数**：@vueuse/core
-- **桌面端**：Tauri 2.x (主) / Electron (备选)
-- **状态管理**：Composition API 单例模式（不使用 Pinia/Vuex）
-- **认证加密**：bcryptjs
-
----
-
-## 私有化部署说明
-
-### 开发环境
+推荐使用 Node.js 20 或更高版本。
 
 ```bash
 npm install
 npm run dev
 ```
 
-若在新环境遇到依赖问题，先执行：
+开发服务器默认运行在 `http://localhost:5173`。`npm run dev` 会以 `0.0.0.0` host 启动，方便局域网设备访问。
+
+如果需要重新安装依赖，推荐使用：
 
 ```bash
-rm -rf node_modules
 npm ci
 ```
 
-开发服务器默认运行在 `http://localhost:5173`。
-
-### Node.js 版本要求
-
-需要 Node.js >= 20.0.0
-
-### 云端部署
-
-项目支持多种部署方式：
-
-```bash
-# 仅构建 Web 版本（推荐用于静态托管）
-npm run build:web
-
-# 构建测试环境版本
-npm run build:test
-
-# 部署到测试环境
-npm run deploy:test
-
-# 合并到主分支并推送
-npm run deploy:main
-```
-
-构建产物在 `dist/` 目录，可部署到任何静态托管服务（推荐 Retinbox Web Hosting）。
-
-### Windows 桌面版编译
-
-推荐使用 Tauri 构建桌面版：
-
-```bash
-# 构建 Tauri 桌面版
-npm run build:desktop
-# 或使用别名
-npm run build:lite
-```
-
-如需完整打包（包括 NSIS 安装包）：
-
-```bash
-# 完整构建：Vite + pkg + NSIS 安装包
-npm run build
-
-# 仅构建可执行文件
-npm run build:exe
-
-# 使用 Electron 构建（备选方案）
-npm run build:full
-```
-
-### 可用构建命令
+## 常用命令
 
 | 命令 | 说明 |
-|------|------|
-| `npm run dev` | 启动开发服务器（localhost:5173） |
-| `npm run build:web` | 仅构建 Web 版本，产物在 dist/ |
-| `npm run build:desktop` | 构建 Tauri 桌面版 |
-| `npm run build:lite` | 等价于 build:desktop |
-| `npm run build` | 完整构建：Vite + pkg + NSIS 安装包 |
-| `npm run build:test` | 构建测试环境版本 |
-| `npm run preview` | 预览构建结果 |
-| `npm run deploy:test` | 部署到测试环境 |
-| `npm run deploy:main` | 合并到 main 并推送 |
+| --- | --- |
+| `npm run dev` | 启动 Vite 开发服务器。 |
+| `npm run build` | 等同于 `npm run build:web`。 |
+| `npm run build:web` | 执行 TypeScript 类型检查并构建 Web 版本，产物在 `dist/`。 |
+| `npm run build:desktop` | 构建 Tauri 桌面版。 |
+| `npm run build:desktop:win` | 构建 Tauri Windows NSIS/MSI 安装包。 |
+| `npm run build:test` | 构建测试环境版本，会临时 patch 指定文件并自动还原。 |
+| `npm run preview` | 预览 Web 构建产物。 |
+| `npm run type-check` | 执行 `vue-tsc --noEmit`。 |
+| `npm run test:run` | 单次运行 Vitest 测试。 |
+| `npm run test:coverage` | 生成测试覆盖率报告。 |
+| `npm run docs:sync` | 从统一真源同步各 agent 入口文档。 |
+| `npm run docs:check` | 检查 agent 文档漂移和命令有效性。 |
 
----
+项目没有统一 linter/formatter；测试框架使用 Vitest + happy-dom。
 
-## 项目架构
+## 构建与部署
 
-### 核心 Composable
+Web 版本构建：
 
-**数据管理：**
+```bash
+npm run build:web
+```
 
-- `useStudentData` - 学生数据 CRUD、排序、选择
-- `useSeatChart` - 座位网格、配置、分配逻辑
-- `useTagData` - 标签系统
-- `useZoneData` - 分区管理
+构建产物位于 `dist/`，可部署到静态托管服务。当前生产环境推荐 Retinbox Web Hosting；涉及 Retinbox 后端或云函数时，请参考 `.agents/retiehe_web_host/` 和 `.agents/rules/` 中的 Retinbox 文档。
 
-**编辑与交互：**
+Tauri 桌面版构建：
 
-- `useEditMode` - 编辑模式状态机
-- `useDragState` / `useStudentDragging` - 拖拽分配
-- `useDragPreview` - 拖拽预览效果
-- `useSelection` - 多选操作
-- `useUndo` - 撤销/重做（Ctrl+Z / Ctrl+Y）
-- `useZoom` - 座位图缩放
-- `useSidebar` - 侧边栏 Tab 状态
+```bash
+npm run build:desktop
+```
 
-**规则与分配：**
+Windows 安装包构建：
 
-- `useSeatRules` - 规则引擎（吸引/排斥/位置偏好）
-- `useAssignment` - 智能自动分配算法
-- `useZoneRotation` - 周期性座位轮换
+```bash
+npm run build:desktop:win
+```
 
-**持久化与同步：**
+## 安全与同步
 
-- `useWorkspace` - 本地工作区
-- `useCloudWorkspace` / `useCloudWorkspaceDialog` - 云端工作区
-- `useWebDav` - WebDAV 同步
-- `useAuth` - 认证
+- 本地工作区适合离线使用，数据由浏览器存储或桌面端文件能力保存。
+- SCE 云端工作区适合跨设备继续编辑，重要数据仍建议定期导出本地备份。
+- WebDAV 支持自定义服务，例如坚果云或 Alist。记住密码时会加密存储，但浏览器环境无法抵御所有 XSS 风险。
+- 已登录 SCE 账号时，WebDAV 加密密钥会结合用户 Token 派生；未登录时安全性较低，建议使用 WebDAV 应用专用密码。
 
-**导出：**
+## 技术栈
 
-- `useImageExport` - 导出高清 PNG
-- `useExcelData` - Excel 导入导出
-- `useExportSettings` - 导出配置
+- Vue 3 Composition API
+- Vue Router 4 hash 路由
+- Vite 7
+- Tauri 2
+- TypeScript / JavaScript 混合代码库
+- lucide-vue-next
+- xlsx-js-style
+- @vueuse/core
+- Vitest + happy-dom
 
-**工具：**
+## 项目结构
 
-- `useLogger` - 日志与提示
-- `useConfirmAction` - 确认对话框
-- `useMarkdown` - Markdown 渲染
+```text
+src/main.js
+└── src/App.vue
+    ├── RouterView
+    ├── GlobalDropZone
+    ├── LoginDialog
+    └── CloudWorkspaceDialog
 
-### 编辑模式
+src/router/index.ts
+├── /editor   -> src/views/EditorView.vue
+├── /files    -> src/views/FilesView.vue
+├── /user     -> src/views/UserView.vue
+├── /students -> src/views/StudentsView.vue
+├── /export   -> src/views/ExportView.vue
+└── /settings -> src/views/SettingsView.vue
 
-1. **NORMAL** - 常规分配模式
-2. **SWAP** - 交换模式
-3. **CLEAR** - 清除模式
-4. **EMPTY_EDIT** - 空置编辑
-5. **ZONE_EDIT** - 选区编辑
+EditorView.vue
+└── AppHeader + EditorWorkbench
+    ├── SeatChart
+    ├── StudentPoolPanel
+    ├── ContextInspector
+    ├── ActivityPanel
+    ├── EditorToolDock
+    └── WorkbenchDialogs
+```
 
----
+核心逻辑集中在 `src/composables/`。项目使用组合式 API 共享状态单例模式，不使用 Pinia 或 Vuex。
+
+## 核心 Composable
+
+| 模块 | 说明 |
+| --- | --- |
+| `useSeatChart` | 座位网格、配置、分配逻辑。 |
+| `useStudentData` | 学生列表 CRUD、排序、选择。 |
+| `useTagData` | 学生标签系统。 |
+| `useZoneData` | 座位选区管理。 |
+| `useEditMode` | 编辑模式状态机。 |
+| `useEditorWorkbench` | 编辑工作台右栏、移动抽屉、区域编辑会话状态。 |
+| `useDragState` / `useStudentDragging` | 拖拽分配。 |
+| `useSelection` | 多选操作。 |
+| `useUndo` | 撤销与重做。 |
+| `useZoom` | 座位图缩放。 |
+| `useSeatRules` | 规则引擎。 |
+| `useAssignment` | 智能自动分配算法。 |
+| `useZoneRotation` | 周期性座位轮换。 |
+| `useWorkspace` | 本地工作区。 |
+| `useCloudWorkspace` / `useCloudWorkspaceDialog` | 云端工作区。 |
+| `useWebDav` | WebDAV 同步。 |
+| `useAuth` | 认证。 |
+| `useImageExport` | 导出高清 PNG。 |
+| `useExcelData` | Excel 导入导出。 |
+| `useExportSettings` | 导出配置。 |
+
+## 数据模型
+
+座位以扁平数组 `seats` 存储，通过 `organizedSeats` 计算属性组织成三级结构用于渲染：
+
+```text
+分组 groupIndex -> 列 columnIndex -> 行 rowIndex
+```
+
+每个分组可独立配置列数和行数。`seatMap` 提供按座位 id 查询的快速索引。
+
+## 编辑模式
+
+| 模式 | 说明 |
+| --- | --- |
+| `NORMAL` | 选中学生后点击座位进行分配。 |
+| `SWAP` | 依次点击两个座位交换学生。 |
+| `CLEAR` | 点击座位移除学生。 |
+| `EMPTY_EDIT` | 标记座位为不可用。 |
+| `ZONE_EDIT` | 圈选座位区域。 |
 
 ## 开发规范
 
-详细开发规范请参考项目文档：
+- 组件使用 PascalCase。
+- Composable 使用 camelCase，并以 `use` 开头。
+- 常量使用 camelCase。
+- 图标统一使用 `lucide-vue-next`。
+- CSS 颜色应使用 `src/assets/main.css` 中的 `var(--color-*)` 变量。
+- 新文件优先使用 `.ts`，类型定义放在 `src/types/`。
+- 不要直接修改 `dist/`。
+- 涉及用户可见功能、入口、工作流、限制条件或排查步骤的变更，需要同步更新 `src/constants/userManual.ts`。
 
-- 命名规范：组件使用 PascalCase，Composable 使用 camelCase + use 前缀
-- 状态管理：使用 Composition API 单例模式，不使用 Pinia
-- 图标使用：统一使用 lucide-vue-next
-- 严禁使用 Emoji
-
----
+更多协作规则见 `AGENTS.md`；复杂模块说明见 `.agents/features/`。
 
 ## 赞助与支持
 

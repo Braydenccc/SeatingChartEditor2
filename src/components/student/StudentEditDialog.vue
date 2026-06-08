@@ -61,10 +61,11 @@
                   v-for="tagId in localTags"
                   :key="tagId"
                   class="tag-item"
-                  :style="{ backgroundColor: getTagColor(tagId) }"
+                  :style="{ '--tag-color': getTagColor(tagId) }"
+                  :title="getTagName(tagId)"
                   @click="removeTag(tagId)"
                 >
-                  {{ getTagName(tagId) }}
+                  <span class="tag-name">{{ getTagName(tagId) }}</span>
                   <X :size="12" />
                 </span>
               </div>
@@ -73,10 +74,11 @@
                   v-for="tag in availableTags"
                   :key="tag.id"
                   class="tag-option"
-                  :style="{ borderColor: tag.color, color: tag.color }"
+                  :style="{ '--tag-color': tag.color }"
+                  :title="tag.name"
                   @click="addTag(tag.id)"
                 >
-                  {{ tag.name }}
+                  <span class="tag-name">{{ tag.name }}</span>
                 </span>
                 <span v-if="availableTags.length === 0" class="no-tags">暂无可用标签</span>
               </div>
@@ -162,7 +164,7 @@ const getTagName = (tagId) => {
 
 const getTagColor = (tagId) => {
   const tag = tags.value.find(t => t.id === tagId)
-  return tag ? tag.color : '#999999'
+  return tag ? tag.color : 'var(--color-text-disabled)'
 }
 
 const addTag = (tagId) => {
@@ -209,24 +211,22 @@ const close = () => {
 <style scoped>
 .student-edit-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: var(--color-bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
   z-index: 9999;
 }
 
 .student-edit-dialog {
   background: var(--color-surface);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  width: 90%;
-  max-width: 480px;
-  max-height: 90vh;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--color-text-primary) 18%, transparent);
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(90dvh, 760px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -236,8 +236,10 @@ const close = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  gap: 16px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--color-border);
+  flex: 0 0 auto;
 }
 
 .dialog-header h3 {
@@ -250,29 +252,40 @@ const close = () => {
 .close-btn {
   background: transparent;
   border: none;
-  padding: 4px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   cursor: pointer;
   color: var(--color-text-muted);
-  border-radius: 6px;
-  transition: all 0.2s;
+  border-radius: 8px;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
 }
 
-.close-btn:hover {
+.close-btn:hover,
+.close-btn:focus-visible {
   background: var(--color-bg-subtle);
   color: var(--color-text-primary);
 }
 
+.close-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
+}
+
 .dialog-body {
-  padding: 24px;
+  padding: 22px 24px;
   overflow-y: auto;
+  overflow-x: hidden;
   flex: 1;
+  min-height: 0;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .form-group:last-child {
@@ -281,20 +294,24 @@ const close = () => {
 
 .form-label {
   display: block;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text-primary);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .form-input {
+  box-sizing: border-box;
   width: 100%;
-  padding: 10px 12px;
+  height: 44px;
+  padding: 0 12px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   font-size: 14px;
+  line-height: 1.4;
   color: var(--color-text-primary);
-  transition: border-color 0.2s;
+  background: var(--color-input-bg);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-input:focus {
@@ -310,72 +327,102 @@ const close = () => {
 .tags-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .numeric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .numeric-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .numeric-field span {
   font-size: 12px;
   color: var(--color-text-secondary);
+  line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .selected-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .tag-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 6px;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--tag-color) 42%, transparent);
+  border-radius: 999px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--color-surface);
+  line-height: 1;
+  color: var(--tag-color);
+  background: color-mix(in srgb, var(--tag-color) 14%, var(--color-surface));
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
 }
 
 .tag-item:hover {
-  opacity: 0.8;
-  transform: scale(0.95);
+  background: color-mix(in srgb, var(--tag-color) 20%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--tag-color) 60%, transparent);
+  transform: translateY(-1px);
 }
 
 .available-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .tag-option {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border: 1.5px solid;
-  border-radius: 6px;
+  justify-content: center;
+  min-width: 0;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--tag-color) 72%, var(--color-border));
+  border-radius: 999px;
   font-size: 13px;
   font-weight: 500;
+  line-height: 1;
   background: var(--color-surface);
+  color: var(--tag-color);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
 }
 
 .tag-option:hover {
-  background: currentColor;
-  color: var(--color-surface) !important;
+  background: color-mix(in srgb, var(--tag-color) 12%, var(--color-surface));
+  border-color: var(--tag-color);
+  transform: translateY(-1px);
+}
+
+.tag-name {
+  min-width: 0;
+  max-width: min(180px, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .no-tags {
@@ -389,19 +436,22 @@ const close = () => {
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 14px 24px;
   border-top: 1px solid var(--color-border);
   background: var(--color-bg-subtle);
+  flex: 0 0 auto;
 }
 
 .btn {
-  padding: 8px 16px;
-  border: none;
+  min-width: 92px;
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid transparent;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
 .btn-secondary {
@@ -422,6 +472,11 @@ const close = () => {
 
 .btn-primary:hover {
   background: var(--color-primary-hover);
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
 }
 
 .dialog-fade-enter-active,
@@ -446,8 +501,8 @@ const close = () => {
 
 @media (max-width: 768px) {
   .student-edit-dialog {
-    width: 95%;
-    max-width: none;
+    width: min(560px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
   }
 
   .dialog-header {
@@ -460,6 +515,25 @@ const close = () => {
 
   .dialog-footer {
     padding: 12px 20px;
+  }
+}
+
+@media (max-width: 520px) {
+  .numeric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-footer {
+    gap: 10px;
+  }
+
+  .btn {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .tag-name {
+    max-width: min(220px, 100%);
   }
 }
 </style>

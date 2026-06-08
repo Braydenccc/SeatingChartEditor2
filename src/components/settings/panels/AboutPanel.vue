@@ -21,7 +21,7 @@
           <span class="info-value">{{ loginMethodLabel }}</span>
         </div>
         <div class="info-item">
-          <span class="info-label">版本发布时间</span>
+          <span class="info-label">版本发布时间 ({{ appBuildInfo.buildTimeZoneText }})</span>
           <span class="info-value">{{ appBuildInfo.buildTimeText }}</span>
         </div>
       </div>
