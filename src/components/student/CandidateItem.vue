@@ -166,6 +166,7 @@ const {
   isStudentDragging,
   lastPointerWasTouch,
   canHtmlDrag,
+  consumeSuppressedClick,
   handlePointerDown,
   handleTouchStart,
   handleDragStart,
@@ -180,6 +181,8 @@ const isCoarsePointerContextMenu = () => {
 }
 
 const handleClick = () => {
+  if (consumeSuppressedClick()) return
+
   if (isSelected.value) {
     clearSelection()
     return
@@ -256,6 +259,26 @@ const handleDoubleClick = () => {
   background: var(--color-selection-bg);
   box-shadow: var(--shadow-selection-card);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .candidate-item:hover {
+    border-color: var(--color-border);
+    background: var(--color-bg-card);
+    box-shadow: none;
+    transform: none;
+  }
+
+  .candidate-item.selected:hover {
+    border-color: var(--color-selection-border);
+    background: var(--color-selection-bg-strong);
+    box-shadow: var(--shadow-selection-ring), var(--shadow-selection-card);
+  }
+
+  .candidate-item.dragging:hover {
+    background: transparent;
+    border-color: var(--color-border);
+  }
 }
 
 .candidate-item:active {

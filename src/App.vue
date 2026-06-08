@@ -19,6 +19,7 @@ import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { useRouteLoading } from '@/composables/useRouteLoading'
 import { initializeTags } from '@/composables/useTagData'
 
 const { isLoginDialogVisible, initAuth, isLoggedIn } = useAuth()
@@ -29,6 +30,7 @@ const { undo, redo, canUndo, canRedo, setMaxHistory } = useUndo()
 const { showCloudDialog, cloudDialogMode, handleCloudSuccess } = useCloudWorkspaceDialog()
 const { settings, applyThemeColor, applyColorScheme } = useGlobalSettings()
 const { startAutoSave } = useAutoSave()
+const { isRouteLoading } = useRouteLoading()
 
 const loginDialogInitialTab = ref('login')
 const handleOpenLogin = (tab = 'login') => {
@@ -122,6 +124,8 @@ onMounted(async () => {
 <template>
   <div class="app-root">
     <RouterView @open-login="handleOpenLogin" />
+
+    <LoadingSpinner v-if="isRouteLoading" text="正在切换页面..." />
 
     <GlobalDropZone />
 

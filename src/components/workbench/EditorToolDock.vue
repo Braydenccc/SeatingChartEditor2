@@ -153,7 +153,6 @@ const router = useRouter()
 const {
   setTool,
   openDialog,
-  showMobileSheet,
   openMobileDrawer,
   closeMobileDrawer,
   zoneEditSession,
@@ -162,7 +161,7 @@ const {
   toggleSeatFullscreen
 } = useEditorWorkbench()
 const { currentMode, setMode, clearFirstSelectedSeat, EditMode } = useEditMode()
-const { isSelectionMode, selectedCount, toggleSelectionMode: toggleRawSelectionMode, clearSelection } = useSelection()
+const { isSelectionMode, selectedCount, toggleSelectionMode: toggleRawSelectionMode } = useSelection()
 const { students, selectedStudentId, clearSelection: clearStudentSelection } = useStudentData()
 const { undo, redo, canUndo, canRedo } = useUndo()
 const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom()
@@ -179,18 +178,19 @@ const selectedStudent = computed(() => (
 
 const selectionModeHint = computed(() => {
   if (selectedCount.value > 0) return `已选 ${selectedCount.value} 个座位`
-  return '按住左键涂抹多选'
+  return isMobileWorkbench.value ? '滑动涂抹多选' : '按住左键涂抹多选'
 })
 
 const selectionToolTitle = computed(() => {
   if (isSelectionMode.value) return `${selectionModeHint.value}，再次点击退出多选`
-  return '多选座位：按住左键拖过座位连续选择，Shift+右键框选'
+  return isMobileWorkbench.value
+    ? '多选座位：在座位表上滑动涂抹选择'
+    : '多选座位：按住左键拖过座位连续选择，Shift+右键框选'
 })
 
 const activateTool = (tool) => {
   finishZoneEditing()
   setTool(tool)
-  clearSelection()
   if (tool === 'normal') {
     setMode(EditMode.NORMAL)
     clearFirstSelectedSeat()
@@ -226,8 +226,9 @@ const toggleSelectionMode = () => {
   }
   toggleRawSelectionMode()
   if (isSelectionMode.value) {
-    showMobileSheet('context')
-    info('多选模式：按住左键涂抹选择座位，再从上下文面板执行操作')
+    info(isMobileWorkbench.value
+      ? '多选模式：在座位表上滑动涂抹选择座位'
+      : '多选模式：按住左键涂抹选择座位，再从上下文面板执行操作')
   } else {
     closeMobileDrawer()
   }

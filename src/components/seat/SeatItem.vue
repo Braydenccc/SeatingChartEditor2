@@ -20,7 +20,7 @@
     @dragstart="handleDragStart" @dragend="handleDragEnd" @dragover.prevent="handleDragOverSeat"
     @dragenter.prevent="handleDragEnter" @dragleave="handleDragLeave" @drop.prevent="handleDrop"
     @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd"
-    @touchcancel="handleTouchCancel" @contextmenu.prevent="handleContextMenuAction" @pointerdown="handlePointerDown">
+    @touchcancel="handleTouchCancel" @contextmenu.prevent.stop="handleContextMenuAction" @pointerdown="handlePointerDown">
     <div v-if="seat.isEmpty" class="empty-indicator">
       <span class="empty-text">空置</span>
     </div>
@@ -140,7 +140,7 @@ const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = use
 const { settings } = useGlobalSettings()
 const { panX, panY, setPan } = useZoom()
 const { enabledAttributeDefinitions, formatNumericValue, showNumericAttributesInEditor } = useStudentAttributes()
-const { setRightRailTab, showMobileSheet, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDrag, isSeatFullscreen } = useEditorWorkbench()
+const { setRightRailTab, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDrag, isSeatFullscreen } = useEditorWorkbench()
 
 const showStudentName = computed(() => settings.value.ui.showStudentName !== false)
 const showStudentNumber = computed(() => settings.value.ui.showStudentNumber !== false)
@@ -172,6 +172,9 @@ let autoPanRafId = null
 let autoPanPoint = null
 let touchStartX = 0
 let touchStartY = 0
+let activeTouchDragData = null
+let suppressNextClick = false
+let suppressClickTimer = null
 // 当前是否通过触摸交互（动态判断，解决触摸屏笔记本问题）
 // 使用 shallowRef 让 isDraggable computed 能追踪其变化
 const lastPointerWasTouch = shallowRef(false)
@@ -313,18 +316,49 @@ const shouldOpenCandidateDrawerForSeatDrag = computed(() => {
   return isMobile.value && isSeatFullscreen.value
 })
 
+const getDragSeatData = () => {
+  const isSelection = isInSelection.value && selectedSeatsArray.value.length > 1
+  return {
+    isSelection,
+    seatIds: isSelection ? selectedSeatsArray.value : [props.seat.id]
+  }
+}
+
+const suppressUpcomingClick = () => {
+  suppressNextClick = true
+  if (suppressClickTimer) {
+    clearTimeout(suppressClickTimer)
+    suppressClickTimer = null
+  }
+  suppressClickTimer = setTimeout(() => {
+    suppressNextClick = false
+    suppressClickTimer = null
+  }, 450)
+}
+
+const consumeSuppressedClick = () => {
+  if (!suppressNextClick) return false
+  suppressNextClick = false
+  if (suppressClickTimer) {
+    clearTimeout(suppressClickTimer)
+    suppressClickTimer = null
+  }
+  return true
+}
+
 // 记录指针类型，用于判断是否为触摸操作
 const handlePointerDown = (e) => {
-  lastPointerWasTouch.value = e.pointerType === 'touch'
+  lastPointerWasTouch.value = e.pointerType === 'touch' || e.pointerType === 'pen'
 }
 
 // ==================== 点击处理 ====================
 
 const handleClick = () => {
+  if (consumeSuppressedClick()) return
+
   // 手机端选择模式：点击切换选中状态
   if (isMobile.value && isSelectionMode.value && !isGuardSeat.value) {
     toggleSeatInSelection(props.seat.id)
-    showMobileSheet('context')
     return
   }
 
@@ -339,13 +373,16 @@ const handleClick = () => {
     return
   }
 
+  if (isMobile.value && currentMode.value === EditMode.NORMAL) {
+    return
+  }
+
   if (currentMode.value === EditMode.NORMAL && !isGuardSeat.value) {
     if (isInSelection.value) {
       clearSelection()
     } else {
       selectSingleSeat(props.seat.id)
       setRightRailTab('selection')
-      if (isMobile.value) showMobileSheet('context')
     }
     return
   }
@@ -377,10 +414,9 @@ const handleClick = () => {
 }
 
 const handleContextMenuAction = () => {
-  if (!isMobile.value || isGuardSeat.value) return
+  if (lastPointerWasTouch.value || isMobile.value || isGuardSeat.value) return
   selectSingleSeat(props.seat.id)
   setRightRailTab('selection')
-  showMobileSheet('context')
 }
 
 // 双击处理
@@ -413,7 +449,7 @@ const handleDragStart = (e) => {
   startDragFromSeat()
   e.dataTransfer.effectAllowed = 'move'
 
-  const isSelection = isInSelection.value && selectedSeatsArray.value.length > 1
+  const isSelection = !lastPointerWasTouch.value && isInSelection.value && selectedSeatsArray.value.length > 1
   const selectionData = isSelection ? selectedSeatsArray.value : [props.seat.id]
 
   if (isSelection) {
@@ -489,19 +525,23 @@ const handleDrop = () => {
 watch(dragCleanupVersion, () => {
   isDragging.value = false
   isDragOver.value = false
+  endDraggingSelection()
   dragEnterCount = 0
 })
 
 // ==================== 触摸拖拽模拟 ====================
 
 const handleTouchStart = (e) => {
-  if (e.touches.length !== 1 || !canTouchDrag.value) return
+  lastPointerWasTouch.value = true
+  if (e.touches.length !== 1) return
 
   const touch = e.touches[0]
   const startX = touch.clientX
   const startY = touch.clientY
   touchStartX = startX
   touchStartY = startY
+
+  if (!canTouchDrag.value) return
 
   touchDragTimer = setTimeout(() => {
     touchDragActive = true
@@ -510,10 +550,10 @@ const handleTouchStart = (e) => {
     startTouchDragFromSeat()
     if (navigator.vibrate) navigator.vibrate(50)
 
-    const isSelection = isInSelection.value && selectedSeatsArray.value.length > 1
-    const selectionData = isSelection ? selectedSeatsArray.value : [props.seat.id]
+    activeTouchDragData = getDragSeatData()
+    const selectionData = activeTouchDragData.seatIds
 
-    if (isSelection) {
+    if (activeTouchDragData.isSelection) {
       startDraggingSelection()
     }
 
@@ -540,7 +580,6 @@ const handleTouchMove = (e) => {
 
     touchSelectionVisited.add(props.seat.id)
     toggleSeatInSelection(props.seat.id)
-    showMobileSheet('context')
   }
 
   if (touchSelectionActive) {
@@ -639,12 +678,14 @@ const cleanupTouchDrag = () => {
   document.body?.classList.remove('seat-dragging-from-chart')
   isDragging.value = false
   if (touchDragActive) {
+    suppressUpcomingClick()
     endTouchDragFromSeat()  // 重置全局触摸拖拽状态
     restoreMobileDrawerOpenedForDrag()
     endDraggingSelection()
     endDragPreview()
   }
   touchDragActive = false
+  activeTouchDragData = null
   touchSelectionActive = false
   touchSelectionMode = null
   touchSelectionVisited.clear()
@@ -661,6 +702,7 @@ const handleTouchEnd = (e) => {
     touchSelectionActive = false
     touchSelectionMode = null
     touchSelectionVisited.clear()
+    suppressUpcomingClick()
     if (touchDragTimer) {
       clearTimeout(touchDragTimer)
       touchDragTimer = null
@@ -678,6 +720,8 @@ const handleTouchEnd = (e) => {
 
   const wasActive = touchDragActive
   if (!wasActive) return
+  const dragData = activeTouchDragData || getDragSeatData()
+  suppressUpcomingClick()
 
   // 获取 drop 目标
   const touch = e.changedTouches[0]
@@ -691,6 +735,7 @@ const handleTouchEnd = (e) => {
   endDraggingSelection()
   endDragPreview()
   touchDragActive = false
+  activeTouchDragData = null
 
   if (!targetEl) return
   const seatEl = findParentSeat(targetEl)
@@ -700,14 +745,13 @@ const handleTouchEnd = (e) => {
     const studentListEl = findParentByClass(targetEl, 'student-items')
     const dropTargetEl = dropOutEl || studentListEl
     if (dropTargetEl && props.seat.studentId != null) {
-      const isSelection = isInSelection.value && selectedSeatsArray.value.length > 1
       const event = new CustomEvent('touch-seat-to-list', {
         bubbles: true,
         detail: {
           seatId: props.seat.id,
           studentId: props.seat.studentId,
-          isSelection: isSelection,
-          selectedSeatIds: isSelection ? selectedSeatsArray.value : [props.seat.id]
+          isSelection: dragData.isSelection,
+          selectedSeatIds: dragData.seatIds
         }
       })
       dropTargetEl.dispatchEvent(event)
@@ -717,9 +761,6 @@ const handleTouchEnd = (e) => {
 
   const targetSeatId = seatEl.dataset.seatId
 
-  // 检查是否是选区拖拽
-  const isSelection = isInSelection.value && selectedSeatsArray.value.length > 1
-
   // 触摸拖拽总是执行交换/分配
   // 通过自定义事件通知 SeatChart
   const event = new CustomEvent('touch-seat-drop', {
@@ -728,8 +769,8 @@ const handleTouchEnd = (e) => {
       sourceSeatId: props.seat.id,
       targetSeatId: targetSeatId,
       studentId: props.seat.studentId,
-      isSelection: isSelection,
-      selectedSeatIds: isSelection ? selectedSeatsArray.value : [props.seat.id]
+      isSelection: dragData.isSelection,
+      selectedSeatIds: dragData.seatIds
     }
   })
   seatEl.dispatchEvent(event)
@@ -806,6 +847,10 @@ onUnmounted(() => {
     cancelAnimationFrame(touchMoveRafId)
     touchMoveRafId = null
   }
+  if (suppressClickTimer) {
+    clearTimeout(suppressClickTimer)
+    suppressClickTimer = null
+  }
 })
 </script>
 
@@ -848,6 +893,36 @@ onUnmounted(() => {
   border-color: var(--color-selection-border);
   box-shadow: var(--shadow-selection-ring), var(--shadow-selection-card);
   transform: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .seat-item:not(.dragging):hover,
+  .seat-item.clickable:not(.selection-selected):hover {
+    border-color: var(--color-border);
+    box-shadow: none;
+    transform: none;
+  }
+
+  .seat-item.occupied:hover,
+  .seat-item.occupied.clickable:not(.selection-selected):hover {
+    border-color: var(--color-primary);
+  }
+
+  .seat-item.selection-selected:hover,
+  .seat-item.selection-selected.clickable:hover {
+    border-color: var(--color-selection-border);
+    box-shadow: var(--shadow-selection-ring), var(--shadow-selection-card);
+  }
+
+  .seat-item.student-selected:hover {
+    border-color: var(--color-selection-border);
+    box-shadow: var(--shadow-selection-ring);
+  }
+
+  .seat-item.drag-over:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 20%, transparent);
+  }
 }
 
 /* 拖拽相关样式 */

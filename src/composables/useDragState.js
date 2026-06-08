@@ -8,13 +8,31 @@ const dragCleanupVersion = ref(0)
 const isTouchDraggingFromSeat = ref(false)
 
 export function useDragState() {
+  const cleanupDragDomClasses = () => {
+    if (typeof document === 'undefined') return
+    document.querySelectorAll('.seat-item.drag-over').forEach(el => {
+      el.classList.remove('drag-over')
+    })
+    document.querySelectorAll('.student-items.drag-over').forEach(el => {
+      el.classList.remove('drag-over')
+    })
+    document.querySelectorAll('.seat-touch-drop-out-zone.is-touch-over').forEach(el => {
+      el.classList.remove('is-touch-over')
+    })
+  }
+
+  const requestDragCleanup = () => {
+    dragCleanupVersion.value += 1
+    cleanupDragDomClasses()
+  }
+
   const startDragFromSeat = () => {
     isDraggingFromSeat.value = true
   }
 
   const endDragFromSeat = () => {
     isDraggingFromSeat.value = false
-    dragCleanupVersion.value += 1
+    requestDragCleanup()
   }
 
   const startTouchDragFromSeat = () => {
@@ -23,11 +41,13 @@ export function useDragState() {
 
   const endTouchDragFromSeat = () => {
     isTouchDraggingFromSeat.value = false
+    requestDragCleanup()
   }
 
   return {
     isDraggingFromSeat,
     dragCleanupVersion,
+    requestDragCleanup,
     startDragFromSeat,
     endDragFromSeat,
     isTouchDraggingFromSeat,

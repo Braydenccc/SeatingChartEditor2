@@ -1,7 +1,9 @@
 import { createRequire } from 'node:module'
+import { createDecipheriv, pbkdf2Sync } from 'node:crypto'
 
 const require = createRequire(import.meta.url)
 const { isAllowedFuckSeatsProxyTarget } = require('./fuckseatsProxyHelper.cjs')
+const transportSalt = 'sce-transport-salt-v1'
 
 export function authMockPlugin() {
     return {
@@ -71,6 +73,47 @@ function getMockAuth(req) {
     }
 }
 
+function isValidMockUsername(username) {
+    return typeof username === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(username)
+}
+
+export function decryptMockTransportPassword(encryptedPassword, username) {
+    if (typeof encryptedPassword !== 'string' || encryptedPassword === '' || !isValidMockUsername(username)) {
+        return null
+    }
+
+    try {
+        const combined = Buffer.from(encryptedPassword, 'base64')
+        if (combined.length <= 28) return null
+
+        const iv = combined.subarray(0, 12)
+        const tag = combined.subarray(combined.length - 16)
+        const ciphertext = combined.subarray(12, combined.length - 16)
+        const key = pbkdf2Sync(`sce-auth-${username}`, transportSalt, 100000, 32, 'sha256')
+        const decipher = createDecipheriv('aes-256-gcm', key, iv)
+        decipher.setAuthTag(tag)
+
+        return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8')
+    } catch (e) {
+        return null
+    }
+}
+
+export function readMockPasswordField(input, username) {
+    if (typeof input?.encryptedPassword === 'string' && input.encryptedPassword !== '') {
+        const password = decryptMockTransportPassword(input.encryptedPassword, username)
+        if (password === null) {
+            return { password: '', error: '密码解密失败' }
+        }
+        return { password, error: '' }
+    }
+
+    return {
+        password: typeof input?.password === 'string' ? input.password : '',
+        error: ''
+    }
+}
+
 function handleRequestWithTimeout(req, res, handler) {
     let body = ''
     let bodyComplete = false
@@ -122,7 +165,13 @@ async function handleAuthRequest(req, res, body) {
             // file not exists, use empty db
         }
 
-        const { action, username, password } = input
+        const { action, username } = input
+        const passwordResult = readMockPasswordField(input, username)
+        if (passwordResult.error) {
+            res.statusCode = 400
+            return res.end(JSON.stringify({ success: false, message: passwordResult.error }))
+        }
+        const password = passwordResult.password
 
         if (action === 'register') {
             if (!username || !password) {

@@ -34,9 +34,6 @@ export function useSelection() {
 
   const toggleSelectionMode = () => {
     isSelectionMode.value = !isSelectionMode.value
-    if (!isSelectionMode.value) {
-      clearSelection()
-    }
   }
 
   const setSelection = (seatIds) => {

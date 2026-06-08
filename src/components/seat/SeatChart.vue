@@ -158,7 +158,8 @@
       <div ref="dragPreviewRef" class="drag-preview-overlay">
         <div v-for="item in previewItems" :key="item.seatId"
           class="drag-preview-seat" :class="{ 'is-anchor': item.isAnchor }" :style="item.style">
-          <span class="drag-preview-name">{{ item.studentName || '空位' }}</span>
+          <div v-if="item.contentHtml" class="drag-preview-content" v-html="item.contentHtml"></div>
+          <span v-else class="drag-preview-name">{{ item.studentName || '空位' }}</span>
         </div>
       </div>
     </Teleport>
@@ -869,6 +870,8 @@ const handleGlobalDragStart = (e) => {
 }
 
 const handleGlobalDragEnd = () => {
+  currentDragAnchorSeatId.value = null
+  currentDragTargetSeatId.value = null
   endDragFromSeat()
   endDragPreview()
 }
@@ -1267,6 +1270,12 @@ const rectSelectStyle = computed(() => {
   padding: 0;
   box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary) 35%, transparent);
   opacity: 0.95;
+}
+
+.drag-preview-content {
+  width: 100%;
+  height: 100%;
+  display: contents;
 }
 
 .drag-preview-name {

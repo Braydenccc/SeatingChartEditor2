@@ -47,6 +47,39 @@ describe('useDragState', () => {
     })
   })
 
+  describe('requestDragCleanup', () => {
+    it('should notify drag visual cleanup without changing drag state', () => {
+      const { dragCleanupVersion, isDraggingFromSeat, requestDragCleanup } = useDragState()
+      const before = dragCleanupVersion.value
+
+      requestDragCleanup()
+
+      expect(dragCleanupVersion.value).toBe(before + 1)
+      expect(isDraggingFromSeat.value).toBe(false)
+    })
+
+    it('should remove transient drag highlight classes', () => {
+      const { requestDragCleanup } = useDragState()
+      const seat = document.createElement('div')
+      seat.className = 'seat-item drag-over'
+      const studentList = document.createElement('div')
+      studentList.className = 'student-items drag-over'
+      const dropOut = document.createElement('div')
+      dropOut.className = 'seat-touch-drop-out-zone is-touch-over'
+      document.body.append(seat, studentList, dropOut)
+
+      requestDragCleanup()
+
+      expect(seat.classList.contains('drag-over')).toBe(false)
+      expect(studentList.classList.contains('drag-over')).toBe(false)
+      expect(dropOut.classList.contains('is-touch-over')).toBe(false)
+
+      seat.remove()
+      studentList.remove()
+      dropOut.remove()
+    })
+  })
+
   describe('startTouchDragFromSeat', () => {
     it('should set isTouchDraggingFromSeat to true', () => {
       const { isTouchDraggingFromSeat, startTouchDragFromSeat } = useDragState()
@@ -59,12 +92,14 @@ describe('useDragState', () => {
 
   describe('endTouchDragFromSeat', () => {
     it('should set isTouchDraggingFromSeat to false', () => {
-      const { isTouchDraggingFromSeat, startTouchDragFromSeat, endTouchDragFromSeat } = useDragState()
+      const { dragCleanupVersion, isTouchDraggingFromSeat, startTouchDragFromSeat, endTouchDragFromSeat } = useDragState()
+      const before = dragCleanupVersion.value
 
       startTouchDragFromSeat()
       endTouchDragFromSeat()
 
       expect(isTouchDraggingFromSeat.value).toBe(false)
+      expect(dragCleanupVersion.value).toBe(before + 1)
     })
   })
 

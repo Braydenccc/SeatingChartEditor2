@@ -216,18 +216,69 @@
   }
 }
 
-/* 11. 桌面触摸屏优化（如 Surface） */
-@media (hover: hover) and (pointer: coarse) {
-  /* 保留 hover 效果，但增加触摸目标 */
+/* 11. 桌面触摸屏优化（如 Surface、触屏一体机） */
+@media (any-pointer: coarse) and (min-width: 769px) {
+  /* 混合输入设备保留鼠标 hover，同时补足手指命中区域 */
   button,
   a,
-  .clickable {
+  .clickable,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .icon-btn,
+  .action-btn,
+  .header-btn,
+  .settings-action,
+  .zoom-btn,
+  .sel-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
     min-height: 40px;
-    min-width: 40px;
+    touch-action: manipulation;
+  }
+
+  .seat-item,
+  .candidate-item,
+  .student-item,
+  .student-list-item {
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+  }
+
+  .seat-chart-viewport {
+    touch-action: none;
+  }
+
+  .student-items,
+  .settings-content,
+  .settings-panel,
+  .dialog-body,
+  .modal-body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .drag-over {
+    outline: 2px solid color-mix(in srgb, var(--color-info) 50%, transparent);
+    outline-offset: -2px;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-info) 30%, transparent) !important;
   }
 
   button:active,
-  .clickable:active {
+  .clickable:active,
+  [role="button"]:active {
     transform: scale(0.98);
   }
 }

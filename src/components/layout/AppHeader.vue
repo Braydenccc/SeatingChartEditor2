@@ -5,7 +5,7 @@
 
       <!-- 用户菜单 -->
       <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
-        <button class="header-btn user-btn" :title="currentUser?.username || '账户'" @click="toggleDropdown">
+        <button ref="userButton" class="header-btn user-btn" :title="currentUser?.username || '账户'" @click="toggleDropdown">
           <Cloud v-if="authType === 'webdav'" :size="18" stroke-width="2" />
           <User v-else :size="18" stroke-width="2" />
           <span class="btn-text">{{ currentUser?.username }}</span>
@@ -13,7 +13,7 @@
         </button>
 
         <Transition name="fade-slide">
-          <div v-if="showDropdown" class="user-dropdown">
+          <div v-if="showDropdown" class="user-dropdown" :style="dropdownStyle">
             <button class="dropdown-item" @click="openUserPage">
               <User :size="16" stroke-width="2" />
               <span>账号中心</span>
@@ -111,6 +111,8 @@ const router = useRouter()
 
 const showDropdown = ref(false)
 const menuContainer = ref(null)
+const userButton = ref(null)
+const dropdownStyle = ref({})
 
 const hasRetiehe = computed(() => !!token.value)
 const hasWebdav = computed(() => !!webdavConfig.value)
@@ -156,8 +158,29 @@ const cycleTheme = () => {
   switchTheme(nextMode.value)
 }
 
+const updateDropdownPosition = () => {
+  const rect = userButton.value?.getBoundingClientRect()
+  if (!rect || typeof window === 'undefined') return
+
+  const menuMinWidth = 160
+  const viewportMargin = 8
+  const maxLeft = Math.max(viewportMargin, window.innerWidth - menuMinWidth - viewportMargin)
+  const left = Math.min(
+    Math.max(rect.left, viewportMargin),
+    maxLeft
+  )
+
+  dropdownStyle.value = {
+    top: `${rect.bottom + 12}px`,
+    left: `${left}px`,
+    minWidth: `${Math.max(rect.width, menuMinWidth)}px`
+  }
+}
+
 const toggleDropdown = () => {
-  showDropdown.value = !showDropdown.value
+  const nextVisible = !showDropdown.value
+  showDropdown.value = nextVisible
+  if (nextVisible) updateDropdownPosition()
 }
 
 const openUserPage = () => {
@@ -192,6 +215,10 @@ const closeDropdownOnOutsideClick = (e) => {
 
 onMounted(() => {
   document.addEventListener('click', closeDropdownOnOutsideClick)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', updateDropdownPosition)
+    window.addEventListener('scroll', updateDropdownPosition, true)
+  }
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
     prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)')
     updatePrefersDarkMode()
@@ -201,6 +228,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeDropdownOnOutsideClick)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updateDropdownPosition)
+    window.removeEventListener('scroll', updateDropdownPosition, true)
+  }
   prefersDarkQuery?.removeEventListener('change', updatePrefersDarkMode)
   closeSettings()
 })
@@ -338,13 +369,10 @@ onBeforeUnmount(() => {
 }
 
 .user-dropdown {
-  position: absolute;
-  top: calc(100% + 12px);
-  left: 0;
+  position: fixed;
   background: var(--color-surface);
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
-  min-width: 160px;
   z-index: 100;
   overflow: hidden;
   border: 1px solid var(--color-border);

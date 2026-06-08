@@ -1,19 +1,25 @@
 import { ref, unref, onUnmounted } from 'vue'
 import { onLongPress, useEventListener } from '@vueuse/core'
 import { useEditMode } from '@/composables/useEditMode'
+import { useDragState } from '@/composables/useDragState'
 
 export function useStudentDragging(studentRef, studentDataProp, options = {}) {
   const { onStartDrag, onEndDrag } = options
   const isStudentDragging = ref(false)
   const lastPointerWasTouch = ref(false)
   const { currentMode, EditMode } = useEditMode()
+  const { requestDragCleanup } = useDragState()
   let dragEndClassTimer = null
   let candidateBodyClassActive = false
+  let suppressNextClick = false
+  let suppressClickTimer = null
+
+  const isTouchLikePointer = (e) => {
+    return e?.pointerType === 'touch' || e?.pointerType === 'pen'
+  }
 
   const shouldUseCandidateBodyClass = () => {
-    if (lastPointerWasTouch.value) return false
-    return typeof window === 'undefined' ||
-      !window.matchMedia?.('(hover: none) and (pointer: coarse)').matches
+    return !lastPointerWasTouch.value
   }
 
   const setCandidateDragClass = (active) => {
@@ -46,14 +52,13 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
 
   // HTML5 draggable 属性：触摸操作时禁用，防止幽灵图
   const canHtmlDrag = () => {
-    if (typeof window !== 'undefined' && window.matchMedia?.('(hover: none) and (pointer: coarse)').matches) return false
     if (lastPointerWasTouch.value) return false
     return canTouchDrag()
   }
 
   // 记录指针类型
   const handlePointerDown = (e) => {
-    lastPointerWasTouch.value = e.pointerType === 'touch'
+    lastPointerWasTouch.value = isTouchLikePointer(e)
   }
 
   const handleTouchStart = () => {
@@ -71,31 +76,14 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
   // ============== Mouse Dragging ==============
   let htmlDragImageEl = null
 
-  const getCandidateCardSize = () => {
-    if (typeof window === 'undefined') return { width: 120, height: 80 }
-    if (window.matchMedia?.('(max-width: 480px)').matches) return { width: 82.5, height: 55 }
-    if (window.matchMedia?.('(max-width: 768px)').matches) return { width: 105, height: 70 }
-    if (window.matchMedia?.('(max-height: 820px) and (min-width: 1025px)').matches) return { width: 96, height: 64 }
-    if (window.matchMedia?.('(max-width: 1366px) and (min-width: 1025px)').matches) return { width: 102, height: 68 }
-    return { width: 120, height: 80 }
-  }
-
-  const getDragPreviewSize = (sourceEl, rect) => {
-    const cardSize = getCandidateCardSize()
-    if (sourceEl.classList.contains('compact') || rect.width > cardSize.width * 1.25) {
-      return cardSize
-    }
-    return { width: rect.width, height: rect.height }
-  }
-
   const createCardClone = () => {
     const sourceEl = unref(studentRef)
     if (!sourceEl) return null
 
     const rect = sourceEl.getBoundingClientRect()
-    const previewSize = getDragPreviewSize(sourceEl, rect)
+    const previewSize = { width: rect.width, height: rect.height }
     const clone = sourceEl.cloneNode(true)
-    clone.classList.remove('dragging', 'compact')
+    clone.classList.remove('dragging')
     clone.classList.add('touch-drag-preview-card')
     clone.removeAttribute('draggable')
     clone.style.width = `${previewSize.width}px`
@@ -158,6 +146,7 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
     isStudentDragging.value = false
     setCandidateDragClass(false)
     cleanupHtmlDragImage()
+    requestDragCleanup()
     if (onEndDrag) onEndDrag()
   }
 
@@ -170,11 +159,32 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
     if (touchPreviewEl) { touchPreviewEl.remove(); touchPreviewEl = null }
     cleanupHtmlDragImage()
     document.querySelectorAll('.seat-item.drag-over').forEach(s => s.classList.remove('drag-over'))
+    document.querySelectorAll('.student-items.drag-over').forEach(s => s.classList.remove('drag-over'))
+    requestDragCleanup()
     setCandidateDragClass(false)
     if (isStudentDragging.value) {
+      suppressNextClick = true
+      if (suppressClickTimer) {
+        clearTimeout(suppressClickTimer)
+        suppressClickTimer = null
+      }
+      suppressClickTimer = setTimeout(() => {
+        suppressNextClick = false
+        suppressClickTimer = null
+      }, 450)
       isStudentDragging.value = false
       if (onEndDrag) onEndDrag()
     }
+  }
+
+  const consumeSuppressedClick = () => {
+    if (!suppressNextClick) return false
+    suppressNextClick = false
+    if (suppressClickTimer) {
+      clearTimeout(suppressClickTimer)
+      suppressClickTimer = null
+    }
+    return true
   }
 
   // 核心优化：使用 VueUse 的 onLongPress 替代原生 setTimeout 与距离防抖计算
@@ -284,6 +294,10 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
       clearTimeout(dragEndClassTimer)
       dragEndClassTimer = null
     }
+    if (suppressClickTimer) {
+      clearTimeout(suppressClickTimer)
+      suppressClickTimer = null
+    }
     document.body?.classList.remove('student-dragging-from-candidate', 'student-drag-ended-from-candidate')
     cleanupVisuals()
   })
@@ -292,6 +306,7 @@ export function useStudentDragging(studentRef, studentDataProp, options = {}) {
     isStudentDragging,
     lastPointerWasTouch,
     canHtmlDrag,
+    consumeSuppressedClick,
     handlePointerDown,
     handleTouchStart,
     handleDragStart,

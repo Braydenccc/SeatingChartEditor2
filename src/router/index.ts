@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { useRouteLoading } from '@/composables/useRouteLoading'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -36,6 +37,22 @@ const router = createRouter({
     },
     { path: '/:pathMatch(.*)*', redirect: '/editor' }
   ]
+})
+
+const { isRouteLoading } = useRouteLoading()
+
+router.beforeEach((to, from) => {
+  if (to.fullPath !== from.fullPath) {
+    isRouteLoading.value = true
+  }
+})
+
+router.afterEach(() => {
+  isRouteLoading.value = false
+})
+
+router.onError(() => {
+  isRouteLoading.value = false
 })
 
 export default router

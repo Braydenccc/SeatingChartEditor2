@@ -173,14 +173,14 @@ describe('useSelection', () => {
       expect(isSelectionMode.value).toBe(false)
     })
 
-    it('should clear selection when exiting selection mode', () => {
+    it('should keep selection when exiting selection mode', () => {
       const { addSeatToSelection, toggleSelectionMode, selectedCount } = useSelection()
 
       addSeatToSelection('seat-1')
       toggleSelectionMode()
       toggleSelectionMode()
 
-      expect(selectedCount.value).toBe(0)
+      expect(selectedCount.value).toBe(1)
     })
   })
 

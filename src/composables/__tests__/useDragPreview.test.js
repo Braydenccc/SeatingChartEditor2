@@ -1,11 +1,30 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import { useDragPreview } from '../useDragPreview'
+import { useSeatChart } from '../useSeatChart'
+import { useStudentData } from '../useStudentData'
 
 describe('useDragPreview', () => {
+  beforeEach(() => {
+    const seatChart = useSeatChart()
+    seatChart.updateConfig({
+      groupCount: 1,
+      columnsPerGroup: 1,
+      seatsPerColumn: 1,
+      groups: [{ columns: 1, rows: 1 }]
+    })
+    seatChart.seats.value.forEach(seat => {
+      seat.studentId = null
+      seat.isEmpty = false
+    })
+    useStudentData().clearAllStudents()
+  })
+
   afterEach(() => {
-    const { endDragPreview, registerPreviewElement } = useDragPreview()
+    const { endDragPreview, registerChartElement, registerPreviewElement } = useDragPreview()
     endDragPreview()
+    registerChartElement(null)
     registerPreviewElement(null)
+    document.body.innerHTML = ''
   })
 
   it('positions preview element when it is registered after drag starts', () => {
@@ -19,5 +38,28 @@ describe('useDragPreview', () => {
     expect(previewEl.style.top).toBe('80px')
     expect(previewEl.style.transform).toBe('translate(-50%, -50%)')
     expect(previewEl.style.transition).toBe('none')
+  })
+
+  it('keeps the original seat card content for preview items', () => {
+    const { assignStudent } = useSeatChart()
+    const studentData = useStudentData()
+    const { registerChartElement, startDragPreview, previewItems } = useDragPreview()
+    const chartEl = document.createElement('div')
+    const seatEl = document.createElement('div')
+    const studentId = studentData.addStudent()
+
+    studentData.updateStudent(studentId, { name: '张三', studentNumber: 7 })
+    assignStudent('seat-0-0-0', studentId, false)
+
+    seatEl.className = 'seat-item occupied'
+    seatEl.dataset.seatId = 'seat-0-0-0'
+    seatEl.innerHTML = '<div class="student-display"><div class="student-name">张三</div><div class="student-number">7</div></div>'
+    chartEl.appendChild(seatEl)
+    registerChartElement(chartEl)
+
+    startDragPreview('seat-0-0-0', ['seat-0-0-0'], 120, 80)
+
+    expect(previewItems.value[0].studentName).toBe('张三')
+    expect(previewItems.value[0].contentHtml).toBe(seatEl.innerHTML)
   })
 })
