@@ -38,6 +38,10 @@
           <Cloud :size="18" />
           <span>热铁盒网页托管</span>
         </a>
+        <button type="button" class="link-item link-button" @click="openHelp">
+          <BookOpen :size="18" />
+          <span>用户手册</span>
+        </button>
       </div>
     </div>
 
@@ -61,7 +65,14 @@
 </template>
 
 <script setup>
-import { Github, Heart, Cloud } from 'lucide-vue-next'
+import { BookOpen, Github, Heart, Cloud } from 'lucide-vue-next'
+import { useSettingsDialog } from '@/composables/useSettingsDialog'
+
+const { openSettings } = useSettingsDialog()
+
+const openHelp = () => {
+  openSettings('about', 'help')
+}
 </script>
 
 <style scoped>
@@ -132,8 +143,10 @@ import { Github, Heart, Cloud } from 'lucide-vue-next'
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 10px 12px;
   background: var(--color-surface);
+  border: none;
   border-radius: 6px;
   text-decoration: none;
   color: var(--color-text-primary);
@@ -145,6 +158,12 @@ import { Github, Heart, Cloud } from 'lucide-vue-next'
   background: var(--color-bg-selected);
   color: var(--color-text-primary);
   transform: translateX(4px);
+}
+
+.link-button {
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
 .tech-tags {

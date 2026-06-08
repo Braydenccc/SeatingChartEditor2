@@ -90,7 +90,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Cloud, Palette, Edit, Info, Grid, RotateCw, Wand2, FileDown } from 'lucide-vue-next'
+import { BookOpen, Cloud, Palette, Edit, Info, Grid, RotateCw, Wand2, FileDown } from 'lucide-vue-next'
 import SyncPanel from './panels/SyncPanel.vue'
 import UIPanel from './panels/UIPanel.vue'
 import EditorPanel from './panels/EditorPanel.vue'
@@ -100,6 +100,7 @@ import RotationPanel from './panels/RotationPanel.vue'
 import AssignmentPanel from './panels/AssignmentPanel.vue'
 import ExportPanel from './panels/ExportPanel.vue'
 import AboutPanel from './panels/AboutPanel.vue'
+import HelpPanel from './panels/HelpPanel.vue'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useLogger } from '@/composables/useLogger'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
@@ -130,7 +131,8 @@ const workspaceCategories = [
 ]
 
 const aboutCategories = [
-  { id: 'about', label: '关于', icon: Info, component: AboutPanel }
+  { id: 'about', label: '关于', icon: Info, component: AboutPanel },
+  { id: 'help', label: '帮助', icon: BookOpen, component: HelpPanel }
 ]
 
 const currentCategories = computed(() => {

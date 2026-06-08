@@ -43,12 +43,13 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Cloud, Edit, FileDown, Grid, Info, Palette, RotateCw, Wand2 } from 'lucide-vue-next'
+import { BookOpen, Cloud, Edit, FileDown, Grid, Info, Palette, RotateCw, Wand2 } from 'lucide-vue-next'
 import AppPageShell from '@/components/layout/AppPageShell.vue'
 import AboutPanel from '@/components/settings/panels/AboutPanel.vue'
 import AssignmentPanel from '@/components/settings/panels/AssignmentPanel.vue'
 import EditorPanel from '@/components/settings/panels/EditorPanel.vue'
 import ExportPanel from '@/components/settings/panels/ExportPanel.vue'
+import HelpPanel from '@/components/settings/panels/HelpPanel.vue'
 import RotationPanel from '@/components/settings/panels/RotationPanel.vue'
 import SeatConfigPanel from '@/components/settings/panels/SeatConfigPanel.vue'
 import SyncPanel from '@/components/settings/panels/SyncPanel.vue'
@@ -79,7 +80,8 @@ const workspaceCategories = [
 ]
 
 const aboutCategories = [
-  { id: 'about', label: '关于', icon: Info, component: AboutPanel }
+  { id: 'about', label: '关于', icon: Info, component: AboutPanel },
+  { id: 'help', label: '帮助', icon: BookOpen, component: HelpPanel }
 ]
 
 const currentCategories = computed(() => {

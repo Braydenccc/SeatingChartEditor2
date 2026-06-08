@@ -77,23 +77,31 @@
         </button>
       </div>
 
-      <button class="header-btn mobile-theme-btn" :title="`主题：${currentThemeMode.label}`" @click="cycleTheme">
-        <component :is="currentThemeMode.icon" :size="18" stroke-width="2" />
+      <button class="header-btn mobile-theme-btn" :title="mobileThemeTitle" @click="cycleTheme">
+        <span class="mobile-theme-icon" :class="{ auto: currentColorScheme === 'auto' }">
+          <component :is="mobileThemeIcon" :size="18" stroke-width="2" />
+          <span v-if="currentColorScheme === 'auto'" class="mobile-theme-auto-mark">A</span>
+        </span>
         <span class="btn-text">主题</span>
       </button>
     </div>
 
-    <div class="header-right"></div>
+    <div class="header-right">
+      <button v-if="isDesktopRuntime" class="header-btn icon-only" @click="openHelp" title="帮助">
+        <CircleQuestionMark :size="18" stroke-width="2" />
+      </button>
+    </div>
   </header>
 </template>
 
 <script setup>
 import { onMounted, ref, onBeforeUnmount, computed } from 'vue'
-import { ChevronDown, Cloud, FileOutput, FileText, LogIn, Monitor, Moon, Settings, Sun, User, Users } from 'lucide-vue-next'
+import { ChevronDown, CircleQuestionMark, Cloud, FileOutput, FileText, LogIn, Monitor, Moon, Settings, Sun, User, Users } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
+import { isTauriRuntime } from '@/platform/runtime'
 
 const emit = defineEmits(['open-login'])
 
@@ -107,6 +115,7 @@ const menuContainer = ref(null)
 
 const hasRetiehe = computed(() => !!token.value)
 const hasWebdav = computed(() => !!webdavConfig.value)
+const isDesktopRuntime = isTauriRuntime()
 
 // 主题切换
 const themeModes = [
@@ -119,6 +128,22 @@ const currentColorScheme = computed(() => settings.value.ui.colorScheme)
 const currentThemeMode = computed(() => (
   themeModes.find(mode => mode.value === currentColorScheme.value) || themeModes[2]
 ))
+const prefersDarkMode = ref(false)
+let prefersDarkQuery = null
+
+const updatePrefersDarkMode = () => {
+  prefersDarkMode.value = Boolean(prefersDarkQuery?.matches)
+}
+
+const mobileThemeIcon = computed(() => {
+  if (currentColorScheme.value !== 'auto') return currentThemeMode.value.icon
+  return prefersDarkMode.value ? Moon : Sun
+})
+
+const mobileThemeTitle = computed(() => {
+  if (currentColorScheme.value !== 'auto') return `主题：${currentThemeMode.value.label}`
+  return `主题：自适应（当前${prefersDarkMode.value ? '深色' : '浅色'}）`
+})
 
 const switchTheme = (mode) => {
   settings.value.ui.colorScheme = mode
@@ -147,6 +172,11 @@ const openUnifiedSettings = () => {
   showDropdown.value = false
 }
 
+const openHelp = () => {
+  openSettings('about', 'help')
+  showDropdown.value = false
+}
+
 const openFiles = () => router.push('/files')
 const openStudents = () => router.push('/students')
 const openExport = () => router.push({ path: '/export', query: { tab: 'image' } })
@@ -164,10 +194,16 @@ const closeDropdownOnOutsideClick = (e) => {
 
 onMounted(() => {
   document.addEventListener('click', closeDropdownOnOutsideClick)
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    updatePrefersDarkMode()
+    prefersDarkQuery.addEventListener('change', updatePrefersDarkMode)
+  }
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeDropdownOnOutsideClick)
+  prefersDarkQuery?.removeEventListener('change', updatePrefersDarkMode)
   closeSettings()
 })
 </script>
@@ -198,6 +234,9 @@ onBeforeUnmount(() => {
 }
 
 .header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex-shrink: 0;
 }
 
@@ -211,6 +250,7 @@ onBeforeUnmount(() => {
 
 /* ===== 统一按钮样式 ===== */
 .header-btn {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -223,21 +263,45 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition:
+    background 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   box-shadow: 0 2px 8px var(--shadow-md);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
+.header-btn svg {
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 .header-btn:hover {
-  background: color-mix(in srgb, var(--color-text-inverse) 20%, transparent);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px var(--shadow-lg);
+  background: color-mix(in srgb, var(--color-text-inverse) 22%, transparent);
+  border-color: color-mix(in srgb, var(--color-text-inverse) 36%, transparent);
+  transform: scale(1.03);
+  box-shadow:
+    0 4px 14px var(--shadow-lg),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-text-inverse) 10%, transparent);
+}
+
+.header-btn:hover svg {
+  transform: scale(1.08);
 }
 
 .header-btn:active {
   transform: scale(0.98);
   background: color-mix(in srgb, var(--color-text-inverse) 15%, transparent);
+  box-shadow: 0 2px 8px var(--shadow-md);
+}
+
+.header-btn.icon-only {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  justify-content: center;
 }
 
 .btn-text {
@@ -342,15 +406,29 @@ onBeforeUnmount(() => {
   color: color-mix(in srgb, var(--color-text-inverse) 60%, transparent);
   border-radius: 20px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition:
+    background 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
 }
 
+.theme-btn svg {
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 .theme-btn:hover {
   color: color-mix(in srgb, var(--color-text-inverse) 90%, transparent);
-  background: color-mix(in srgb, var(--color-text-inverse) 8%, transparent);
+  background: color-mix(in srgb, var(--color-text-inverse) 12%, transparent);
+  transform: scale(1.04);
+}
+
+.theme-btn:hover svg {
+  transform: scale(1.08);
 }
 
 .theme-btn.active {
@@ -383,6 +461,34 @@ onBeforeUnmount(() => {
 
 .mobile-theme-btn {
   display: none;
+}
+
+.mobile-theme-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+}
+
+.mobile-theme-auto-mark {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-primary-light);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* ===== 响应式 - 中等屏幕 ===== */
@@ -514,6 +620,10 @@ onBeforeUnmount(() => {
   .header-btn:hover {
     transform: none;
     background: color-mix(in srgb, var(--color-text-inverse) 10%, transparent);
+  }
+
+  .header-btn:hover svg {
+    transform: none;
   }
 
   .header-btn:active {

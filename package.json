@@ -35,7 +35,7 @@
     "@playwright/test": "^1.59.1",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
-    "@tauri-apps/plugin-http": "^2.5.9",
+             "@tauri-apps/plugin-http": "^2.5.9",
     "@vueuse/core": "^14.2.1",
     "bcryptjs": "^3.0.3",
     "lucide-vue-next": "^1.0.0",
