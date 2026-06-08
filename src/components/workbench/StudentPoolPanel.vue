@@ -199,6 +199,8 @@ const toggleTag = (tagId) => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  flex: 0 0 auto;
+  max-width: 160px;
   min-height: 28px;
   padding: 0 8px;
   border: 1px solid var(--color-border);
@@ -208,6 +210,12 @@ const toggleTag = (tagId) => {
   font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
+}
+
+.tag-filter span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tag-filter.active {
