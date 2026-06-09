@@ -117,6 +117,10 @@
           </div>
 
           <div class="rule-actions">
+            <button class="rule-edit-btn" title="编辑规则" @click.stop="emit('edit', rule.id)">
+              <Pencil :size="14" stroke-width="2" />
+              <span>编辑</span>
+            </button>
             <span class="rule-chevron" :class="{ open: expandedId === rule.id }">
               <ChevronDown :size="14" />
             </span>
@@ -148,8 +152,8 @@
               <!-- 子规则列表（多规则时显示） -->
               <template v-if="rule.subRules && rule.subRules.length > 1">
                 <div v-for="(sr, idx) in rule.subRules" :key="`sr-${idx}`" class="detail-item full-width sub-rule-detail">
-                  <span class="detail-key">条件 #{{ idx + 1 }}{{ sr.not ? ' [非]' : '' }}</span>
-                  <span class="detail-val">{{ RULE_TYPE_LABELS[sr.predicate] || sr.predicate }} · {{ formatSubjects(sr.subjects || []) }}</span>
+                  <span class="detail-key">条件 #{{ idx + 1 }}</span>
+                  <span class="detail-val">{{ getSubRuleText(rule, sr) }}</span>
                 </div>
               </template>
               <!-- 单条规则的类型 -->
@@ -190,7 +194,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
-import { Search, X, FileOutput, FileInput, Trash2, AlertTriangle, ClipboardList, ChevronDown } from 'lucide-vue-next'
+import { Search, X, FileOutput, FileInput, Trash2, AlertTriangle, ClipboardList, ChevronDown, Pencil } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useLogger } from '@/composables/useLogger'
 import { useConfirmAction } from '@/composables/useConfirmAction'
@@ -216,7 +220,7 @@ const props = defineProps({
 
 const emit = defineEmits(['export', 'import', 'edit'])
 
-const { rules, renderRuleText, toggleRule, updateRule, deleteRule, clearAllRules, detectConflicts } = useSeatRules()
+const { rules, renderRuleText, renderRuleTextWithoutPriority, toggleRule, updateRule, deleteRule, clearAllRules, detectConflicts } = useSeatRules()
 const { students } = useStudentData()
 const { tags } = useTagData()
 const { attributeDefinitions, getAttributeById } = useStudentAttributes()
@@ -440,6 +444,14 @@ const getRuleText = (rule) => {
   const text = renderRuleText(rule)
   ruleTextCache.set(rule.id, { signature, text })
   return text
+}
+
+const getSubRuleText = (rule, subRule) => {
+  return renderRuleTextWithoutPriority({
+    ...subRule,
+    subjects: rule.subjects?.length ? rule.subjects : (subRule.subjects || []),
+    priority: rule.priority
+  })
 }
 
 const getParamLabel = (predicate, key) => {
@@ -931,6 +943,27 @@ defineExpose({ focusRule })
 
 .rule-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
+.rule-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rule-edit-btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-subtle);
+}
+
 .rule-chevron {
   color: var(--color-text-disabled);
   transition: transform 0.2s;
@@ -1066,5 +1099,106 @@ defineExpose({ focusRule })
 .expand-leave-from {
   max-height: 400px;
   opacity: 1;
+}
+
+@media (max-width: 720px) {
+  .rule-toolbar {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .filter-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .filter-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .filter-tab {
+    flex: 1 0 auto;
+    min-height: 38px;
+  }
+
+  .toolbar-actions {
+    justify-content: flex-end;
+  }
+
+  .action-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .batch-toolbar {
+    gap: 6px;
+  }
+
+  .batch-actions {
+    max-height: 92px;
+    overflow-y: auto;
+  }
+
+  .batch-btn {
+    min-height: 34px;
+  }
+
+  .rule-main {
+    align-items: flex-start;
+    padding: 10px 10px 10px 0;
+  }
+
+  .rule-select {
+    padding-left: 8px;
+  }
+
+  .rule-toggle {
+    padding-left: 8px;
+    padding-top: 2px;
+  }
+
+  .rule-label {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .rule-actions {
+    align-self: stretch;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .rule-edit-btn {
+    width: 40px;
+    min-height: 36px;
+    padding: 0;
+  }
+
+  .rule-edit-btn span {
+    display: none;
+  }
+
+  .rule-detail {
+    padding: 12px;
+  }
+
+  .rule-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-actions {
+    gap: 8px;
+  }
+
+  .btn-edit,
+  .btn-delete {
+    flex: 1;
+    min-height: 40px;
+    margin-right: 0;
+  }
 }
 </style>

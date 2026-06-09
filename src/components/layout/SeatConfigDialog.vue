@@ -302,7 +302,7 @@ function handleConfirm() {
   border-radius: 12px;
   width: 100%;
   max-width: 900px;
-  max-height: 90vh;
+  max-height: calc(100vh - 40px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -313,6 +313,7 @@ function handleConfirm() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
   padding: 16px 20px;
   border-bottom: 1px solid var(--color-border-light);
 }
@@ -344,6 +345,7 @@ function handleConfirm() {
 
 .dialog-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 20px;
   display: flex;
@@ -369,6 +371,7 @@ function handleConfirm() {
   border: 1px solid var(--color-border-light);
   border-radius: 8px;
   padding: 24px;
+  min-height: 0;
   overflow-x: auto;
   flex: 1;
 }
@@ -607,6 +610,7 @@ function handleConfirm() {
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
   gap: 12px;
   padding: 16px 20px;
   border-top: 1px solid var(--color-border-light);
@@ -654,5 +658,17 @@ function handleConfirm() {
 
 .confirm-btn.confirming:hover {
   box-shadow: 0 4px 12px color-mix(in srgb, var(--color-danger) 40%, transparent);
+}
+
+@media (max-width: 640px) {
+  .seat-config-dialog-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .seat-config-dialog {
+    max-height: 92vh;
+    border-radius: 12px 12px 0 0;
+  }
 }
 </style>

@@ -1,173 +1,181 @@
 <template>
   <div class="rule-builder">
-    <h4 class="builder-title">{{ isEditing ? '编辑规则' : '添加新规则' }}</h4>
-
-    <div class="sentence-builder">
-      <!-- 对象集合（所有子规则共用） -->
-      <div class="builder-segment">
-        <label class="seg-label">适用对象</label>
-        <div class="subject-section inline-subject">
-          <div class="subject-slot">
-            <div v-for="(entry, entryIndex) in sharedSubjects" :key="`s-${entryIndex}`" class="subject-row">
-              <select v-model="entry.type" class="detail-select" @change="onEntryTypeChange(entry)">
-                <option value="all">全体</option>
-                <option value="person">个人</option>
-                <option value="tag">标签</option>
-              </select>
-
-              <select v-if="entry.type !== 'all'" v-model="entry.id" class="detail-select">
-                <option :value="null">{{ entry.type === 'person' ? '选择学生…' : '选择标签…' }}</option>
-                <option
-                  v-for="opt in getEntryOptions(entry.type)"
-                  :key="opt.id"
-                  :value="opt.id"
-                >
-                  {{ opt.label }}
-                </option>
-              </select>
-
-              <button class="mini-btn danger" @click="removeSharedEntry(entryIndex)">删除</button>
-            </div>
-            <button class="mini-btn" @click="addSharedEntry">+ 添加对象</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 规则条件区域 -->
-      <div class="rules-container">
-        <label class="seg-label">规则条件</label>
-
-        <!-- 子规则列表 -->
-        <div v-for="(subRule, ruleIndex) in subRules" :key="`rule-${ruleIndex}`" class="sub-rule-item">
-          <div class="rule-header-row">
-            <!-- 逻辑操作符（多规则时显示，第一条不显示或显示为默认） -->
-            <button
-              v-if="subRules.length > 1"
-              class="logic-toggle"
-              :class="{ active: selectedLogicOperator === 'AND', or: selectedLogicOperator === 'OR' }"
-              @click="selectedLogicOperator = selectedLogicOperator === 'AND' ? 'OR' : 'AND'"
-              title="点击切换与/或"
-            >
-              {{ selectedLogicOperator === 'AND' ? '且' : '或' }}
-            </button>
-            <span v-else class="logic-placeholder"></span>
-
-            <!-- 是/非 切换 -->
-            <button
-              class="not-toggle"
-              :class="{ active: subRule.not }"
-              @click="toggleNot(ruleIndex)"
-              title="点击切换是否取反该规则"
-            >
-              {{ subRule.not ? '非' : '是' }}
-            </button>
-
-            <div class="rule-selector-wrap flex-1">
-              <select
-                v-model="subRule.predicate"
-                class="seg-select pred-select"
-                @change="onPredicateChange(ruleIndex)"
-              >
-                <option value="" disabled>请选择规则类型...</option>
-                <optgroup v-for="group in filteredPredicateGroups" :key="group.label" :label="group.label">
-                  <option v-for="p in group.predicates" :key="p.key" :value="p.key">
-                    {{ p.label }}
-                  </option>
-                </optgroup>
-              </select>
-              <div class="select-arrow"></div>
-            </div>
-
-            <!-- 删除子规则按钮 -->
-            <button
-              v-if="subRules.length > 1"
-              class="mini-btn danger remove-rule-btn"
-              @click="removeSubRule(ruleIndex)"
-              title="删除此规则"
-            >
-              <X :size="14" />
-            </button>
-          </div>
-
-          <!-- 参数（仅当选择了谓词时显示） -->
-          <div v-if="subRule.predicate && getParamSpecs(ruleIndex).length > 0" class="params-inline">
-            <template v-for="param in getParamSpecs(ruleIndex)" :key="param.key">
-              <div class="input-group inline-param">
-                <label>{{ param.label }}</label>
-                <input
-                  v-if="param.type === 'number'"
-                  v-model.number="subRule.params[param.key]"
-                  type="number"
-                  :min="param.min ?? 1"
-                  class="detail-input"
-                />
-                <select
-                  v-else-if="param.type === 'select'"
-                  v-model="subRule.params[param.key]"
-                  class="detail-select"
-                >
-                  <option v-for="opt in param.options" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
-                <select
-                  v-else-if="param.type === 'attribute'"
-                  v-model="subRule.params[param.key]"
-                  class="detail-select"
-                >
-                  <option value="">选择数值属性…</option>
-                  <option v-for="opt in attributeOptions" :key="opt.id" :value="opt.id">
-                    {{ opt.label }}
-                  </option>
-                </select>
-                <select
-                  v-else-if="param.type === 'zone'"
-                  v-model="subRule.params[param.key]"
-                  class="detail-select"
-                >
-                  <option :value="null">选择选区…</option>
-                  <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
-                </select>
-              </div>
-            </template>
-          </div>
-        </div>
-
-        <!-- 添加子规则按钮 -->
-        <button class="add-sub-rule-btn" @click="addSubRule">
-          + 添加规则条件（{{ selectedLogicOperator === 'AND' ? '与' : '或' }}组合）
+    <div class="builder-content">
+      <div class="builder-heading">
+        <h4 class="builder-title">{{ isEditing ? '编辑规则' : '添加新规则' }}</h4>
+        <button class="template-button" @click="showTemplateDialog = true">
+          <Wand2 :size="15" stroke-width="2" />
+          <span>快捷方案</span>
         </button>
       </div>
 
-      <div class="builder-segment">
-        <label class="seg-label">重要程度</label>
-        <div class="priority-pills">
-          <button
-            v-for="p in priorities"
-            :key="p.key"
-            class="priority-pill"
-            :class="[p.key, { active: selectedPriority === p.key }]"
-            @click="selectedPriority = p.key"
-          >
-            <span class="pill-dot"></span>
-            {{ p.label }}
+      <div class="sentence-builder">
+        <!-- 对象集合（所有子规则共用） -->
+        <div class="builder-segment">
+          <label class="seg-label">适用对象</label>
+          <div class="subject-section inline-subject">
+            <div class="subject-slot">
+              <div v-for="(entry, entryIndex) in sharedSubjects" :key="`s-${entryIndex}`" class="subject-row">
+                <select v-model="entry.type" class="detail-select" @change="onEntryTypeChange(entry)">
+                  <option value="all">全体</option>
+                  <option value="person">个人</option>
+                  <option value="tag">标签</option>
+                </select>
+
+                <select v-if="entry.type !== 'all'" v-model="entry.id" class="detail-select">
+                  <option :value="null">{{ entry.type === 'person' ? '选择学生…' : '选择标签…' }}</option>
+                  <option
+                    v-for="opt in getEntryOptions(entry.type)"
+                    :key="opt.id"
+                    :value="opt.id"
+                  >
+                    {{ opt.label }}
+                  </option>
+                </select>
+
+                <button class="mini-btn danger" @click="removeSharedEntry(entryIndex)">删除</button>
+              </div>
+              <button class="mini-btn" @click="addSharedEntry">+ 添加对象</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 规则条件区域 -->
+        <div class="rules-container">
+          <label class="seg-label">规则条件</label>
+
+          <!-- 子规则列表 -->
+          <div v-for="(subRule, ruleIndex) in subRules" :key="`rule-${ruleIndex}`" class="sub-rule-item">
+            <div class="rule-header-row">
+              <!-- 逻辑操作符（多规则时显示，第一条不显示或显示为默认） -->
+              <button
+                v-if="subRules.length > 1"
+                class="logic-toggle"
+                :class="{ active: selectedLogicOperator === 'AND', or: selectedLogicOperator === 'OR' }"
+                @click="selectedLogicOperator = selectedLogicOperator === 'AND' ? 'OR' : 'AND'"
+                title="点击切换与/或"
+              >
+                {{ selectedLogicOperator === 'AND' ? '且' : '或' }}
+              </button>
+              <span v-else class="logic-placeholder"></span>
+
+              <!-- 是/非 切换 -->
+              <button
+                class="not-toggle"
+                :class="{ active: subRule.not }"
+                @click="toggleNot(ruleIndex)"
+                title="点击切换是否取反该规则"
+              >
+                {{ subRule.not ? '非' : '是' }}
+              </button>
+
+              <div class="rule-selector-wrap flex-1">
+                <select
+                  v-model="subRule.predicate"
+                  class="seg-select pred-select"
+                  @change="onPredicateChange(ruleIndex)"
+                >
+                  <option value="" disabled>请选择规则类型...</option>
+                  <optgroup v-for="group in filteredPredicateGroups" :key="group.label" :label="group.label">
+                    <option v-for="p in group.predicates" :key="p.key" :value="p.key">
+                      {{ p.label }}
+                    </option>
+                  </optgroup>
+                </select>
+                <div class="select-arrow"></div>
+              </div>
+
+              <!-- 删除子规则按钮 -->
+              <button
+                v-if="subRules.length > 1"
+                class="mini-btn danger remove-rule-btn"
+                @click="removeSubRule(ruleIndex)"
+                title="删除此规则"
+              >
+                <X :size="14" />
+              </button>
+            </div>
+
+            <!-- 参数（仅当选择了谓词时显示） -->
+            <div v-if="subRule.predicate && getParamSpecs(ruleIndex).length > 0" class="params-inline">
+              <template v-for="param in getParamSpecs(ruleIndex)" :key="param.key">
+                <div class="input-group inline-param">
+                  <label>{{ param.label }}</label>
+                  <input
+                    v-if="param.type === 'number'"
+                    v-model.number="subRule.params[param.key]"
+                    type="number"
+                    :min="param.min ?? 1"
+                    class="detail-input"
+                  />
+                  <select
+                    v-else-if="param.type === 'select'"
+                    v-model="subRule.params[param.key]"
+                    class="detail-select"
+                  >
+                    <option v-for="opt in param.options" :key="opt.value" :value="opt.value">
+                      {{ opt.label }}
+                    </option>
+                  </select>
+                  <select
+                    v-else-if="param.type === 'attribute'"
+                    v-model="subRule.params[param.key]"
+                    class="detail-select"
+                  >
+                    <option value="">选择数值属性…</option>
+                    <option v-for="opt in attributeOptions" :key="opt.id" :value="opt.id">
+                      {{ opt.label }}
+                    </option>
+                  </select>
+                  <select
+                    v-else-if="param.type === 'zone'"
+                    v-model="subRule.params[param.key]"
+                    class="detail-select"
+                  >
+                    <option :value="null">选择选区…</option>
+                    <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
+                  </select>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 添加子规则按钮 -->
+          <button class="add-sub-rule-btn" @click="addSubRule">
+            + 添加规则条件（{{ selectedLogicOperator === 'AND' ? '与' : '或' }}组合）
           </button>
         </div>
-      </div>
-    </div>
 
-    <div v-if="previewText" class="builder-preview-section">
-      <label class="seg-label">效果预览</label>
-      <div class="smart-preview-card" :class="selectedPriority">
-        <div class="preview-main">
-          <div class="preview-text-content">{{ previewText }}</div>
+        <div class="builder-segment">
+          <label class="seg-label">重要程度</label>
+          <div class="priority-pills">
+            <button
+              v-for="p in priorities"
+              :key="p.key"
+              class="priority-pill"
+              :class="[p.key, { active: selectedPriority === p.key }]"
+              @click="selectedPriority = p.key"
+            >
+              <span class="pill-dot"></span>
+              {{ p.label }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div v-if="validationWarnings.length > 0" class="validation-warnings">
-      <div v-for="(w, i) in validationWarnings" :key="i" class="warning-item">
-        警告：{{ w }}
+      <div v-if="previewText" class="builder-preview-section">
+        <label class="seg-label">效果预览</label>
+        <div class="smart-preview-card" :class="selectedPriority">
+          <div class="preview-main">
+            <div class="preview-text-content">{{ previewText }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="validationWarnings.length > 0" class="validation-warnings">
+        <div v-for="(w, i) in validationWarnings" :key="i" class="warning-item">
+          警告：{{ w }}
+        </div>
       </div>
     </div>
 
@@ -175,12 +183,43 @@
       <button class="btn-add" :disabled="!canAdd" @click="handleAdd">{{ isEditing ? '保存修改' : '添加规则' }}</button>
       <button class="btn-reset" @click="handleReset">{{ isEditing ? '取消编辑' : '重置' }}</button>
     </div>
+
+    <Teleport to="body">
+      <div v-if="showTemplateDialog" class="template-overlay" @click.self="showTemplateDialog = false">
+        <section class="template-dialog" role="dialog" aria-modal="true" aria-labelledby="quick-template-title">
+          <header class="template-dialog-header">
+            <div>
+              <h3 id="quick-template-title">快捷方案</h3>
+              <p>选择后会覆盖当前编辑草稿的对象、规则类型和默认参数。</p>
+            </div>
+            <button class="template-close-button" title="关闭" @click="showTemplateDialog = false">
+              <X :size="18" stroke-width="2" />
+            </button>
+          </header>
+
+          <div class="template-groups">
+            <section v-for="group in quickTemplateGroups" :key="group.title" class="template-group">
+              <h4>{{ group.title }}</h4>
+              <button
+                v-for="option in group.options"
+                :key="option.key"
+                class="template-option"
+                @click="handleQuickTemplate(option.key)"
+              >
+                <span>{{ option.title }}</span>
+                <small>{{ option.desc }}</small>
+              </button>
+            </section>
+          </div>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { X } from 'lucide-vue-next'
+import { Wand2, X } from 'lucide-vue-next'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useZoneData } from '@/composables/useZoneData'
@@ -384,7 +423,35 @@ const currentRulePayload = computed(() => {
 const validationWarnings = ref([])
 const canAdd = ref(false)
 const previewText = ref('')
+const showTemplateDialog = ref(false)
 let feedbackTimer = null
+
+const quickTemplateGroups = [
+  {
+    title: '位置照顾',
+    options: [
+      { key: QUICK_TEMPLATE_KEYS.FRONT_ROW, title: '前排优先', desc: '给需要关注的学生限定前几排' },
+      { key: QUICK_TEMPLATE_KEYS.AVOID_WINDOW, title: '避开窗边', desc: '减少靠墙或窗边位置影响' }
+    ]
+  },
+  {
+    title: '同桌关系',
+    options: [
+      { key: QUICK_TEMPLATE_KEYS.DESKMATES, title: '安排同桌', desc: '把两个指定学生安排为同桌' },
+      { key: QUICK_TEMPLATE_KEYS.AVOID_DESKMATES, title: '禁止同桌', desc: '避免两个学生成为同桌' },
+      { key: QUICK_TEMPLATE_KEYS.KEEP_DISTANCE, title: '保持距离', desc: '让指定学生之间隔开距离' }
+    ]
+  },
+  {
+    title: '全班均衡',
+    options: [
+      { key: QUICK_TEMPLATE_KEYS.SPREAD_GROUP, title: '标签分散', desc: '把同标签学生尽量分散' },
+      { key: QUICK_TEMPLATE_KEYS.HEIGHT_GRADIENT, title: '身高梯度', desc: '按身高形成前后梯度' },
+      { key: QUICK_TEMPLATE_KEYS.SCORE_BALANCE, title: '成绩均衡', desc: '让各大组平均成绩接近' },
+      { key: QUICK_TEMPLATE_KEYS.SCORE_BANDS, title: '成绩分层', desc: '按成绩分层后均匀分布' }
+    ]
+  }
+]
 
 const buildFeedbackState = () => {
   const firstPredicate = subRules.value[0]?.predicate
@@ -642,15 +709,20 @@ const applyQuickTemplate = (key) => {
   const tpl = quickTemplates[key]
   if (!tpl) return
   selectedPriority.value = tpl.priority
+  selectedLogicOperator.value = LogicOperator.AND
   sharedSubjects.value = tpl.subjects ? tpl.subjects() : [{ type: 'person', id: null }]
+  subRules.value = [{
+    predicate: tpl.predicate,
+    params: tpl.params(),
+    not: false
+  }]
+  ensureMinimumSharedSubjects()
+}
 
-  // 应用到第一条子规则
-  if (subRules.value[0]) {
-    subRules.value[0].predicate = tpl.predicate
-    subRules.value[0].params = tpl.params()
-    subRules.value[0].not = false
-    ensureMinimumSharedSubjects()
-  }
+const handleQuickTemplate = (key) => {
+  applyQuickTemplate(key)
+  showTemplateDialog.value = false
+  applyFeedbackState()
 }
 
 watch(
@@ -673,6 +745,7 @@ onBeforeUnmount(() => {
     window.clearTimeout(feedbackTimer)
     feedbackTimer = null
   }
+  showTemplateDialog.value = false
 })
 
 defineExpose({
@@ -681,8 +754,53 @@ defineExpose({
 </script>
 
 <style scoped>
-.rule-builder { display: flex; flex-direction: column; gap: 14px; }
+.rule-builder {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.builder-content {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.builder-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 .builder-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--color-primary); }
+.template-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.template-button:hover {
+  background: var(--color-bg-subtle);
+}
+
 .sentence-builder { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: var(--color-surface); border-radius: 12px; border: 1px solid var(--color-border-light); }
 .builder-segment { display: flex; flex-direction: column; gap: 8px; }
 .seg-label { font-size: 12px; color: var(--color-text-muted); font-weight: 600; }
@@ -847,7 +965,219 @@ defineExpose({
 .preview-text-content { font-size: 13px; color: var(--color-text-primary); }
 .validation-warnings { display: flex; flex-direction: column; gap: 6px; }
 .warning-item { color: var(--color-warning); font-size: 12px; }
-.builder-footer { display: flex; gap: 8px; }
+.builder-footer {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--color-border-light);
+  background: var(--color-dialog-bg);
+}
 .btn-add, .btn-reset { border-radius: 8px; padding: 8px 12px; border: 1px solid var(--color-border-light); background: var(--color-surface); cursor: pointer; }
 .btn-add[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+.template-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-bg-overlay);
+}
+
+.template-dialog {
+  width: min(560px, calc(100vw - 48px));
+  max-height: min(720px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-dialog-bg);
+  box-shadow: var(--shadow-lg);
+}
+
+.template-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.template-dialog-header h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 16px;
+}
+
+.template-dialog-header p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.template-close-button {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.template-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.template-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-group h4 {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.template-option {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-option:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-subtle);
+}
+
+.template-option span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.template-option small {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .rule-builder {
+    height: 100%;
+  }
+
+  .builder-content {
+    padding-right: 0;
+  }
+
+  .builder-heading {
+    align-items: stretch;
+  }
+
+  .template-button {
+    min-height: 40px;
+  }
+
+  .sentence-builder {
+    padding: 12px;
+    gap: 14px;
+  }
+
+  .subject-row {
+    grid-template-columns: 1fr;
+  }
+
+  .rule-header-row {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .logic-placeholder {
+    display: none;
+  }
+
+  .logic-toggle,
+  .not-toggle,
+  .remove-rule-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .rule-selector-wrap {
+    flex-basis: calc(100% - 52px);
+  }
+
+  .seg-select,
+  .detail-select,
+  .detail-input,
+  .mini-btn,
+  .add-sub-rule-btn,
+  .priority-pill,
+  .btn-add,
+  .btn-reset {
+    min-height: 44px;
+  }
+
+  .inline-param {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .priority-pills {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .builder-footer {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .builder-footer .btn-add,
+  .builder-footer .btn-reset {
+    flex: 1;
+  }
+
+  .template-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .template-dialog {
+    width: 100%;
+    max-height: 82vh;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .template-groups {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0));
+  }
+}
 </style>

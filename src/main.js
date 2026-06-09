@@ -10,6 +10,61 @@ const hideLoading = () => {
   }
 }
 
+const preloadReloadStorageKey = 'sce:preload-error-reloaded'
+const preloadReloadQueryParam = 'sce-preload-reloaded'
+
+const getCurrentUrl = () => {
+  try {
+    return new URL(window.location.href)
+  } catch {
+    return null
+  }
+}
+
+const hasReloadedForPreloadError = () => {
+  const currentUrl = getCurrentUrl()
+  if (currentUrl?.searchParams.get(preloadReloadQueryParam) === '1') {
+    return true
+  }
+
+  try {
+    return sessionStorage.getItem(preloadReloadStorageKey) === '1'
+  } catch {
+    return false
+  }
+}
+
+const reloadAfterPreloadError = () => {
+  try {
+    sessionStorage.setItem(preloadReloadStorageKey, '1')
+  } catch {
+    // sessionStorage 不可用时使用 URL 标记兜底。
+  }
+
+  const currentUrl = getCurrentUrl()
+  if (currentUrl) {
+    currentUrl.searchParams.set(preloadReloadQueryParam, '1')
+    window.location.replace(currentUrl.toString())
+    return
+  }
+
+  window.location.reload()
+}
+
+const clearPreloadErrorReloadMark = () => {
+  try {
+    sessionStorage.removeItem(preloadReloadStorageKey)
+  } catch {
+    // 忽略存储异常，避免影响正常启动。
+  }
+
+  const currentUrl = getCurrentUrl()
+  if (currentUrl?.searchParams.has(preloadReloadQueryParam)) {
+    currentUrl.searchParams.delete(preloadReloadQueryParam)
+    window.history.replaceState(window.history.state, '', currentUrl.toString())
+  }
+}
+
 const renderFatalError = (error) => {
   const appRoot = document.getElementById('app')
   if (!appRoot) return
@@ -67,6 +122,18 @@ window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled promise rejection:', event.reason)
 })
 
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  console.error('Vite preload error:', event.payload)
+
+  if (!hasReloadedForPreloadError()) {
+    reloadAfterPreloadError()
+    return
+  }
+
+  renderFatalError(new Error('应用资源加载失败。请手动刷新页面，或清理浏览器缓存后重试。'))
+})
+
 const bootstrap = async () => {
   await import('./assets/main.css')
   await import('./styles/touch-optimization.css')
@@ -91,6 +158,7 @@ const bootstrap = async () => {
   if (appRoot) {
     appRoot.dataset.ready = 'true'
   }
+  clearPreloadErrorReloadMark()
   await new Promise((resolve) => requestAnimationFrame(resolve))
   hideLoading()
 }

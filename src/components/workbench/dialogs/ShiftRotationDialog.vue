@@ -142,7 +142,7 @@ const applySeatShift = () => {
 
 .workbench-dialog {
   width: min(560px, 100%);
-  max-height: min(720px, 90vh);
+  max-height: min(720px, calc(100vh - 48px));
   display: flex;
   flex-direction: column;
   background: var(--color-dialog-bg);
@@ -191,6 +191,8 @@ const applySeatShift = () => {
 }
 
 .dialog-body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
 }
@@ -286,6 +288,8 @@ const applySeatShift = () => {
   }
 
   .workbench-dialog {
+    width: 100%;
+    max-height: 92vh;
     border-radius: 12px 12px 0 0;
   }
 

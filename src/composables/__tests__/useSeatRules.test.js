@@ -3,24 +3,36 @@ import { useSeatRules } from '../useSeatRules'
 
 vi.mock('../useStudentData', () => ({
   useStudentData: () => ({
-    students: { value: [] }
+    students: {
+      value: [
+        { id: 1, name: '张三' },
+        { id: 2, name: '李四' },
+        { id: 3, name: '王五' }
+      ]
+    }
   })
 }))
 
 vi.mock('../useTagData', () => ({
   useTagData: () => ({
-    tags: { value: [] }
+    tags: { value: [{ id: 'care', name: '视力照顾' }] }
   })
 }))
 
 vi.mock('../useZoneData', () => ({
   useZoneData: () => ({
-    zones: { value: [] }
+    zones: { value: [{ id: 'front-zone', name: '前排照顾区' }] }
   })
 }))
 
 vi.mock('../useStudentAttributes', () => ({
   useStudentAttributes: () => ({
+    attributeDefinitions: {
+      value: [
+        { id: 'height', name: '身高', unit: 'cm' },
+        { id: 'score', name: '成绩', unit: '分' }
+      ]
+    },
     getAttributeById: (id) => id ? { id, name: id === 'height' ? '身高' : '成绩', unit: id === 'height' ? 'cm' : '分' } : undefined
   })
 }))
@@ -83,7 +95,64 @@ describe('useSeatRules', () => {
   })
 
   describe('renderRuleText', () => {
-    it('should render a negated composite sub-rule with a single negation marker', () => {
+    it('renders a single-student position rule as natural language', () => {
+      const text = seatRules.renderRuleText({
+        priority: 'required',
+        subjects: [{ type: 'person', id: 1 }],
+        predicate: 'IN_ROW_RANGE',
+        params: { minRow: 1, maxRow: 3 }
+      })
+
+      expect(text).toBe('张三必须坐在第 1 至 3 排。')
+    })
+
+    it('renders a pair relationship rule as natural language', () => {
+      const text = seatRules.renderRuleText({
+        priority: 'required',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        predicate: 'MUST_BE_SEATMATES',
+        params: {}
+      })
+
+      expect(text).toBe('张三和李四必须安排为同桌。')
+    })
+
+    it('renders a tag rule as natural language', () => {
+      const text = seatRules.renderRuleText({
+        priority: 'prefer',
+        subjects: [{ type: 'tag', id: 'care' }],
+        predicate: 'NOT_IN_COLUMN_TYPE',
+        params: { columnType: 'wall' }
+      })
+
+      expect(text).toBe('带有「视力照顾」标签的学生尽量不要坐在墙边列。')
+    })
+
+    it('renders an all-students numeric rule as natural language', () => {
+      const text = seatRules.renderRuleText({
+        priority: 'prefer',
+        subjects: [{ type: 'all', id: null }],
+        predicate: 'ATTRIBUTE_ROW_GRADIENT',
+        params: { attributeId: 'height', direction: 'lowFront' }
+      })
+
+      expect(text).toBe('全体学生尽量按身高（cm）形成低值靠前的前后梯度。')
+    })
+
+    it('renders a negated rule without structural negation markers', () => {
+      const text = seatRules.renderRuleText({
+        priority: 'prefer',
+        subjects: [{ type: 'person', id: 1 }],
+        predicate: 'IN_ROW_RANGE',
+        not: true,
+        params: { minRow: 1, maxRow: 2 }
+      })
+
+      expect(text).toBe('张三尽量不要坐在第 1 至 2 排。')
+      expect(text).not.toContain('[非]')
+    })
+
+    it('renders a composite rule as a natural-language sentence', () => {
       const text = seatRules.renderRuleText({
         priority: 'prefer',
         subjects: [{ type: 'person', id: 1 }],
@@ -102,8 +171,10 @@ describe('useSeatRules', () => {
         ]
       })
 
-      expect(text).toContain('[非]尽量坐在第 1～2 排')
-      expect(text).not.toContain('[非][非]')
+      expect(text).toBe('对张三，尽量同时满足：不要坐在第 1 至 2 排，并且避开墙边列。')
+      expect(text).not.toContain('[非]')
+      expect(text).not.toContain('对象集合')
+      expect(text).not.toContain('·')
     })
   })
 

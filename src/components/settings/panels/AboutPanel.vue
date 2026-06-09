@@ -46,6 +46,10 @@
           <BookOpen :size="18" />
           <span>用户手册</span>
         </button>
+        <button type="button" class="link-item link-button" @click="openIntro">
+          <Compass :size="18" />
+          <span>查看入门简介</span>
+        </button>
       </div>
     </div>
 
@@ -70,11 +74,12 @@
 
 <script setup>
 import { computed } from 'vue'
-import { BookOpen, Github, Heart, Cloud } from 'lucide-vue-next'
+import { BookOpen, Compass, Github, Heart, Cloud } from 'lucide-vue-next'
 import { appBuildInfo } from '@/constants/appBuildInfo'
 import { isTauriRuntime } from '@/platform/runtime'
 import { useAuth } from '@/composables/useAuth'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
+import { openWelcomeIntro } from '@/composables/useWelcomeOnboarding'
 
 const { openSettings } = useSettingsDialog()
 const { authType, currentUser, token, webdavConfig } = useAuth()
@@ -91,6 +96,10 @@ const versionSummary = computed(() => runtimeLabel.value)
 
 const openHelp = () => {
   openSettings('about', 'help')
+}
+
+const openIntro = () => {
+  openWelcomeIntro()
 }
 </script>
 

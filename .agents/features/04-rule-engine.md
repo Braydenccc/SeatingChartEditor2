@@ -50,7 +50,7 @@ const PREDICATE_META = {
 ```
 
 ## 4. 关键实现节点 (Implementation Details)
-- **自然语言渲染 (`renderRuleText`)**: 能够根据 `subjects` (主体), `predicate` (动词/条件), `params` (参数) 拼接成类似：`❗ 张三、李四 · 禁止同桌` 的字符串，用于展示在左侧列表。
+- **自然语言渲染 (`renderRuleText`)**: 能够根据 `subjects` (主体), `predicate` (动词/条件), `params` (参数), `priority` (优先级) 和 `not` / `subRules` 拼接成完整自然句，例如「张三必须坐在第 1 至 3 排。」或「对张三，尽量同时满足：不要坐在第 1 至 2 排，并且避开墙边列。」。规则列表、效果预览、排位报告和冲突提示都应复用此函数，避免直接展示 `对象集合(...)`、`[非]` 或内部谓词名。
 - **平埔展开 (`expandEntriesToStudentIds`)**: 由于规则主体支持“标签(Tag)”，真正的算法计算前，必须利用此函数将一个规则平铺展开成若干个“学生实例(StudentId)”。
 - **全体主体 (`type: 'all'`)**: 用于数值参考等班级级规则，展开时表示当前学生列表中的全部学生，不需要额外 `id`。
 - **数值参考谓词**: `ATTRIBUTE_ROW_GRADIENT`、`ATTRIBUTE_GROUP_BALANCE`、`ATTRIBUTE_PAIR_DELTA`、`ATTRIBUTE_DISTRIBUTE_BANDS` 通过 `params.attributeId` 绑定学生数值属性。`PREDICATE_META` 支持 `attribute` 参数类型，由规则 UI 渲染为属性选择器。

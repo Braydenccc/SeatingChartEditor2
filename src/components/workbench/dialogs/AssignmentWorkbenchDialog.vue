@@ -1,6 +1,9 @@
 <template>
   <div v-if="visible" class="dialog-overlay" @click.self="emit('close')">
-    <section class="workbench-dialog">
+    <section
+      class="workbench-dialog"
+      :class="{ 'rule-mobile-editor-active': activePanel === 'rules' && mobileRulePage === 'editor' }"
+    >
       <header class="dialog-header">
         <div>
           <h2>智能排位与规则</h2>
@@ -25,7 +28,7 @@
         </button>
       </nav>
 
-      <div class="dialog-body">
+      <div class="dialog-body" :class="{ 'rules-body': activePanel === 'rules' }">
         <template v-if="activePanel === 'run'">
           <section class="summary-strip">
             <div><span>学生</span><strong>{{ students.length }}</strong></div>
@@ -104,8 +107,12 @@
         </template>
 
         <template v-else-if="activePanel === 'rules'">
-          <div class="rule-workbench">
-            <section class="rule-pane list-pane">
+          <div class="rule-workbench" :class="{ 'show-mobile-editor': mobileRulePage === 'editor' }">
+            <section class="rule-pane rule-left-pane">
+              <button class="add-rule-button" @click="handleCreateRule">
+                <Plus :size="15" stroke-width="2" />
+                <span>添加规则</span>
+              </button>
               <RuleList
                 ref="ruleListRef"
                 :focus-rule-id="focusRuleId"
@@ -114,35 +121,30 @@
                 @edit="handleEditRule"
               />
             </section>
-            <section class="rule-pane editor-pane">
+            <section v-if="isRuleEditorOpen" class="rule-pane editor-pane">
+              <div class="mobile-rule-editor-header">
+                <button class="icon-button" title="返回规则列表" @click="closeRuleEditor">
+                  <ArrowLeft :size="18" stroke-width="2" />
+                </button>
+                <h3>{{ isEditingRule ? '编辑规则' : '添加规则' }}</h3>
+              </div>
               <RuleBuilder
                 ref="ruleBuilderRef"
                 :editing-rule="editingRule"
                 @added="onRuleAdded"
-                @cancel-edit="editingRuleId = ''"
+                @cancel-edit="closeRuleEditor"
               />
             </section>
-            <aside class="rule-pane quick-pane">
-              <div class="quick-panel">
-                <div class="quick-panel-head">
-                  <Wand2 :size="16" stroke-width="2" />
-                  <div>
-                    <h3>快捷方案</h3>
-                    <p>选择场景后补齐对象和参数</p>
-                  </div>
+            <aside v-else class="rule-pane empty-editor-pane">
+              <div class="empty-editor-panel">
+                <div>
+                  <h3>选择一条规则进行编辑</h3>
+                  <p>也可以新建规则，在编辑窗口中使用快捷方案快速填充常见约束。</p>
                 </div>
-                <section v-for="group in quickTemplateGroups" :key="group.title" class="quick-section">
-                  <div class="quick-section-title">{{ group.title }}</div>
-                  <button
-                    v-for="option in group.options"
-                    :key="option.key"
-                    class="quick-option"
-                    @click="applyTemplate(option.key)"
-                  >
-                    <span>{{ option.title }}</span>
-                    <small>{{ option.desc }}</small>
-                  </button>
-                </section>
+                <button class="add-rule-button" @click="handleCreateRule">
+                  <Plus :size="15" stroke-width="2" />
+                  <span>添加规则</span>
+                </button>
               </div>
             </aside>
           </div>
@@ -180,7 +182,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { BookOpen, CircleAlert, CircleX, Loader2, Play, Scale, Sliders, Wand2, X } from 'lucide-vue-next'
+import { ArrowLeft, BookOpen, CircleAlert, CircleX, Loader2, Play, Plus, Scale, Sliders, X } from 'lucide-vue-next'
 import ZoneList from '@/components/zone/ZoneList.vue'
 import AssignmentInlineReport from '@/components/rule/AssignmentInlineReport.vue'
 import RuleBuilder from '@/components/rule/RuleBuilder.vue'
@@ -232,6 +234,8 @@ const activePanel = ref('run')
 const ruleListRef = ref(null)
 const ruleBuilderRef = ref(null)
 const editingRuleId = ref('')
+const creatingRule = ref(false)
+const mobileRulePage = ref('list')
 const lastAssignmentReport = ref(null)
 const lastAssignmentDuration = ref(0)
 const precheckResult = ref(null)
@@ -243,38 +247,13 @@ const editingRule = computed(() => {
   if (!editingRuleId.value) return null
   return rules.value.find(rule => rule.id === editingRuleId.value) || null
 })
+const isEditingRule = computed(() => !!editingRule.value)
+const isRuleEditorOpen = computed(() => creatingRule.value || isEditingRule.value)
 const panelTabs = computed(() => [
   { key: 'run', icon: Play, label: '执行排位', badge: null },
   { key: 'rules', icon: Scale, label: '规则管理', badge: ruleCount.value > 0 ? ruleCount.value : null },
   { key: 'guide', icon: BookOpen, label: '使用说明', badge: null }
 ])
-
-const quickTemplateGroups = [
-  {
-    title: '位置照顾',
-    options: [
-      { key: 'front-row', title: '前排优先', desc: '给需要关注的学生限定前几排' },
-      { key: 'avoid-window', title: '避开窗边', desc: '减少靠墙或窗边位置影响' }
-    ]
-  },
-  {
-    title: '同桌关系',
-    options: [
-      { key: 'deskmates', title: '安排同桌', desc: '把两个指定学生安排为同桌' },
-      { key: 'avoid-deskmates', title: '禁止同桌', desc: '避免两个学生成为同桌' },
-      { key: 'keep-distance', title: '保持距离', desc: '让指定学生之间隔开距离' }
-    ]
-  },
-  {
-    title: '全班均衡',
-    options: [
-      { key: 'spread-group', title: '标签分散', desc: '把同标签学生尽量分散' },
-      { key: 'height-gradient', title: '身高梯度', desc: '按身高形成前后梯度' },
-      { key: 'score-balance', title: '成绩均衡', desc: '让各大组平均成绩接近' },
-      { key: 'score-bands', title: '成绩分层', desc: '按成绩分层后均匀分布' }
-    ]
-  }
-]
 
 const precheckRiskText = computed(() => {
   if (!precheckResult.value) return '未评估'
@@ -404,32 +383,47 @@ const handleImportRules = async () => {
 }
 
 const handleEditRule = (ruleId) => {
+  creatingRule.value = false
   editingRuleId.value = ruleId
+  mobileRulePage.value = 'editor'
 }
 
 const onRuleAdded = () => {
-  editingRuleId.value = ''
+  closeRuleEditor()
 }
 
-const applyTemplate = (key) => {
-  ruleBuilderRef.value?.applyQuickTemplate?.(key)
+const closeRuleEditor = () => {
+  creatingRule.value = false
+  editingRuleId.value = ''
+  mobileRulePage.value = 'list'
+}
+
+const handleCreateRule = () => {
+  editingRuleId.value = ''
+  creatingRule.value = true
+  mobileRulePage.value = 'editor'
 }
 
 watch(() => props.visible, (visible) => {
   if (visible) {
     activePanel.value = props.initialPanel || 'run'
+    if ((props.initialPanel || 'run') === 'rules') mobileRulePage.value = 'list'
   } else {
-    editingRuleId.value = ''
+    closeRuleEditor()
   }
 }, { immediate: true })
 
 watch(() => props.initialPanel, (panel) => {
-  if (props.visible && panel) activePanel.value = panel
+  if (props.visible && panel) {
+    activePanel.value = panel
+    if (panel === 'rules') mobileRulePage.value = 'list'
+  }
 })
 
 watch(() => props.focusRuleId, (ruleId) => {
   if (!props.visible || !ruleId) return
   activePanel.value = 'rules'
+  mobileRulePage.value = 'list'
   nextTick(() => {
     ruleListRef.value?.focusRule?.(ruleId)
   })
@@ -466,8 +460,9 @@ onBeforeUnmount(() => {
 }
 
 .workbench-dialog {
-  width: min(1180px, 100%);
-  max-height: min(820px, 92vh);
+  width: min(1280px, calc(100vw - 48px));
+  height: min(860px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
   background: var(--color-dialog-bg);
@@ -553,8 +548,14 @@ onBeforeUnmount(() => {
 }
 
 .dialog-body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
+}
+
+.dialog-body.rules-body {
+  overflow: hidden;
 }
 
 .footer-stats {
@@ -678,91 +679,82 @@ onBeforeUnmount(() => {
 
 .rule-workbench {
   display: grid;
-  grid-template-columns: minmax(280px, 0.95fr) minmax(380px, 1.25fr) minmax(240px, 0.75fr);
+  grid-template-columns: minmax(360px, 0.9fr) minmax(420px, 1.1fr);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
+  height: 100%;
+  min-height: 0;
 }
 
 .rule-pane {
   min-width: 0;
+  min-height: 0;
 }
 
-.list-pane,
+.rule-left-pane,
+.empty-editor-pane {
+  height: 100%;
+  overflow-y: auto;
+}
+
 .editor-pane {
-  max-height: calc(92vh - 220px);
-  overflow: auto;
+  height: 100%;
+  overflow: hidden;
 }
 
-.quick-panel {
+.rule-left-pane {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 12px;
+}
+
+.add-rule-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.add-rule-button:hover {
+  background: var(--color-primary-hover);
+}
+
+.mobile-rule-editor-header {
+  display: none;
+}
+
+.empty-editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+  min-height: 100%;
+  padding: 24px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-surface);
 }
 
-.quick-panel-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  color: var(--color-primary);
-}
-
-.quick-panel-head h3 {
+.empty-editor-panel h3 {
   margin: 0;
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: 15px;
 }
 
-.quick-panel-head p {
-  margin: 4px 0 0;
+.empty-editor-panel p {
+  margin: 6px 0 0;
   color: var(--color-text-muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.quick-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.quick-section-title {
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.quick-option {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  width: 100%;
-  padding: 9px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-  text-align: left;
-  cursor: pointer;
-}
-
-.quick-option:hover {
-  border-color: var(--color-primary);
-  background: var(--color-bg-subtle);
-}
-
-.quick-option span {
   font-size: 13px;
-  font-weight: 700;
-}
-
-.quick-option small {
-  color: var(--color-text-muted);
-  font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .precheck-card {
@@ -847,6 +839,9 @@ onBeforeUnmount(() => {
   }
 
   .workbench-dialog {
+    width: 100%;
+    height: 92vh;
+    max-height: 92vh;
     border-radius: 12px 12px 0 0;
   }
 
@@ -860,12 +855,58 @@ onBeforeUnmount(() => {
 
   .rule-workbench {
     grid-template-columns: 1fr;
+    height: 100%;
+    min-height: 0;
   }
 
-  .list-pane,
-  .editor-pane {
+  .dialog-body.rules-body {
+    overflow: hidden;
+  }
+
+  .rule-left-pane,
+  .editor-pane,
+  .empty-editor-pane {
+    height: 100%;
     max-height: none;
-    overflow: visible;
+    overflow-y: auto;
+  }
+
+  .rule-workbench.show-mobile-editor .rule-left-pane,
+  .rule-workbench:not(.show-mobile-editor) .editor-pane,
+  .rule-workbench:not(.show-mobile-editor) .empty-editor-pane {
+    display: none;
+  }
+
+  .mobile-rule-editor-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+
+  .mobile-rule-editor-header h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 16px;
+  }
+
+  .rule-mobile-editor-active .dialog-header,
+  .rule-mobile-editor-active .workbench-tabs,
+  .rule-mobile-editor-active .dialog-footer {
+    display: none;
+  }
+
+  .workbench-dialog.rule-mobile-editor-active {
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .rule-mobile-editor-active .dialog-body {
+    padding: 14px;
   }
 
   .dialog-footer {

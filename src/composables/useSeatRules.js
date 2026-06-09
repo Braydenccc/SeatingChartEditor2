@@ -9,8 +9,6 @@ import { useZoneData } from './useZoneData'
 import { useStudentAttributes } from './useStudentAttributes'
 import {
   RulePriority,
-  PRIORITY_ICONS,
-  PRIORITY_LABELS,
   RULE_TYPE_LABELS,
   COLUMN_TYPE_LABELS,
   SCOPE_LABELS,
@@ -154,193 +152,208 @@ export function useSeatRules() {
     return attribute.unit ? `${attribute.name}（${attribute.unit}）` : attribute.name
   }
 
-  const getSubjectsText = (subjects) => {
-    return (subjects || [])
-      .map(entry => {
-        if (entry.type === 'person') return getStudentName(entry.id)
-        if (entry.type === 'tag') return `[${getTagName(entry.id)}]全体`
-        if (entry.type === 'all') return '全体学生'
-        return ''
-      })
-      .filter(Boolean)
-      .join('、')
+  const getEntryText = (entry) => {
+    if (!entry) return '未选择对象'
+    if (entry.type === 'person') {
+      return entry.id ? getStudentName(entry.id) : '未选择学生的对象'
+    }
+    if (entry.type === 'tag') {
+      return entry.id ? `带有「${getTagName(entry.id)}」标签的学生` : '未选择标签的对象'
+    }
+    if (entry.type === 'all') return '全体学生'
+    return '未选择对象'
+  }
+
+  const joinNatural = (items) => {
+    const list = (items || []).filter(Boolean)
+    if (list.length === 0) return '未选择对象'
+    if (list.length === 1) return list[0]
+    if (list.length === 2) return `${list[0]}和${list[1]}`
+    return `${list.slice(0, -1).join('、')}和${list[list.length - 1]}`
+  }
+
+  const getSubjectsText = (subjects) => joinNatural((subjects || []).map(getEntryText))
+  const getSubjectPhrase = (subjects) => getSubjectsText(subjects)
+
+  const getPairPhrase = (subjects) => {
+    const entries = subjects || []
+    if (entries.length < 2) return `${getSubjectsText(entries)}之间`
+    return joinNatural(entries.map(getEntryText))
+  }
+
+  const getOrderedPairPhrase = (subjects) => {
+    const entries = subjects || []
+    return {
+      first: getEntryText(entries[0]),
+      second: getEntryText(entries[1])
+    }
+  }
+
+  const getPriorityWord = (priority, negative = false) => {
+    if (priority === RulePriority.REQUIRED) return negative ? '不能' : '必须'
+    if (priority === RulePriority.OPTIONAL) return negative ? '可作为参考，尽量不要' : '可作为参考，尽量'
+    return negative ? '尽量不要' : '尽量'
+  }
+
+  const getRangeText = (min, max) => `${min ?? '未设置'} 至 ${max ?? '未设置'}`
+  const finishSentence = (text) => text.endsWith('。') ? text : `${text}。`
+
+  const renderConditionPhrase = (predicate, params = {}, not = false, subjects = []) => {
+    const subject = getSubjectPhrase(subjects)
+    const pair = getPairPhrase(subjects)
+    switch (predicate) {
+      case 'IN_ROW_RANGE':
+        return `${not ? '不要' : ''}坐在第 ${getRangeText(params.minRow, params.maxRow)} 排`
+      case 'NOT_IN_COLUMN_TYPE':
+        return not
+          ? `可以坐在${COLUMN_TYPE_LABELS[params.columnType] ?? params.columnType ?? '未设置列类型'}`
+          : `避开${COLUMN_TYPE_LABELS[params.columnType] ?? params.columnType ?? '未设置列类型'}`
+      case 'IN_ZONE':
+        return `${not ? '不要' : ''}坐在「${getZoneName(params.zoneId)}」选区内`
+      case 'NOT_IN_ZONE':
+        return not
+          ? `可以坐在「${getZoneName(params.zoneId)}」选区内`
+          : `避开「${getZoneName(params.zoneId)}」选区`
+      case 'IN_GROUP_RANGE':
+        return `${not ? '不要' : ''}坐在第 ${getRangeText(params.minGroup, params.maxGroup)} 大组`
+      case 'MUST_BE_SEATMATES':
+        return not ? '不要安排为同桌' : '安排为同桌'
+      case 'MUST_NOT_BE_SEATMATES':
+        return not ? '可以成为同桌' : '不要成为同桌'
+      case 'DISTANCE_AT_MOST':
+        return `${not ? '不要' : ''}让彼此距离不超过 ${params.distance ?? '未设置'} 个座位`
+      case 'DISTANCE_AT_LEAST':
+        return `${not ? '不要' : ''}让彼此至少相隔 ${params.distance ?? '未设置'} 个座位`
+      case 'NOT_BLOCK_VIEW': {
+        const { first, second } = getOrderedPairPhrase(subjects)
+        const tolerance = params.tolerance === 1 ? '（含斜向）' : ''
+        return not ? `允许${first}遮挡${second}的视线${tolerance}` : `避免${first}遮挡${second}的视线${tolerance}`
+      }
+      case 'MUST_BE_SAME_GROUP':
+        return not ? '不要安排在同一大组' : '安排在同一大组'
+      case 'MUST_NOT_BE_SAME_GROUP':
+        return not ? '可以安排在同一大组' : '安排在不同大组'
+      case 'MUST_BE_ADJACENT_ROW':
+        return not ? '不要安排在相邻排' : '安排在相邻排'
+      case 'DISTRIBUTE_EVENLY':
+        return not ? '不要刻意均匀分散' : '均匀分散并尽量拉开彼此距离'
+      case 'CLUSTER_TOGETHER':
+        return not
+          ? `不要聚集在同一${SCOPE_LABELS[params.scope] ?? params.scope ?? '范围'}`
+          : `聚集在同一${SCOPE_LABELS[params.scope] ?? params.scope ?? '范围'}`
+      case 'ATTRIBUTE_ROW_GRADIENT':
+        return not
+          ? `不要按${getAttributeName(params.attributeId)}形成${params.direction === 'highFront' ? '高值靠前' : '低值靠前'}的前后梯度`
+          : `按${getAttributeName(params.attributeId)}形成${params.direction === 'highFront' ? '高值靠前' : '低值靠前'}的前后梯度`
+      case 'ATTRIBUTE_GROUP_BALANCE':
+        return not
+          ? `不要让各大组${params.aggregate === 'sum' ? '合计' : '平均'}${getAttributeName(params.attributeId)}接近`
+          : `让各大组${params.aggregate === 'sum' ? '合计' : '平均'}${getAttributeName(params.attributeId)}尽量接近`
+      case 'ATTRIBUTE_PAIR_DELTA':
+        return not
+          ? `不要限制${pair}的${getAttributeName(params.attributeId)}差值`
+          : `让${pair}的${getAttributeName(params.attributeId)}差值不超过 ${params.maxDelta ?? '未设置'}`
+      case 'ATTRIBUTE_DISTRIBUTE_BANDS':
+        return not
+          ? `不要按${getAttributeName(params.attributeId)}分层分散`
+          : `按${getAttributeName(params.attributeId)}分 ${params.bandCount ?? '未设置'} 层均匀分散`
+      default:
+        return RULE_TYPE_LABELS[predicate] ?? predicate ?? '未选择规则类型'
+    }
+  }
+
+  const renderSingleRuleText = (ruleLike, { includePriority = true } = {}) => {
+    const normalized = normalizeRuleShape(ruleLike)
+    const subjects = normalized.subjects || []
+    const params = ruleLike.params || {}
+    const priority = ruleLike.priority || RulePriority.PREFER
+    const subject = getSubjectPhrase(subjects)
+    const pair = getPairPhrase(subjects)
+    const priorityWord = includePriority ? getPriorityWord(priority, ruleLike.not) : (ruleLike.not ? '不要' : '')
+    const positivePriorityWord = includePriority ? getPriorityWord(priority, false) : ''
+    const negativePriorityWord = includePriority ? getPriorityWord(priority, true) : '不要'
+
+    switch (ruleLike.predicate) {
+      case 'IN_ROW_RANGE':
+        return finishSentence(`${subject}${priorityWord}坐在第 ${getRangeText(params.minRow, params.maxRow)} 排`)
+      case 'NOT_IN_COLUMN_TYPE':
+        return finishSentence(`${subject}${ruleLike.not ? positivePriorityWord : negativePriorityWord}坐在${COLUMN_TYPE_LABELS[params.columnType] ?? params.columnType ?? '未设置列类型'}`)
+      case 'IN_ZONE':
+        return finishSentence(`${subject}${priorityWord}坐在「${getZoneName(params.zoneId)}」选区内`)
+      case 'NOT_IN_ZONE':
+        return finishSentence(`${subject}${ruleLike.not ? positivePriorityWord : negativePriorityWord}坐在「${getZoneName(params.zoneId)}」选区内`)
+      case 'IN_GROUP_RANGE':
+        return finishSentence(`${subject}${priorityWord}坐在第 ${getRangeText(params.minGroup, params.maxGroup)} 大组`)
+      case 'MUST_BE_SEATMATES':
+        return finishSentence(`${pair}${ruleLike.not ? negativePriorityWord : positivePriorityWord}安排为同桌`)
+      case 'MUST_NOT_BE_SEATMATES':
+        return finishSentence(`${pair}${ruleLike.not ? positivePriorityWord : negativePriorityWord}成为同桌`)
+      case 'DISTANCE_AT_MOST':
+        return finishSentence(`${pair}${priorityWord}距离不超过 ${params.distance ?? '未设置'} 个座位`)
+      case 'DISTANCE_AT_LEAST':
+        return finishSentence(`${pair}${priorityWord}至少相隔 ${params.distance ?? '未设置'} 个座位`)
+      case 'NOT_BLOCK_VIEW': {
+        const { first, second } = getOrderedPairPhrase(subjects)
+        const tolerance = params.tolerance === 1 ? '（含斜向）' : ''
+        if (ruleLike.not) return finishSentence(`${first}可以遮挡${second}的视线${tolerance}`)
+        if (!includePriority || priority === RulePriority.REQUIRED) {
+          return finishSentence(`${first}${negativePriorityWord}遮挡${second}的视线${tolerance}`)
+        }
+        return finishSentence(`${negativePriorityWord}让${first}遮挡${second}的视线${tolerance}`)
+      }
+      case 'MUST_BE_SAME_GROUP':
+        return finishSentence(`${pair}${ruleLike.not ? negativePriorityWord : positivePriorityWord}安排在同一大组`)
+      case 'MUST_NOT_BE_SAME_GROUP':
+        return finishSentence(`${pair}${ruleLike.not ? positivePriorityWord : negativePriorityWord}安排在同一大组`)
+      case 'MUST_BE_ADJACENT_ROW':
+        return finishSentence(`${pair}${ruleLike.not ? negativePriorityWord : positivePriorityWord}安排在相邻排`)
+      case 'DISTRIBUTE_EVENLY':
+        return finishSentence(`${subject}${ruleLike.not ? negativePriorityWord : positivePriorityWord}均匀分散，尽量拉开彼此距离`)
+      case 'CLUSTER_TOGETHER':
+        return finishSentence(`${subject}${priorityWord}聚集在同一${SCOPE_LABELS[params.scope] ?? params.scope ?? '范围'}`)
+      case 'ATTRIBUTE_ROW_GRADIENT':
+        return finishSentence(`${subject}${priorityWord}按${getAttributeName(params.attributeId)}形成${params.direction === 'highFront' ? '高值靠前' : '低值靠前'}的前后梯度`)
+      case 'ATTRIBUTE_GROUP_BALANCE':
+        return finishSentence(`${subject}${priorityWord}让各大组${params.aggregate === 'sum' ? '合计' : '平均'}${getAttributeName(params.attributeId)}接近`)
+      case 'ATTRIBUTE_PAIR_DELTA':
+        return finishSentence(`${pair}${priorityWord}让${getAttributeName(params.attributeId)}差值不超过 ${params.maxDelta ?? '未设置'}`)
+      case 'ATTRIBUTE_DISTRIBUTE_BANDS':
+        return finishSentence(`${subject}${priorityWord}按${getAttributeName(params.attributeId)}分 ${params.bandCount ?? '未设置'} 层均匀分散`)
+      default:
+        return finishSentence(`${subject}${positivePriorityWord}${RULE_TYPE_LABELS[ruleLike.predicate] ?? ruleLike.predicate ?? '未选择规则类型'}`)
+    }
+  }
+
+  const renderCompositeRuleText = (rule, { includePriority = true } = {}) => {
+    const normalized = normalizeRuleShape(rule)
+    const subject = getSubjectPhrase(normalized.subjects)
+    const operator = rule.logicOperator === 'OR' ? '满足其中一项' : '同时满足'
+    const joiner = rule.logicOperator === 'OR' ? '，或者' : '，并且'
+    const priorityText = includePriority
+      ? (rule.priority === RulePriority.REQUIRED ? '要求' : getPriorityWord(rule.priority, false))
+      : '需要'
+    const subTexts = rule.subRules
+      .filter(sr => sr?.predicate)
+      .map(sr => renderConditionPhrase(sr.predicate, sr.params, sr.not, normalized.subjects))
+
+    if (subTexts.length === 0) {
+      return finishSentence(`对${subject}，尚未选择规则条件`)
+    }
+    return finishSentence(`对${subject}，${priorityText}${operator}：${subTexts.join(joiner)}`)
   }
 
   const renderRuleText = (rule) => {
-    const priorityLabel = PRIORITY_LABELS[rule.priority] ?? ''
-    const normalized = normalizeRuleShape(rule)
-
-    // 支持复合规则（多规则组合）
-    if (rule.subRules && rule.subRules.length > 1) {
-      const logicOp = rule.logicOperator === 'OR' ? ' 或 ' : ' 且 '
-      const subTexts = rule.subRules.map((sr, idx) => {
-        return renderSingleRuleText(sr.predicate, sr.params, sr.not, normalized.subjects, priorityLabel)
-      })
-      return `${getSubjectsText(normalized.subjects)} · (${subTexts.join(logicOp)})`
+    if (rule?.subRules && rule.subRules.length > 1) {
+      return renderCompositeRuleText(rule)
     }
-
-    // 单条规则（支持 not 取反）
-    return renderSingleRuleText(rule.predicate, rule.params, rule.not, normalized.subjects, priorityLabel)
-  }
-
-  /**
-   * 渲染单条规则的文本
-   */
-  const renderSingleRuleText = (predicate, params, not, subjects, priorityLabel) => {
-    const relation = PREDICATE_META[predicate]?.relation || 'single'
-    const subjectText = relation === 'single'
-      ? getSubjectsText(subjects)
-      : `对象集合(${getSubjectsText(subjects)})`
-
-    let predicateText = ''
-    switch (predicate) {
-      case 'IN_ROW_RANGE':
-        predicateText = `${priorityLabel}坐在第 ${params.minRow}～${params.maxRow} 排`
-        break
-      case 'NOT_IN_COLUMN_TYPE':
-        predicateText = `${priorityLabel}不坐在${COLUMN_TYPE_LABELS[params.columnType] ?? params.columnType}`
-        break
-      case 'IN_ZONE':
-        predicateText = `${priorityLabel}在「${getZoneName(params.zoneId)}」选区`
-        break
-      case 'NOT_IN_ZONE':
-        predicateText = `${priorityLabel}不在「${getZoneName(params.zoneId)}」选区`
-        break
-      case 'IN_GROUP_RANGE':
-        predicateText = `${priorityLabel}在第 ${params.minGroup}～${params.maxGroup} 大组`
-        break
-      case 'MUST_BE_SEATMATES':
-        predicateText = '必须同桌'
-        break
-      case 'MUST_NOT_BE_SEATMATES':
-        predicateText = '禁止同桌'
-        break
-      case 'DISTANCE_AT_MOST':
-        predicateText = `${priorityLabel}距离不超过 ${params.distance} 个座位`
-        break
-      case 'DISTANCE_AT_LEAST':
-        predicateText = `${priorityLabel}距离至少 ${params.distance} 个座位`
-        break
-      case 'NOT_BLOCK_VIEW': {
-        const tol = params.tolerance === 1 ? '（含斜向）' : ''
-        predicateText = `不可遮挡视线${tol}`
-        break
-      }
-      case 'MUST_BE_SAME_GROUP':
-        predicateText = '必须同大组'
-        break
-      case 'MUST_NOT_BE_SAME_GROUP':
-        predicateText = '必须不同大组'
-        break
-      case 'MUST_BE_ADJACENT_ROW':
-        predicateText = `${priorityLabel}相邻排`
-        break
-      case 'DISTRIBUTE_EVENLY':
-        predicateText = `${priorityLabel}互相保持距离（最大化直线距离）`
-        break
-      case 'CLUSTER_TOGETHER':
-        predicateText = `${priorityLabel}聚集在同一${SCOPE_LABELS[params.scope] ?? params.scope}`
-        break
-      case 'ATTRIBUTE_ROW_GRADIENT':
-        predicateText = `${priorityLabel}按${getAttributeName(params.attributeId)}${params.direction === 'highFront' ? '高值靠前' : '低值靠前'}`
-        break
-      case 'ATTRIBUTE_GROUP_BALANCE':
-        predicateText = `${priorityLabel}让各大组${params.aggregate === 'sum' ? '合计' : '平均'}${getAttributeName(params.attributeId)}尽量接近`
-        break
-      case 'ATTRIBUTE_PAIR_DELTA':
-        predicateText = `${priorityLabel}${getAttributeName(params.attributeId)}差值不超过 ${params.maxDelta}`
-        break
-      case 'ATTRIBUTE_DISTRIBUTE_BANDS':
-        predicateText = `${priorityLabel}按${getAttributeName(params.attributeId)}分 ${params.bandCount} 层均匀分散`
-        break
-      default:
-        predicateText = RULE_TYPE_LABELS[predicate] ?? predicate
-    }
-
-    // 应用 NOT 取反前缀
-    if (not) {
-      predicateText = `[非]${predicateText}`
-    }
-
-    return `${subjectText} · ${predicateText}`
+    return renderSingleRuleText(rule)
   }
 
   const renderRuleTextWithoutPriority = (rule) => {
-    const priorityLabel = PRIORITY_LABELS[rule.priority] ?? ''
-    const { predicate, params } = rule
-    const normalized = normalizeRuleShape(rule)
-
-    const relation = PREDICATE_META[predicate]?.relation || 'single'
-    const subjectText = relation === 'single'
-      ? getSubjectsText(normalized.subjects)
-      : `对象集合(${getSubjectsText(normalized.subjects)})`
-
-    let predicateText = ''
-    switch (predicate) {
-      case 'IN_ROW_RANGE':
-        predicateText = `${priorityLabel}坐在第 ${params.minRow}～${params.maxRow} 排`
-        break
-      case 'NOT_IN_COLUMN_TYPE':
-        predicateText = `${priorityLabel}不坐在${COLUMN_TYPE_LABELS[params.columnType] ?? params.columnType}`
-        break
-      case 'IN_ZONE':
-        predicateText = `${priorityLabel}在「${getZoneName(params.zoneId)}」选区`
-        break
-      case 'NOT_IN_ZONE':
-        predicateText = `${priorityLabel}不在「${getZoneName(params.zoneId)}」选区`
-        break
-      case 'IN_GROUP_RANGE':
-        predicateText = `${priorityLabel}在第 ${params.minGroup}～${params.maxGroup} 大组`
-        break
-      case 'MUST_BE_SEATMATES':
-        predicateText = '必须同桌'
-        break
-      case 'MUST_NOT_BE_SEATMATES':
-        predicateText = '禁止同桌'
-        break
-      case 'DISTANCE_AT_MOST':
-        predicateText = `${priorityLabel}距离不超过 ${params.distance} 个座位`
-        break
-      case 'DISTANCE_AT_LEAST':
-        predicateText = `${priorityLabel}距离至少 ${params.distance} 个座位`
-        break
-      case 'NOT_BLOCK_VIEW': {
-        const tol = params.tolerance === 1 ? '（含斜向）' : ''
-        predicateText = `不可遮挡视线${tol}`
-        break
-      }
-      case 'MUST_BE_SAME_GROUP':
-        predicateText = '必须同大组'
-        break
-      case 'MUST_NOT_BE_SAME_GROUP':
-        predicateText = '必须不同大组'
-        break
-      case 'MUST_BE_ADJACENT_ROW':
-        predicateText = `${priorityLabel}相邻排`
-        break
-      case 'DISTRIBUTE_EVENLY':
-        predicateText = `${priorityLabel}互相保持距离（最大化直线距离）`
-        break
-      case 'CLUSTER_TOGETHER':
-        predicateText = `${priorityLabel}聚集在同一${SCOPE_LABELS[params.scope] ?? params.scope}`
-        break
-      case 'ATTRIBUTE_ROW_GRADIENT':
-        predicateText = `${priorityLabel}按${getAttributeName(params.attributeId)}${params.direction === 'highFront' ? '高值靠前' : '低值靠前'}`
-        break
-      case 'ATTRIBUTE_GROUP_BALANCE':
-        predicateText = `${priorityLabel}让各大组${params.aggregate === 'sum' ? '合计' : '平均'}${getAttributeName(params.attributeId)}尽量接近`
-        break
-      case 'ATTRIBUTE_PAIR_DELTA':
-        predicateText = `${priorityLabel}${getAttributeName(params.attributeId)}差值不超过 ${params.maxDelta}`
-        break
-      case 'ATTRIBUTE_DISTRIBUTE_BANDS':
-        predicateText = `${priorityLabel}按${getAttributeName(params.attributeId)}分 ${params.bandCount} 层均匀分散`
-        break
-      default:
-        predicateText = RULE_TYPE_LABELS[predicate] ?? predicate
+    if (rule?.subRules && rule.subRules.length > 1) {
+      return renderCompositeRuleText(rule, { includePriority: false })
     }
-
-    return `${subjectText} · ${predicateText}`
+    return renderSingleRuleText(rule, { includePriority: false })
   }
 
   const validateRule = (ruleData) => {
