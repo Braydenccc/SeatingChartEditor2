@@ -92,7 +92,7 @@
   --seat-card-transition: 0.18s ease;
   --seat-card-shadow-hover: 0 4px 12px var(--shadow-lg);
   --seat-card-shadow-drag: 0 8px 24px color-mix(in srgb, var(--color-primary) 35%, transparent);
-  --candidate-card-height: 56px;
+  --candidate-card-height: 68px;
   --candidate-card-radius: 8px;
   --student-card-face-gap: 4px;
   --student-card-face-padding: 8px;

@@ -643,7 +643,7 @@ const getDragData = (e) => {
   }
 
   .student-list-container.display-compact .student-items {
-    --candidate-card-height: 50px;
+    --candidate-card-height: 60px;
     padding: 6px 8px;
     grid-template-columns: 1fr;
     grid-auto-rows: var(--candidate-card-height);

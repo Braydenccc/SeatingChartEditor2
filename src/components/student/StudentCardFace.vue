@@ -383,4 +383,41 @@ const hasNumericAttributes = computed(() => visibleStudentAttributes.value.lengt
   --student-card-tag-text-size: 7px;
   --student-card-attribute-size: 7px;
 }
+
+.student-card-face.variant-candidate.density-compact .face-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-auto-rows: min-content;
+  align-content: center;
+  align-items: center;
+  justify-items: start;
+  gap: 4px 8px;
+  padding: 7px 10px;
+}
+
+.student-card-face.variant-candidate.density-compact .student-name {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.student-card-face.variant-candidate.density-compact .student-number {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  max-width: 72px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-card-face.variant-candidate.density-compact .student-tags,
+.student-card-face.variant-candidate.density-compact .student-tags-text,
+.student-card-face.variant-candidate.density-compact .student-attributes-text {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
 </style>
