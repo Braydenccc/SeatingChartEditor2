@@ -70,13 +70,13 @@
             <RefreshCw :size="18" stroke-width="2" />
             <span>{{ isRefreshing ? '刷新中' : '刷新统计' }}</span>
           </button>
-          <button class="action-button" type="button" @click="openCloudLoad">
+          <button class="action-button" type="button" :title="cloudLoadTitle" @click="openCloudLoad">
             <CloudDownload :size="18" stroke-width="2" />
-            <span>从云端加载</span>
+            <span>{{ cloudLoadLabel }}</span>
           </button>
-          <button class="action-button" type="button" @click="openCloudSave">
+          <button class="action-button" type="button" :title="cloudSaveTitle" @click="openCloudSave">
             <CloudUpload :size="18" stroke-width="2" />
-            <span>保存至云端</span>
+            <span>{{ cloudSaveLabel }}</span>
           </button>
           <button class="action-button" type="button" @click="router.push('/files')">
             <FolderOpen :size="18" stroke-width="2" />
@@ -188,6 +188,11 @@ const accountStatusText = computed(() => {
   if (currentUser.value) return '当前为 WebDAV 连接，SCE 账号功能不可用。'
   return '登录后可查看账号信息。'
 })
+
+const cloudLoadLabel = computed(() => token.value ? '从云端加载' : '登录后从云端加载')
+const cloudSaveLabel = computed(() => token.value ? '保存至云端' : '登录后保存至云端')
+const cloudLoadTitle = computed(() => token.value ? '从 SCE 云端加载工作区' : '需要先登录 SCE 账号')
+const cloudSaveTitle = computed(() => token.value ? '保存当前工作区至 SCE 云端' : '需要先登录 SCE 账号')
 
 const passwordValidation = computed(() => {
   if (!newPassword.value) return null

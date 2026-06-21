@@ -1,9 +1,11 @@
 import { shallowRef } from 'vue'
 import { getEffectivePodiumPosition, getGuardSideForVisualSlot, getOrderedIndices, getRowNumber, getSourceRowIndex } from '@/utils/exportLayout'
 import { useStudentAttributes } from './useStudentAttributes'
+import { useLogger } from './useLogger'
 import { saveBinaryFile } from '@/platform/files'
 
 export const xlsxInstance = shallowRef(null)
+const MAX_EXCEL_ROSTER_STUDENTS = 150
 export const loadXlsx = async () => {
     if (xlsxInstance.value) return xlsxInstance.value
     const mod = await import('xlsx-js-style')
@@ -698,6 +700,57 @@ const getColumnValues = (rows, colIndex) => rows
   .map(row => row?.[colIndex])
   .filter(value => !isBlankImportValue(value))
 
+const attributeHeaderPrefixPattern = /^(数值属性|标签数值|数值|属性|numeric|attribute|number|value)(?:\s*[:：_\-－—–/／]\s*|\s+)/i
+
+const looksLikeStudentNumberHeader = (header) => {
+  const normalized = normalizeHeaderForImport(header)
+  return normalized.includes('学号') || normalized.includes('studentnumber') || normalized === 'id'
+}
+
+const looksLikeStudentNameHeader = (header) => {
+  const normalized = normalizeHeaderForImport(header)
+  return normalized.includes('姓名') || normalized.includes('名字') || normalized === 'name'
+}
+
+const normalizeImportedStudentNumber = (value) => {
+  if (isBlankImportValue(value)) return null
+  const normalized = normalizeImportText(value)
+  const numberValue = Number(normalized)
+  if (!Number.isFinite(numberValue)) return undefined
+  return numberValue
+}
+
+const buildDataRows = (rows) => rows
+  .slice(1)
+  .map((row, index) => ({ row, rowNumber: index + 2 }))
+  .filter(({ row }) => Array.isArray(row) && row.some(value => !isBlankImportValue(value)))
+
+const parseAttributeHeaderLabelForImport = (header) => {
+  const rawName = String(header || '')
+    .replace(attributeHeaderPrefixPattern, '')
+    .trim()
+  const unitMatch = rawName.match(/^(.+?)[（(]([^（）()]+)[）)]$/) ||
+    rawName.match(/^(.+?)[\[【]([^\]】]+)[\]】]$/) ||
+    rawName.match(/^(.+?)[/／]([^/／]+)$/)
+  if (!unitMatch) {
+    return { name: rawName, unit: '' }
+  }
+  return {
+    name: unitMatch[1].trim(),
+    unit: unitMatch[2].trim()
+  }
+}
+
+const buildRowIssue = (severity, message, rowNumber, field = '') => ({
+  severity,
+  message,
+  rowNumber,
+  field
+})
+
+const hasBlockingImportIssues = (issues) =>
+  issues.some(issue => issue.severity === 'error' || issue.severity === 'conflict')
+
 const shouldInferNumericAttributeColumn = (header, rows, colIndex, parseNumericValue) => {
   if (headerLooksCategorical(header)) return false
   const values = getColumnValues(rows, colIndex)
@@ -747,7 +800,7 @@ export function useExcelData() {
     return await saveWorkbook(XLSX, wb, '学生名单模板.xlsx')
   }
 
-  const importFromExcel = async (file) => {
+  const buildExcelRosterPreview = async (file, options = {}) => {
     const XLSX = await loadXlsx()
     try {
       const data = file instanceof Uint8Array
@@ -768,64 +821,145 @@ export function useExcelData() {
         throw new Error('Excel文件格式不正确，至少需要学号和姓名列')
       }
 
-      const firstColName = String(headers[0] || '').trim()
-      const secondColName = String(headers[1] || '').trim()
+      const headerColumns = headers.map((h, index) => ({
+        name: h == null ? '' : String(h).trim(),
+        colIndex: index
+      }))
+      const studentNumberColumn = headerColumns.find(header => looksLikeStudentNumberHeader(header.name))
+      const nameColumn = headerColumns.find(header => looksLikeStudentNameHeader(header.name))
 
-      const hasStudentId = firstColName.includes('学号') || secondColName.includes('学号')
-      const hasName = firstColName.includes('姓名') || secondColName.includes('姓名')
-
-      if (!hasStudentId || !hasName) {
+      if (!studentNumberColumn || !nameColumn) {
         throw new Error('缺少必要字段：学号、姓名。请确保 Excel 第一行包含这些列名。')
       }
 
+      if (studentNumberColumn.colIndex === nameColumn.colIndex) {
+        throw new Error('学号和姓名不能使用同一列，请检查表头。')
+      }
+
+      const dataRows = buildDataRows(jsonData)
+      if (dataRows.length === 0) {
+        throw new Error('Excel文件格式不正确，至少需要一行学生数据')
+      }
+
       const invalidRows = []
-      for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i]
-        const nameValue = row[1]
-        if (!nameValue || String(nameValue).trim() === '') {
-          invalidRows.push(i + 1)
+      const invalidStudentNumberRows = []
+      const studentNumberRows = new Map()
+      const duplicateStudentNumberRows = new Map()
+      const rowIssues = new Map()
+      const issues = []
+
+      const addIssue = (issue) => {
+        issues.push(issue)
+        if (issue.rowNumber) {
+          const rowIssueList = rowIssues.get(issue.rowNumber) || []
+          rowIssueList.push(issue)
+          rowIssues.set(issue.rowNumber, rowIssueList)
         }
       }
 
-      if (invalidRows.length > 0) {
-        const rowList = invalidRows.slice(0, 5).join('、')
-        const more = invalidRows.length > 5 ? ` 等 ${invalidRows.length} 行` : ''
-        throw new Error(`第 ${rowList}${more} 的姓名为空，请检查数据`)
+      for (const { row, rowNumber } of dataRows) {
+        const nameValue = row[nameColumn.colIndex]
+        if (!nameValue || String(nameValue).trim() === '') {
+          invalidRows.push(rowNumber)
+          addIssue(buildRowIssue('error', '姓名为空', rowNumber, 'name'))
+        }
+
+        const rawStudentNumber = row[studentNumberColumn.colIndex]
+        const studentNumber = normalizeImportedStudentNumber(rawStudentNumber)
+        if (studentNumber === undefined) {
+          invalidStudentNumberRows.push(rowNumber)
+          addIssue(buildRowIssue('error', '学号不是有效数字', rowNumber, 'studentNumber'))
+          continue
+        }
+        if (studentNumber !== null) {
+          const key = String(studentNumber)
+          if (studentNumberRows.has(key)) {
+            const firstRow = studentNumberRows.get(key)
+            duplicateStudentNumberRows.set(key, [firstRow, ...(duplicateStudentNumberRows.get(key) || []), rowNumber])
+            addIssue(buildRowIssue('conflict', `学号 ${studentNumber} 在导入文件内重复`, rowNumber, 'studentNumber'))
+          } else {
+            studentNumberRows.set(key, rowNumber)
+          }
+        }
       }
 
-      const tagHeaders = headers
-        .map((h, index) => ({
-          name: h == null ? '' : String(h).trim(),
-          colIndex: index
-        }))
-        .filter(header => header.colIndex >= 2 && header.name.length > 0)
-
-      const { ensureAttributeForHeader, parseNumericValue } = useStudentAttributes()
-      const attributeColumns = []
-      const tagColumns = []
-
-      tagHeaders.forEach(header => {
-        const explicitAttribute = ensureAttributeForHeader(header.name)
-        const attribute = explicitAttribute || (
-          shouldInferNumericAttributeColumn(header.name, jsonData, header.colIndex, parseNumericValue)
-            ? ensureAttributeForHeader(header.name, { allowImplicit: true })
-            : null
-        )
-        if (attribute) {
-          attributeColumns.push({ ...header, attribute })
-        } else {
-          tagColumns.push(header)
+      duplicateStudentNumberRows.forEach((rows, number) => {
+        const firstRow = rows[0]
+        if (firstRow) {
+          addIssue(buildRowIssue('conflict', `学号 ${number} 在导入文件内重复`, firstRow, 'studentNumber'))
         }
       })
 
-      const studentCount = jsonData.length - 1
-      if (studentCount > 100) {
+      if (!options.collectIssues) {
+        if (invalidRows.length > 0) {
+          const rowList = invalidRows.slice(0, 5).join('、')
+          const more = invalidRows.length > 5 ? ` 等 ${invalidRows.length} 行` : ''
+          throw new Error(`第 ${rowList}${more} 的姓名为空，请检查数据`)
+        }
+
+        if (invalidStudentNumberRows.length > 0) {
+          const rowList = invalidStudentNumberRows.slice(0, 5).join('、')
+          const more = invalidStudentNumberRows.length > 5 ? ` 等 ${invalidStudentNumberRows.length} 行` : ''
+          throw new Error(`第 ${rowList}${more} 的学号不是有效数字，请检查数据`)
+        }
+
+        if (duplicateStudentNumberRows.size > 0) {
+          const duplicateRows = Array.from(duplicateStudentNumberRows.values())
+            .map(rows => rows.join('、'))
+          const rowList = duplicateRows.slice(0, 5).join('；')
+          const more = duplicateRows.length > 5 ? ` 等 ${duplicateRows.length} 组` : ''
+          throw new Error(`检测到重复学号，涉及行：${rowList}${more}`)
+        }
+      }
+
+      const studentCount = dataRows.length
+      if (studentCount > MAX_EXCEL_ROSTER_STUDENTS) {
+        const warningMessage = `检测到 ${studentCount} 个学生，数量较多可能影响性能`
+        if (options.collectIssues) {
+          issues.push({ severity: 'warning', message: warningMessage })
+        } else {
+          return {
+            students: [],
+            tagNames: [],
+            warning: warningMessage
+          }
+        }
+      }
+
+      const { ensureAttributeForHeader, findAttributeByHeader, parseNumericValue } = useStudentAttributes()
+      const materializeAttributes = options.materializeAttributes !== false && !hasBlockingImportIssues(issues)
+
+      if (!options.collectIssues && studentCount > MAX_EXCEL_ROSTER_STUDENTS) {
         return {
           students: [],
           tagNames: [],
           warning: `检测到 ${studentCount} 个学生，数量较多可能影响性能`
         }
       }
+
+      const importHeaders = headerColumns
+        .filter(header =>
+          header.colIndex !== studentNumberColumn.colIndex &&
+          header.colIndex !== nameColumn.colIndex &&
+          header.name.length > 0
+        )
+
+      const attributeCandidates = []
+      const tagColumns = []
+
+      importHeaders.forEach(header => {
+        const hasAttributePrefix = attributeHeaderPrefixPattern.test(header.name)
+        const existingAttribute = findAttributeByHeader(header.name)
+        const inferredAttribute = shouldInferNumericAttributeColumn(header.name, jsonData, header.colIndex, parseNumericValue)
+        if (existingAttribute || hasAttributePrefix || inferredAttribute) {
+          attributeCandidates.push({
+            ...header,
+            allowImplicit: inferredAttribute && !hasAttributePrefix && !existingAttribute
+          })
+        } else {
+          tagColumns.push(header)
+        }
+      })
 
       const validTagIndices = []
       const tagMap = {}
@@ -834,8 +968,8 @@ export function useExcelData() {
       tagColumns.forEach(({ name: tagName, colIndex }) => {
         let hasValidData = false
 
-        for (let i = 1; i < jsonData.length; i++) {
-          const cellValue = jsonData[i][colIndex]
+        for (const { row } of dataRows) {
+          const cellValue = row[colIndex]
           const cellTagNames = getTagNamesForCell(tagName, cellValue)
           if (cellTagNames.length === 0) continue
           hasValidData = true
@@ -849,20 +983,48 @@ export function useExcelData() {
       })
 
       if (validTagIndices.length > 20) {
-        return {
-          students: [],
-          tagNames: [],
-          warning: `检测到 ${validTagIndices.length} 个标签，数量较多可能影响性能`
+        const warningMessage = `检测到 ${validTagIndices.length} 个标签，数量较多可能影响性能`
+        if (options.collectIssues) {
+          issues.push({ severity: 'warning', message: warningMessage })
+        } else {
+          return {
+            students: [],
+            tagNames: [],
+            warning: warningMessage
+          }
         }
       }
 
+      const attributeColumns = attributeCandidates
+        .map(header => {
+          const existingAttribute = findAttributeByHeader(header.name)
+          const attribute = materializeAttributes
+            ? ensureAttributeForHeader(header.name, { allowImplicit: header.allowImplicit })
+            : existingAttribute
+          const fallback = parseAttributeHeaderLabelForImport(header.name)
+          const key = attribute?.id || `__excel_attr_${header.colIndex}`
+          return {
+            ...header,
+            key,
+            attribute: attribute || {
+              id: key,
+              name: fallback.name,
+              unit: fallback.unit,
+              min: null,
+              max: null,
+              precision: 1
+            },
+            existing: !!existingAttribute
+          }
+        })
+        .filter(Boolean)
+
       const studentsData = []
-      for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i]
+      for (const { row, rowNumber } of dataRows) {
         if (!row || row.length < 2) continue
 
-        const studentNumber = row[0]
-        const name = row[1]
+        const studentNumber = normalizeImportedStudentNumber(row[studentNumberColumn.colIndex])
+        const name = row[nameColumn.colIndex]
 
         if (!name || !name.toString().trim()) continue
 
@@ -877,32 +1039,67 @@ export function useExcelData() {
         attributeColumns.forEach(({ colIndex, attribute }) => {
           const numericValue = parseNumericValue(row[colIndex], attribute)
           numericAttributes[attribute.id] = numericValue
+          if (!isBlankImportValue(row[colIndex]) && numericValue === null) {
+            const issue = buildRowIssue('error', `${attribute.name} 不是有效数值`, rowNumber, attribute.id)
+            addIssue(issue)
+          }
         })
 
         studentsData.push({
-          studentNumber: studentNumber ? studentNumber.toString() : null,
+          rowNumber,
+          studentNumber,
           name: name.toString().trim(),
           tagNames: studentTagNames,
-          numericAttributes
+          numericAttributes,
+          issues: rowIssues.get(rowNumber) || []
         })
       }
 
       return {
         students: studentsData,
-        tagNames: Array.from(allTagNames)
+        tagNames: Array.from(allTagNames),
+        attributes: attributeColumns.map(({ attribute, key, name, colIndex, existing }) => ({
+          id: attribute.id,
+          key,
+          name: attribute.name,
+          unit: attribute.unit || '',
+          header: name,
+          colIndex,
+          existing
+        })),
+        issues,
+        hasErrors: hasBlockingImportIssues(issues)
       }
     } catch (error) {
       throw new Error(`解析Excel文件失败: ${error.message}`)
     }
   }
 
+  const previewImportFromExcel = async (file) => buildExcelRosterPreview(file, {
+    collectIssues: true,
+    materializeAttributes: false
+  })
+
+  const importFromExcel = async (file) => {
+    const result = await buildExcelRosterPreview(file, {
+      collectIssues: false,
+      materializeAttributes: true
+    })
+    if (result.hasErrors) {
+      const firstIssue = result.issues?.find(issue => issue.severity === 'error' || issue.severity === 'conflict')
+      throw new Error(firstIssue?.message || '导入数据存在错误')
+    }
+    return result
+  }
+
   const exportToExcel = async (students, tags, numericAttributes = null) => {
-    const XLSX = await loadXlsx()
     if (!students || students.length === 0) {
-      alert('没有学生数据可导出')
+      const { warning } = useLogger()
+      warning('没有学生数据可导出')
       return
     }
 
+    const XLSX = await loadXlsx()
     const { enabledAttributeDefinitions } = useStudentAttributes()
     const attributeDefinitions = numericAttributes || enabledAttributeDefinitions.value
 
@@ -1199,6 +1396,7 @@ export function useExcelData() {
     loadXlsx,
     downloadTemplate,
     importFromExcel,
+    previewImportFromExcel,
     exportToExcel,
     generateSeatChartWorkbook,
     exportSeatChartToExcel,

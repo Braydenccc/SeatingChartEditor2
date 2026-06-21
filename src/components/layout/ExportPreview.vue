@@ -359,6 +359,7 @@ import { useStudentData } from '@/composables/useStudentData'
 import { useAuth } from '@/composables/useAuth'
 import { useWebDav } from '@/composables/useWebDav'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
+import { useLogger } from '@/composables/useLogger'
 import { escapeHtmlWithBreaks } from '@/utils/xss'
 import { saveBinaryFile } from '@/platform/files'
 
@@ -386,6 +387,7 @@ const { students } = useStudentData()
 const { authType, webdavConfig } = useAuth()
 const { putFile } = useWebDav()
 const { loadCloudSettings, saveCloudSettings } = useCloudWorkspace()
+const { success, error } = useLogger()
 
 const activeTab = ref(props.initialTab === 'excel' ? 'excel' : 'image')
 const previewUrl = ref('')
@@ -875,14 +877,14 @@ const handleCloudExportImage = async () => {
     const filename = `座位表_${ts}.png`
     const path = getWebdavPath(filename)
     await putFile(webdavConfig.value, path, blob, 'image/png')
-    alert(`图片已成功保存到云盘: ${path}`)
+    success(`图片已保存到云盘：${path}`)
     
     // Save settings back
     saveCloudSettings({
       webdavExportDir: exportSettings.value.webdavExportDir
     })
   } catch (err) {
-    alert('保存到云盘失败: ' + (err.message || '未知错误，请确保存储目录存在。'))
+    error(`保存到云盘失败：${err.message || '未知错误，请确保存储目录存在。'}`)
   } finally {
     isUploading.value = false
   }
@@ -902,13 +904,13 @@ const handleCloudExportExcel = async () => {
     const filename = `座位表_${ts}.xlsx`
     const path = getWebdavPath(filename)
     await putFile(webdavConfig.value, path, buffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    alert(`Excel已成功保存到云盘: ${path}`)
+    success(`Excel 已保存到云盘：${path}`)
     
     saveCloudSettings({
       webdavExportDir: exportSettings.value.webdavExportDir
     })
   } catch (err) {
-    alert('保存到云盘失败: ' + (err.message || '未知错误，请确保存储目录存在。'))
+    error(`保存到云盘失败：${err.message || '未知错误，请确保存储目录存在。'}`)
   } finally {
     isUploading.value = false
   }

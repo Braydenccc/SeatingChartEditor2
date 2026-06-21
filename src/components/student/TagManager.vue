@@ -117,7 +117,7 @@ const closeDialog = () => {
 
 const saveTag = () => {
   if (!currentTag.value.name.trim()) {
-    alert('请输入标签名称')
+    warning('请输入标签名称')
     return
   }
 

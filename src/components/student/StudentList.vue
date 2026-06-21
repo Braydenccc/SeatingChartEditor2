@@ -44,9 +44,9 @@
               <FolderOpen :size="14" stroke-width="2" />
               <span>本地工作区</span>
             </button>
-            <button class="empty-action-btn outline" @click="openCloudLoad">
+            <button class="empty-action-btn outline" :title="cloudLoadTitle" @click="openCloudLoad">
               <CloudDownload :size="14" stroke-width="2" />
-              <span>云端工作区</span>
+              <span>{{ cloudLoadLabel }}</span>
             </button>
           </div>
         </div>
@@ -107,6 +107,7 @@ import { useWorkspace } from '@/composables/useWorkspace'
 import { useDragState } from '@/composables/useDragState'
 import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
+import { useAuth } from '@/composables/useAuth'
 
 const StudentEditDialog = defineAsyncComponent(() => import('./StudentEditDialog.vue'))
 const props = defineProps({
@@ -138,9 +139,12 @@ const { isTouchDraggingFromSeat, endDragFromSeat } = useDragState()
 const { recordBatch, createSnapshot } = useUndo()
 const { width: windowWidth } = useWindowSize()
 const { openCloudLoad } = useCloudWorkspaceDialog()
+const { isLoggedIn } = useAuth()
 const router = useRouter()
 
 const isMobile = computed(() => windowWidth.value <= 1024)
+const cloudLoadLabel = computed(() => isLoggedIn.value ? '云端工作区' : '登录后加载')
+const cloudLoadTitle = computed(() => isLoggedIn.value ? '从云端加载工作区' : '需要先登录或配置 WebDAV')
 
 const goFilesView = () => {
   router.push('/files')

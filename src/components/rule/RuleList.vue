@@ -30,7 +30,13 @@
           <button class="action-btn" @click="emit('import')" title="导入规则">
             <FileInput :size="14" />
           </button>
-          <button v-if="rules.length > 0" class="action-btn danger" @click="handleClearAll" title="清空全部">
+          <button
+            v-if="rules.length > 0"
+            class="action-btn danger"
+            :class="{ confirming: isClearingAllRules.value }"
+            @click="handleClearAll"
+            :title="isClearingAllRules.value ? '再次点击确认清空全部' : '清空全部'"
+          >
             <Trash2 :size="14" />
           </button>
         </div>
@@ -52,7 +58,14 @@
           <button class="batch-btn optional" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('optional')">设为可选</button>
           <button class="batch-btn" :disabled="!hasSelectedRules" @click="handleBatchToggle(true)">启用</button>
           <button class="batch-btn" :disabled="!hasSelectedRules" @click="handleBatchToggle(false)">停用</button>
-          <button class="batch-btn danger" :disabled="!hasSelectedRules" @click="handleBatchDelete">删除</button>
+          <button
+            class="batch-btn danger"
+            :class="{ confirming: isDeletingSelectedRules.value }"
+            :disabled="!hasSelectedRules"
+            @click="handleBatchDelete"
+          >
+            {{ isDeletingSelectedRules.value ? '确认删除' : '删除' }}
+          </button>
         </div>
       </div>
     </div>
@@ -268,6 +281,10 @@ const isAllFilteredSelected = computed(() => {
   return filteredRuleIds.value.every(id => selectedRuleIdSet.value.has(id))
 })
 const hasSelectedRules = computed(() => selectedRuleIds.value.length > 0)
+const deleteSelectedRulesKey = 'deleteSelectedRules'
+const clearAllRulesKey = 'clearAllRules'
+const isDeletingSelectedRules = isConfirming(deleteSelectedRulesKey)
+const isClearingAllRules = isConfirming(clearAllRulesKey)
 
 const studentNameMap = computed(() => {
   const map = new Map()
@@ -370,14 +387,22 @@ const handleBatchToggle = (enabled) => {
 const handleBatchDelete = () => {
   const count = selectedRuleIds.value.length
   if (count === 0) return
-  if (!confirm(`确定删除已选 ${count} 条规则？此操作不可撤销。`)) return
-  selectedRuleIds.value.forEach(ruleId => deleteRule(ruleId))
-  selectedRuleIds.value = []
-  if (expandedId.value && !rules.value.find(r => r.id === expandedId.value)) {
-    expandedId.value = null
+  if (!isDeletingSelectedRules.value) {
+    info(`请再次点击以确认删除已选 ${count} 条规则`)
   }
-  success(`已成功删除 ${count} 条规则`)
-  hasScannedConflicts.value = false
+  requestConfirm(
+    deleteSelectedRulesKey,
+    () => {
+      selectedRuleIds.value.forEach(ruleId => deleteRule(ruleId))
+      selectedRuleIds.value = []
+      if (expandedId.value && !rules.value.find(r => r.id === expandedId.value)) {
+        expandedId.value = null
+      }
+      success(`已成功删除 ${count} 条规则`)
+      hasScannedConflicts.value = false
+    },
+    `确定删除已选 ${count} 条规则？此操作不可撤销。`
+  )
 }
 
 const getDeletingKey = (id) => `deleteRule-${id}`
@@ -399,15 +424,23 @@ const handleDelete = (rule) => {
 }
 
 const handleClearAll = () => {
-  if (confirm(`确定清空全部 ${rules.value.length} 条规则？此操作不可撤销。`)) {
-    const count = rules.value.length
-    clearAllRules()
-    expandedId.value = null
-    selectedRuleIds.value = []
-    success(`已成功清空 ${count} 条规则`)
-    conflicts.value = []
-    hasScannedConflicts.value = false
+  const count = rules.value.length
+  if (count === 0) return
+  if (!isClearingAllRules.value) {
+    info(`请再次点击以确认清空全部 ${count} 条规则`)
   }
+  requestConfirm(
+    clearAllRulesKey,
+    () => {
+      clearAllRules()
+      expandedId.value = null
+      selectedRuleIds.value = []
+      success(`已成功清空 ${count} 条规则`)
+      conflicts.value = []
+      hasScannedConflicts.value = false
+    },
+    `确定清空全部 ${count} 条规则？此操作不可撤销。`
+  )
 }
 
 const runConflictScan = () => {
@@ -628,6 +661,12 @@ defineExpose({ focusRule })
   background: var(--color-danger-bg);
 }
 
+.batch-btn.danger.confirming {
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
+  border-color: var(--color-danger);
+}
+
 .search-box {
   position: relative;
   display: flex;
@@ -740,6 +779,12 @@ defineExpose({ focusRule })
   border-color: var(--color-danger-text);
   color: var(--color-danger-text);
   background: var(--color-danger-bg);
+}
+
+.action-btn.danger.confirming {
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
+  border-color: var(--color-danger);
 }
 
 /* ==================== 冲突警告 ==================== */

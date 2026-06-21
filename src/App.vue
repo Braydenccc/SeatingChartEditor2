@@ -11,6 +11,7 @@ const LoginDialog = defineAsyncComponent({
 })
 const CloudWorkspaceDialog = defineAsyncComponent(() => import('./components/workspace/CloudWorkspaceDialog.vue'))
 const WelcomeIntroDialog = defineAsyncComponent(() => import('./components/onboarding/WelcomeIntroDialog.vue'))
+const RosterExcelImportDialog = defineAsyncComponent(() => import('./components/student/RosterExcelImportDialog.vue'))
 
 import { useAuth } from '@/composables/useAuth'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
@@ -132,6 +133,8 @@ onMounted(async () => {
     <LoadingSpinner v-if="isRouteLoading" text="正在切换页面..." />
 
     <GlobalDropZone />
+
+    <RosterExcelImportDialog />
 
     <LoginDialog
       v-if="isLoginDialogVisible"

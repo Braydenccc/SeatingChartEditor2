@@ -24,13 +24,13 @@
               <RefreshCw :size="16" stroke-width="2" />
               <span>{{ isRefreshing ? '刷新中' : '刷新' }}</span>
             </button>
-            <button class="compact-button" type="button" @click="openCloudLoad">
+            <button class="compact-button" type="button" :title="cloudLoadTitle" @click="openCloudLoad">
               <CloudDownload :size="16" stroke-width="2" />
-              <span>加载</span>
+              <span>{{ cloudLoadShortLabel }}</span>
             </button>
-            <button class="compact-button" type="button" @click="openCloudSave">
+            <button class="compact-button" type="button" :title="cloudSaveTitle" @click="openCloudSave">
               <CloudUpload :size="16" stroke-width="2" />
-              <span>保存</span>
+              <span>{{ cloudSaveShortLabel }}</span>
             </button>
           </div>
         </div>
@@ -52,13 +52,13 @@
             <Save :size="18" stroke-width="2" />
             <span>另存为</span>
           </button>
-          <button class="action-button" type="button" @click="openCloudLoad">
+          <button class="action-button" type="button" :title="cloudLoadTitle" @click="openCloudLoad">
             <CloudDownload :size="18" stroke-width="2" />
-            <span>从云端加载</span>
+            <span>{{ cloudLoadLabel }}</span>
           </button>
-          <button class="action-button" type="button" @click="openCloudSave">
+          <button class="action-button" type="button" :title="cloudSaveTitle" @click="openCloudSave">
             <CloudUpload :size="18" stroke-width="2" />
-            <span>保存至云端</span>
+            <span>{{ cloudSaveLabel }}</span>
           </button>
         </div>
 
@@ -228,6 +228,7 @@ import { useCloudWorkspaceStats } from '@/composables/useCloudWorkspaceStats'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useExcelData } from '@/composables/useExcelData'
 import { useLogger } from '@/composables/useLogger'
+import { useRosterExcelImport } from '@/composables/useRosterExcelImport'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useWorkspace } from '@/composables/useWorkspace'
@@ -253,7 +254,7 @@ const {
 } = useWorkspace()
 const { markSaved } = useAutoSave()
 const { success, warning, error } = useLogger()
-const { token } = useAuth()
+const { token, isLoggedIn } = useAuth()
 const { openCloudLoad, openCloudSave } = useCloudWorkspaceDialog()
 const {
   isFetching: isManagingCloud,
@@ -271,13 +272,20 @@ const {
   errorMessage,
   refresh
 } = useCloudWorkspaceStats({ source: 'retiehe' })
-const { downloadTemplate, importFromExcel, exportToExcel } = useExcelData()
-const { students, addStudent, updateStudent, clearAllStudents } = useStudentData()
-const { tags, addTag, clearAllTags } = useTagData()
+const { downloadTemplate, exportToExcel } = useExcelData()
+const { students } = useStudentData()
+const { tags } = useTagData()
+const { beginExcelRosterImport } = useRosterExcelImport()
 
 const cloudWorkspaces = computed(() => workspaces.value || [])
 const isCloudActionBusy = computed(() => isRefreshing.value || isManagingCloud.value)
 const goEditorAfterSuccess = () => router.push('/editor')
+const cloudLoadLabel = computed(() => isLoggedIn.value ? '从云端加载' : '登录后从云端加载')
+const cloudSaveLabel = computed(() => isLoggedIn.value ? '保存至云端' : '登录后保存至云端')
+const cloudLoadShortLabel = computed(() => isLoggedIn.value ? '加载' : '登录后加载')
+const cloudSaveShortLabel = computed(() => isLoggedIn.value ? '保存' : '登录后保存')
+const cloudLoadTitle = computed(() => isLoggedIn.value ? '从云端加载工作区' : '需要先登录或配置 WebDAV')
+const cloudSaveTitle = computed(() => isLoggedIn.value ? '保存当前工作区至云端' : '需要先登录或配置 WebDAV')
 
 const getWorkspaceName = (workspace) => workspace.metadata?.name || '未命名工作区'
 
@@ -500,48 +508,7 @@ const handleImportExcel = async (event = null) => {
   if (!file) return
 
   try {
-    const result = await importFromExcel(file)
-    if (result.warning) {
-      warning(result.warning + '，请减少数据量后重试')
-      return
-    }
-
-    clearAllStudents()
-    clearAllTags()
-    const colors = [
-      'var(--tag-color-1)',
-      'var(--tag-color-2)',
-      'var(--tag-color-3)',
-      'var(--tag-color-4)',
-      'var(--tag-color-5)',
-      'var(--tag-color-6)',
-      'var(--tag-color-7)',
-      'var(--tag-color-8)',
-      'var(--tag-color-9)',
-      'var(--tag-color-10)'
-    ]
-    const tagNameToId = {}
-
-    result.tagNames.forEach((tagName, index) => {
-      const newTagId = addTag({ name: tagName, color: colors[index % colors.length] })
-      tagNameToId[tagName] = newTagId
-    })
-
-    result.students.forEach(studentData => {
-      const studentTags = studentData.tagNames
-        .map(tagName => tagNameToId[tagName])
-        .filter(id => id != null)
-      const newStudentId = addStudent()
-      updateStudent(newStudentId, {
-        name: studentData.name,
-        studentNumber: studentData.studentNumber,
-        tags: studentTags,
-        numericAttributes: studentData.numericAttributes || {}
-      })
-    })
-
-    success(`成功导入 ${result.students.length} 个学生，${result.tagNames.length} 个标签`)
-    router.push('/students')
+    await beginExcelRosterImport(file)
   } catch (err) {
     error(`导入失败: ${err.message}`)
   } finally {

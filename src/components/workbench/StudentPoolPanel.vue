@@ -3,7 +3,7 @@
     <header class="pool-header">
       <div>
         <h2>候选学生</h2>
-        <p>{{ unassignedCount }} 名未入座</p>
+        <p>{{ poolSubtitle }}</p>
       </div>
       <button class="icon-action" title="名单与属性" @click="router.push('/students')">
         <Users :size="16" stroke-width="2" />
@@ -16,10 +16,21 @@
         <input v-model="searchText" type="search" placeholder="搜索姓名或学号" />
       </label>
 
-      <div class="filter-tabs" role="tablist" aria-label="学生过滤">
-        <button :class="{ active: filterMode === 'unassigned' }" @click="filterMode = 'unassigned'">未入座</button>
-        <button :class="{ active: filterMode === 'all' }" @click="filterMode = 'all'">全部</button>
-        <button :class="{ active: filterMode === 'assigned' }" @click="filterMode = 'assigned'">已入座</button>
+      <div class="filter-row">
+        <div class="filter-tabs" role="tablist" aria-label="学生过滤">
+          <button :class="{ active: filterMode === 'unassigned' }" @click="filterMode = 'unassigned'">未入座</button>
+          <button :class="{ active: filterMode === 'all' }" @click="filterMode = 'all'">全部</button>
+          <button :class="{ active: filterMode === 'assigned' }" @click="filterMode = 'assigned'">已入座</button>
+        </div>
+        <button
+          v-if="hasActiveFilters"
+          class="reset-filters-button"
+          type="button"
+          title="清空入座状态和标签筛选"
+          @click="resetFilters"
+        >
+          清空筛选
+        </button>
       </div>
 
       <div v-if="visibleTags.length > 0" class="tag-filter-list">
@@ -70,6 +81,38 @@ const unassignedCount = computed(() => (
 ))
 
 const visibleTags = computed(() => tags.value.filter(tag => tag.showInSeatChart !== false))
+const hasActiveFilters = computed(() => (
+  filterMode.value !== 'unassigned' ||
+  activeTagIds.value.length > 0
+))
+const visibleStudentCount = computed(() => {
+  const search = searchText.value.trim().toLowerCase()
+  return students.value.filter(student => {
+    const seat = findSeatByStudent(student.id)
+    if (filterMode.value === 'unassigned' && seat) return false
+    if (filterMode.value === 'assigned' && !seat) return false
+    if (activeTagIds.value.length > 0 && !activeTagIds.value.every(tagId => (student.tags || []).includes(tagId))) return false
+    if (!search) return true
+    const name = String(student.name || '').toLowerCase()
+    const number = String(student.studentNumber || '').toLowerCase()
+    return name.includes(search) || number.includes(search)
+  }).length
+})
+
+const poolSubtitle = computed(() => {
+  if (!searchText.value.trim() && activeTagIds.value.length === 0 && filterMode.value === 'unassigned') {
+    return `${unassignedCount.value} 名未入座`
+  }
+  const modeLabel = {
+    unassigned: '未入座',
+    all: '全部',
+    assigned: '已入座'
+  }[filterMode.value]
+  const parts = [modeLabel]
+  if (searchText.value.trim()) parts.push('搜索中')
+  if (activeTagIds.value.length > 0) parts.push(`${activeTagIds.value.length} 个标签`)
+  return `当前显示 ${visibleStudentCount.value} 名 · ${parts.join(' · ')}`
+})
 
 const toggleTag = (tagId) => {
   if (activeTagIds.value.includes(tagId)) {
@@ -77,6 +120,11 @@ const toggleTag = (tagId) => {
   } else {
     activeTagIds.value = [...activeTagIds.value, tagId]
   }
+}
+
+const resetFilters = () => {
+  filterMode.value = 'unassigned'
+  activeTagIds.value = []
 }
 </script>
 
@@ -162,6 +210,13 @@ const toggleTag = (tagId) => {
   font-size: 13px;
 }
 
+.filter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
 .filter-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -186,6 +241,24 @@ const toggleTag = (tagId) => {
   color: var(--color-primary);
   font-weight: 600;
   box-shadow: var(--shadow-sm);
+}
+
+.reset-filters-button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reset-filters-button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .tag-filter-list {

@@ -48,4 +48,45 @@ describe('useExcelData import', () => {
     expect(result.students[0].tagNames).toEqual(expect.arrayContaining(['住宿生', '男']))
     expect(result.students[1].tagNames).toEqual(['女'])
   })
+
+  it('uses header positions instead of fixed first two columns', async () => {
+    const { importFromExcel } = useExcelData()
+    const file = await createWorkbookFile([
+      ['姓名', '学号', '住宿生'],
+      ['张三', '1', '是'],
+      ['李四', '2', '']
+    ])
+
+    const result = await importFromExcel(file)
+
+    expect(result.students).toMatchObject([
+      { name: '张三', studentNumber: 1, tagNames: ['住宿生'] },
+      { name: '李四', studentNumber: 2, tagNames: [] }
+    ])
+  })
+
+  it('rejects duplicate student numbers instead of silently clearing earlier numbers', async () => {
+    const { importFromExcel } = useExcelData()
+    const file = await createWorkbookFile([
+      ['学号', '姓名'],
+      ['1', '张三'],
+      ['1', '李四']
+    ])
+
+    await expect(importFromExcel(file)).rejects.toThrow('重复学号')
+  })
+
+  it('does not create attribute definitions when import is blocked by size limits', async () => {
+    const { importFromExcel } = useExcelData()
+    const rows = [
+      ['学号', '姓名', '标签数值:专注度(分)'],
+      ...Array.from({ length: 151 }, (_, index) => [index + 1, `学生${index + 1}`, index])
+    ]
+    const file = await createWorkbookFile(rows)
+
+    const result = await importFromExcel(file)
+
+    expect(result.warning).toContain('151 个学生')
+    expect(attributes.attributeDefinitions.value.some(def => def.name === '专注度')).toBe(false)
+  })
 })
