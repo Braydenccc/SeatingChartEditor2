@@ -9,11 +9,13 @@ on:
       - main
       - dev
 
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
-  # ── 生产环境：main 分支 → sce.jbyc.cc ─────────────────────────────────────
-  deploy-production:
-    name: 🚀 Production (sce.jbyc.cc)
-    if: github.ref == 'refs/heads/main'
+  deploy:
+    name: Deploy ${{ github.ref_name }}
     runs-on: ubuntu-latest
 
     steps:
@@ -24,112 +26,58 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
+
+      - name: Configure deployment target
+        shell: bash
+        run: |
+          case "${GITHUB_REF_NAME}" in
+            main)
+              echo "BUILD_SCRIPT=build:web" >> "$GITHUB_ENV"
+              echo "DEPLOY_ENVIRONMENT=production" >> "$GITHUB_ENV"
+              echo "DEPLOY_SITE=sce.jbyc.cc" >> "$GITHUB_ENV"
+              echo "DEPLOY_URL=https://sce.jbyc.cc" >> "$GITHUB_ENV"
+              ;;
+            dev)
+              echo "BUILD_SCRIPT=build:test" >> "$GITHUB_ENV"
+              echo "DEPLOY_ENVIRONMENT=test" >> "$GITHUB_ENV"
+              echo "DEPLOY_SITE=testsce.jbyc.cc" >> "$GITHUB_ENV"
+              echo "DEPLOY_URL=https://testsce.jbyc.cc" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "Unsupported branch: ${GITHUB_REF_NAME}" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Set build time
         run: echo "VITE_APP_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
 
       - name: Build
-        run: npm run build:web
+        run: npm run "$BUILD_SCRIPT"
 
-      # 第 1 次尝试
-      - name: Deploy (1/3)
-        id: d1
-        continue-on-error: true
+      - name: Deploy
         env:
           RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: node scripts/deploy-staging.js --site sce.jbyc.cc --outdir dist
-
-      # 第 2 次尝试（仅在第 1 次失败后执行）
-      - name: Wait before retry (1→2)
-        if: steps.d1.outcome == 'failure'
+        shell: bash
         run: |
-          echo "::warning::Attempt 1 failed, retrying in 15s..."
-          sleep 15
+          for attempt in 1 2 3; do
+            if node scripts/deploy-staging.js --site "$DEPLOY_SITE" --outdir dist; then
+              echo "Deployed ${DEPLOY_ENVIRONMENT} to ${DEPLOY_URL}"
+              exit 0
+            fi
 
-      - name: Deploy (2/3)
-        id: d2
-        if: steps.d1.outcome == 'failure'
-        continue-on-error: true
-        env:
-          RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: node scripts/deploy-staging.js --site sce.jbyc.cc --outdir dist
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::Deploy attempt ${attempt} failed, retrying in 15s..."
+              sleep 15
+            fi
+          done
 
-      # 第 3 次尝试（仅在第 2 次失败后执行）
-      - name: Wait before retry (2→3)
-        if: steps.d2.outcome == 'failure'
-        run: |
-          echo "::warning::Attempt 2 failed, retrying in 15s..."
-          sleep 15
+          echo "Deploy failed after 3 attempts." >&2
+          exit 1
 
-      - name: Deploy (3/3)
-        if: steps.d2.outcome == 'failure'
-        env:
-          RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: node scripts/deploy-staging.js --site sce.jbyc.cc --outdir dist
-
-
-  # ── 测试环境：dev 分支 → testsce.jbyc.cc ────────────────────────────────
-  deploy-staging:
-    name: 🧪 Staging (testsce.jbyc.cc)
-    if: github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Set build time
-        run: echo "VITE_APP_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
-
-      - name: Build for test
-        run: npm run build:test
-
-      # 第 1 次尝试
-      - name: Deploy (1/3)
-        id: d1
-        continue-on-error: true
-        env:
-          RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: node scripts/deploy-staging.js --site testsce.jbyc.cc --outdir dist
-
-      # 第 2 次尝试
-      - name: Wait before retry (1→2)
-        if: steps.d1.outcome == 'failure'
-        run: |
-          echo "::warning::Attempt 1 failed, retrying in 15s..."
-          sleep 15
-
-      - name: Deploy (2/3)
-        id: d2
-        if: steps.d1.outcome == 'failure'
-        continue-on-error: true
-        env:
-          RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: node scripts/deploy-staging.js --site testsce.jbyc.cc --outdir dist
-
-      # 第 3 次尝试
-      - name: Wait before retry (2→3)
-        if: steps.d2.outcome == 'failure'
-        run: |
-          echo "::warning::Attempt 2 failed, retrying in 15s..."
-          sleep 15
-
-      - name: Deploy (3/3)
-        if: steps.d2.outcome == 'failure'
-        env:
-          RTH_API_KEY: ${{ secrets.RTH_API_KEY }}
-        run: node scripts/deploy-staging.js --site testsce.jbyc.cc --outdir dist
-
-      - name: Show staging URL
-        run: 'echo "Staging URL: https://testsce.jbyc.cc"'
+      - name: Show deployed URL
+        run: echo "Deployed URL: $DEPLOY_URL"

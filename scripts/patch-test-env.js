@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { execSync } from 'child_process';
 
-const TEST_HOST = 'https://test.sce.jbyc.cc';
+const TEST_HOST = 'https://testsce.jbyc.cc';
 
 try {
   // 解决 GitHub Actions 容器环境下的 git 目录所有权安全限制
@@ -11,7 +11,7 @@ try {
     // Ignore errors if this fails (e.g. locally without perms)
   }
 
-  console.log('Patching test environment markers');
+  console.log(`Patching test environment markers for ${TEST_HOST}`);
 
   // 1. index.html - 添加 [test] 前缀到标题
   let indexHtml = fs.readFileSync('index.html', 'utf8');
@@ -26,7 +26,7 @@ try {
   let loginVue = fs.readFileSync(loginPath, 'utf8');
   loginVue = loginVue.replace(
     '本账号服务不保证可用性，请妥善备份您的数据',
-    '⚠️ 测试环境：账号与正式版不互通，用户数据可能随时被清除，请勿使用真实账号'
+    `测试环境（${TEST_HOST}）：账号与正式版不互通，用户数据可能随时被清除，请勿使用真实账号`
   );
   fs.writeFileSync(loginPath, loginVue);
 
@@ -48,14 +48,14 @@ try {
   display: inline-block;
   font-size: 12px;
   font-weight: 600;
-  background: #ff9800;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: var(--color-warning);
+  color: var(--color-text-inverse);
+  border: 1px solid color-mix(in srgb, var(--color-text-inverse) 30%, transparent);
   border-radius: 6px;
   padding: 4px 10px;
   margin-left: 12px;
   vertical-align: middle;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-text-primary) 15%, transparent);
   letter-spacing: 0.5px;
 }
 
