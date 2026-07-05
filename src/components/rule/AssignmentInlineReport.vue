@@ -116,7 +116,7 @@ const gradeIconComponent = computed(() => {
   background: var(--color-surface);
   border-radius: 10px;
   border: 1px solid var(--color-border);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  box-shadow: 0 4px 12px var(--shadow-sm);
   overflow: hidden;
   display: flex;
   flex-direction: column;

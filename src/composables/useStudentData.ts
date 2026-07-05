@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
 import type { Student, UseStudentDataReturn } from '@/types'
+import { useSeatChart } from './useSeatChart'
 
 // 学生数据管理
 const students = ref<Student[]>([])
@@ -32,6 +33,17 @@ const normalizeNumericAttributes = (
 const hasMeaningfulNumericAttributes = (attributes?: Record<string, number | null>): boolean => {
   if (!attributes) return false
   return Object.values(attributes).some(value => value !== null && value !== undefined)
+}
+
+const clearSeatAssignmentsForStudents = (studentIds: number[]): void => {
+  if (studentIds.length === 0) return
+  const studentIdSet = new Set(studentIds)
+  const { seats } = useSeatChart()
+  seats.value.forEach(seat => {
+    if (seat.studentId !== null && studentIdSet.has(seat.studentId)) {
+      seat.studentId = null
+    }
+  })
 }
 
 export function useStudentData(): UseStudentDataReturn {
@@ -90,11 +102,13 @@ export function useStudentData(): UseStudentDataReturn {
       if (emptyStudents.length >= toDelete) {
         // 删除足够的空白学生
         const idsToDelete = emptyStudents.slice(0, toDelete).map(s => s.id)
+        clearSeatAssignmentsForStudents(idsToDelete)
         students.value = students.value.filter(s => !idsToDelete.includes(s.id))
         return true
       } else {
         // 删除所有空白学生但仍不够
         const idsToDelete = emptyStudents.map(s => s.id)
+        clearSeatAssignmentsForStudents(idsToDelete)
         students.value = students.value.filter(s => !idsToDelete.includes(s.id))
         return false // 返回false表示无法完全满足
       }
@@ -145,6 +159,7 @@ export function useStudentData(): UseStudentDataReturn {
 
   // 删除学生
   const deleteStudent = (studentId: number): void => {
+    clearSeatAssignmentsForStudents([studentId])
     students.value = students.value.filter(s => s.id !== studentId)
     // 健壮性：如果被删除的学生正处于选中状态，则清空焦点
     if (selectedStudentId.value === studentId) {
@@ -187,6 +202,7 @@ export function useStudentData(): UseStudentDataReturn {
 
   // 清除所有学生
   const clearAllStudents = (): void => {
+    clearSeatAssignmentsForStudents(students.value.map(student => student.id))
     students.value = []
     selectedStudentId.value = null
     nextStudentId = 1

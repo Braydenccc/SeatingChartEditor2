@@ -12,6 +12,7 @@ description: 定义系统最底层的“座位”、“学生”与“工作区�
 - 学生数据源: `src/composables/useStudentData.ts`
 - 座位数据源: `src/composables/useSeatChart.js`
 - 数据中枢与格式定义: `src/composables/useWorkspace.js`
+- 自动保存备份: `src/composables/useAutoSave.js`
 
 ## 3. 数据模型定义 (TypeScript Interfaces)
 
@@ -73,6 +74,7 @@ interface Zone {
 - **Map加速 (`rebuildSeatMap`)**:  为了避免拖拽时产生的 $O(n)$ 线性查找，在每次更改配置（行、列）后，都会执行 `rebuildSeatMap()` 把所有 proxy 给铺平到 Map 中，确保 `O(1)` 操作。
 - **渲染数据准备 (`organizedSeats`)**: 原生 `seats.value` 是扁平一维数组，为了让 Vue 能通过嵌套 `v-for` 渲染出大组-列-行的 UI 表格组合，专门设计了 `organizedSeats` computed，以 $O(n)$ 复杂度预分桶成三维数组 `[group][col][row]`。
 - **护法特殊座位**: 左右护法与普通座位共享 `seatMap`、分配、交换、清空和撤销机制，但不进入 `organizedSeats`。编辑器通过 `visibleGuardSeats` 渲染讲台两侧；渲染时根据讲台视觉位置决定左右槽位，讲台在顶部时左右护法顺序互换，讲台在底部时保持 `左护法 / 讲台 / 右护法`。默认不进入 `getAvailableSeats()`，只有显式传入并开启 `guardSeats.includeInAutoAssignment` 时才可被智能排位使用。
+- **自动保存恢复**: `useAutoSave()` 将当前工作区 JSON 写入平台存储中的 `sce-autosave-backup` 和 `sce-autosave-time`。启动时 `App.vue` 检测未处理的新备份并先显示恢复提示，文件页会在工作区列表顶部显示自动保存卡片，统一调用 `restoreAutoSaveBackup()` 应用工作区数据。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **坐标系方向警告陷阱**:  底层 `rowIndex` 始终是物理坐标，不随导出翻转改写。编辑器内“前方”只由 `seatConfig.podiumPosition` 决定：讲台在底部时 `rowIndex` 越大越靠前；讲台在顶部时 `rowIndex` 越小越靠前。旧字段 `alignment`/`seatAlignment` 只用于工作区加载迁移。

@@ -90,7 +90,7 @@ const popupStyle = computed(() => {
   background: var(--color-surface);
   border: 2px solid var(--color-primary);
   border-radius: 8px;
-  box-shadow: var(--shadow-lg, 0 6px 20px rgba(0, 0, 0, 0.25));
+  box-shadow: 0 6px 20px var(--shadow-lg);
   min-width: 220px;
   overflow-y: auto;
 }
@@ -122,7 +122,7 @@ const popupStyle = computed(() => {
   font-weight: 500;
 }
 .tag-option:hover {
-  background: var(--color-bg-selected, #e8f4f8);
+  background: var(--color-bg-selected);
 }
 .tag-dot {
   width: 14px;

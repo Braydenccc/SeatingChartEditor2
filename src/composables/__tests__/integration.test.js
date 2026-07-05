@@ -32,6 +32,7 @@ describe('Integration: Student and Seat Management', () => {
 
       studentData.deleteStudent(studentId)
       expect(studentData.students.value).toHaveLength(0)
+      expect(seatChart.getStudentAtSeat(seatId)).toBeNull()
     })
 
     it('should handle tag assignment and filtering', () => {
@@ -152,6 +153,30 @@ describe('Integration: Student and Seat Management', () => {
       const uniqueIds = new Set(seatIds)
 
       expect(uniqueIds.size).toBe(seatIds.length)
+    })
+
+    it('should clear seat assignments when reducing blank student count', () => {
+      studentData.setStudentCount(1)
+      const studentId = studentData.students.value[0].id
+      const seatId = 'seat-0-0-0'
+
+      seatChart.assignStudent(seatId, studentId, false)
+      const result = studentData.setStudentCount(0)
+
+      expect(result).toBe(true)
+      expect(studentData.students.value).toHaveLength(0)
+      expect(seatChart.getStudentAtSeat(seatId)).toBeNull()
+    })
+
+    it('should clear seat assignments when clearing all students', () => {
+      const studentId = studentData.addStudent()
+      const seatId = 'seat-0-0-0'
+
+      seatChart.assignStudent(seatId, studentId, false)
+      studentData.clearAllStudents()
+
+      expect(studentData.students.value).toHaveLength(0)
+      expect(seatChart.getStudentAtSeat(seatId)).toBeNull()
     })
 
     it('should handle tag deletion with student references', () => {

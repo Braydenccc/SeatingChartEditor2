@@ -180,7 +180,7 @@ const removeTag = (tagId) => {
 
 const getTag = (id) => props.availableTags.find(t => t.id === id)
 const getTagName = (id) => getTag(id)?.name || '未知'
-const getTagColor = (id) => getTag(id)?.color || '#999999'
+const getTagColor = (id) => getTag(id)?.color || 'var(--color-text-disabled)'
 
 </script>
 
@@ -194,7 +194,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   border-radius: 10px;
   margin-bottom: 8px;
   border: 1px solid var(--color-border-light);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 2px 6px var(--shadow-sm);
   transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
   position: relative;
 }
@@ -309,7 +309,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 2px var(--shadow-md);
 }
 
 .student-tags-text {
@@ -326,7 +326,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   color: var(--color-text-inverse);
   padding: 1px 4px;
   border-radius: 3px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 1px var(--shadow-md);
   line-height: 1.2;
 }
 
@@ -413,7 +413,7 @@ const getTagColor = (id) => getTag(id)?.color || '#999999'
   width: 160px;
   background: var(--color-surface);
   border-radius: 10px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 25px var(--shadow-lg);
   border: 1px solid var(--color-border);
   overflow: hidden;
 }

@@ -62,8 +62,8 @@
           </button>
         </div>
 
-        <div v-if="token" class="workspace-manager">
-          <div class="manager-toolbar">
+        <div v-if="showWorkspaceManager" class="workspace-manager">
+          <div v-if="token" class="manager-toolbar">
             <input
               v-model="newCloudWorkspaceName"
               class="manager-name-input"
@@ -83,76 +83,102 @@
             </button>
           </div>
 
-          <div v-if="cloudWorkspaces.length === 0" class="workspace-empty-row">
-            <Inbox :size="22" stroke-width="1.8" />
-            <span>暂无云端工作区</span>
-          </div>
-          <div v-else class="workspace-manager-list">
-            <article v-for="ws in cloudWorkspaces" :key="ws.fileId" class="workspace-row">
+          <div class="workspace-manager-list">
+            <article v-if="autoSaveBackup" class="workspace-row autosave-row">
               <div class="workspace-row-main">
-                <CloudDownload :size="18" stroke-width="2" />
-                <div v-if="editingWorkspaceId === ws.fileId" class="workspace-edit">
-                  <input
-                    v-model="editingWorkspaceName"
-                    class="workspace-edit-input"
-                    type="text"
-                    maxlength="50"
-                    @keyup.enter="handleRenameWorkspace(ws)"
-                    @keyup.esc="handleCancelRename"
-                  />
-                </div>
-                <div v-else class="workspace-info">
-                  <strong>{{ getWorkspaceName(ws) }}</strong>
-                  <span>{{ formatWorkspaceDate(ws.metadata?.time) }} · {{ formatWorkspaceSize(ws.metadata?.size) }}</span>
+                <History :size="18" stroke-width="2" />
+                <div class="workspace-info">
+                  <strong>自动保存</strong>
+                  <span>{{ autoSaveSummary }}</span>
                 </div>
               </div>
 
               <div class="workspace-row-actions">
                 <button
-                  class="icon-button"
+                  class="icon-button primary"
                   type="button"
-                  title="加载工作区"
-                  :disabled="isCloudActionBusy"
-                  @click="handleLoadCloudWorkspace(ws)"
+                  title="恢复自动保存"
+                  :disabled="isRestoringAutoSave"
+                  @click="handleRestoreAutoSave"
                 >
-                  <CloudDownload :size="15" stroke-width="2" />
+                  <RotateCcw :size="15" stroke-width="2" />
                 </button>
-                <template v-if="editingWorkspaceId === ws.fileId">
-                  <button
-                    class="icon-button success"
-                    type="button"
-                    title="保存名称"
-                    :disabled="isCloudActionBusy || !editingWorkspaceName.trim()"
-                    @click="handleRenameWorkspace(ws)"
-                  >
-                    <Check :size="15" stroke-width="2" />
-                  </button>
-                  <button class="icon-button" type="button" title="取消改名" :disabled="isCloudActionBusy" @click="handleCancelRename">
-                    <X :size="15" stroke-width="2" />
-                  </button>
-                </template>
-                <template v-else>
-                  <button
-                    class="icon-button"
-                    type="button"
-                    title="修改名称"
-                    :disabled="isCloudActionBusy"
-                    @click="handleStartRename(ws)"
-                  >
-                    <Pencil :size="15" stroke-width="2" />
-                  </button>
-                  <button
-                    class="icon-button danger"
-                    type="button"
-                    title="删除工作区"
-                    :disabled="isCloudActionBusy"
-                    @click="handleRemoveCloudWorkspace(ws)"
-                  >
-                    <Trash2 :size="15" stroke-width="2" />
-                  </button>
-                </template>
               </div>
             </article>
+
+            <template v-if="token">
+              <div v-if="cloudWorkspaces.length === 0" class="workspace-empty-row">
+                <Inbox :size="22" stroke-width="1.8" />
+                <span>暂无云端工作区</span>
+              </div>
+              <template v-else>
+                <article v-for="ws in cloudWorkspaces" :key="ws.fileId" class="workspace-row">
+                  <div class="workspace-row-main">
+                    <CloudDownload :size="18" stroke-width="2" />
+                    <div v-if="editingWorkspaceId === ws.fileId" class="workspace-edit">
+                      <input
+                        v-model="editingWorkspaceName"
+                        class="workspace-edit-input"
+                        type="text"
+                        maxlength="50"
+                        @keyup.enter="handleRenameWorkspace(ws)"
+                        @keyup.esc="handleCancelRename"
+                      />
+                    </div>
+                    <div v-else class="workspace-info">
+                      <strong>{{ getWorkspaceName(ws) }}</strong>
+                      <span>{{ formatWorkspaceDate(ws.metadata?.time) }} · {{ formatWorkspaceSize(ws.metadata?.size) }}</span>
+                    </div>
+                  </div>
+
+                  <div class="workspace-row-actions">
+                    <button
+                      class="icon-button"
+                      type="button"
+                      title="加载工作区"
+                      :disabled="isCloudActionBusy"
+                      @click="handleLoadCloudWorkspace(ws)"
+                    >
+                      <CloudDownload :size="15" stroke-width="2" />
+                    </button>
+                    <template v-if="editingWorkspaceId === ws.fileId">
+                      <button
+                        class="icon-button success"
+                        type="button"
+                        title="保存名称"
+                        :disabled="isCloudActionBusy || !editingWorkspaceName.trim()"
+                        @click="handleRenameWorkspace(ws)"
+                      >
+                        <Check :size="15" stroke-width="2" />
+                      </button>
+                      <button class="icon-button" type="button" title="取消改名" :disabled="isCloudActionBusy" @click="handleCancelRename">
+                        <X :size="15" stroke-width="2" />
+                      </button>
+                    </template>
+                    <template v-else>
+                      <button
+                        class="icon-button"
+                        type="button"
+                        title="修改名称"
+                        :disabled="isCloudActionBusy"
+                        @click="handleStartRename(ws)"
+                      >
+                        <Pencil :size="15" stroke-width="2" />
+                      </button>
+                      <button
+                        class="icon-button danger"
+                        type="button"
+                        title="删除工作区"
+                        :disabled="isCloudActionBusy"
+                        @click="handleRemoveCloudWorkspace(ws)"
+                      >
+                        <Trash2 :size="15" stroke-width="2" />
+                      </button>
+                    </template>
+                  </div>
+                </article>
+              </template>
+            </template>
           </div>
         </div>
       </section>
@@ -209,10 +235,12 @@ import {
   FileOutput,
   FilePlus,
   FolderOpen,
+  History,
   Inbox,
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   Trash2,
   X,
@@ -239,6 +267,7 @@ const newCloudWorkspaceName = ref('')
 const editingWorkspaceId = ref(null)
 const editingWorkspaceName = ref('')
 const showFuckSeatsImportDialog = ref(false)
+const isRestoringAutoSave = ref(false)
 
 const { requestConfirm, isConfirming } = useConfirmAction()
 const {
@@ -252,7 +281,12 @@ const {
   clearLastWorkspace,
   getWorkspaceJson
 } = useWorkspace()
-const { markSaved } = useAutoSave()
+const {
+  autoSaveBackup,
+  getAutoSaveBackup,
+  restoreAutoSaveBackup,
+  markSaved
+} = useAutoSave()
 const { success, warning, error } = useLogger()
 const { token, isLoggedIn } = useAuth()
 const { openCloudLoad, openCloudSave } = useCloudWorkspaceDialog()
@@ -279,6 +313,7 @@ const { beginExcelRosterImport } = useRosterExcelImport()
 
 const cloudWorkspaces = computed(() => workspaces.value || [])
 const isCloudActionBusy = computed(() => isRefreshing.value || isManagingCloud.value)
+const showWorkspaceManager = computed(() => !!token.value || !!autoSaveBackup.value)
 const goEditorAfterSuccess = () => router.push('/editor')
 const cloudLoadLabel = computed(() => isLoggedIn.value ? '从云端加载' : '登录后从云端加载')
 const cloudSaveLabel = computed(() => isLoggedIn.value ? '保存至云端' : '登录后保存至云端')
@@ -312,6 +347,19 @@ const formatWorkspaceSize = (bytes) => {
   }
   return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
 }
+
+const autoSaveSummary = computed(() => {
+  const backup = autoSaveBackup.value
+  if (!backup) return ''
+
+  const studentCount = Array.isArray(backup.data?.students) ? backup.data.students.length : 0
+  const assignedCount = Array.isArray(backup.data?.layout?.seats)
+    ? backup.data.layout.seats.filter(seat => seat.studentId != null).length
+    : 0
+  const backupSize = formatWorkspaceSize(backup.size)
+
+  return `${formatWorkspaceDate(backup.timeIso)} · ${studentCount} 名学生 · ${assignedCount} 个已排座位 · ${backupSize}`
+})
 
 const handleNewWorkspace = () => {
   const confirmed = requestConfirm('newWorkspace', () => {
@@ -431,6 +479,26 @@ const handleLoadCloudWorkspace = async (workspace) => {
   }
 }
 
+const handleRestoreAutoSave = async () => {
+  if (isRestoringAutoSave.value) return
+
+  isRestoringAutoSave.value = true
+  try {
+    const isSuccess = await restoreAutoSaveBackup(autoSaveBackup.value)
+    if (!isSuccess) {
+      error('自动保存恢复失败，请稍后重试或手动加载工作区')
+      return
+    }
+
+    success('已恢复自动保存的工作区')
+    goEditorAfterSuccess()
+  } catch (err) {
+    error(`自动保存恢复失败: ${err.message || err}`)
+  } finally {
+    isRestoringAutoSave.value = false
+  }
+}
+
 const handleStartRename = (workspace) => {
   editingWorkspaceId.value = workspace.fileId
   editingWorkspaceName.value = getWorkspaceName(workspace)
@@ -528,6 +596,7 @@ const handleExportExcel = async () => {
 }
 
 onMounted(() => {
+  getAutoSaveBackup()
   if (token.value) refresh()
 })
 </script>
@@ -777,6 +846,11 @@ onMounted(() => {
   background: var(--color-bg-subtle);
 }
 
+.workspace-row.autosave-row {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-bg-subtle));
+}
+
 .workspace-row-main {
   min-width: 0;
   display: flex;
@@ -836,6 +910,16 @@ onMounted(() => {
 .icon-button:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+
+.icon-button.primary {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.icon-button.primary:hover {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 .icon-button.success:hover {

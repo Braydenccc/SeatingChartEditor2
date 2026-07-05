@@ -163,7 +163,7 @@ const openStudentRoster = () => {
 .info-item:hover {
   background: var(--color-bg-secondary);
   transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px var(--shadow-sm);
 }
 
 .info-icon {

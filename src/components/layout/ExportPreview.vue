@@ -801,20 +801,10 @@ const generatePreview = () => {
 
 // ── 下载图片 ──
 const handleDownload = async () => {
-  let url = previewUrl.value
-  if (!url) {
-    isGenerating.value = true
-    try {
-      url = await exportToImage()
-      previewUrl.value = url
-      if (lastPreviewObjectUrl) {
-        URL.revokeObjectURL(lastPreviewObjectUrl)
-      }
-      lastPreviewObjectUrl = url
-    }
-    catch { return }
-    finally { isGenerating.value = false }
-  }
+  await generatePreviewNow()
+  const url = previewUrl.value
+  if (!url) return
+
   const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
   const filename = `座位表_${ts}.png`
   try {
@@ -861,13 +851,9 @@ const getWebdavPath = (filename) => {
 }
 
 const handleCloudExportImage = async () => {
-  let url = previewUrl.value
-  if (!url) {
-    isGenerating.value = true
-    try { url = await exportToImage(); previewUrl.value = url }
-    catch { return }
-    finally { isGenerating.value = false }
-  }
+  await generatePreviewNow()
+  const url = previewUrl.value
+  if (!url) return
   
   isUploading.value = true
   try {

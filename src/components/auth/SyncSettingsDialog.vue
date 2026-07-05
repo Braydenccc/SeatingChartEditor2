@@ -3,7 +3,9 @@
     <div class="login-dialog">
       <div class="dialog-header">
         <h3>同步设置</h3>
-        <button class="close-btn" @click="close">&times;</button>
+        <button class="close-btn" type="button" aria-label="关闭" @click="close">
+          <X :size="18" stroke-width="2" />
+        </button>
       </div>
 
       <div class="dialog-body">
@@ -88,6 +90,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { X } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { useWebDav } from '@/composables/useWebDav'
 
@@ -226,7 +229,7 @@ const handleSubmit = async () => {
   width: 90%;
   max-width: 400px;
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 40px var(--shadow-lg);
   overflow: hidden;
   animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -260,11 +263,15 @@ const handleSubmit = async () => {
 .close-btn {
   background: none;
   border: none;
-  font-size: 24px;
   color: var(--color-text-secondary);
   cursor: pointer;
-  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
+  border-radius: 8px;
 }
 
 .close-btn:hover {

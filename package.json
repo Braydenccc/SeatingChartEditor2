@@ -1,6 +1,6 @@
 {
   "name": "seat-chart-editor-v2",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -35,7 +35,7 @@
     "@playwright/test": "^1.59.1",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
-             "@tauri-apps/plugin-http": "^2.5.9",
+    "@tauri-apps/plugin-http": "^2.5.9",
     "@vueuse/core": "^14.2.1",
     "bcryptjs": "^3.0.3",
     "lucide-vue-next": "^1.0.0",
@@ -59,8 +59,13 @@
     "vitest": "^2.1.9",
     "vue-tsc": "^3.2.7"
   },
-  "description": "This template should help get you started developing with Vue 3 in Vite.",
-  "keywords": [],
+  "description": "A Vue and Tauri classroom seating chart editor.",
+  "keywords": [
+    "seat-chart",
+    "classroom",
+    "tauri",
+    "vue"
+  ],
   "author": "Braydenccc",
   "license": "GPL-3.0-or-later"
 }

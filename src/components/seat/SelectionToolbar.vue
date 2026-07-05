@@ -68,7 +68,7 @@ const handleCancel = () => emit('cancel')
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px var(--shadow-lg), 0 1px 4px var(--shadow-sm);
   transform: translateX(-50%);
   pointer-events: auto;
   user-select: none;

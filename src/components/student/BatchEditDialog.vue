@@ -5,7 +5,9 @@
         <div class="dialog-header">
           <h3>批量编辑</h3>
           <span class="selected-count">已选中 {{ selectedStudents.length }} 人</span>
-          <button class="close-btn" @click="close">&times;</button>
+          <button class="close-btn" type="button" aria-label="关闭" @click="close">
+            <X :size="18" stroke-width="2" />
+          </button>
         </div>
 
         <div class="dialog-body">
@@ -104,7 +106,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Check } from 'lucide-vue-next'
+import { Check, X } from 'lucide-vue-next'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 
@@ -201,7 +203,7 @@ const getTagName = (tagId) => {
 
 const getTagColor = (tagId) => {
   const tag = tags.value.find(t => t.id === tagId)
-  return tag?.color || '#999999'
+  return tag?.color || 'var(--color-text-disabled)'
 }
 
 const close = () => {
@@ -229,7 +231,7 @@ const close = () => {
   max-width: 560px;
   max-height: 85vh;
   border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 25px var(--shadow-lg);
   display: flex;
   flex-direction: column;
   animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -268,11 +270,15 @@ const close = () => {
   margin-left: auto;
   background: none;
   border: none;
-  font-size: 24px;
   color: var(--color-text-disabled);
   cursor: pointer;
-  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
+  border-radius: 8px;
 }
 
 .close-btn:hover {
@@ -332,7 +338,7 @@ const close = () => {
   border-radius: 10px;
   margin-bottom: 8px;
   border: 1px solid var(--color-border-light);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 2px 6px var(--shadow-sm);
   transition: all 0.2s ease;
 }
 
@@ -433,7 +439,7 @@ const close = () => {
   color: var(--color-text-inverse);
   padding: 2px 6px;
   border-radius: 4px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 1px var(--shadow-md);
 }
 
 .no-tags-hint {

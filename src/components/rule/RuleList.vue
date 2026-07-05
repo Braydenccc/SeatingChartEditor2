@@ -747,7 +747,7 @@ defineExpose({ focusRule })
 .filter-tab.active {
   background: var(--color-surface);
   color: var(--color-primary);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 6px var(--shadow-sm);
 }
 
 .toolbar-actions {
@@ -882,12 +882,12 @@ defineExpose({ focusRule })
   background: var(--color-surface);
   overflow: hidden;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 1px 3px var(--shadow-sm);
 }
 
 .rule-item:hover { 
   border-color: var(--color-border-strong);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+  box-shadow: 0 4px 12px var(--shadow-md);
   transform: translateY(-1px);
 }
 
@@ -963,7 +963,7 @@ defineExpose({ focusRule })
   background: var(--color-surface);
   border-radius: 50%;
   transition: transform 0.2s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 3px var(--shadow-md);
 }
 
 .toggle-switch input:checked ~ .toggle-knob { background: var(--color-success); }

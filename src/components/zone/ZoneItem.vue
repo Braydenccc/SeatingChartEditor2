@@ -138,7 +138,7 @@ const getTagName = (tagId) => {
 
 const getTagColor = (tagId) => {
   const tag = props.availableTags.find(t => t.id === tagId)
-  return tag ? tag.color : '#999'
+  return tag ? tag.color : 'var(--color-text-disabled)'
 }
 
 // 选中选区
@@ -352,15 +352,15 @@ onUnmounted(() => {
   gap: 4px;
   padding: 3px 8px;
   border-radius: 12px;
-  color: var(--color-surface);
+  color: var(--color-text-inverse);
   font-size: 11px;
   font-weight: 500;
 }
 
 .remove-tag-btn {
-  background: rgba(255, 255, 255, 0.3);
+  background: color-mix(in srgb, var(--color-text-inverse) 30%, transparent);
   border: none;
-  color: var(--color-surface);
+  color: var(--color-text-inverse);
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -375,7 +375,7 @@ onUnmounted(() => {
 }
 
 .remove-tag-btn:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: color-mix(in srgb, var(--color-text-inverse) 50%, transparent);
 }
 
 .add-tag-btn {
@@ -421,7 +421,7 @@ onUnmounted(() => {
 
 .delete-zone-btn.confirming {
   background: var(--color-danger) !important;
-  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 20%, transparent);
 }
 
 .tag-picker {
@@ -430,7 +430,7 @@ onUnmounted(() => {
   background: var(--color-surface);
   border: 2px solid var(--color-primary);
   border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px var(--shadow-lg);
   z-index: 1000;
   max-height: 200px;
   overflow-y: auto;

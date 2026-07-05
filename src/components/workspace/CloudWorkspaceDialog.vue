@@ -535,7 +535,7 @@ const formatSize = (bytes) => {
 .spinner {
   width: 30px;
   height: 30px;
-  border: 3px solid rgba(var(--color-primary-rgb), 0.1);
+  border: 3px solid color-mix(in srgb, var(--color-primary) 10%, transparent);
   border-radius: 50%;
   border-top-color: var(--color-primary);
   animation: spin 1s ease-in-out infinite;
@@ -570,7 +570,7 @@ const formatSize = (bytes) => {
 .form-group input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .section-title {

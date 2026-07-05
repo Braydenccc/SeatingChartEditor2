@@ -3,7 +3,9 @@
     <div class="login-dialog">
       <div class="dialog-header">
         <h3>{{ isLoginMode ? '账号登录' : '注册账号' }}</h3>
-        <button class="close-btn" @click="close">&times;</button>
+        <button class="close-btn" type="button" aria-label="关闭" @click="close">
+          <X :size="18" stroke-width="2" />
+        </button>
       </div>
 
       <div class="dialog-body">
@@ -89,15 +91,19 @@
               />
               <div v-if="tabMode === 'register' && passwordValidation" class="password-requirements">
                 <div :class="['requirement', { met: passwordValidation.length }]">
+                  <Check v-if="passwordValidation.length" :size="12" stroke-width="3" />
                   至少 8 个字符
                 </div>
                 <div :class="['requirement', { met: passwordValidation.uppercase }]">
+                  <Check v-if="passwordValidation.uppercase" :size="12" stroke-width="3" />
                   包含大写字母
                 </div>
                 <div :class="['requirement', { met: passwordValidation.lowercase }]">
+                  <Check v-if="passwordValidation.lowercase" :size="12" stroke-width="3" />
                   包含小写字母
                 </div>
                 <div :class="['requirement', { met: passwordValidation.number }]">
+                  <Check v-if="passwordValidation.number" :size="12" stroke-width="3" />
                   包含数字
                 </div>
               </div>
@@ -124,6 +130,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { Check, X } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { useWebDav } from '@/composables/useWebDav'
 import { validatePasswordStrength, PASSWORD_MIN_LENGTH } from '@/utils/passwordValidator'
@@ -259,7 +266,7 @@ const handleSubmit = async () => {
   width: 90%;
   max-width: 360px;
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 40px var(--shadow-lg);
   overflow: hidden;
   animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -293,11 +300,15 @@ const handleSubmit = async () => {
 .close-btn {
   background: none;
   border: none;
-  font-size: 24px;
   color: var(--color-text-secondary);
   cursor: pointer;
-  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
+  border-radius: 8px;
 }
 
 .close-btn:hover {
@@ -331,7 +342,7 @@ const handleSubmit = async () => {
 .tabs button.active {
   background: var(--color-surface);
   color: var(--color-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px var(--shadow-sm);
 }
 
 .form-group {
@@ -415,17 +426,16 @@ const handleSubmit = async () => {
 }
 
 .requirement {
+  min-height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: var(--color-text-disabled);
   padding: 2px 0;
 }
 
 .requirement.met {
   color: var(--color-success);
-}
-
-.requirement.met::before {
-  content: '✓ ';
-  font-weight: bold;
 }
 
 .checkbox-group {
