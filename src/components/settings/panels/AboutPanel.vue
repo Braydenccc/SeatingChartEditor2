@@ -88,7 +88,7 @@ const isWeb = computed(() => !isTauriRuntime())
 const runtimeLabel = computed(() => (isWeb.value ? 'Web 版' : 'Tauri 桌面版'))
 const loginMethodLabel = computed(() => {
   if (authType.value === 'webdav' && webdavConfig.value) return 'WebDAV'
-  if (currentUser.value && token.value) return 'SCE 账号'
+  if (currentUser.value && token.value) return 'SCE'
   if (webdavConfig.value) return 'WebDAV'
   return '未登录'
 })

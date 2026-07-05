@@ -17,6 +17,7 @@ related_files:
 - WebDAV 底层驱动: `src/composables/useWebDav.js`
 - 聚合存储操作平台: `src/composables/useCloudWorkspace.js`
 - 桌面端 HTTP/API 适配: `src/platform/apiClient.ts`、`src/platform/webdavTransport.ts`
+- OAuth/OIDC 登录入口: `public/api/oauth-start.php`、`public/api/oauth-callback.php`、`public/api/oauth-common.php`
 
 ## 3. 数据模型 / 核心API (Data Models & Core API)
 
@@ -33,6 +34,7 @@ const backupMode = ref<boolean>(false) // 若开启，存入 retiehe 时会静�
 - **Tauri Retinbox API**: 桌面端不能使用相对 `/api/*.php`，必须通过 `src/platform/apiClient.ts` 读取设置面板保存的 SCE 云服务地址、`VITE_RETIEHE_API_BASE` 或内置默认地址 `https://sce.jbyc.cc`，再拼接 `/api/auth.php` 和 `/api/workspace.php`。
 - **不依赖第三方库**: WebDAV 解析直接手写使用了原生的 `new DOMParser().parseFromString(text, 'text/xml')`，零 npm 依赖，避免了包体积膨胀。
 - **工作区列表管理**: SCE 云端工作区列表以 `users` 库中的 `{username}_files` 数组为准；删除工作区会在 `scefiles` 对应记录的 `metadata` 上写入 `deleted` 标记和 `deletedAt` 时间，不删除数据库值。`list`、`load`、`rename` 和覆盖保存都会忽略已标记删除的工作区。
+- **登录方式绑定**: 管理员可在 admin 后台配置多家 OAuth/OIDC 身份源。账号密码登录和 OAuth 登录都是登录 SCE 账号的方式，任一方式首次登录都可以创建正常 SCE 账号。账号主体由 `accountId` 承载云端工作区、设置和审计归属；账号密码登录由 `password_login_links` 映射到 `accountId`，OAuth 身份由 `oauth_identity_links.accountId` 绑定到同一账号。用户可在账号中心添加或解除登录方式，但至少需要保留一种可用登录方式；添加已属于另一账号的登录方式时，需要二次确认并合并到当前账号。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **多数据源混淆**: 在写上传/下载界面时，务必调用 `useCloudWorkspace.js` 里的封装函数（例如 `listWorkspaces()`），**绝对不要**去绕过它直接调用底层的 `useWebDav.js`，因为它负责把官方接口和 DAV 接口的数据拼合成无缝的列表给 UI 消费。

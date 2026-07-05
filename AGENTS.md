@@ -41,6 +41,34 @@ This file provides guidance to Codex when working with code in this repository.
 
 Node.js >= 20.0.0。项目没有统一 linter/formatter；测试框架使用 Vitest + happy-dom。
 
+## 任务执行流程
+
+开始任务前先判断任务类型，再读取对应上下文：
+
+- 只读诊断或代码审查：保持只读，先用 `git diff --stat`、`git diff --name-status` 或相关搜索确认范围，再按文件读取证据；除非用户改变范围，不修改、不测试、不构建。
+- Bug 修复：先确认复现线索，再按入口层、状态层、数据层、交互层、规则与算法层、UI/样式层、平台层顺序定位；Codex 执行时必须使用 `.agents/skills/bugfix/SKILL.md`。
+- 功能开发：先查现有入口、状态和数据模型，再选择最小改动面；涉及复杂模块时优先读取 `.agents/features/` 中对应功能文档。
+- 文档或规则更新：优先修改统一真源，生成文件通过 `npm run docs:sync` 同步，不手动维护多份完整规则。
+- Retinbox 后端或部署相关问题：先读取 Retinbox 后端规范和对应参考文档，再处理 PHP/Node 云函数、KV 数据库和部署说明。
+
+## 执行边界与验证
+
+- 默认不启动 dev server、不运行完整构建、不部署、不创建 Git 提交、分支、PR 或 Issue；用户明确要求时才执行。
+- 修改文件前先确认现有实现和相邻约定；遇到未由当前 agent 产生的改动时，相关则在其基础上合并处理，不相关则绕开。
+- 代码改动保持范围小，优先修源文件，不修改 `dist/`、`build/`、`.next/` 等构建产物。
+- 结构化数据优先使用类型、schema、解析器或项目已有 API，不使用脆弱字符串拼接。
+- 修复或功能改动后运行最小相关测试；没有运行测试时，最终回复必须说明原因。
+- 文档规则变更后运行 `npm run docs:sync` 和 `npm run docs:check`；若检查失败，说明失败项是否来自本次改动。
+
+## 交付说明
+
+最终回复应简明说明：
+
+- 改了什么。
+- 涉及哪些关键文件。
+- 运行了哪些验证。
+- 还有哪些未验证或需要用户确认的事项。
+
 ## 当前架构
 
 本项目是 Vue 3 + Vite 的教室座位表编辑器，支持 Web、Tauri 桌面端和 Retinbox Web Hosting。当前应用使用 `vue-router` 的 hash 路由，不再是无路由单页结构。

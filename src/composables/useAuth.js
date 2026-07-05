@@ -1,12 +1,13 @@
 import { ref, computed } from 'vue'
 import { safeStorageGet as storageGet, safeStorageSet as storageSet, safeStorageRemove as storageRemove } from '@/utils/storage'
 import { encrypt, decrypt, encryptPasswordForTransport } from '@/utils/crypto'
-import { apiFetch, clearRetieheSessionCookies } from '@/platform/apiClient'
+import { apiFetch, clearRetieheSessionCookies, getRetieheApiBase } from '@/platform/apiClient'
 import { isTauriRuntime } from '@/platform/runtime'
 
 const currentUser = ref(null)
 const token = ref(null)
 const isLoginDialogVisible = ref(false)
+const oauthProviders = ref([])
 
 // 鉴权方式: 'retiehe' 或 'webdav'
 const authType = ref('retiehe')
@@ -145,7 +146,7 @@ const verifyRetieheSession = async () => {
         }, 0)
         const result = await response.json().catch(() => null)
         if (response.ok && result?.success && result.data?.username) {
-            currentUser.value = { username: result.data.username }
+            currentUser.value = result.data
             token.value = cookieSessionToken
             authType.value = 'retiehe'
             return true
@@ -278,6 +279,19 @@ const attachPasswordField = async (requestBody, plainKey, encryptedKey, password
     requestBody[plainKey] = password
 }
 
+const buildOAuthStartUrl = (providerId, mode = 'login', options = {}) => {
+    const basePath = isTauriRuntime() ? getRetieheApiBase() : ''
+    const params = new URLSearchParams({
+        provider: providerId,
+        mode,
+        returnTo: '/#/user'
+    })
+    if (options.confirmMerge) {
+        params.set('confirmMerge', 'true')
+    }
+    return `${basePath}/api/oauth-start.php?${params.toString()}`
+}
+
 export function useAuth() {
     const isLoggedIn = computed(() => {
         return !!currentUser.value || !!webdavConfig.value
@@ -325,7 +339,7 @@ export function useAuth() {
     const login = async (username, password) => {
         const result = await callAuthApi('login', username, password)
         if (result.success) {
-            currentUser.value = { username: result.data.username }
+            currentUser.value = result.data
             token.value = cookieSessionToken
             authType.value = 'retiehe'
             eraseCookie('sce_user')
@@ -338,7 +352,7 @@ export function useAuth() {
     const register = async (username, password) => {
         const result = await callAuthApi('register', username, password)
         if (result.success) {
-            currentUser.value = { username: result.data.username }
+            currentUser.value = result.data
             token.value = cookieSessionToken
             authType.value = 'retiehe'
             eraseCookie('sce_user')
@@ -360,8 +374,9 @@ export function useAuth() {
                 action: 'change_password',
                 _csrf: csrfToken
             }
-            await attachPasswordField(requestBody, 'currentPassword', 'encryptedCurrentPassword', currentPassword, currentUser.value.username)
-            await attachPasswordField(requestBody, 'newPassword', 'encryptedNewPassword', newPassword, currentUser.value.username)
+            const passwordUsername = currentUser.value.passwordUsername || currentUser.value.username
+            await attachPasswordField(requestBody, 'currentPassword', 'encryptedCurrentPassword', currentPassword, passwordUsername)
+            await attachPasswordField(requestBody, 'newPassword', 'encryptedNewPassword', newPassword, passwordUsername)
 
             const response = await apiFetch('/api/auth.php', {
                 method: 'POST',
@@ -379,7 +394,11 @@ export function useAuth() {
                 return { success: false, message }
             }
 
-            return await response.json()
+            const result = await response.json()
+            if (result.success && result.data?.username) {
+                currentUser.value = result.data
+            }
+            return result
         } catch (err) {
             console.error('Change Password API Network Error:', err)
             return { success: false, message: err.message || '网络请求失败，请检查连接' }
@@ -497,6 +516,129 @@ export function useAuth() {
         safeStorageSet('sce_auth_type', type)
     }
 
+    const loadOAuthProviders = async () => {
+        try {
+            const response = await apiFetch('/api/oauth-providers.php', { method: 'GET' }, 0)
+            const result = await response.json().catch(() => null)
+            oauthProviders.value = response.ok && result?.success && Array.isArray(result.data) ? result.data : []
+        } catch (e) {
+            oauthProviders.value = []
+        }
+        return oauthProviders.value
+    }
+
+    const startOAuthLogin = (providerId, mode = 'login', options = {}) => {
+        if (!providerId) return ''
+        const url = buildOAuthStartUrl(providerId, mode, options)
+        window.location.href = url
+        return url
+    }
+
+    const refreshAuthBindings = async () => {
+        if (!currentUser.value || token.value !== cookieSessionToken) {
+            return { success: false, message: '未登录' }
+        }
+
+        try {
+            const csrfToken = getOrCreateCsrfToken()
+            const response = await apiFetch('/api/auth.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify({ action: 'list_auth_bindings', _csrf: csrfToken })
+            }, 0)
+            const result = await response.json()
+            if (result.success && result.data?.username) {
+                currentUser.value = result.data
+            }
+            return result
+        } catch (e) {
+            return { success: false, message: '网络错误' }
+        }
+    }
+
+    const bindPasswordLogin = async (loginUsername, loginPassword, confirmMerge = false) => {
+        if (!currentUser.value || token.value !== cookieSessionToken) {
+            return { success: false, message: '未登录' }
+        }
+
+        try {
+            const csrfToken = getOrCreateCsrfToken()
+            const requestBody = {
+                action: 'bind_password_login',
+                loginUsername,
+                confirmMerge,
+                _csrf: csrfToken
+            }
+            await attachPasswordField(requestBody, 'loginPassword', 'encryptedLoginPassword', loginPassword, loginUsername)
+            const response = await apiFetch('/api/auth.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify(requestBody)
+            }, 0)
+            const result = await response.json()
+            if (result.success && result.data?.username) {
+                currentUser.value = result.data
+                token.value = cookieSessionToken
+                authType.value = 'retiehe'
+            }
+            return result
+        } catch (e) {
+            return { success: false, message: '网络错误' }
+        }
+    }
+
+    const bindSceAccount = (targetUsername, targetPassword, confirmMerge = false) => {
+        return bindPasswordLogin(targetUsername, targetPassword, confirmMerge)
+    }
+
+    const unbindPasswordLogin = async (loginUsername) => {
+        if (!currentUser.value || token.value !== cookieSessionToken) {
+            return { success: false, message: '未登录' }
+        }
+
+        try {
+            const csrfToken = getOrCreateCsrfToken()
+            const response = await apiFetch('/api/auth.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify({ action: 'unbind_password_login', loginUsername, _csrf: csrfToken })
+            }, 0)
+            const result = await response.json()
+            if (result.success && result.data?.username) {
+                currentUser.value = result.data
+            }
+            return result
+        } catch (e) {
+            return { success: false, message: '网络错误' }
+        }
+    }
+
+    const unbindOAuthIdentity = async (identityKey) => {
+        if (!currentUser.value || token.value !== cookieSessionToken) {
+            return { success: false, message: '未登录' }
+        }
+
+        try {
+            const csrfToken = getOrCreateCsrfToken()
+            const response = await apiFetch('/api/auth.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify({ action: 'unbind_oauth_identity', identityKey, _csrf: csrfToken })
+            }, 0)
+            const result = await response.json()
+            if (result.success && result.data?.username) {
+                currentUser.value = result.data
+            }
+            return result
+        } catch (e) {
+            return { success: false, message: '网络错误' }
+        }
+    }
+
     return {
         currentUser,
         isLoggedIn,
@@ -504,6 +646,7 @@ export function useAuth() {
         authType,
         webdavConfig,
         backupMode,
+        oauthProviders,
         isLoginDialogVisible,
         login,
         register,
@@ -512,6 +655,13 @@ export function useAuth() {
         updateSyncSettings,
         setAuthType,
         logout,
+        loadOAuthProviders,
+        startOAuthLogin,
+        refreshAuthBindings,
+        bindPasswordLogin,
+        bindSceAccount,
+        unbindPasswordLogin,
+        unbindOAuthIdentity,
         initAuth
     }
 }

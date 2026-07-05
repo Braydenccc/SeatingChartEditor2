@@ -151,6 +151,86 @@ describe('useAuth', () => {
     })
   })
 
+  it('sends bind_password_login with csrf tokens and encrypted password', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: { username: 'acct_123' }
+      })
+    })
+
+    const { useAuth } = await import('../useAuth')
+    const auth = useAuth()
+    await auth.initAuth()
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: { username: 'acct_123', passwordUsername: 'teacher' }
+      })
+    })
+
+    const result = await auth.bindPasswordLogin('teacher', 'Pass1234', true)
+
+    expect(result.success).toBe(true)
+    const request = vi.mocked(fetch).mock.calls[1][1]
+    const requestBody = JSON.parse(request.body)
+    expect(requestBody).toMatchObject({
+      action: 'bind_password_login',
+      loginUsername: 'teacher',
+      confirmMerge: true,
+      _csrf: request.headers['X-CSRF-Token']
+    })
+    expect(requestBody.loginPassword).toBeUndefined()
+    expect(requestBody.encryptedLoginPassword).toEqual(expect.any(String))
+  })
+
+  it('sends unbind_password_login for the selected password username', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: { username: 'acct_123', passwordUsername: 'teacher' }
+      })
+    })
+
+    const { useAuth } = await import('../useAuth')
+    const auth = useAuth()
+    await auth.initAuth()
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: { username: 'acct_123' }
+      })
+    })
+
+    const result = await auth.unbindPasswordLogin('teacher')
+
+    expect(result.success).toBe(true)
+    const requestBody = JSON.parse(vi.mocked(fetch).mock.calls[1][1].body)
+    expect(requestBody).toMatchObject({
+      action: 'unbind_password_login',
+      loginUsername: 'teacher'
+    })
+  })
+
+  it('adds confirmMerge when restarting OAuth binding after merge confirmation', async () => {
+    const { useAuth } = await import('../useAuth')
+    const auth = useAuth()
+
+    const url = auth.startOAuthLogin('stcn', 'bind', { confirmMerge: true })
+    const parsedUrl = new URL(url, window.location.origin)
+
+    expect(parsedUrl.pathname).toBe('/api/oauth-start.php')
+    expect(parsedUrl.searchParams.get('provider')).toBe('stcn')
+    expect(parsedUrl.searchParams.get('mode')).toBe('bind')
+    expect(parsedUrl.searchParams.get('confirmMerge')).toBe('true')
+  })
+
   it('keeps deferred sync from consuming fetch mocks created after initAuth', async () => {
     vi.useFakeTimers()
 

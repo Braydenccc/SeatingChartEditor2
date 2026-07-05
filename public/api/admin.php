@@ -1,6 +1,7 @@
 <?php
 require_once "api/common.php";
 require_once "api/file-permissions.php";
+require_once "api/oauth-common.php";
 
 const ADMIN_DB_NAME = 'admin';
 const ADMIN_ENABLE_KEY = 'is_enable';
@@ -320,6 +321,7 @@ function adminSanitizeForLog($value, $depth = 0) {
         'content',
         'authorization',
         'encryptedpassword',
+        'clientsecret',
         'webdav',
         'settings'
     ];
@@ -421,6 +423,131 @@ function adminGetExistingUserHash($usersDb, $username) {
 
     $hash = $usersDb->get($username);
     return adminIsPasswordHash($hash) ? $hash : null;
+}
+
+function adminIsExternalUserMarker($value) {
+    return is_string($value) && strpos($value, 'external:') === 0;
+}
+
+function adminReadOauthIdentityLinks($identityDb) {
+    $links = [];
+    $keys = $identityDb->list_keys();
+    if (!is_array($keys)) {
+        return [];
+    }
+
+    foreach ($keys as $key) {
+        $identity = adminDecodeJson($identityDb->get($key), null);
+        if (!is_array($identity) || !isValidUsername(oauthIdentityAccountId($identity))) {
+            continue;
+        }
+        $identity['accountId'] = oauthIdentityAccountId($identity);
+        $identity['username'] = $identity['accountId'];
+        $identity['key'] = $key;
+        $links[] = $identity;
+    }
+
+    usort($links, function($a, $b) {
+        return strcmp((string)($b['lastLoginAt'] ?? $b['linkedAt'] ?? ''), (string)($a['lastLoginAt'] ?? $a['linkedAt'] ?? ''));
+    });
+
+    return $links;
+}
+
+function adminGetUserIdentities($identityDb, $username) {
+    if (!isValidUsername($username)) {
+        return [];
+    }
+
+    return array_values(array_filter(adminReadOauthIdentityLinks($identityDb), function($identity) use ($username) {
+        return oauthIdentityAccountId($identity) === $username;
+    }));
+}
+
+function adminUserExists($usersDb, $profilesDb, $identityDb, $username) {
+    if (!isValidUsername($username)) {
+        return false;
+    }
+
+    $userValue = $usersDb->get($username);
+    if (adminIsPasswordHash($userValue) || adminIsExternalUserMarker($userValue) || oauthUserHasPassword($username)) {
+        return true;
+    }
+
+    if ($profilesDb->get($username) !== null) {
+        return true;
+    }
+
+    return count(adminGetUserIdentities($identityDb, $username)) > 0;
+}
+
+function adminBuildUserSummary($usersDb, $profilesDb, $filesDb, $permissionsDb, $identityDb) {
+    $usernames = [];
+
+    $userKeys = $usersDb->list_keys();
+    if (is_array($userKeys)) {
+        foreach ($userKeys as $key) {
+            if (!isValidUsername($key)) {
+                continue;
+            }
+            $value = $usersDb->get($key);
+            if (adminIsPasswordHash($value) || adminIsExternalUserMarker($value)) {
+                $accountId = oauthResolvePasswordAccountId($key);
+                $usernames[] = $accountId !== '' ? $accountId : $key;
+            }
+        }
+    }
+
+    $passwordLinkDb = oauthPasswordLinkDb();
+    $passwordLinkKeys = $passwordLinkDb->list_keys();
+    if (is_array($passwordLinkKeys)) {
+        foreach ($passwordLinkKeys as $loginUsername) {
+            if (!isValidUsername($loginUsername) || oauthGetPasswordLoginHash($loginUsername) === null) {
+                continue;
+            }
+            $accountId = oauthResolvePasswordAccountId($loginUsername);
+            if ($accountId !== '') {
+                $usernames[] = $accountId;
+            }
+        }
+    }
+
+    $profileKeys = $profilesDb->list_keys();
+    if (is_array($profileKeys)) {
+        foreach ($profileKeys as $key) {
+            if (isValidUsername($key)) {
+                $usernames[] = $key;
+            }
+        }
+    }
+
+    foreach (adminReadOauthIdentityLinks($identityDb) as $identity) {
+        $accountId = oauthIdentityAccountId($identity);
+        if (isValidUsername($accountId)) {
+            $usernames[] = $accountId;
+        }
+    }
+
+    $usernames = array_values(array_unique($usernames));
+    sort($usernames);
+
+    $users = [];
+    foreach ($usernames as $username) {
+        $profile = getUserProfile($profilesDb, $username);
+        $authData = oauthBuildAccountUserData($username);
+        $users[] = [
+            'accountId' => $username,
+            'username' => $username,
+            'displayName' => $authData['displayName'],
+            'passwordUsername' => $authData['passwordUsername'],
+            'status' => $profile['status'],
+            'workspaceCount' => count(adminGetUserWorkspaces($usersDb, $filesDb, $permissionsDb, $username, false)),
+            'authSources' => $authData['authSources'],
+            'loginMethods' => $authData['loginMethods']
+        ];
+    }
+
+    return $users;
 }
 
 function adminIsWorkspaceDeleted($fileData) {
@@ -529,6 +656,57 @@ function adminReadLogArray($adminDb, $key, $limit) {
     return $result;
 }
 
+function adminFindOauthProvider($providers, $providerId) {
+    foreach ($providers as $provider) {
+        if (is_array($provider) && ($provider['id'] ?? '') === $providerId) {
+            return $provider;
+        }
+    }
+    return null;
+}
+
+function adminSaveOauthProvider($input) {
+    $providers = oauthGetProvidersRaw();
+    $providerInput = isset($input['provider']) && is_array($input['provider']) ? $input['provider'] : [];
+    $providerId = oauthNormalizeId($providerInput['id'] ?? '');
+    $existing = adminFindOauthProvider($providers, $providerId);
+    $provider = oauthNormalizeProvider($providerInput, $existing);
+    if (!$provider) {
+        return [false, 'OAuth 提供商配置无效', null];
+    }
+
+    $updated = [];
+    $replaced = false;
+    foreach ($providers as $item) {
+        if (is_array($item) && ($item['id'] ?? '') === $provider['id']) {
+            $updated[] = $provider;
+            $replaced = true;
+        } else {
+            $updated[] = $item;
+        }
+    }
+    if (!$replaced) {
+        $updated[] = $provider;
+    }
+
+    oauthSaveProvidersRaw($updated);
+    return [true, 'OAuth 提供商已保存', oauthSafeProvider($provider, true)];
+}
+
+function adminDeleteOauthProvider($providerId) {
+    $normalizedId = oauthNormalizeId($providerId);
+    if ($normalizedId === '') {
+        return false;
+    }
+
+    $providers = oauthGetProvidersRaw();
+    $updated = array_values(array_filter($providers, function($provider) use ($normalizedId) {
+        return !is_array($provider) || ($provider['id'] ?? '') !== $normalizedId;
+    }));
+    oauthSaveProvidersRaw($updated);
+    return count($updated) !== count($providers);
+}
+
 $adminDb = new Database(ADMIN_DB_NAME);
 $parseResult = adminParseRequest();
 $input = $parseResult['input'];
@@ -587,6 +765,12 @@ $allowedActions = [
     'get_workspace_detail',
     'rename_workspace',
     'set_workspace_deleted',
+    'list_oauth_providers',
+    'save_oauth_provider',
+    'delete_oauth_provider',
+    'test_oauth_provider',
+    'list_oauth_identity_links',
+    'unlink_oauth_identity',
     'list_audit_logs',
     'list_audit_failures'
 ];
@@ -611,35 +795,14 @@ try {
     $permissionsDb = new Database('file_permissions');
     $settingsDb = new Database('users_settings');
     $sessionDb = new Database('users_sessions');
+    $identityDb = new Database(OAUTH_IDENTITY_DB_NAME);
 
     if ($action === 'list_users') {
-        $keys = $usersDb->list_keys();
-        sort($keys);
-
-        $users = [];
-        foreach ($keys as $key) {
-            if (!isValidUsername($key)) {
-                continue;
-            }
-
-            $hash = $usersDb->get($key);
-            if (!adminIsPasswordHash($hash)) {
-                continue;
-            }
-
-            $profile = getUserProfile($profilesDb, $key);
-            $users[] = [
-                'username' => $key,
-                'status' => $profile['status'],
-                'workspaceCount' => count(adminGetUserWorkspaces($usersDb, $filesDb, $permissionsDb, $key, false))
-            ];
-        }
-
         adminRespond(
             $adminDb,
             $input,
             $action,
-            ['success' => true, 'data' => $users],
+            ['success' => true, 'data' => adminBuildUserSummary($usersDb, $profilesDb, $filesDb, $permissionsDb, $identityDb)],
             200,
             true,
             true
@@ -648,7 +811,7 @@ try {
 
     if ($action === 'get_user_detail') {
         $username = isset($input['username']) ? trim((string)$input['username']) : '';
-        if (adminGetExistingUserHash($usersDb, $username) === null) {
+        if (!adminUserExists($usersDb, $profilesDb, $identityDb, $username)) {
             adminRespond(
                 $adminDb,
                 $input,
@@ -663,6 +826,7 @@ try {
         }
 
         $profile = getUserProfile($profilesDb, $username);
+        $authData = oauthBuildAccountUserData($username);
         adminRespond(
             $adminDb,
             $input,
@@ -670,11 +834,17 @@ try {
             [
                 'success' => true,
                 'data' => [
+                    'accountId' => $username,
                     'username' => $username,
+                    'displayName' => $authData['displayName'],
+                    'passwordUsername' => $authData['passwordUsername'],
                     'status' => $profile['status'],
                     'profile' => $profile,
                     'workspaces' => adminGetUserWorkspaces($usersDb, $filesDb, $permissionsDb, $username, true),
-                    'settings' => adminGetSettingsSummary($settingsDb, $username)
+                    'settings' => adminGetSettingsSummary($settingsDb, $username),
+                    'authSources' => $authData['authSources'],
+                    'loginMethods' => $authData['loginMethods'],
+                    'oauthIdentities' => array_map('oauthSafeIdentity', adminGetUserIdentities($identityDb, $username))
                 ]
             ],
             200,
@@ -689,7 +859,7 @@ try {
         $username = isset($input['username']) ? trim((string)$input['username']) : '';
         $status = isset($input['status']) ? trim((string)$input['status']) : '';
 
-        if (adminGetExistingUserHash($usersDb, $username) === null) {
+        if (!adminUserExists($usersDb, $profilesDb, $identityDb, $username)) {
             adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '用户不存在'], 404, false, true, 'user_not_found', $username);
         }
 
@@ -714,9 +884,10 @@ try {
     if ($action === 'reset_user_password') {
         $username = isset($input['username']) ? trim((string)$input['username']) : '';
         $newPassword = isset($input['newPassword']) && is_string($input['newPassword']) ? $input['newPassword'] : '';
+        $passwordUsername = oauthGetPrimaryPasswordUsername($username);
 
-        if (adminGetExistingUserHash($usersDb, $username) === null) {
-            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '用户不存在'], 404, false, true, 'user_not_found', $username);
+        if ($passwordUsername === '' || adminGetExistingUserHash($usersDb, $passwordUsername) === null) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '用户未添加账号密码登录'], 404, false, true, 'password_login_not_found', $username);
         }
 
         $validation = validatePasswordStrength($newPassword);
@@ -724,9 +895,68 @@ try {
             adminRespond($adminDb, $input, $action, ['success' => false, 'message' => $validation['message']], 400, false, true, 'invalid_password', $username);
         }
 
-        $usersDb->set($username, password_hash($newPassword, PASSWORD_DEFAULT));
+        $usersDb->set($passwordUsername, password_hash($newPassword, PASSWORD_DEFAULT));
+        oauthSetPasswordLoginLink($passwordUsername, $username);
         $sessionDb->delete($username);
         adminRespond($adminDb, $input, $action, ['success' => true, 'message' => '密码已重置'], 200, true, true, '', $username);
+    }
+
+    if ($action === 'list_oauth_providers') {
+        $providers = array_map(function($provider) {
+            return oauthSafeProvider($provider, true);
+        }, oauthGetProvidersRaw());
+        adminRespond($adminDb, $input, $action, ['success' => true, 'data' => $providers], 200, true, true);
+    }
+
+    if ($action === 'save_oauth_provider') {
+        [$ok, $message, $provider] = adminSaveOauthProvider($input);
+        if (!$ok) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => $message], 400, false, true, 'invalid_oauth_provider');
+        }
+        adminRespond($adminDb, $input, $action, ['success' => true, 'message' => $message, 'data' => $provider], 200, true, true, '', $provider['id'] ?? null);
+    }
+
+    if ($action === 'delete_oauth_provider') {
+        $providerId = isset($input['providerId']) ? oauthNormalizeId($input['providerId']) : '';
+        if (!adminDeleteOauthProvider($providerId)) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => 'OAuth 提供商不存在'], 404, false, true, 'oauth_provider_not_found', $providerId);
+        }
+        adminRespond($adminDb, $input, $action, ['success' => true, 'message' => 'OAuth 提供商已删除'], 200, true, true, '', $providerId);
+    }
+
+    if ($action === 'test_oauth_provider') {
+        $providerInput = isset($input['provider']) && is_array($input['provider']) ? $input['provider'] : [];
+        $existing = adminFindOauthProvider(oauthGetProvidersRaw(), oauthNormalizeId($providerInput['id'] ?? ''));
+        $provider = oauthNormalizeProvider($providerInput, $existing);
+        if (!$provider) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => 'OAuth 提供商配置无效'], 400, false, true, 'invalid_oauth_provider');
+        }
+        $discovery = oauthProviderDiscovery($provider);
+        adminRespond($adminDb, $input, $action, ['success' => true, 'data' => [
+            'authorizationEndpoint' => $discovery['authorizationEndpoint'],
+            'tokenEndpoint' => $discovery['tokenEndpoint'],
+            'userInfoEndpoint' => $discovery['userInfoEndpoint'],
+            'jwksUri' => $discovery['jwksUri'],
+            'callbackUrl' => oauthCallbackUrl()
+        ]], 200, true, true, '', $provider['id']);
+    }
+
+    if ($action === 'list_oauth_identity_links') {
+        adminRespond($adminDb, $input, $action, ['success' => true, 'data' => adminReadOauthIdentityLinks($identityDb)], 200, true, true);
+    }
+
+    if ($action === 'unlink_oauth_identity') {
+        $identityKey = isset($input['identityKey']) ? sanitizeDbKey((string)$input['identityKey']) : '';
+        $identity = $identityKey !== '' ? adminDecodeJson($identityDb->get($identityKey), null) : null;
+        if (!is_array($identity)) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => 'OAuth 绑定不存在'], 404, false, true, 'oauth_identity_not_found', $identityKey);
+        }
+        $identityAccountId = oauthIdentityAccountId($identity);
+        if ($identityAccountId !== '' && oauthLoginMethodCount($identityAccountId) <= 1) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '至少需要保留一种登录方式'], 400, false, true, 'last_login_method', $identityAccountId);
+        }
+        $identityDb->delete($identityKey);
+        adminRespond($adminDb, $input, $action, ['success' => true, 'message' => 'OAuth 绑定已解除'], 200, true, true, '', $identityAccountId ?: $identityKey);
     }
 
     if ($action === 'list_workspaces') {

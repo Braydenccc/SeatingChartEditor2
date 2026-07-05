@@ -19,6 +19,19 @@
           通过 WebDAV 连接网盘以使用云端工作区。连接需要跨域(CORS)支持。
         </div>
 
+        <div v-if="tabMode === 'login' && oauthProviders.length" class="oauth-section">
+          <button
+            v-for="provider in oauthProviders"
+            :key="provider.id"
+            type="button"
+            class="oauth-button"
+            @click="handleOAuthLogin(provider.id)"
+          >
+            <LogIn :size="16" stroke-width="2" />
+            <span>{{ provider.name }}</span>
+          </button>
+        </div>
+
         <form @submit.prevent="handleSubmit">
           <template v-if="tabMode === 'webdav'">
             <div class="form-group">
@@ -124,6 +137,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { LogIn } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { useWebDav } from '@/composables/useWebDav'
 import { validatePasswordStrength, PASSWORD_MIN_LENGTH } from '@/utils/passwordValidator'
@@ -138,7 +152,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible', 'success'])
 
-const { login, register, setWebdavLogin } = useAuth()
+const { login, register, setWebdavLogin, oauthProviders, loadOAuthProviders, startOAuthLogin } = useAuth()
 const { mkcol } = useWebDav()
 
 const tabMode = ref('login') // 'login', 'register', 'webdav'
@@ -167,11 +181,16 @@ watch(() => props.visible, (newVal) => {
     errorMessage.value = ''
     successMessage.value = ''
     tabMode.value = props.initialTab || 'login'
+    loadOAuthProviders()
   }
-})
+}, { immediate: true })
 
 const close = () => {
   emit('update:visible', false)
+}
+
+const handleOAuthLogin = (providerId) => {
+  startOAuthLogin(providerId, 'login')
 }
 
 const handleSubmit = async () => {
@@ -384,6 +403,34 @@ const handleSubmit = async () => {
 
 .dialog-actions {
   margin-top: 24px;
+}
+
+.oauth-section {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.oauth-button {
+  width: 100%;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.oauth-button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-surface);
 }
 
 .btn-primary {

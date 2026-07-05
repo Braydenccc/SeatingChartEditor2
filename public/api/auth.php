@@ -2,6 +2,7 @@
 // 使用 Retinbox 平台规范：从网站根目录开始的绝对路径（省略开头的 /）
 // auth.php 位于 api/ 目录下，所以需要引用同目录的 common.php
 require_once "api/common.php";
+require_once "api/oauth-common.php";
 header('Content-Type: application/json; charset=utf-8');
 
 if (!class_exists('Database')) {
@@ -175,6 +176,10 @@ function sanitizeUserSettings($settings) {
     return $settings;
 }
 
+function buildAuthUserData($username) {
+    return oauthBuildAccountUserData($username);
+}
+
 try {
     $input = parseRequestInput();
 
@@ -184,7 +189,7 @@ try {
     $currentPassword = isset($input['currentPassword']) && is_string($input['currentPassword']) ? $input['currentPassword'] : '';
     $newPassword = isset($input['newPassword']) && is_string($input['newPassword']) ? $input['newPassword'] : '';
 
-    $allowedActions = ['register', 'login', 'verify', 'logout', 'change_password', 'set_settings', 'get_settings'];
+    $allowedActions = ['register', 'login', 'verify', 'logout', 'change_password', 'set_settings', 'get_settings', 'list_auth_bindings', 'bind_password_login', 'unbind_password_login', 'bind_sce_account', 'unbind_oauth_identity'];
     if (!in_array($action, $allowedActions, true)) {
         respond(['success' => false, 'message' => 'Unknown action'], 400);
     }
@@ -208,18 +213,21 @@ try {
         checkRateLimit($username);
 
         $existingHash = $db->get($username);
-        if ($existingHash !== null) {
+        if ($existingHash !== null || oauthResolvePasswordAccountId($username) !== '') {
             logSecurityEvent('register_failed', $username, ['reason' => 'username_exists']);
             respond(['success' => false, 'message' => '注册失败，请检查输入或稍后重试']);
         }
 
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $db->set($username, $hash);
+        oauthSetPasswordLoginLink($username, $username);
         $profileDb->set($username, json_encode([
             'status' => 'active',
+            'displayName' => $username,
             'createdAt' => date('c'),
             'updatedAt' => date('c')
         ], JSON_UNESCAPED_UNICODE));
+        oauthEnsureAccountProfile($username);
 
         $issuedToken = issueSessionToken($sessionDb, $username);
         setAuthCookies($username, $issuedToken);
@@ -227,9 +235,7 @@ try {
         respond([
             'success' => true,
             'message' => '注册成功',
-            'data' => [
-                'username' => $username
-            ]
+            'data' => buildAuthUserData($username)
         ]);
 
     } elseif ($action === 'login') {
@@ -242,27 +248,28 @@ try {
 
         checkRateLimit($username);
 
-        $existingHash = $db->get($username);
-        if ($existingHash === null) {
+        $passwordLogin = oauthResolvePasswordLogin($username);
+        if ($passwordLogin === null) {
             logSecurityEvent('login_failed', $username, ['reason' => 'user_not_found']);
             respond(['success' => false, 'message' => '用户名或密码不正确']);
         }
 
-        if (password_verify($password, $existingHash)) {
-            if (isUserDisabled($profileDb, $username)) {
-                logSecurityEvent('login_failed', $username, ['reason' => 'user_disabled']);
+        if (password_verify($password, $passwordLogin['hash'])) {
+            $accountId = $passwordLogin['accountId'];
+            if (isUserDisabled($profileDb, $accountId)) {
+                logSecurityEvent('login_failed', $accountId, ['reason' => 'user_disabled', 'loginUsername' => $username]);
                 respond(['success' => false, 'message' => '账号已被禁用'], 403);
             }
 
-            $issuedToken = issueSessionToken($sessionDb, $username);
-            setAuthCookies($username, $issuedToken);
-            logSecurityEvent('login_success', $username);
+            oauthSetPasswordLoginLink($username, $accountId);
+            oauthEnsureAccountProfile($accountId);
+            $issuedToken = issueSessionToken($sessionDb, $accountId);
+            setAuthCookies($accountId, $issuedToken);
+            logSecurityEvent('login_success', $accountId, ['loginUsername' => $username]);
             respond([
                 'success' => true,
                 'message' => '登录成功',
-                'data' => [
-                    'username' => $username
-                ]
+                'data' => buildAuthUserData($accountId)
             ]);
         } else {
             logSecurityEvent('login_failed', $username, ['reason' => 'invalid_password']);
@@ -275,9 +282,7 @@ try {
         }
         respond([
             'success' => true,
-            'data' => [
-                'username' => $authUsername
-            ]
+            'data' => buildAuthUserData($authUsername)
         ]);
     } elseif ($action === 'logout') {
         $authUsername = getAuthenticatedUsername($sessionDb);
@@ -294,8 +299,12 @@ try {
         ensureHttps();
         $authUsername = requireAuthenticatedUsername($sessionDb);
         checkRateLimitGeneric('change_password_' . $authUsername, MAX_ATTEMPTS, '密码修改尝试次数过多', 'change_password_rate_limit', $authUsername);
-        $currentPassword = readPasswordField($input, 'currentPassword', 'encryptedCurrentPassword', $authUsername);
-        $newPassword = readPasswordField($input, 'newPassword', 'encryptedNewPassword', $authUsername);
+        $passwordUsername = oauthGetPrimaryPasswordUsername($authUsername);
+        if ($passwordUsername === '') {
+            respond(['success' => false, 'message' => '当前账号未添加账号密码登录'], 400);
+        }
+        $currentPassword = readPasswordField($input, 'currentPassword', 'encryptedCurrentPassword', $passwordUsername);
+        $newPassword = readPasswordField($input, 'newPassword', 'encryptedNewPassword', $passwordUsername);
 
         if ($currentPassword === '' || $newPassword === '') {
             respond(['success' => false, 'message' => '当前密码和新密码不能为空']);
@@ -303,17 +312,18 @@ try {
 
         validatePassword($newPassword);
 
-        $existingHash = $db->get($authUsername);
+        $existingHash = oauthGetPasswordLoginHash($passwordUsername);
         if ($existingHash === null || !password_verify($currentPassword, $existingHash)) {
             logSecurityEvent('change_password_failed', $authUsername, ['reason' => 'invalid_current_password']);
             respond(['success' => false, 'message' => '当前密码不正确']);
         }
 
-        $db->set($authUsername, password_hash($newPassword, PASSWORD_DEFAULT));
+        $db->set($passwordUsername, password_hash($newPassword, PASSWORD_DEFAULT));
+        oauthSetPasswordLoginLink($passwordUsername, $authUsername);
         $issuedToken = issueSessionToken($sessionDb, $authUsername);
         setAuthCookies($authUsername, $issuedToken);
         logSecurityEvent('change_password_success', $authUsername);
-        respond(['success' => true, 'message' => '密码已修改']);
+        respond(['success' => true, 'message' => '密码已修改', 'data' => buildAuthUserData($authUsername)]);
     } elseif ($action === 'set_settings') {
         $authUsername = requireAuthenticatedUsername($sessionDb);
         $settingsDb = new Database("users_settings");
@@ -327,6 +337,102 @@ try {
         $settingsStr = $settingsDb->get($authUsername);
         $settings = $settingsStr ? json_decode($settingsStr, true) : null;
         respond(['success' => true, 'data' => $settings]);
+    } elseif ($action === 'list_auth_bindings') {
+        $authUsername = requireAuthenticatedUsername($sessionDb);
+        respond(['success' => true, 'data' => buildAuthUserData($authUsername)]);
+    } elseif ($action === 'bind_password_login' || $action === 'bind_sce_account') {
+        ensureHttps();
+        $authUsername = requireAuthenticatedUsername($sessionDb);
+        $targetUsername = isset($input['loginUsername'])
+            ? trim((string)$input['loginUsername'])
+            : (isset($input['targetUsername']) ? trim((string)$input['targetUsername']) : '');
+        $targetPassword = '';
+        if (isset($input['encryptedLoginPassword']) || isset($input['loginPassword'])) {
+            $targetPassword = readPasswordField($input, 'loginPassword', 'encryptedLoginPassword', $targetUsername);
+        } else {
+            $targetPassword = readPasswordField($input, 'targetPassword', 'encryptedTargetPassword', $targetUsername);
+        }
+        $confirmMerge = isset($input['confirmMerge']) && $input['confirmMerge'] === true;
+
+        if (!isValidUsername($targetUsername) || $targetPassword === '') {
+            respond(['success' => false, 'message' => '用户名或密码不能为空'], 400);
+        }
+
+        $existingLogin = oauthResolvePasswordLogin($targetUsername);
+        if ($existingLogin !== null) {
+            if (!password_verify($targetPassword, $existingLogin['hash'])) {
+                logSecurityEvent('bind_password_login_failed', $targetUsername, ['reason' => 'invalid_password', 'source' => $authUsername]);
+                respond(['success' => false, 'message' => '用户名或密码不正确'], 401);
+            }
+
+            $sourceAccountId = $existingLogin['accountId'];
+            if (isUserDisabled($profileDb, $sourceAccountId)) {
+                respond(['success' => false, 'message' => '该登录方式所属账号已被禁用'], 403);
+            }
+
+            if ($sourceAccountId !== $authUsername) {
+                if (!$confirmMerge) {
+                    respond([
+                        'success' => false,
+                        'code' => 'merge_required',
+                        'message' => '该账号密码登录已属于另一个 SCE 账号，确认后会把两个账号的数据合并到当前账号。',
+                        'data' => [
+                            'sourceAccountId' => $sourceAccountId,
+                            'targetAccountId' => $authUsername
+                        ]
+                    ], 409);
+                }
+                oauthMergeAccountInto($sourceAccountId, $authUsername);
+            }
+            oauthSetPasswordLoginLink($targetUsername, $authUsername);
+        } else {
+            validatePassword($targetPassword);
+            $db->set($targetUsername, password_hash($targetPassword, PASSWORD_DEFAULT));
+            oauthSetPasswordLoginLink($targetUsername, $authUsername);
+        }
+
+        oauthEnsureAccountProfile($authUsername);
+        $issuedToken = issueSessionToken($sessionDb, $authUsername);
+        setAuthCookies($authUsername, $issuedToken);
+        logSecurityEvent('bind_password_login_success', $authUsername, ['loginUsername' => $targetUsername]);
+        respond(['success' => true, 'message' => '账号密码登录已添加', 'data' => buildAuthUserData($authUsername)]);
+    } elseif ($action === 'unbind_password_login') {
+        $authUsername = requireAuthenticatedUsername($sessionDb);
+        $targetUsername = isset($input['loginUsername']) ? trim((string)$input['loginUsername']) : oauthGetPrimaryPasswordUsername($authUsername);
+        if (!isValidUsername($targetUsername)) {
+            respond(['success' => false, 'message' => '缺少登录用户名'], 400);
+        }
+        if (oauthResolvePasswordAccountId($targetUsername) !== $authUsername || oauthGetPasswordLoginHash($targetUsername) === null) {
+            respond(['success' => false, 'message' => '账号密码登录不存在'], 404);
+        }
+        if (oauthLoginMethodCount($authUsername) <= 1) {
+            respond(['success' => false, 'message' => '至少需要保留一种登录方式'], 400);
+        }
+
+        $db->delete($targetUsername);
+        oauthPasswordLinkDb()->delete($targetUsername);
+        oauthEnsureAccountProfile($authUsername);
+        respond(['success' => true, 'message' => '账号密码登录已解除', 'data' => buildAuthUserData($authUsername)]);
+    } elseif ($action === 'unbind_oauth_identity') {
+        $authUsername = requireAuthenticatedUsername($sessionDb);
+        $identityKey = isset($input['identityKey']) ? sanitizeDbKey((string)$input['identityKey']) : '';
+        if ($identityKey === '') {
+            respond(['success' => false, 'message' => '缺少绑定标识'], 400);
+        }
+
+        $identityDb = new Database(OAUTH_IDENTITY_DB_NAME);
+        $identity = oauthJsonDecode($identityDb->get($identityKey), null);
+        if (!is_array($identity) || oauthIdentityAccountId($identity) !== $authUsername) {
+            respond(['success' => false, 'message' => '绑定不存在'], 404);
+        }
+
+        if (oauthLoginMethodCount($authUsername) <= 1) {
+            respond(['success' => false, 'message' => '至少需要保留一种登录方式'], 400);
+        }
+
+        $identityDb->delete($identityKey);
+        oauthEnsureAccountProfile($authUsername);
+        respond(['success' => true, 'message' => 'OAuth 绑定已解除', 'data' => buildAuthUserData($authUsername)]);
     }
 } catch (Exception $e) {
     // 记录详细错误到日志，但不暴露给客户端

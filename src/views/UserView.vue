@@ -16,7 +16,7 @@
             <strong>{{ currentUser?.username || '未登录' }}</strong>
           </div>
           <div class="info-item">
-            <span class="info-label">账号类型</span>
+            <span class="info-label">当前登录</span>
             <strong>{{ accountTypeText }}</strong>
           </div>
           <div class="info-item">
@@ -32,6 +32,85 @@
             <LogIn :size="16" stroke-width="2" />
             <span>登录 SCE</span>
           </button>
+        </div>
+
+        <div v-if="token" class="binding-panel">
+          <div class="binding-header">
+            <ShieldCheck :size="18" stroke-width="2" />
+            <strong>登录绑定</strong>
+            <button class="icon-inline-button" type="button" :disabled="isRefreshingBindings" @click="handleRefreshBindings">
+              <RefreshCw :size="15" stroke-width="2" :class="{ spinning: isRefreshingBindings }" />
+            </button>
+          </div>
+
+          <div class="binding-list">
+            <div class="binding-item">
+              <div>
+                <strong>账号密码登录</strong>
+                <span>{{ currentUser?.passwordUsername || '未添加' }}</span>
+              </div>
+              <span class="mini-status" :class="{ active: !!currentUser?.hasPassword }">
+                {{ currentUser?.hasPassword ? '已添加' : '未添加' }}
+              </span>
+              <button
+                v-if="currentUser?.hasPassword"
+                class="icon-inline-button danger"
+                type="button"
+                title="解除账号密码登录"
+                :disabled="isUnbindingPassword"
+                @click="handleUnbindPasswordLogin"
+              >
+                <Unlink :size="15" stroke-width="2" />
+              </button>
+            </div>
+            <div v-for="identity in oauthIdentities" :key="identity.key" class="binding-item">
+              <div>
+                <strong>{{ identity.providerName || identity.providerId }}</strong>
+                <span>{{ identity.displayName || identity.email || '已绑定' }}</span>
+              </div>
+              <button
+                class="icon-inline-button danger"
+                type="button"
+                title="解除绑定"
+                :disabled="isUnbindingIdentity === identity.key"
+                @click="handleUnbindOAuth(identity)"
+              >
+                <Unlink :size="15" stroke-width="2" />
+              </button>
+            </div>
+          </div>
+
+          <form v-if="!currentUser?.hasPassword" class="bind-form" @submit.prevent="handleBindPasswordLogin">
+            <label class="form-field">
+              <span>登录用户名</span>
+              <input v-model="bindLoginUsername" type="text" autocomplete="username" />
+            </label>
+            <label class="form-field">
+              <span>登录密码</span>
+              <input v-model="bindLoginPassword" type="password" autocomplete="current-password" />
+            </label>
+            <button class="primary-button" type="submit" :disabled="isBindingPassword">
+              <Link2 :size="18" stroke-width="2" />
+              <span>{{ isBindingPassword ? '添加中' : '添加账号密码登录' }}</span>
+            </button>
+          </form>
+
+          <div v-if="availableOAuthProviders.length" class="oauth-bind-actions">
+            <button
+              v-for="provider in availableOAuthProviders"
+              :key="provider.id"
+              class="action-button"
+              type="button"
+              @click="handleBindOAuth(provider.id)"
+            >
+              <Link2 :size="18" stroke-width="2" />
+              <span>绑定 {{ provider.name }}</span>
+            </button>
+          </div>
+
+          <p v-if="bindMessage" class="status-text" :class="{ danger: bindMessageType === 'error', success: bindMessageType === 'success' }">
+            {{ bindMessage }}
+          </p>
         </div>
       </section>
 
@@ -89,12 +168,12 @@
         <div class="section-header">
           <KeyRound :size="20" stroke-width="2" />
           <div>
-            <h2>修改 SCE 密码</h2>
-            <p>{{ token ? '更新当前 SCE 账号的登录密码。' : '此操作需要先登录 SCE 账号。' }}</p>
+            <h2>修改登录密码</h2>
+            <p>{{ token && currentUser?.hasPassword ? '更新账号密码登录的密码。' : '此操作需要先添加账号密码登录。' }}</p>
           </div>
         </div>
 
-        <form v-if="token" class="password-form" @submit.prevent="handleChangePassword">
+        <form v-if="token && currentUser?.hasPassword" class="password-form" @submit.prevent="handleChangePassword">
           <label class="form-field">
             <span>当前密码</span>
             <input v-model="currentPassword" type="password" autocomplete="current-password" />
@@ -129,7 +208,7 @@
 
         <div v-else class="empty-panel">
           <Cloud :size="22" stroke-width="2" />
-          <span>仅 SCE 账号支持在此修改登录密码。</span>
+          <span>当前账号未添加账号密码登录。</span>
         </div>
       </section>
     </div>
@@ -138,15 +217,18 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Cloud,
   CloudDownload,
   CloudUpload,
   FolderOpen,
   KeyRound,
+  Link2,
   LogIn,
   RefreshCw,
+  ShieldCheck,
+  Unlink,
   User
 } from 'lucide-vue-next'
 import AppPageShell from '@/components/layout/AppPageShell.vue'
@@ -157,7 +239,21 @@ import { useLogger } from '@/composables/useLogger'
 import { validatePasswordStrength } from '@/utils/passwordValidator'
 
 const router = useRouter()
-const { currentUser, token, authType, isLoginDialogVisible, changePassword } = useAuth()
+const route = useRoute()
+const {
+  currentUser,
+  token,
+  authType,
+  isLoginDialogVisible,
+  changePassword,
+  oauthProviders,
+  loadOAuthProviders,
+  startOAuthLogin,
+  refreshAuthBindings,
+  bindPasswordLogin,
+  unbindPasswordLogin,
+  unbindOAuthIdentity
+} = useAuth()
 const { openCloudLoad, openCloudSave } = useCloudWorkspaceDialog()
 const { success, error } = useLogger()
 const {
@@ -176,15 +272,26 @@ const confirmPassword = ref('')
 const isChangingPassword = ref(false)
 const passwordMessage = ref('')
 const passwordMessageType = ref('')
+const bindLoginUsername = ref('')
+const bindLoginPassword = ref('')
+const bindMessage = ref('')
+const bindMessageType = ref('')
+const isBindingPassword = ref(false)
+const isRefreshingBindings = ref(false)
+const isUnbindingPassword = ref(false)
+const isUnbindingIdentity = ref('')
+const handledOAuthQuery = ref('')
 
 const accountTypeText = computed(() => {
-  if (token.value) return 'SCE 账号'
+  if (token.value) return 'SCE'
   if (authType.value === 'webdav') return 'WebDAV'
   return '未登录'
 })
 
 const accountStatusText = computed(() => {
-  if (token.value) return '已连接 SCE 账号，可管理云端工作区与密码。'
+  if (token.value && currentUser.value?.hasPassword && oauthIdentities.value.length) return '已连接 SCE，可使用账号密码或统一登录进入。'
+  if (token.value && currentUser.value?.hasPassword) return '已连接 SCE，可管理云端工作区与登录密码。'
+  if (token.value) return '已连接 SCE，当前仅绑定统一登录，可添加账号密码登录。'
   if (currentUser.value) return '当前为 WebDAV 连接，SCE 账号功能不可用。'
   return '登录后可查看账号信息。'
 })
@@ -201,6 +308,12 @@ const passwordValidation = computed(() => {
 
 const isNewPasswordValid = computed(() =>
   !!passwordValidation.value && Object.values(passwordValidation.value).every(Boolean)
+)
+
+const oauthIdentities = computed(() => currentUser.value?.oauthIdentities || [])
+const boundOAuthProviderIds = computed(() => new Set(oauthIdentities.value.map(identity => identity.providerId)))
+const availableOAuthProviders = computed(() =>
+  oauthProviders.value.filter(provider => !boundOAuthProviderIds.value.has(provider.id))
 )
 
 const openLoginDialog = () => {
@@ -236,7 +349,7 @@ const handleChangePassword = async () => {
       confirmPassword.value = ''
       passwordMessage.value = result.message || '密码已修改'
       passwordMessageType.value = 'success'
-      success('SCE 密码已修改')
+      success('登录密码已修改')
     } else {
       passwordMessage.value = result.message || '密码修改失败'
       passwordMessageType.value = 'error'
@@ -247,9 +360,163 @@ const handleChangePassword = async () => {
   }
 }
 
+const handleRefreshBindings = async () => {
+  isRefreshingBindings.value = true
+  try {
+    await Promise.all([loadOAuthProviders(), refreshAuthBindings()])
+  } finally {
+    isRefreshingBindings.value = false
+  }
+}
+
+const handleBindOAuth = (providerId, confirmMerge = false) => {
+  startOAuthLogin(providerId, 'bind', { confirmMerge })
+}
+
+const submitBindPasswordLogin = async (confirmMerge = false) => {
+  const result = await bindPasswordLogin(bindLoginUsername.value.trim(), bindLoginPassword.value, confirmMerge)
+  if (!result.success && result.code === 'merge_required') {
+    const confirmed = window.confirm(result.message || '该登录方式已属于另一个账号，确认合并到当前账号？')
+    if (confirmed) {
+      return submitBindPasswordLogin(true)
+    }
+  }
+  return result
+}
+
+const handleBindPasswordLogin = async () => {
+  bindMessage.value = ''
+  bindMessageType.value = ''
+  if (!bindLoginUsername.value.trim() || !bindLoginPassword.value) {
+    bindMessage.value = '请填写登录用户名和密码'
+    bindMessageType.value = 'error'
+    return
+  }
+
+  isBindingPassword.value = true
+  try {
+    const result = await submitBindPasswordLogin()
+    if (result.success) {
+      bindLoginPassword.value = ''
+      bindMessage.value = result.message || '账号密码登录已添加'
+      bindMessageType.value = 'success'
+      success(bindMessage.value)
+      await handleRefreshBindings()
+    } else {
+      bindMessage.value = result.message || '绑定失败'
+      bindMessageType.value = 'error'
+      error(bindMessage.value)
+    }
+  } finally {
+    isBindingPassword.value = false
+  }
+}
+
+const handleUnbindPasswordLogin = async () => {
+  if (!window.confirm('确认解除账号密码登录？解除后仍需至少保留一种登录方式。')) return
+  isUnbindingPassword.value = true
+  try {
+    const result = await unbindPasswordLogin(currentUser.value?.passwordUsername)
+    if (result.success) {
+      success(result.message || '账号密码登录已解除')
+      await handleRefreshBindings()
+    } else {
+      error(result.message || '解除失败')
+    }
+  } finally {
+    isUnbindingPassword.value = false
+  }
+}
+
+const handleUnbindOAuth = async (identity) => {
+  if (!window.confirm(`确认解除 ${identity.providerName || identity.providerId} 绑定？`)) return
+  isUnbindingIdentity.value = identity.key
+  try {
+    const result = await unbindOAuthIdentity(identity.key)
+    if (result.success) {
+      success(result.message || 'OAuth 绑定已解除')
+      await handleRefreshBindings()
+    } else {
+      error(result.message || '解绑失败')
+    }
+  } finally {
+    isUnbindingIdentity.value = ''
+  }
+}
+
+const readQueryString = (value) => {
+  if (Array.isArray(value)) return value[0] || ''
+  return typeof value === 'string' ? value : ''
+}
+
+const clearOAuthQueryParams = () => {
+  const query = { ...route.query }
+  let changed = false
+  for (const key of ['oauth_merge_required', 'provider', 'oauth_message', 'oauth_error', 'oauth_bind', 'oauth_login']) {
+    if (key in query) {
+      delete query[key]
+      changed = true
+    }
+  }
+  if (changed) {
+    void router.replace({ path: route.path, query })
+  }
+}
+
+const handleOAuthRouteQuery = () => {
+  const providerId = readQueryString(route.query.provider)
+  const oauthMessage = readQueryString(route.query.oauth_message)
+  const oauthError = readQueryString(route.query.oauth_error)
+  const oauthBind = readQueryString(route.query.oauth_bind)
+  const oauthLogin = readQueryString(route.query.oauth_login)
+  const mergeRequired = readQueryString(route.query.oauth_merge_required)
+  const signature = JSON.stringify({ providerId, oauthMessage, oauthError, oauthBind, oauthLogin, mergeRequired })
+
+  if (signature === handledOAuthQuery.value) return
+  handledOAuthQuery.value = signature
+
+  if ((mergeRequired === '1' || mergeRequired === 'true') && providerId) {
+    const message = oauthMessage || '该统一登录已属于另一个 SCE 账号，确认后会把两个账号的数据合并到当前账号。'
+    clearOAuthQueryParams()
+    if (window.confirm(message)) {
+      handleBindOAuth(providerId, true)
+      return
+    }
+    bindMessage.value = '已取消 OAuth 合并绑定'
+    bindMessageType.value = 'error'
+    return
+  }
+
+  if (oauthError) {
+    bindMessage.value = oauthError
+    bindMessageType.value = 'error'
+    error(oauthError)
+    clearOAuthQueryParams()
+    return
+  }
+
+  if (oauthBind === 'success') {
+    bindMessage.value = 'OAuth 登录方式已绑定'
+    bindMessageType.value = 'success'
+    void handleRefreshBindings()
+    clearOAuthQueryParams()
+    return
+  }
+
+  if (oauthLogin === 'success') {
+    void handleRefreshBindings()
+    clearOAuthQueryParams()
+  }
+}
+
 watch(token, (value) => {
-  if (value) refresh()
+  if (value) {
+    refresh()
+    handleRefreshBindings()
+  }
 }, { immediate: true })
+
+watch(() => route.query, handleOAuthRouteQuery, { immediate: true })
 </script>
 
 <style scoped>
@@ -359,6 +626,126 @@ watch(token, (value) => {
   background: var(--color-bg-subtle);
   color: var(--color-text-secondary);
   font-size: 13px;
+}
+
+.binding-panel {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-subtle);
+}
+
+.binding-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-primary);
+}
+
+.binding-header strong {
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.binding-list {
+  display: grid;
+  gap: 8px;
+}
+
+.binding-item {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  padding: 9px;
+}
+
+.binding-item div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.binding-item strong,
+.binding-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.binding-item strong {
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.binding-item span {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.mini-status {
+  flex: 0 0 auto;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mini-status.active {
+  color: var(--color-success);
+  background: var(--color-success-bg-light);
+}
+
+.icon-inline-button {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.icon-inline-button:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.icon-inline-button.danger:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.bind-form,
+.oauth-bind-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .action-row,
