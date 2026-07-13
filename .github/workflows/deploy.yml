@@ -80,4 +80,5 @@ jobs:
           exit 1
 
       - name: Show deployed URL
-        run: echo "Deployed URL: $DEPLOY_URL"
+        run: |
+          echo "Deployed URL: $DEPLOY_URL"
