@@ -188,7 +188,7 @@
           <Users :size="20" stroke-width="2" />
           <div>
             <h2>名单管理</h2>
-            <p>维护学生、标签、数值属性，并处理 Excel 文件。</p>
+            <p>维护学生、标签、数值属性，并处理 Excel 和 SDES 文件。</p>
           </div>
         </div>
 
@@ -213,12 +213,27 @@
             <FileOutput :size="18" stroke-width="2" />
             <span>导出名单到 Excel</span>
           </button>
+          <button class="action-button" type="button" @click="handleImportSdes">
+            <FileInput :size="18" stroke-width="2" />
+            <span>导入 SDES</span>
+          </button>
+          <button class="action-button" type="button" @click="handleExportSdes">
+            <FileOutput :size="18" stroke-width="2" />
+            <span>导出 SDES</span>
+          </button>
         </div>
       </section>
     </div>
     <FuckSeatsImportDialog
       v-model:visible="showFuckSeatsImportDialog"
       @imported="handleFuckSeatsImported"
+    />
+    <SdesImportDialog
+      v-model:visible="showSdesImportDialog"
+      :file-name="sdesFileName"
+      :targets="sdesTargets"
+      :is-importing="isImportingSdes"
+      @import="handleConfirmSdesImport"
     />
   </AppPageShell>
 </template>
@@ -248,6 +263,7 @@ import {
 } from 'lucide-vue-next'
 import AppPageShell from '@/components/layout/AppPageShell.vue'
 import FuckSeatsImportDialog from '@/components/student/FuckSeatsImportDialog.vue'
+import SdesImportDialog from '@/components/workspace/SdesImportDialog.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
@@ -257,16 +273,22 @@ import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useExcelData } from '@/composables/useExcelData'
 import { useLogger } from '@/composables/useLogger'
 import { useRosterExcelImport } from '@/composables/useRosterExcelImport'
+import { formatSdesReportSummary, useSdesExchange } from '@/composables/useSdesExchange'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useWorkspace } from '@/composables/useWorkspace'
-import { excelFileFilters, openBinaryFile } from '@/platform/files'
+import { excelFileFilters, openBinaryFile, openTextFile, sdesFileFilters } from '@/platform/files'
 
 const router = useRouter()
 const newCloudWorkspaceName = ref('')
 const editingWorkspaceId = ref(null)
 const editingWorkspaceName = ref('')
 const showFuckSeatsImportDialog = ref(false)
+const showSdesImportDialog = ref(false)
+const sdesDocument = ref(null)
+const sdesTargets = ref([])
+const sdesFileName = ref('')
+const isImportingSdes = ref(false)
 const isRestoringAutoSave = ref(false)
 
 const { requestConfirm, isConfirming } = useConfirmAction()
@@ -307,6 +329,12 @@ const {
   refresh
 } = useCloudWorkspaceStats({ source: 'retiehe' })
 const { downloadTemplate, exportToExcel } = useExcelData()
+const {
+  parseSdesText,
+  getSdesImportTargets,
+  importSdesTarget,
+  exportCurrentSdes
+} = useSdesExchange()
 const { students } = useStudentData()
 const { tags } = useTagData()
 const { beginExcelRosterImport } = useRosterExcelImport()
@@ -592,6 +620,64 @@ const handleExportExcel = async () => {
     success('Excel导出成功！')
   } catch (err) {
     error(`导出失败: ${err.message}`)
+  }
+}
+
+const handleImportSdes = async () => {
+  try {
+    const selected = await openTextFile({
+      title: '导入 SDES',
+      accept: '.sdes.json,.json,application/json',
+      filters: sdesFileFilters
+    })
+    if (!selected) return
+
+    const document = parseSdesText(selected.text)
+    const targets = getSdesImportTargets(document)
+    if (targets.length === 0) {
+      error('SDES 文件中没有当前可导入的座位表')
+      return
+    }
+
+    sdesDocument.value = document
+    sdesTargets.value = targets
+    sdesFileName.value = selected.name
+    showSdesImportDialog.value = true
+  } catch (err) {
+    error(`SDES 导入失败: ${err.message || err}`)
+  }
+}
+
+const handleConfirmSdesImport = async (target) => {
+  if (!sdesDocument.value || !target || isImportingSdes.value) return
+
+  isImportingSdes.value = true
+  try {
+    const report = await importSdesTarget(sdesDocument.value, target)
+    const summary = formatSdesReportSummary(report)
+    success(`SDES 导入完成：${target.className} / ${target.chartName}`)
+    if (report.warnings.length > 0) {
+      warning(`SDES 兼容性提示：${summary}`)
+    }
+    showSdesImportDialog.value = false
+    goEditorAfterSuccess()
+  } catch (err) {
+    error(`SDES 导入失败: ${err.message || err}`)
+  } finally {
+    isImportingSdes.value = false
+  }
+}
+
+const handleExportSdes = async () => {
+  try {
+    const result = await exportCurrentSdes()
+    if (result.success) {
+      success('SDES 导出成功！')
+    } else if (!result.canceled) {
+      error('SDES 导出失败，请查看控制台了解详情')
+    }
+  } catch (err) {
+    error(`SDES 导出失败: ${err.message || err}`)
   }
 }
 

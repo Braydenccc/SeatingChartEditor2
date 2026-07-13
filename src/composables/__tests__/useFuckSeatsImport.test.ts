@@ -138,7 +138,8 @@ describe('useFuckSeatsImport', () => {
         numericAttributes: { score: 88 }
       }
     ])
-    expect(workspace.layout.seats).toEqual([
+    expect(workspace.layout.seats).toHaveLength(4)
+    expect(workspace.layout.seats).toEqual(expect.arrayContaining([
       {
         id: 'seat-0-0-0',
         kind: 'regular',
@@ -175,7 +176,7 @@ describe('useFuckSeatsImport', () => {
         studentId: null,
         empty: false
       }
-    ])
+    ]))
   })
 
   it('marks missing sparse seat coordinates as unavailable', () => {
@@ -214,6 +215,84 @@ describe('useFuckSeatsImport', () => {
       empty: false
     })
     expect(workspace.layout.seats.filter(seat => seat.empty)).toHaveLength(3)
+  })
+
+  it('preserves fuckseats explicit seat groups as grouped columns', () => {
+    const classroom: FuckSeatsClassroomSummary = {
+      id: 11,
+      name: '显式小组班级',
+      baseUrl: 'http://127.0.0.1:23948',
+      href: '/classroom/11/',
+      gridLabel: '1 × 5',
+      studentCount: 2,
+      seatCount: 4
+    }
+
+    const workspace = buildWorkspaceFromFuckSeatsState(classroom, {
+      seats: [
+        { row: 1, col: 1, cell_type: 'seat', student: { id: 41, name: '甲' }, group: { id: 1, name: '第一组' } },
+        { row: 1, col: 2, cell_type: 'seat', student: null, group: { id: 1, name: '第一组' } },
+        { row: 1, col: 3, cell_type: 'aisle', student: null },
+        { row: 1, col: 4, cell_type: 'seat', student: { id: 42, name: '乙' }, group: { id: 2, name: '第二组' } },
+        { row: 1, col: 5, cell_type: 'seat', student: null, group: { id: 2, name: '第二组' } }
+      ]
+    })
+
+    expect(workspace.layout.config).toMatchObject({
+      groupCount: 2,
+      columnsPerGroup: 2,
+      seatsPerColumn: 1,
+      groups: [
+        { columns: 2, rows: 1 },
+        { columns: 2, rows: 1 }
+      ]
+    })
+    expect(workspace.layout.seats).toContainEqual({
+      id: 'seat-1-0-0',
+      kind: 'regular',
+      group: 1,
+      col: 0,
+      row: 0,
+      studentId: 42,
+      empty: false
+    })
+    expect(workspace.layout.seats.some(seat => seat.id === 'seat-0-2-0')).toBe(false)
+  })
+
+  it('infers grouped columns from fuckseats aisle-only columns without group metadata', () => {
+    const classroom: FuckSeatsClassroomSummary = {
+      id: 12,
+      name: '走廊分组班级',
+      baseUrl: 'http://127.0.0.1:23948',
+      href: '/classroom/12/',
+      gridLabel: '1 × 5',
+      studentCount: 1,
+      seatCount: 4
+    }
+
+    const workspace = buildWorkspaceFromFuckSeatsState(classroom, {
+      seats: [
+        { row: 1, col: 1, cell_type: 'seat', student: null },
+        { row: 1, col: 2, cell_type: 'seat', student: null },
+        { row: 1, col: 3, cell_type: 'aisle', student: null },
+        { row: 1, col: 4, cell_type: 'seat', student: { id: 51, name: '丙' } },
+        { row: 1, col: 5, cell_type: 'seat', student: null }
+      ]
+    })
+
+    expect(workspace.layout.config.groups).toEqual([
+      { columns: 2, rows: 1 },
+      { columns: 2, rows: 1 }
+    ])
+    expect(workspace.layout.seats).toContainEqual({
+      id: 'seat-1-0-0',
+      kind: 'regular',
+      group: 1,
+      col: 0,
+      row: 0,
+      studentId: 51,
+      empty: false
+    })
   })
 
   it('keeps students from unavailable cells unseated', () => {

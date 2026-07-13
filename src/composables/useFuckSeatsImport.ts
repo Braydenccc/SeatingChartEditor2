@@ -1,5 +1,6 @@
 import { useWorkspace } from './useWorkspace'
-import { generateGuardSeatId, generateSeatId } from '@/utils/seatHelpers'
+import { generateGuardSeatId } from '@/utils/seatHelpers'
+import { convertGridToGroupedColumns, type GridToGroupedCell } from '@/utils/gridToGroupedColumns'
 import { isTauriRuntime } from '@/platform/runtime'
 import proxyConfig from '../../fuckseats-proxy.config.json'
 
@@ -43,6 +44,10 @@ interface FuckSeatsSeat {
   col?: number
   cell_type?: string
   student?: FuckSeatsStudentProfile | null
+  group?: {
+    id?: number | string
+    name?: string
+  } | null
 }
 
 interface FuckSeatsTag {
@@ -341,16 +346,6 @@ const normalizeSeatPosition = (seat: FuckSeatsSeat) => {
   }
 }
 
-const createEmptySeatItem = (colIndex: number, rowIndex: number) => ({
-  id: generateSeatId(0, colIndex, rowIndex),
-  kind: 'regular',
-  group: 0,
-  col: colIndex,
-  row: rowIndex,
-  studentId: null,
-  empty: true
-})
-
 export const buildWorkspaceFromFuckSeatsState = (
   classroom: FuckSeatsClassroomSummary,
   state: FuckSeatsStatePayload
@@ -362,7 +357,6 @@ export const buildWorkspaceFromFuckSeatsState = (
   const seats = Array.isArray(state.seats) ? state.seats : []
   const tagMap = new Map<number, any>()
   const students = new Map<number, any>()
-  const physicalSeatByStudentId = new Map<number, boolean>()
 
   ;(state.tags || []).forEach(tag => addTagToMap(tagMap, tag))
 
@@ -398,8 +392,8 @@ export const buildWorkspaceFromFuckSeatsState = (
   const positions = seats.map(normalizeSeatPosition)
   const maxRow = Math.max(1, ...positions.map(position => position.rowIndex + 1))
   const maxCol = Math.max(1, ...positions.map(position => position.colIndex + 1))
-  const seatItems: any[] = []
   const seenPositions = new Set<string>()
+  const gridCells: GridToGroupedCell[] = []
 
   seats.forEach((seat, index) => {
     const { rowIndex, colIndex } = positions[index]
@@ -411,27 +405,25 @@ export const buildWorkspaceFromFuckSeatsState = (
     const student = addStudent(seat.student)
     const isSeatCell = seat.cell_type === 'seat'
     const studentId = isSeatCell ? (student?.id ?? null) : null
-    if (studentId !== null) physicalSeatByStudentId.set(studentId, true)
 
-    seatItems.push({
-      id: generateSeatId(0, colIndex, rowIndex),
-      kind: 'regular',
-      group: 0,
-      col: colIndex,
-      row: rowIndex,
+    gridCells.push({
+      x: colIndex,
+      y: rowIndex,
+      kind: seat.cell_type || 'seat',
       studentId,
-      empty: !isSeatCell
+      groupId: seat.group?.id ?? seat.group?.name ?? null,
+      groupName: seat.group?.name
     })
   })
 
-  for (let colIndex = 0; colIndex < maxCol; colIndex++) {
-    for (let rowIndex = 0; rowIndex < maxRow; rowIndex++) {
-      const positionKey = `${colIndex}:${rowIndex}`
-      if (!seenPositions.has(positionKey)) {
-        seatItems.push(createEmptySeatItem(colIndex, rowIndex))
-      }
+  const gridResult = convertGridToGroupedColumns(maxRow, maxCol, gridCells)
+  const seatItems: any[] = [...gridResult.seats]
+  const physicalSeatByStudentId = new Set<number>()
+  seatItems.forEach(seat => {
+    if (!seat.empty && seat.studentId !== null && seat.studentId !== undefined) {
+      physicalSeatByStudentId.add(seat.studentId)
     }
-  }
+  })
 
   ;(state.unseated || []).forEach(student => addStudent(student))
 
@@ -472,10 +464,7 @@ export const buildWorkspaceFromFuckSeatsState = (
     },
     layout: {
       config: {
-        groupCount: 1,
-        columnsPerGroup: maxCol,
-        seatsPerColumn: maxRow,
-        groups: [{ columns: maxCol, rows: maxRow }],
+        ...gridResult.seatConfig,
         shiftDistance: 4,
         podiumPosition: 'bottom',
         guardSeats: {

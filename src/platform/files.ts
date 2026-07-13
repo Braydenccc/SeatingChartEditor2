@@ -254,3 +254,7 @@ export const workspaceFileFilters: DialogFilter[] = [
 export const excelFileFilters: DialogFilter[] = [
   { name: 'Excel 文件', extensions: ['xlsx', 'xls'] }
 ]
+
+export const sdesFileFilters: DialogFilter[] = [
+  { name: 'SDES 文件', extensions: ['sdes.json', 'json'] }
+]
