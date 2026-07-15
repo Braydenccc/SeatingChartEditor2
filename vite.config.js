@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
+import { readFileSync } from 'node:fs'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -8,12 +9,8 @@ import viteCompression from 'vite-plugin-compression'
 import { authMockPlugin } from './vite.mock.plugin.js'
 
 const buildTime = process.env.VITE_APP_BUILD_TIME || new Date().toISOString()
-const buildDate = new Date(buildTime)
-const releaseVersion = process.env.VITE_APP_RELEASE_VERSION || (
-  Number.isNaN(buildDate.getTime())
-    ? 'vunknown'
-    : `v${buildDate.getUTCFullYear()}${String(buildDate.getUTCMonth() + 1).padStart(2, '0')}${String(buildDate.getUTCDate()).padStart(2, '0')}-${String(buildDate.getUTCHours()).padStart(2, '0')}${String(buildDate.getUTCMinutes()).padStart(2, '0')}${String(buildDate.getUTCSeconds()).padStart(2, '0')}`
-)
+const packageMetadata = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+const releaseVersion = process.env.VITE_APP_RELEASE_VERSION || packageMetadata.releaseVersion || `v${packageMetadata.version}`
 
 // https://vite.dev/config/
 export default defineConfig({

@@ -34,6 +34,14 @@ function validateWorkspaceContent($content) {
         return ['valid' => false, 'message' => 'students 必须是数组'];
     }
 
+    // tags 是客户端恢复工作区时的必需字段，服务端必须使用同一入口契约
+    if (!isset($content['tags'])) {
+        return ['valid' => false, 'message' => '缺少必需字段: tags'];
+    }
+    if (!is_array($content['tags'])) {
+        return ['valid' => false, 'message' => 'tags 必须是数组'];
+    }
+
     // 检测数据结构版本
     $isNewFormat = isset($content['layout']) && is_array($content['layout']);
 
@@ -112,6 +120,15 @@ function validateWorkspaceContent($content) {
         }
         if (!isset($student['id']) || !isset($student['name'])) {
             return ['valid' => false, 'message' => '学生数据缺少必需字段 (id, name)'];
+        }
+    }
+
+    foreach ($content['tags'] as $tag) {
+        if (!is_array($tag)) {
+            return ['valid' => false, 'message' => '标签数据格式错误'];
+        }
+        if (!isset($tag['id']) || !isset($tag['name']) || !isset($tag['color'])) {
+            return ['valid' => false, 'message' => '标签数据缺少必需字段 (id, name, color)'];
         }
     }
 

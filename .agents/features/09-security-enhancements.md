@@ -88,13 +88,15 @@
 
 **必需字段：**
 - `students` — 学生数组
-- `seats` — 座位数组
-- `seatConfig` — 座位配置对象
+- `tags` — 标签数组
+- `layout.seats`（或旧版 `seats`）— 座位数组
+- `layout.config`（或旧版 `seatConfig`）— 座位配置对象
 
 **字段类型验证：**
 - `students` 必须是数组，每个元素必须包含 `id` 和 `name`
+- `tags` 必须是数组，每个元素必须包含 `id`、`name` 和 `color`
 - `seats` 必须是数组，每个元素必须包含 `id`
-- `seatConfig` 必须是对象，必须包含 `groups` 数组
+- 客户端会在修改现有状态前完成嵌套结构、唯一 ID、容量上限和布局字段校验
 
 **示例有效载荷：**
 
@@ -103,11 +105,19 @@
   "students": [
     { "id": "1", "name": "张三", "gender": "male" }
   ],
-  "seats": [
-    { "id": "s1", "groupIndex": 0, "columnIndex": 0, "rowIndex": 0 }
+  "tags": [
+    { "id": "tag-1", "name": "重点", "color": "#FF0000" }
   ],
-  "seatConfig": {
-    "groups": [{ "columns": 6, "rows": 5 }]
+  "layout": {
+    "seats": [
+      { "id": "seat-0-0-0", "group": 0, "col": 0, "row": 0 }
+    ],
+    "config": {
+      "groupCount": 1,
+      "columnsPerGroup": 1,
+      "seatsPerColumn": 1,
+      "groups": [{ "columns": 1, "rows": 1 }]
+    }
   }
 }
 ```
@@ -125,6 +135,10 @@
 
 **服务器端：**
 - [public/api/workspace.php](../../public/api/workspace.php) — `validateWorkspaceContent()` 函数
+
+**客户端：**
+- [src/utils/workspaceValidation.ts](../../src/utils/workspaceValidation.ts) — 完整工作区结构校验
+- [src/composables/useWorkspace.js](../../src/composables/useWorkspace.js) — 迁移、原子提交与失败回滚
 
 ### 错误响应
 

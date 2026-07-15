@@ -30,15 +30,11 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
-      - name: Set build metadata
+      - name: Prepare timestamp release version
         shell: pwsh
         run: |
-          $now = (Get-Date).ToUniversalTime()
-          $buildTime = $now.ToString("yyyy-MM-ddTHH:mm:ssZ")
-          $releaseVersion = "v$($now.ToString('yyyyMMdd-HHmmss'))"
-          "VITE_APP_BUILD_TIME=$buildTime" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "VITE_APP_RELEASE_VERSION=$releaseVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "RELEASE_VERSION=$releaseVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $buildTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          node scripts/set-release-version.js --timestamp $buildTime --github-env
 
       - name: Build Desktop (Tauri)
         run: npm run build:desktop:win

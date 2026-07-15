@@ -145,19 +145,34 @@ export interface WorkspaceMeta {
   createdAt: string
 }
 
+export interface WorkspaceSeat {
+  id: string
+  kind?: 'regular' | 'guard'
+  guardSide?: 'left' | 'right'
+  group?: number
+  col?: number
+  row?: number
+  studentId: number | string | null
+  empty: boolean
+}
+
+export interface WorkspaceLayout {
+  config: SeatConfig
+  seats: WorkspaceSeat[]
+}
+
 // 工作区数据模型
 export interface Workspace {
-  meta: WorkspaceMeta
+  meta?: WorkspaceMeta
   students: Student[]
   studentAttributeDefinitions?: NumericAttributeDefinition[]
   studentAttributeSettings?: StudentAttributeSettings
   tags: Tag[]
-  seatConfig: SeatConfig
-  seats: Seat[]
-  zones: Zone[]
-  rules: Rule[]
-  exportSettings?: ExportSettings
   tagSettings?: TagSettings
+  layout: WorkspaceLayout
+  zones: Zone[]
+  rules: Record<string, unknown>[]
+  exportSettings?: ExportSettings
 }
 
 // 导出设置

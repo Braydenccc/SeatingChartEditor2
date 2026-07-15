@@ -29,6 +29,7 @@ Trae 执行任务前请优先读取：
 | 命令 | 说明 |
 | --- | --- |
 | `npm run dev` | 启动 Vite 开发服务器，默认 `localhost:5173` |
+| `npm run dev:lan` | 以 `0.0.0.0` 启动开发服务器，允许局域网访问 |
 | `npm run build` | 等同于 `npm run build:web`，构建 Web 版本 |
 | `npm run build:web` | 类型检查并构建 Web 版本，产物在 `dist/` |
 | `npm run build:desktop` | 构建 Tauri 桌面版 |
@@ -39,11 +40,18 @@ Trae 执行任务前请优先读取：
 | `npm run test` | 运行 Vitest watch 模式 |
 | `npm run test:run` | 运行 Vitest 单次测试 |
 | `npm run test:coverage` | 生成覆盖率报告 |
+| `npm run test:e2e` | 运行桌面与移动视口的 Playwright 浏览器流程测试 |
 | `npm run type-check` | TypeScript 类型检查 |
 | `npm run docs:sync` | 从统一真源同步各 agent 入口文档 |
 | `npm run docs:check` | 检查 agent 文档漂移、旧引用和命令有效性 |
+| `npm run version:timestamp` | 按当前 UTC 时间同步发布、SemVer 与 MSI 版本 |
+| `npm run version:check` | 检查各版本文件是否来自同一时间戳 |
 
-Node.js >= 20.0.0。项目没有统一 linter/formatter；测试框架使用 Vitest + happy-dom。
+Node.js >= 20.0.0。项目没有统一 linter/formatter；单元与组件测试使用 Vitest + happy-dom，浏览器流程测试使用 Playwright。
+
+## 版本规则
+
+发布版本使用单一 UTC 时间戳。用户可见版本与 GitHub Release 使用 `vYYYYMMDD-HHmmss`；`scripts/set-release-version.js` 同时生成合法 SemVer 和符合 MSI 数值限制的四段版本。手动发布前运行 `npm run version:timestamp`，自动发布与 Web 部署 workflow 会自行执行；不要分别手改 `package.json`、Cargo 或 Tauri 版本。
 
 ## 当前架构
 

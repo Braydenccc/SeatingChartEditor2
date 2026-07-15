@@ -427,17 +427,15 @@ const handleLoadWorkspace = async (event = null) => {
   const file = event?.target?.files?.[0] || null
 
   try {
-    const workspace = await loadWorkspace(file)
-    if (!workspace) return
-    if (!workspace || !workspace.students || !workspace.tags) {
-      error('工作区文件内容不完整或格式不正确')
-      return
-    }
+    const loadedWorkspace = await loadWorkspace(file)
+    if (!loadedWorkspace) return
 
-    const isSuccess = await applyWorkspaceData(workspace)
+    const isSuccess = await applyWorkspaceData(loadedWorkspace.data, {
+      localPath: loadedWorkspace.path
+    })
     if (isSuccess) {
       success('工作区加载并恢复成功！')
-      saveLastWorkspace({ type: 'local', name: file?.name || '本地工作区' })
+      saveLastWorkspace({ type: 'local', name: loadedWorkspace.name || '本地工作区' })
       goEditorAfterSuccess()
     }
   } catch (err) {

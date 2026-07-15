@@ -16,6 +16,8 @@ export type {
   RuleParams,
   Workspace,
   WorkspaceMeta,
+  WorkspaceLayout,
+  WorkspaceSeat,
   ExportSettings,
   TagSettings,
   StudentAttributeSettings,

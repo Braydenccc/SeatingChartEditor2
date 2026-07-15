@@ -1,13 +1,14 @@
 {
   "name": "seat-chart-editor-v2",
-  "version": "0.1.0",
+  "version": "26.7.1502-3238",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "cross-env EDITOR=antigravity vite --host 0.0.0.0",
+    "dev": "cross-env EDITOR=antigravity vite",
+    "dev:lan": "cross-env EDITOR=antigravity vite --host 0.0.0.0",
     "build": "npm run build:web",
     "build:web": "vue-tsc --noEmit && vite build",
     "build:test": "node scripts/patch-test-env.js && vite build && git checkout -- index.html src/components/auth/LoginDialog.vue src/components/layout/AppHeader.vue",
@@ -22,6 +23,8 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "test:student": "vitest run src/composables/__tests__/useStudentData.test.js",
     "test:seat": "vitest run src/composables/__tests__/useSeatChart.test.js",
     "test:assignment": "vitest run src/composables/__tests__/useAssignment.test.js",
@@ -29,10 +32,11 @@
     "test:edge": "vitest run src/composables/__tests__/edge-cases.test.js",
     "test:ci": "vitest run --coverage --reporter=dot --reporter=json --reporter=html",
     "docs:sync": "node scripts/sync-agent-docs.js",
-    "docs:check": "node scripts/check-agent-docs.js"
+    "docs:check": "node scripts/check-agent-docs.js",
+    "version:timestamp": "node scripts/set-release-version.js",
+    "version:check": "node scripts/set-release-version.js --check"
   },
   "dependencies": {
-    "@playwright/test": "^1.59.1",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-http": "^2.5.9",
@@ -44,6 +48,7 @@
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tauri-apps/cli": "^2.10.1",
     "@types/node": "^25.6.0",
     "@vitejs/plugin-vue": "^6.0.1",
@@ -67,5 +72,6 @@
     "vue"
   ],
   "author": "Braydenccc",
-  "license": "GPL-3.0-or-later"
+  "license": "GPL-3.0-or-later",
+  "releaseVersion": "v20260715-023238"
 }

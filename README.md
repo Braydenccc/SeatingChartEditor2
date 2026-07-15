@@ -51,7 +51,7 @@ npm install
 npm run dev
 ```
 
-开发服务器默认运行在 `http://localhost:5173`。`npm run dev` 会以 `0.0.0.0` host 启动，方便局域网设备访问。
+开发服务器默认运行在 `http://localhost:5173`，只监听本机。需要从局域网设备访问时，显式使用 `npm run dev:lan`。
 
 如果需要重新安装依赖，推荐使用：
 
@@ -63,7 +63,8 @@ npm ci
 
 | 命令 | 说明 |
 | --- | --- |
-| `npm run dev` | 启动 Vite 开发服务器。 |
+| `npm run dev` | 启动仅本机可访问的 Vite 开发服务器。 |
+| `npm run dev:lan` | 以 `0.0.0.0` 启动开发服务器，允许局域网访问。 |
 | `npm run build` | 等同于 `npm run build:web`。 |
 | `npm run build:web` | 执行 TypeScript 类型检查并构建 Web 版本，产物在 `dist/`。 |
 | `npm run build:desktop` | 构建 Tauri 桌面版。 |
@@ -73,10 +74,14 @@ npm ci
 | `npm run type-check` | 执行 `vue-tsc --noEmit`。 |
 | `npm run test:run` | 单次运行 Vitest 测试。 |
 | `npm run test:coverage` | 生成测试覆盖率报告。 |
+| `npm run test:e2e` | 使用 Playwright 在桌面和移动视口运行浏览器流程测试。 |
+| `npm run test:e2e:ui` | 打开 Playwright 交互式测试界面。 |
 | `npm run docs:sync` | 从统一真源同步各 agent 入口文档。 |
 | `npm run docs:check` | 检查 agent 文档漂移和命令有效性。 |
+| `npm run version:timestamp` | 以当前 UTC 时间生成并写入统一发布版本。 |
+| `npm run version:check` | 检查 package、Cargo、Tauri 和 MSI 版本是否来自同一时间戳。 |
 
-项目没有统一 linter/formatter；测试框架使用 Vitest + happy-dom。
+项目没有统一 linter/formatter；单元与组件测试使用 Vitest + happy-dom，浏览器流程测试使用 Playwright。
 
 ## 构建与部署
 
@@ -100,6 +105,17 @@ Windows 安装包构建：
 npm run build:desktop:win
 ```
 
+### 时间戳版本规则
+
+项目发布版本只使用一个 UTC 时间戳作为真源。展示版本格式为 `vYYYYMMDD-HHmmss`，例如 `v20260715-023238`。`scripts/set-release-version.js` 会从同一时间戳派生并同步：
+
+- `package.json`、`package-lock.json`、`Cargo.toml` 和 `Cargo.lock` 使用合法 SemVer，例如 `26.7.1502-3238`。
+- Tauri 从 `package.json` 读取应用版本。
+- Windows MSI 使用受字段上限约束的四段版本，例如 `26.7.1502.3238`。
+- 应用内「关于」、GitHub Release 标签和安装包文件名使用完整展示版本。
+
+GitHub Actions 发布和 Web 部署会自动执行版本同步。手动发布前先运行 `npm run version:timestamp`；可以用 `npm run version:check` 检查版本文件是否一致。
+
 ## 安全与同步
 
 - 本地工作区适合离线使用，数据由浏览器存储或桌面端文件能力保存。
@@ -118,6 +134,7 @@ npm run build:desktop:win
 - xlsx-js-style
 - @vueuse/core
 - Vitest + happy-dom
+- Playwright
 
 ## 项目结构
 

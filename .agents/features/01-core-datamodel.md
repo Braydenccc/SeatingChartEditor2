@@ -13,6 +13,7 @@ description: 定义系统最底层的“座位”、“学生”与“工作区�
 - 座位数据源: `src/composables/useSeatChart.js`
 - 数据中枢与格式定义: `src/composables/useWorkspace.js`
 - 自动保存备份: `src/composables/useAutoSave.js`
+- 工作区结构校验: `src/utils/workspaceValidation.ts`
 
 ## 3. 数据模型定义 (TypeScript Interfaces)
 
@@ -75,8 +76,11 @@ interface Zone {
 - **渲染数据准备 (`organizedSeats`)**: 原生 `seats.value` 是扁平一维数组，为了让 Vue 能通过嵌套 `v-for` 渲染出大组-列-行的 UI 表格组合，专门设计了 `organizedSeats` computed，以 $O(n)$ 复杂度预分桶成三维数组 `[group][col][row]`。
 - **护法特殊座位**: 左右护法与普通座位共享 `seatMap`、分配、交换、清空和撤销机制，但不进入 `organizedSeats`。编辑器通过 `visibleGuardSeats` 渲染讲台两侧；渲染时根据讲台视觉位置决定左右槽位，讲台在顶部时左右护法顺序互换，讲台在底部时保持 `左护法 / 讲台 / 右护法`。默认不进入 `getAvailableSeats()`，只有显式传入并开启 `guardSeats.includeInAutoAssignment` 时才可被智能排位使用。
 - **自动保存恢复**: `useAutoSave()` 将当前工作区 JSON 写入平台存储中的 `sce-autosave-backup` 和 `sce-autosave-time`。启动时 `App.vue` 检测未处理的新备份并先显示恢复提示，文件页会在工作区列表顶部显示自动保存卡片，统一调用 `restoreAutoSaveBackup()` 应用工作区数据。
+- **原子加载**: 所有本地、云端和自动保存数据都会先复制、迁移并通过 `workspaceValidation.ts` 完整校验。只有候选数据有效时才写入共享状态；写入阶段异常会恢复原工作区及撤销、选择、编辑模式等运行时状态。
+- **本地路径提交**: Tauri 本地文件路径只在工作区成功应用后更新。云端或自动保存来源会清除旧本地路径，避免后续“保存”误覆盖先前文件。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **坐标系方向警告陷阱**:  底层 `rowIndex` 始终是物理坐标，不随导出翻转改写。编辑器内“前方”只由 `seatConfig.podiumPosition` 决定：讲台在底部时 `rowIndex` 越大越靠前；讲台在顶部时 `rowIndex` 越小越靠前。旧字段 `alignment`/`seatAlignment` 只用于工作区加载迁移。
 - **特殊座位解析陷阱**: `guard-left` / `guard-right` 不能传入普通 `parseSeatId()` 坐标流程。多选平移、区域轮换、行列规则等依赖普通坐标的逻辑应默认跳过护法位。
 - **学号防冲突覆盖**: 在更新学生信息时若发现 `studentNumber` 冲突，老数据（即使已被绑定）会**静默丢失其学号**，而把该号码转交给新用户。
+- **迁移纯度**: `migrateWorkspace()` 只能处理 `cloneWorkspaceInput()` 创建的副本，禁止直接修改调用方传入的工作区对象。

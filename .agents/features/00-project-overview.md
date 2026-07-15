@@ -19,6 +19,7 @@ description: 作为项目的中枢级指南，概述技术栈、多端适配策�
 | **编辑主界面** | `src/views/EditorView.vue`、`src/components/workbench/EditorWorkbench.vue` | 当前编辑器布局与工作台。 |
 | **用户手册** | `src/constants/userManual.ts`、`src/components/settings/panels/HelpPanel.vue` | 应用内完整用户手册，入口位于「设置 - 关于 - 帮助」，桌面端编辑页顶部问号会直接打开该分类。 |
 | **Vite 配置** | `vite.config.js` | Web 构建核心。 |
+| **版本生成器** | `scripts/set-release-version.js` | 从单一 UTC 时间戳生成展示版本、SemVer 和 MSI 版本。 |
 | **Tauri 入口** | `src-tauri/` | Tauri/Rust 壳配置，通常不需要高频修改。 |
 | **平台适配层** | `src/platform/` | 隔离 Tauri 文件、HTTP、存储等本地能力，Web 版提供浏览器 fallback。 |
 | **PWA 配置**  | `index.html` | 提供了 manifest 和移动端 icon 的元数据。 |
@@ -29,8 +30,17 @@ description: 作为项目的中枢级指南，概述技术栈、多端适配策�
 - **状态管理**: 未使用 Pinia。依靠 Vue3 reactivity (`ref`, `computed`) 封装在多个独立的 `useXXX` composables 中，通过单例模式共享状态。
 - **构建/包管理**: Vite + Tauri。
 - **本地能力**: Tauri 插件按需启用 dialog、fs、http；前端只能通过 `src/platform/` 的封装访问这些插件。
+- **测试分层**: composable 与组件使用 Vitest，关键桌面/移动用户流程使用 Playwright。
 
-## 4. 全局依赖 (Dependencies)
+## 4. 版本策略 (Versioning)
+
+- 发布展示版本统一为 UTC `vYYYYMMDD-HHmmss`。
+- `npm run version:timestamp` 会同步 `package.json`、lockfile、Cargo、Tauri 与 MSI 版本；`npm run version:check` 用于检查漂移。
+- Tauri 的 `version` 指向根 `package.json`，不要再单独维护一份应用版本。
+- MSI 四段版本由同一时间戳派生，以满足 major/minor 最大 255、build 最大 65535 的限制。
+- GitHub Release 和 Web 部署 workflow 都必须先调用版本生成器，再开始构建。
+
+## 5. 全局依赖 (Dependencies)
 ```json
 {
   "@vueuse/core": "用于鼠标拖拽、窗口大小防抖等高级交互",
@@ -39,7 +49,7 @@ description: 作为项目的中枢级指南，概述技术栈、多端适配策�
 }
 ```
 
-## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
+## 6. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **避免引入 Vuex或Pinia**: 项目强依赖 `composables/` 的自闭环状态树（Stateful Composables），如果要加新状态字段，直接去对应 `useXXX` 文件的顶层定义 `const myVar = ref(null)`。
 - **全平台兼容警示**: 项目需要编译为浏览器 Web 和 Tauri 桌面端。因此，绝对不要在 `src/components/` 或 `src/composables/` 内部直接调用 Node.js 内置模块（如 `fs`, `path`）。也不要在业务组件中静态导入 `@tauri-apps/*`，必须通过 `src/platform/` 的动态适配层隔离。
 - **用户手册同步**: 任何用户可见功能、入口、工作流、限制条件或排查步骤变化，都必须同步更新 `src/constants/userManual.ts`。手册内容由 `HelpPanel.vue` 结构化渲染，不要在面板模板中硬编码功能说明。

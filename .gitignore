@@ -51,6 +51,10 @@ coverage/
 .local-*.json
 pnpm-lock.yaml
 草稿/seat_chart_2025-11-08T19-09-44.png
+/diff_output.txt
+/tmp-*.txt
+/tmp-*.js
+/tmp_*.js
 
 # Editor project files
 *.suo
@@ -69,6 +73,10 @@ pnpm-lock.yaml
 __screenshots__/
 test-results/
 .vitest/
+
+# Playwright
+playwright-report/
+blob-report/
 
 # Git worktrees
 .worktrees/

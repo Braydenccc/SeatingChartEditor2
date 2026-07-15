@@ -59,13 +59,15 @@ const createRecentCloudWorkspaceWithoutMeta = () => ({
 })
 
 describe('workspace defaults', () => {
+  let studentData: ReturnType<typeof useStudentData>
   let attributes: ReturnType<typeof useStudentAttributes>
   let tagData: ReturnType<typeof useTagData>
   let seatChart: ReturnType<typeof useSeatChart>
   let workspace: ReturnType<typeof useWorkspace>
 
   beforeEach(() => {
-    useStudentData().clearAllStudents()
+    studentData = useStudentData()
+    studentData.clearAllStudents()
     attributes = useStudentAttributes()
     tagData = useTagData()
     seatChart = useSeatChart()
@@ -91,11 +93,31 @@ describe('workspace defaults', () => {
   })
 
   it('preserves seat assignments for recent cloud workspaces without meta version', async () => {
-    const result = await workspace.applyWorkspaceData(createRecentCloudWorkspaceWithoutMeta())
+    const source = createRecentCloudWorkspaceWithoutMeta()
+    const result = await workspace.applyWorkspaceData(source)
 
     expect(result).toBe(true)
     expect(seatChart.getStudentAtSeat('seat-0-0-0')).toBe(1)
     expect(seatChart.getStudentAtSeat('seat-0-0-1')).toBe(2)
+    expect(source).not.toHaveProperty('meta')
+    expect(source.layout.config).not.toHaveProperty('groups')
+  })
+
+  it('rejects malformed workspace data before changing the current workspace', async () => {
+    const studentId = studentData.addStudent()
+    studentData.updateStudent(studentId, { name: '保留学生', studentNumber: 12 })
+    seatChart.assignStudent('seat-0-0-0', studentId, false)
+
+    const malformedWorkspace = {
+      ...createExistingWorkspace(),
+      tags: [{ id: 1, name: '缺少颜色' }]
+    }
+    const result = await workspace.applyWorkspaceData(malformedWorkspace)
+
+    expect(result).toBe(false)
+    expect(studentData.students.value).toHaveLength(1)
+    expect(studentData.students.value[0]).toMatchObject({ name: '保留学生', studentNumber: 12 })
+    expect(seatChart.getStudentAtSeat('seat-0-0-0')).toBe(studentId)
   })
 
   it('clears seat assignments when creating a new workspace', () => {

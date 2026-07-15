@@ -16,6 +16,13 @@ import { initializeTags } from './useTagData'
 import { parseSeatId, isGuardSeatId } from '@/utils/seatHelpers'
 import { isTauriRuntime } from '@/platform/runtime'
 import { openTextFile, saveTextFile, workspaceFileFilters, writeTextFilePath } from '@/platform/files'
+import {
+  cloneWorkspaceInput,
+  formatWorkspaceValidationErrors,
+  MAX_WORKSPACE_GROUPS,
+  MAX_WORKSPACE_SEATS,
+  validateWorkspaceDocument
+} from '@/utils/workspaceValidation'
 
 const LAST_WORKSPACE_COOKIE = 'sce_last_workspace'
 
@@ -102,11 +109,18 @@ const normalizeWorkspaceSeat = (seat = {}) => {
 }
 
 export function useWorkspace() {
-  const { students, addStudent, updateStudent, clearAllStudents, syncStudentIdCounter } = useStudentData()
+  const {
+    students,
+    selectedStudentId,
+    addStudent,
+    updateStudent,
+    clearAllStudents,
+    syncStudentIdCounter
+  } = useStudentData()
   const { tags, addTag, clearAllTags, showTagsInSeatChart, tagDisplayMode, setShowTagsInSeatChart, setTagDisplayMode } = useTagData()
   const { seatConfig, seats, updateConfig, clearAllSeats, batchUpdateSeats } = useSeatChart()
   const { exportSettings, resetExportSettings, applyExportSettings } = useExportSettings()
-  const { zones, clearAllZones, addZone, updateZone, syncZoneIdCounter } = useZoneData()
+  const { zones, selectedZoneId, clearAllZones, addZone, updateZone, syncZoneIdCounter } = useZoneData()
   const { rules, clearAllRules, addRule } = useSeatRules()
   const {
     attributeDefinitions,
@@ -115,10 +129,21 @@ export function useWorkspace() {
     setShowNumericAttributesInEditor
   } = useStudentAttributes()
   const { success, warning, error } = useLogger()
-  const { clearHistory } = useUndo()
-  const { clearSelection } = useSelection()
-  const { resetEditMode } = useEditMode()
-  const { clearAllRotData, syncZoneRotationIdCounter } = useZoneRotation()
+  const { undoStack, redoStack, highlightedSeats, clearHistory } = useUndo()
+  const {
+    selectedSeatIds,
+    isSelecting,
+    isDraggingSelection,
+    isSelectionMode,
+    clearSelection
+  } = useSelection()
+  const { currentMode, firstSelectedSeat, resetEditMode } = useEditMode()
+  const {
+    rotGroups,
+    editingZoneId,
+    clearAllRotData,
+    syncZoneRotationIdCounter
+  } = useZoneRotation()
 
   // 生成工作区 JSON 数据 (用于云端或本地保存)
   const getWorkspaceJson = () => {
@@ -205,6 +230,57 @@ export function useWorkspace() {
     }
   }
 
+  const prepareWorkspaceData = (workspaceRaw) => {
+    const workspace = migrateWorkspace(cloneWorkspaceInput(workspaceRaw))
+    const validation = validateWorkspaceDocument(workspace)
+    if (!validation.valid) {
+      throw new Error(formatWorkspaceValidationErrors(validation.errors))
+    }
+    return validation.data
+  }
+
+  const captureRuntimeSnapshot = () => {
+    const workspaceJson = getWorkspaceJson()
+    if (!workspaceJson) {
+      throw new Error('无法创建当前工作区回滚快照')
+    }
+
+    return {
+      workspace: JSON.parse(workspaceJson),
+      undoStack: cloneWorkspaceInput(undoStack.value),
+      redoStack: cloneWorkspaceInput(redoStack.value),
+      highlightedSeatIds: [...highlightedSeats.value],
+      selectedSeatIds: [...selectedSeatIds.value],
+      isSelecting: isSelecting.value,
+      isDraggingSelection: isDraggingSelection.value,
+      isSelectionMode: isSelectionMode.value,
+      selectedStudentId: selectedStudentId.value,
+      selectedZoneId: selectedZoneId.value,
+      currentMode: currentMode.value,
+      firstSelectedSeat: firstSelectedSeat.value,
+      rotGroups: cloneWorkspaceInput(rotGroups.value),
+      editingZoneId: editingZoneId.value
+    }
+  }
+
+  const restoreRuntimeSnapshot = (snapshot) => {
+    applyWorkspaceState(prepareWorkspaceData(snapshot.workspace))
+    undoStack.value = cloneWorkspaceInput(snapshot.undoStack)
+    redoStack.value = cloneWorkspaceInput(snapshot.redoStack)
+    highlightedSeats.value = new Set(snapshot.highlightedSeatIds)
+    selectedSeatIds.value = new Set(snapshot.selectedSeatIds)
+    isSelecting.value = snapshot.isSelecting
+    isDraggingSelection.value = snapshot.isDraggingSelection
+    isSelectionMode.value = snapshot.isSelectionMode
+    selectedStudentId.value = snapshot.selectedStudentId
+    selectedZoneId.value = snapshot.selectedZoneId
+    currentMode.value = snapshot.currentMode
+    firstSelectedSeat.value = snapshot.firstSelectedSeat
+    rotGroups.value = cloneWorkspaceInput(snapshot.rotGroups)
+    editingZoneId.value = snapshot.editingZoneId
+    syncZoneRotationIdCounter()
+  }
+
   const buildDefaultWorkspaceName = () => {
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     return `座位表_${timestamp}${FILE_EXT}`
@@ -251,17 +327,9 @@ export function useWorkspace() {
         }
       }
 
-      const workspace = JSON.parse(text)
-
-      // 验证基本结构
-      if (!workspace.students || !workspace.tags) {
-        throw new Error('工作区文件格式不正确')
-      }
-
-      // 版本迁移
-      return migrateWorkspace(workspace)
+      return prepareWorkspaceData(JSON.parse(text))
     } catch (error) {
-      if (error.message?.startsWith('请选择') || error.message === '工作区文件格式不正确') {
+      if (error.message?.startsWith('请选择')) {
         throw error
       }
       throw new Error(`解析工作区文件失败: ${error.message}`)
@@ -276,9 +344,11 @@ export function useWorkspace() {
         filters: workspaceFileFilters
       })
       if (!selected) return null
-      const workspace = parseWorkspaceText(selected.text, selected.name)
-      currentLocalWorkspacePath.value = selected.path
-      return workspace
+      return {
+        data: parseWorkspaceText(selected.text, selected.name),
+        name: selected.name,
+        path: selected.path
+      }
     }
 
     return new Promise((resolve, reject) => {
@@ -293,7 +363,11 @@ export function useWorkspace() {
 
       reader.onload = (e) => {
         try {
-          resolve(parseWorkspaceText(e.target.result, file.name))
+          resolve({
+            data: parseWorkspaceText(e.target.result, file.name),
+            name: file.name,
+            path: null
+          })
         } catch (error) {
           reject(error)
         }
@@ -308,19 +382,7 @@ export function useWorkspace() {
   }
 
   // 应用工作区数据 (云端或本地解析后共享的逻辑)
-  const applyWorkspaceData = async (workspaceRaw) => {
-    return new Promise((resolve) => {
-      try {
-        // 验证基本结构
-        if (!workspaceRaw.students || !workspaceRaw.tags) {
-          error('工作区文件内容不完整或格式不正确')
-          resolve(false)
-          return
-        }
-
-        // 版本迁移
-        const workspace = migrateWorkspace(workspaceRaw)
-
+  const applyWorkspaceState = (workspace) => {
         // 1. 清理所有 UI 状态
         clearHistory()
         clearSelection()
@@ -544,13 +606,43 @@ export function useWorkspace() {
         syncZoneIdCounter()
         syncZoneRotationIdCounter()
 
-        resolve(true)
-      } catch (err) {
-        console.error('Apply Workspace Data failed:', err)
-        error('恢复工作区时发生错误: ' + (err.message || err))
-        resolve(false)
+        return true
+  }
+
+  const applyWorkspaceData = async (workspaceRaw, options = {}) => {
+    let workspace
+    try {
+      workspace = prepareWorkspaceData(workspaceRaw)
+    } catch (err) {
+      console.error('Workspace validation failed:', err)
+      error('工作区文件内容不完整或格式不正确: ' + (err.message || err))
+      return false
+    }
+
+    let runtimeSnapshot
+    try {
+      runtimeSnapshot = captureRuntimeSnapshot()
+    } catch (err) {
+      console.error('Workspace snapshot failed:', err)
+      error('加载前无法创建安全回滚快照，已取消加载: ' + (err.message || err))
+      return false
+    }
+
+    try {
+      applyWorkspaceState(workspace)
+      currentLocalWorkspacePath.value = options.localPath ?? null
+      return true
+    } catch (err) {
+      console.error('Apply Workspace Data failed:', err)
+      try {
+        restoreRuntimeSnapshot(runtimeSnapshot)
+        error('恢复工作区时发生错误，已保留原工作区: ' + (err.message || err))
+      } catch (rollbackError) {
+        console.error('Workspace rollback failed:', rollbackError)
+        error('恢复工作区失败，且无法自动回滚: ' + (rollbackError.message || rollbackError))
       }
-    })
+      return false
+    }
   }
 
   const createNewWorkspace = () => {
@@ -587,7 +679,7 @@ export function useWorkspace() {
 
   // 版本迁移
   function migrateWorkspace(ws) {
-    const version = ws.meta?.version || ws.version || '1.0'
+    const version = String(ws.meta?.version || ws.version || '1.0')
 
     // v1.0 → v1.1：bindings → relations (忽略)
     if (version === '1.0') {
@@ -599,6 +691,9 @@ export function useWorkspace() {
     // 旧版扁平结构 → layout 结构。部分近期云端存档版本号不可靠，因此按数据形状迁移。
     if (!ws.layout && (ws.seats || ws.seatConfig)) {
       const oldSeats = Array.isArray(ws.seats) ? ws.seats : []
+      if (oldSeats.length > MAX_WORKSPACE_SEATS + 2) {
+        throw new Error(`工作区座位数不能超过 ${MAX_WORKSPACE_SEATS + 2}`)
+      }
       ws.layout = {
         config: ws.seatConfig || {},
         seats: oldSeats.map(normalizeWorkspaceSeat)
@@ -610,6 +705,9 @@ export function useWorkspace() {
         ws.layout.config = ws.seatConfig
       }
       if (Array.isArray(ws.layout.seats)) {
+        if (ws.layout.seats.length > MAX_WORKSPACE_SEATS + 2) {
+          throw new Error(`工作区座位数不能超过 ${MAX_WORKSPACE_SEATS + 2}`)
+        }
         ws.layout.seats = ws.layout.seats.map(normalizeWorkspaceSeat)
       }
     }
@@ -631,10 +729,13 @@ export function useWorkspace() {
       delete ws.timestamp
     }
 
-    // v2.0 → v2.2：添加 groups 数组支持每大组独立配置
-    if (version.startsWith('2.') && ws.layout?.config && !ws.layout.config.groups) {
+    // 旧版或缺少可靠版本号的存档：添加 groups 数组支持每大组独立配置
+    if (ws.layout?.config && !ws.layout.config.groups) {
       const config = ws.layout.config
       const groupCount = config.groupCount || 4
+      if (!Number.isInteger(groupCount) || groupCount <= 0 || groupCount > MAX_WORKSPACE_GROUPS) {
+        throw new Error(`工作区大组数必须在 1 到 ${MAX_WORKSPACE_GROUPS} 之间`)
+      }
       config.groups = []
       for (let i = 0; i < groupCount; i++) {
         config.groups.push({
@@ -647,6 +748,9 @@ export function useWorkspace() {
     // v2.x → 当前：编辑器方向统一为 podiumPosition
     if (ws.layout?.config) {
       const config = ws.layout.config
+      if (!config.groupCount && Array.isArray(config.groups)) config.groupCount = config.groups.length
+      if (!config.columnsPerGroup) config.columnsPerGroup = 2
+      if (!config.seatsPerColumn) config.seatsPerColumn = 7
       if (!config.podiumPosition && config.seatAlignment) {
         config.podiumPosition = config.seatAlignment
       }
@@ -670,7 +774,22 @@ export function useWorkspace() {
     }
 
     // 确保默认值
+    ws.meta = {
+      ...(ws.meta || {}),
+      version: CURRENT_VERSION,
+      app: ws.meta?.app || 'SeatingChartEditor',
+      createdAt: ws.meta?.createdAt || new Date().toISOString()
+    }
+    ws.studentAttributeDefinitions = ws.studentAttributeDefinitions || []
+    ws.studentAttributeSettings = {
+      showNumericAttributesInEditor: ws.studentAttributeSettings?.showNumericAttributesInEditor !== false
+    }
+    ws.tagSettings = {
+      showTagsInSeatChart: ws.tagSettings?.showTagsInSeatChart !== false,
+      tagDisplayMode: ws.tagSettings?.tagDisplayMode || 'dot'
+    }
     ws.zones = ws.zones || []
+    ws.rules = ws.rules || []
     ws.exportSettings = ws.exportSettings || {}
 
     return ws
