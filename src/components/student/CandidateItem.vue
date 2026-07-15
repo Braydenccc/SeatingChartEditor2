@@ -205,6 +205,16 @@ const handleDoubleClick = () => {
   pointer-events: none;
 }
 
+.candidate-item.touch-drag-preview-card {
+  border-color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 10%, var(--color-bg-card));
+  box-shadow: var(--seat-card-shadow-drag);
+}
+
+.candidate-item.touch-drag-preview-card::before {
+  background: var(--color-info);
+}
+
 .candidate-item.compact {
   width: 100%;
   height: var(--candidate-card-height);

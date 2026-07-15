@@ -57,7 +57,6 @@ const defaultSettings = {
     largeNumberMode: false
   },
   editor: {
-    autoSaveInterval: 60000, // 1分钟
     undoHistorySize: 50,
     dragSensitivity: 1.0,
     doubleClickAction: 'edit' // 'edit' | 'random'
@@ -71,6 +70,30 @@ const STORAGE_KEY = 'sce-global-settings'
 const WHITE_RGB = { r: 255, g: 255, b: 255 }
 const BLACK_RGB = { r: 0, g: 0, b: 0 }
 const DARK_SURFACE_RGB = { r: 30, g: 41, b: 59 }
+const CUSTOM_ONLY_COLOR_PROPERTIES = [
+  '--color-surface',
+  '--color-surface-rgb',
+  '--color-bg-selected',
+  '--color-bg-card',
+  '--color-bg-subtle',
+  '--color-bg-soft',
+  '--color-bg-hover',
+  '--color-text-primary',
+  '--color-text-secondary',
+  '--color-text-muted',
+  '--color-text-disabled',
+  '--color-border',
+  '--color-border-strong',
+  '--color-border-hover',
+  '--color-danger',
+  '--color-danger-hover',
+  '--color-success',
+  '--color-success-hover',
+  '--color-warning',
+  '--color-warning-hover',
+  '--color-info',
+  '--color-info-hover'
+]
 
 /**
  * 从 localStorage 加载设置
@@ -245,6 +268,9 @@ const applyThemeColor = () => {
   const root = document.documentElement
 
   if (colorMode === 'simple') {
+    // 退出定制模式时移除内联覆盖，让浅色/深色方案重新接管这些变量
+    CUSTOM_ONLY_COLOR_PROPERTIES.forEach(property => root.style.removeProperty(property))
+
     // 简单模式：只应用主题色
     if (themeColor) {
       const isDark = isDarkSimpleScheme()

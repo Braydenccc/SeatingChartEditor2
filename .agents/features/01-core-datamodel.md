@@ -75,7 +75,7 @@ interface Zone {
 - **Map加速 (`rebuildSeatMap`)**:  为了避免拖拽时产生的 $O(n)$ 线性查找，在每次更改配置（行、列）后，都会执行 `rebuildSeatMap()` 把所有 proxy 给铺平到 Map 中，确保 `O(1)` 操作。
 - **渲染数据准备 (`organizedSeats`)**: 原生 `seats.value` 是扁平一维数组，为了让 Vue 能通过嵌套 `v-for` 渲染出大组-列-行的 UI 表格组合，专门设计了 `organizedSeats` computed，以 $O(n)$ 复杂度预分桶成三维数组 `[group][col][row]`。
 - **护法特殊座位**: 左右护法与普通座位共享 `seatMap`、分配、交换、清空和撤销机制，但不进入 `organizedSeats`。编辑器通过 `visibleGuardSeats` 渲染讲台两侧；渲染时根据讲台视觉位置决定左右槽位，讲台在顶部时左右护法顺序互换，讲台在底部时保持 `左护法 / 讲台 / 右护法`。默认不进入 `getAvailableSeats()`，只有显式传入并开启 `guardSeats.includeInAutoAssignment` 时才可被智能排位使用。
-- **自动保存恢复**: `useAutoSave()` 将当前工作区 JSON 写入平台存储中的 `sce-autosave-backup` 和 `sce-autosave-time`。启动时 `App.vue` 检测未处理的新备份并先显示恢复提示，文件页会在工作区列表顶部显示自动保存卡片，统一调用 `restoreAutoSaveBackup()` 应用工作区数据。
+- **自动保存恢复**: `useAutoSave()` 监听完整工作区签名，每次逻辑变更都会按顺序覆盖平台存储中的唯一 `sce-autosave-backup` 快照；快照记录同时包含保存时间与工作区数据，避免分键写入产生不一致。启动时 `App.vue` 每次都会检查现有快照并显示恢复提示，文件页会在工作区列表顶部显示自动保存卡片，统一调用 `restoreAutoSaveBackup()` 应用工作区数据。旧版 `sce-autosave-time` 数据仍可读取，并会在下一次保存时清理。
 - **原子加载**: 所有本地、云端和自动保存数据都会先复制、迁移并通过 `workspaceValidation.ts` 完整校验。只有候选数据有效时才写入共享状态；写入阶段异常会恢复原工作区及撤销、选择、编辑模式等运行时状态。
 - **本地路径提交**: Tauri 本地文件路径只在工作区成功应用后更新。云端或自动保存来源会清除旧本地路径，避免后续“保存”误覆盖先前文件。
 

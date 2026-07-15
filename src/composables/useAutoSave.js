@@ -1,24 +1,30 @@
 import { ref, watch } from 'vue'
-import { useGlobalSettings } from './useGlobalSettings'
 import { useWorkspace } from './useWorkspace'
 import { useLogger } from './useLogger'
 import { readStoredText, removeStoredText, writeStoredText } from '@/platform/nativeStorage'
 
 const AUTO_SAVE_BACKUP_KEY = 'sce-autosave-backup'
-const AUTO_SAVE_TIME_KEY = 'sce-autosave-time'
-const AUTO_SAVE_HANDLED_TIME_KEY = 'sce-autosave-handled-time'
+const LEGACY_AUTO_SAVE_TIME_KEY = 'sce-autosave-time'
+const LEGACY_AUTO_SAVE_HANDLED_TIME_KEY = 'sce-autosave-handled-time'
+const AUTO_SAVE_RECORD_TYPE = 'sce-autosave'
+const AUTO_SAVE_RECORD_VERSION = 1
 
-let autoSaveTimer = null
+let stopAutoSaveWatcher = null
+let autoSaveQueue = Promise.resolve()
 let lastSavedSignature = null
 const isAutoSaveEnabled = ref(false)
 const lastSaveTime = ref(null)
 const autoSaveBackup = ref(null)
 const isAutoSaveBackupLoading = ref(false)
 
-const buildBackupRecord = (backup, time) => {
-  if (!backup || !time) return null
+const buildBackupRecord = (storedBackup, legacyTime = null) => {
+  if (!storedBackup) return null
 
-  const data = JSON.parse(backup)
+  const parsed = JSON.parse(storedBackup)
+  const isCurrentRecord = parsed?.type === AUTO_SAVE_RECORD_TYPE && parsed?.workspace
+  const data = isCurrentRecord ? parsed.workspace : parsed
+  const time = isCurrentRecord ? parsed.savedAt : legacyTime
+  if (!time) return null
   if (!data || !Array.isArray(data.students) || !Array.isArray(data.tags)) {
     return null
   }
@@ -30,9 +36,16 @@ const buildBackupRecord = (backup, time) => {
     data,
     time: Number.isFinite(parsedTime.getTime()) ? parsedTime : null,
     timeIso,
-    size: backup.length
+    size: JSON.stringify(data).length
   }
 }
+
+const createStoredBackup = (json, savedAtIso) => JSON.stringify({
+  type: AUTO_SAVE_RECORD_TYPE,
+  version: AUTO_SAVE_RECORD_VERSION,
+  savedAt: savedAtIso,
+  workspace: JSON.parse(json)
+})
 
 const createAutoSaveSignature = (json) => {
   try {
@@ -47,74 +60,86 @@ const createAutoSaveSignature = (json) => {
 }
 
 export function useAutoSave() {
-  const { settings } = useGlobalSettings()
   const { getWorkspaceJson, applyWorkspaceData, saveLastWorkspace } = useWorkspace()
   const { error } = useLogger()
 
-  const performAutoSave = async () => {
-    try {
-      const json = getWorkspaceJson()
-      if (!json) return
+  const performAutoSave = (workspaceJson = null) => {
+    const json = workspaceJson || getWorkspaceJson()
+    if (!json) return Promise.resolve(false)
 
-      const signature = createAutoSaveSignature(json)
-      if (lastSavedSignature !== null && signature === lastSavedSignature) return
+    const signature = createAutoSaveSignature(json)
+    const saveOperation = async () => {
+      if (lastSavedSignature !== null && signature === lastSavedSignature) return false
 
-      const savedAt = new Date()
-      const savedAtIso = savedAt.toISOString()
-      const backupWritten = await writeStoredText(AUTO_SAVE_BACKUP_KEY, json)
-      const timeWritten = await writeStoredText(AUTO_SAVE_TIME_KEY, savedAtIso)
-      if (!backupWritten || !timeWritten) {
-        throw new Error('写入自动保存失败')
+      try {
+        const savedAt = new Date()
+        const savedAtIso = savedAt.toISOString()
+        const storedBackup = createStoredBackup(json, savedAtIso)
+        const backupWritten = await writeStoredText(AUTO_SAVE_BACKUP_KEY, storedBackup)
+        if (!backupWritten) {
+          throw new Error('写入自动保存失败')
+        }
+
+        await removeStoredText(LEGACY_AUTO_SAVE_TIME_KEY)
+        await removeStoredText(LEGACY_AUTO_SAVE_HANDLED_TIME_KEY)
+
+        lastSavedSignature = signature
+        lastSaveTime.value = savedAt
+        autoSaveBackup.value = buildBackupRecord(storedBackup)
+        return true
+      } catch (err) {
+        error('自动保存失败: ' + (err.message || err))
+        return false
       }
-
-      lastSavedSignature = signature
-      lastSaveTime.value = savedAt
-      autoSaveBackup.value = buildBackupRecord(json, savedAtIso)
-    } catch (err) {
-      error('自动保存失败: ' + (err.message || err))
     }
+
+    const queuedSave = autoSaveQueue.then(saveOperation, saveOperation)
+    autoSaveQueue = queuedSave.then(() => undefined, () => undefined)
+    return queuedSave
   }
 
-  // 启动自动保存
+  // 监听完整工作区签名；Vue 会将同一轮同步修改合并成一次逻辑变更。
   const startAutoSave = () => {
-    if (autoSaveTimer) {
-      clearInterval(autoSaveTimer)
+    if (stopAutoSaveWatcher) {
+      stopAutoSaveWatcher()
     }
 
-    const interval = settings.value.editor.autoSaveInterval || 60000
-
-    autoSaveTimer = setInterval(() => {
-      performAutoSave()
-    }, interval)
+    stopAutoSaveWatcher = watch(
+      () => {
+        const json = getWorkspaceJson()
+        return json ? createAutoSaveSignature(json) : null
+      },
+      (signature, previousSignature) => {
+        if (!signature || signature === previousSignature) return
+        void performAutoSave()
+      }
+    )
 
     isAutoSaveEnabled.value = true
   }
 
-  // 停止自动保存
   const stopAutoSave = () => {
-    if (autoSaveTimer) {
-      clearInterval(autoSaveTimer)
-      autoSaveTimer = null
+    if (stopAutoSaveWatcher) {
+      stopAutoSaveWatcher()
+      stopAutoSaveWatcher = null
     }
     isAutoSaveEnabled.value = false
   }
 
-  // 监听自动保存间隔变化
-  watch(() => settings.value.editor.autoSaveInterval, (newInterval) => {
-    if (isAutoSaveEnabled.value && newInterval) {
-      startAutoSave()
-    }
-  })
+  const flushAutoSave = () => autoSaveQueue
 
   // 恢复自动保存的数据
   const getAutoSaveBackup = async () => {
     isAutoSaveBackupLoading.value = true
     try {
       const backup = await readStoredText(AUTO_SAVE_BACKUP_KEY)
-      const time = await readStoredText(AUTO_SAVE_TIME_KEY)
+      const legacyTime = await readStoredText(LEGACY_AUTO_SAVE_TIME_KEY)
 
-      const record = buildBackupRecord(backup, time)
+      const record = buildBackupRecord(backup, legacyTime)
       autoSaveBackup.value = record
+      lastSavedSignature = record
+        ? createAutoSaveSignature(JSON.stringify(record.data))
+        : null
       return record
     } catch (error) {
       console.error('Failed to get auto save backup:', error)
@@ -123,28 +148,6 @@ export function useAutoSave() {
       isAutoSaveBackupLoading.value = false
     }
     return null
-  }
-
-  const isAutoSavePromptDue = async (backup = autoSaveBackup.value) => {
-    if (!backup?.timeIso) return false
-
-    try {
-      const handledTime = await readStoredText(AUTO_SAVE_HANDLED_TIME_KEY)
-      return handledTime !== backup.timeIso
-    } catch (error) {
-      console.error('Failed to read auto save prompt state:', error)
-      return true
-    }
-  }
-
-  const markAutoSaveBackupHandled = async (backup = autoSaveBackup.value) => {
-    if (!backup?.timeIso) return false
-    return writeStoredText(AUTO_SAVE_HANDLED_TIME_KEY, backup.timeIso)
-  }
-
-  const markSaved = () => {
-    const json = getWorkspaceJson()
-    lastSavedSignature = json ? createAutoSaveSignature(json) : null
   }
 
   const restoreAutoSaveBackup = async (backup = autoSaveBackup.value) => {
@@ -158,15 +161,14 @@ export function useAutoSave() {
       name: '自动保存',
       time: backup.timeIso
     })
-    markSaved()
-    await markAutoSaveBackupHandled(backup)
     return true
   }
 
   const clearAutoSaveBackup = async () => {
+    await flushAutoSave()
     await removeStoredText(AUTO_SAVE_BACKUP_KEY)
-    await removeStoredText(AUTO_SAVE_TIME_KEY)
-    await removeStoredText(AUTO_SAVE_HANDLED_TIME_KEY)
+    await removeStoredText(LEGACY_AUTO_SAVE_TIME_KEY)
+    await removeStoredText(LEGACY_AUTO_SAVE_HANDLED_TIME_KEY)
     autoSaveBackup.value = null
     lastSavedSignature = null
   }
@@ -179,10 +181,8 @@ export function useAutoSave() {
     startAutoSave,
     stopAutoSave,
     performAutoSave,
-    markSaved,
+    flushAutoSave,
     getAutoSaveBackup,
-    isAutoSavePromptDue,
-    markAutoSaveBackupHandled,
     restoreAutoSaveBackup,
     clearAutoSaveBackup
   }

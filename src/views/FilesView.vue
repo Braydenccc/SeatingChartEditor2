@@ -306,8 +306,7 @@ const {
 const {
   autoSaveBackup,
   getAutoSaveBackup,
-  restoreAutoSaveBackup,
-  markSaved
+  restoreAutoSaveBackup
 } = useAutoSave()
 const { success, warning, error } = useLogger()
 const { token, isLoggedIn } = useAuth()
@@ -393,7 +392,6 @@ const handleNewWorkspace = () => {
   const confirmed = requestConfirm('newWorkspace', () => {
     const isSuccess = createNewWorkspace()
     if (isSuccess) {
-      markSaved()
       goEditorAfterSuccess()
     }
   }, '再次点击确认新建')
@@ -406,7 +404,6 @@ const handleNewWorkspace = () => {
 const handleSaveWorkspace = async () => {
   const isSuccess = await saveWorkspace()
   if (isSuccess) {
-    markSaved()
     success('工作区已成功保存到本地！')
   } else {
     error('工作区保存到本地失败，请查看控制台了解详情')
@@ -416,7 +413,6 @@ const handleSaveWorkspace = async () => {
 const handleSaveWorkspaceAs = async () => {
   const isSuccess = await saveWorkspaceAs()
   if (isSuccess) {
-    markSaved()
     success('工作区已成功另存到本地！')
   } else {
     error('工作区另存到本地失败，请查看控制台了解详情')
@@ -463,7 +459,6 @@ const handleCreateCloudWorkspace = async () => {
       return
     }
 
-    markSaved()
     newCloudWorkspaceName.value = ''
     saveLastWorkspace({
       type: 'cloud',

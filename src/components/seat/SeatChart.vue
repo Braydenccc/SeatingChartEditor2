@@ -1239,7 +1239,7 @@ const zoneArrowData = computed(() => {
     if (group.type === 'swap') {
       biDirLines(centroids[0], centroids[1]).forEach(({ from, to }, idx) => {
         const adj = adjustLine(from, to, 24, 6)
-        arrows.push({ ...adj, color: 'var(--color-accent)', markerId: `sw-${group.id}-${idx}` })
+        arrows.push({ ...adj, color: 'var(--color-mode-swap)', markerId: `sw-${group.id}-${idx}` })
       })
     } else {
       // cycle arrows: 0→1→2→...→n-1→0
@@ -1296,9 +1296,9 @@ const rectSelectStyle = computed(() => {
 .drag-preview-seat {
   position: absolute;
   box-sizing: border-box;
-  border: var(--seat-card-border-width) solid var(--color-primary);
+  border: var(--seat-card-border-width) solid var(--color-info);
   border-radius: var(--seat-card-radius);
-  background: var(--color-bg-selected);
+  background: color-mix(in srgb, var(--color-info) 10%, var(--color-bg-card));
   color: var(--color-text-primary);
   display: flex;
   align-items: center;
@@ -1323,7 +1323,7 @@ const rectSelectStyle = computed(() => {
 
 .drag-preview-seat.is-anchor {
   border-width: 3px;
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-primary) 45%, transparent);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-info) 42%, transparent);
   z-index: 10;
 }
 

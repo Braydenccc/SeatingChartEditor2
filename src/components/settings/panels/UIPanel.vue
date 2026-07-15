@@ -897,6 +897,7 @@ watch(() => localSettings.value.colorMode, () => {
 
 watch(() => localSettings.value.colorScheme, () => {
   applyColorScheme()
+  applyThemeColor()
 }, { immediate: true })
 
 watch(() => localSettings.value.themeColor, () => {

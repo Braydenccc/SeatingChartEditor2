@@ -37,8 +37,6 @@ const {
   startAutoSave,
   autoSaveBackup,
   getAutoSaveBackup,
-  isAutoSavePromptDue,
-  markAutoSaveBackupHandled,
   restoreAutoSaveBackup
 } = useAutoSave()
 const { isRouteLoading } = useRouteLoading()
@@ -142,8 +140,7 @@ const handleRestoreAutoSavePrompt = async () => {
   }
 }
 
-const handleDismissAutoSavePrompt = async () => {
-  await markAutoSaveBackupHandled(autoSaveBackup.value)
+const handleDismissAutoSavePrompt = () => {
   showAutoSavePrompt.value = false
   warning('已暂不恢复自动保存，可在文件页的自动保存卡片中恢复')
   continueStartup()
@@ -164,9 +161,9 @@ onMounted(async () => {
     document.documentElement.classList.toggle('disable-animations', !settings.value.ui.enableAnimations)
   }
 
-  startAutoSave()
   const backup = await getAutoSaveBackup()
-  if (backup && await isAutoSavePromptDue(backup)) {
+  startAutoSave()
+  if (backup) {
     showAutoSavePrompt.value = true
   } else {
     continueStartup()

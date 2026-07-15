@@ -352,7 +352,7 @@ const applyRotation = () => {
 }
 
 .type-badge.swap {
-  background: var(--color-accent);
+  background: var(--color-mode-swap);
 }
 
 .group-header input,

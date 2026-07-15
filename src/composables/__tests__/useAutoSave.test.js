@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick, ref } from 'vue'
+
+const workspaceJson = ref('')
 
 const mocks = vi.hoisted(() => ({
   storage: new Map(),
-  workspaceJson: '',
+  getWorkspaceJson: vi.fn(),
   applyWorkspaceData: vi.fn(),
   saveLastWorkspace: vi.fn(),
   loggerError: vi.fn(),
@@ -23,21 +26,9 @@ vi.mock('@/platform/nativeStorage', () => ({
   removeStoredText: mocks.removeStoredText
 }))
 
-vi.mock('../useGlobalSettings', () => ({
-  useGlobalSettings: () => ({
-    settings: {
-      value: {
-        editor: {
-          autoSaveInterval: 60000
-        }
-      }
-    }
-  })
-}))
-
 vi.mock('../useWorkspace', () => ({
   useWorkspace: () => ({
-    getWorkspaceJson: () => mocks.workspaceJson,
+    getWorkspaceJson: mocks.getWorkspaceJson,
     applyWorkspaceData: mocks.applyWorkspaceData,
     saveLastWorkspace: mocks.saveLastWorkspace
   })
@@ -51,14 +42,17 @@ vi.mock('../useLogger', () => ({
 
 import { useAutoSave } from '../useAutoSave'
 
-const createWorkspaceJson = (createdAt = '2026-01-01T00:00:00.000Z') => JSON.stringify({
+const createWorkspaceJson = (
+  createdAt = '2026-01-01T00:00:00.000Z',
+  studentName = '张三'
+) => JSON.stringify({
   meta: {
     version: '2.2',
     app: 'SeatingChartEditor',
     createdAt
   },
   students: [
-    { id: 1, name: '张三', studentNumber: '1', tags: [] }
+    { id: 1, name: studentName, studentNumber: '1', tags: [] }
   ],
   tags: [],
   layout: {
@@ -77,7 +71,9 @@ describe('useAutoSave', () => {
     const autoSave = useAutoSave()
     autoSave.stopAutoSave()
     mocks.storage.clear()
-    mocks.workspaceJson = createWorkspaceJson()
+    workspaceJson.value = createWorkspaceJson()
+    mocks.getWorkspaceJson.mockReset()
+    mocks.getWorkspaceJson.mockImplementation(() => workspaceJson.value)
     mocks.applyWorkspaceData.mockReset()
     mocks.applyWorkspaceData.mockResolvedValue(true)
     mocks.saveLastWorkspace.mockReset()
@@ -88,21 +84,19 @@ describe('useAutoSave', () => {
     mocks.removeStoredText.mockClear()
   })
 
-  it('loads an autosave backup and suppresses prompts after it is handled', async () => {
+  it('loads a legacy autosave backup on every startup check', async () => {
     const autoSave = useAutoSave()
     const time = '2026-07-05T08:00:00.000Z'
     mocks.storage.set('sce-autosave-backup', createWorkspaceJson())
     mocks.storage.set('sce-autosave-time', time)
+    mocks.storage.set('sce-autosave-handled-time', time)
 
-    const backup = await autoSave.getAutoSaveBackup()
+    const firstBackup = await autoSave.getAutoSaveBackup()
+    const secondBackup = await autoSave.getAutoSaveBackup()
 
-    expect(backup.data.students).toHaveLength(1)
-    expect(backup.timeIso).toBe(time)
-    await expect(autoSave.isAutoSavePromptDue(backup)).resolves.toBe(true)
-
-    await autoSave.markAutoSaveBackupHandled(backup)
-
-    await expect(autoSave.isAutoSavePromptDue(backup)).resolves.toBe(false)
+    expect(firstBackup.data.students).toHaveLength(1)
+    expect(firstBackup.timeIso).toBe(time)
+    expect(secondBackup.timeIso).toBe(time)
   })
 
   it('restores a backup and records it as the last autosave workspace', async () => {
@@ -121,18 +115,64 @@ describe('useAutoSave', () => {
       name: '自动保存',
       time
     })
-    expect(mocks.storage.get('sce-autosave-handled-time')).toBe(time)
+    expect(mocks.writeStoredText).not.toHaveBeenCalled()
   })
 
   it('does not write a new backup when only the generated meta timestamp changes', async () => {
     const autoSave = useAutoSave()
 
-    mocks.workspaceJson = createWorkspaceJson('2026-07-05T08:00:00.000Z')
+    workspaceJson.value = createWorkspaceJson('2026-07-05T08:00:00.000Z')
     await autoSave.performAutoSave()
 
-    mocks.workspaceJson = createWorkspaceJson('2026-07-05T08:01:00.000Z')
+    workspaceJson.value = createWorkspaceJson('2026-07-05T08:01:00.000Z')
     await autoSave.performAutoSave()
 
+    expect(mocks.writeStoredText).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves once after each reactive workspace change and keeps one latest record', async () => {
+    const autoSave = useAutoSave()
+    autoSave.startAutoSave()
+
+    workspaceJson.value = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    await nextTick()
+    await autoSave.flushAutoSave()
+
+    workspaceJson.value = createWorkspaceJson('2026-07-05T08:02:00.000Z', '王五')
+    await nextTick()
+    await autoSave.flushAutoSave()
+
+    const storedBackup = JSON.parse(mocks.storage.get('sce-autosave-backup'))
     expect(mocks.writeStoredText).toHaveBeenCalledTimes(2)
+    expect(storedBackup.type).toBe('sce-autosave')
+    expect(storedBackup.workspace.students[0].name).toBe('王五')
+    expect(mocks.storage.has('sce-autosave-time')).toBe(false)
+    expect(mocks.storage.has('sce-autosave-handled-time')).toBe(false)
+  })
+
+  it('serializes overlapping writes so an older snapshot cannot overwrite the latest one', async () => {
+    const autoSave = useAutoSave()
+    let releaseFirstWrite
+
+    mocks.writeStoredText.mockImplementationOnce((key, value) => new Promise((resolve) => {
+      releaseFirstWrite = () => {
+        mocks.storage.set(key, value)
+        resolve(true)
+      }
+    }))
+
+    autoSave.startAutoSave()
+    workspaceJson.value = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    await nextTick()
+    workspaceJson.value = createWorkspaceJson('2026-07-05T08:02:00.000Z', '王五')
+    await nextTick()
+
+    expect(mocks.writeStoredText).toHaveBeenCalledTimes(1)
+    releaseFirstWrite()
+    await autoSave.flushAutoSave()
+
+    const storedBackup = JSON.parse(mocks.storage.get('sce-autosave-backup'))
+    expect(mocks.writeStoredText).toHaveBeenCalledTimes(2)
+    expect(storedBackup.workspace.students[0].name).toBe('王五')
   })
 })

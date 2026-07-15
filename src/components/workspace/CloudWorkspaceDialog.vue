@@ -154,7 +154,6 @@ import { useWorkspace } from '@/composables/useWorkspace'
 import { useLogger } from '@/composables/useLogger'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useAuth } from '@/composables/useAuth'
-import { useAutoSave } from '@/composables/useAutoSave'
 
 const props = defineProps({
   visible: Boolean,
@@ -171,7 +170,6 @@ const { getWorkspaceJson, applyWorkspaceData, saveLastWorkspace, getLastWorkspac
 const { success, error } = useLogger()
 const { requestConfirm } = useConfirmAction()
 const { token, webdavConfig, authType, backupMode } = useAuth()
-const { markSaved } = useAutoSave()
 
 const isSaveMode = ref(false)
 const workspaces = ref([])
@@ -273,7 +271,6 @@ const handleSave = async () => {
     )
     
     if (result.success) {
-      markSaved()
       success('工作区已保存至云端！')
       
       // 记录到 Cookie

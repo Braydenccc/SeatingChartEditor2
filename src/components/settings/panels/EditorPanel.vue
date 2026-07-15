@@ -6,30 +6,6 @@
 
       <div class="setting-item">
         <div class="setting-row">
-          <label class="setting-label">自动保存间隔（秒）</label>
-          <button
-            class="reset-btn"
-            @click="resetAutoSaveInterval"
-            :disabled="isDefaultAutoSaveInterval"
-            title="恢复默认自动保存间隔"
-          >
-            <RotateCcw :size="16" />
-          </button>
-        </div>
-        <input
-          v-model.number="autoSaveSeconds"
-          type="number"
-          class="setting-input"
-          min="10"
-          max="600"
-          step="10"
-          @input="validateAutoSave"
-        />
-        <span v-if="autoSaveSeconds < 10" class="hint-text error">最小值为 10 秒</span>
-      </div>
-
-      <div class="setting-item">
-        <div class="setting-row">
           <label class="setting-label">撤销历史大小</label>
           <button
             class="reset-btn"
@@ -116,26 +92,7 @@ const localSettings = computed({
   set: (value) => emit('update:settings', value)
 })
 
-const autoSaveSeconds = computed({
-  get: () => Math.round(localSettings.value.autoSaveInterval / 1000),
-  set: (value) => {
-    localSettings.value.autoSaveInterval = value * 1000
-  }
-})
-
-const validateAutoSave = () => {
-  if (autoSaveSeconds.value < 10) {
-    autoSaveSeconds.value = 10
-  } else if (autoSaveSeconds.value > 600) {
-    autoSaveSeconds.value = 600
-  }
-}
-
 // 判断是否为默认值
-const isDefaultAutoSaveInterval = computed(() =>
-  localSettings.value.autoSaveInterval === defaultSettings.editor.autoSaveInterval
-)
-
 const isDefaultUndoHistorySize = computed(() =>
   localSettings.value.undoHistorySize === defaultSettings.editor.undoHistorySize
 )
@@ -149,10 +106,6 @@ const isDefaultDoubleClickAction = computed(() =>
 )
 
 // 重置单个设置项
-const resetAutoSaveInterval = () => {
-  localSettings.value.autoSaveInterval = defaultSettings.editor.autoSaveInterval
-}
-
 const resetUndoHistorySize = () => {
   localSettings.value.undoHistorySize = defaultSettings.editor.undoHistorySize
 }
