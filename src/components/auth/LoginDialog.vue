@@ -1,23 +1,15 @@
 <template>
-  <div v-if="visible" class="login-overlay" @mousedown.self="close">
-    <div class="login-dialog">
-      <div class="dialog-header">
-        <h3>{{ isLoginMode ? '账号登录' : '注册账号' }}</h3>
-        <button class="close-btn" type="button" aria-label="关闭" @click="close">
-          <X :size="18" stroke-width="2" />
-        </button>
-      </div>
-
+  <ResponsiveOverlay :show="visible" :title="isLoginMode ? '账号登录' : '注册账号'" :busy="loading" :desktop-width="480" @update:show="value => !value && close()">
       <div class="dialog-body">
-        <div class="tabs">
-          <button :class="{ active: tabMode === 'login' }" @click="tabMode = 'login'">登录</button>
-          <button :class="{ active: tabMode === 'register' }" @click="tabMode = 'register'">注册</button>
-          <button :class="{ active: tabMode === 'webdav' }" @click="tabMode = 'webdav'">WebDAV</button>
-        </div>
-        <div v-if="tabMode !== 'webdav'" style="color: var(--color-danger-text); font-size: 13px; margin-bottom: 16px; text-align: center;">
+        <NTabs v-model:value="tabMode" class="tabs" type="segment" size="small">
+          <NTabPane name="login" tab="登录" />
+          <NTabPane name="register" tab="注册" />
+          <NTabPane name="webdav" tab="WebDAV" />
+        </NTabs>
+        <div v-if="tabMode !== 'webdav'" class="service-warning">
           本账号服务不保证可用性，请妥善备份您的数据
         </div>
-        <div v-else style="color: var(--color-text-muted); font-size: 13px; margin-bottom: 16px; text-align: center;">
+        <div v-else class="service-note">
           通过 WebDAV 连接网盘以使用云端工作区。连接需要跨域(CORS)支持。
         </div>
 
@@ -25,39 +17,37 @@
           <template v-if="tabMode === 'webdav'">
             <div class="form-group">
               <label>服务器地址(URL)</label>
-              <input 
-                type="url" 
-                v-model="webdavUrl" 
-                placeholder="例如: https://pan.example.com/dav" 
-                required 
+              <NInput
+                type="text"
+                v-model:value="webdavUrl"
+                placeholder="例如: https://pan.example.com/dav"
+                required
                 autocomplete="off"
               />
             </div>
             <div class="form-group">
               <label>用户名</label>
-              <input 
-                type="text" 
-                v-model="webdavUser" 
-                placeholder="请输入WebDAV用户名" 
-                required 
+              <NInput
+                type="text"
+                v-model:value="webdavUser"
+                placeholder="请输入WebDAV用户名"
+                required
                 autocomplete="off"
               />
             </div>
             <div class="form-group">
               <label>密码</label>
-              <input
+              <NInput
                 type="password"
-                v-model="webdavPass"
+                v-model:value="webdavPass"
+                show-password-on="click"
                 placeholder="请输入WebDAV密码/Token"
                 required
                 autocomplete="new-password"
               />
             </div>
             <div class="form-group checkbox-group">
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="rememberWebdavPassword" />
-                <span>记住密码（加密存储到浏览器）</span>
-              </label>
+              <NCheckbox v-model:checked="rememberWebdavPassword">记住密码（加密存储到浏览器）</NCheckbox>
               <div class="checkbox-hint">
                 密码将使用 AES-GCM 加密后存储在浏览器中。注意：此功能无法防止 XSS 攻击获取密钥。
               </div>
@@ -67,11 +57,11 @@
           <template v-else>
             <div class="form-group">
               <label>用户名</label>
-              <input 
-                type="text" 
-                v-model="username" 
-                placeholder="请输入字母或数字" 
-                required 
+              <NInput
+                type="text"
+                v-model:value="username"
+                placeholder="请输入字母或数字"
+                required
                 maxlength="32"
                 pattern="[A-Za-z0-9_\-]{1,32}"
                 title="只能包含字母、数字、下划线和连字符"
@@ -81,9 +71,10 @@
 
             <div class="form-group">
               <label>密码</label>
-              <input
+              <NInput
                 type="password"
-                v-model="password"
+                v-model:value="password"
+                show-password-on="click"
                 placeholder="请输入密码"
                 required
                 :minlength="tabMode === 'register' ? 8 : 6"
@@ -118,19 +109,20 @@
           </div>
 
           <div class="dialog-actions">
-            <button type="submit" class="btn-primary" :disabled="loading">
+            <NButton attr-type="submit" class="btn-primary" type="primary" block :loading="loading">
               {{ loading ? '处理中...' : (tabMode === 'login' ? '登录' : (tabMode === 'register' ? '注册并登录' : '连接并创建文件夹')) }}
-            </button>
+            </NButton>
           </div>
         </form>
       </div>
-    </div>
-  </div>
+  </ResponsiveOverlay>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { Check, X } from 'lucide-vue-next'
+import { NButton, NCheckbox, NInput, NTabPane, NTabs } from 'naive-ui'
+import { Check } from 'lucide-vue-next'
+import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useWebDav } from '@/composables/useWebDav'
 import { validatePasswordStrength, PASSWORD_MIN_LENGTH } from '@/utils/passwordValidator'
@@ -208,7 +200,7 @@ const handleSubmit = async () => {
         emit('success')
       }, 500)
     } catch (err) {
-      errorMessage.value = err.message || 'WebDAV 连接失败，请检查账号密码或CORS设置'
+      errorMessage.value = err instanceof Error ? err.message : 'WebDAV 连接失败，请检查账号密码或CORS设置'
     } finally {
       loading.value = false
     }
@@ -234,7 +226,7 @@ const handleSubmit = async () => {
   const result = await action(username.value.trim(), password.value)
 
   if (result.success) {
-    successMessage.value = result.message
+    successMessage.value = result.message ?? '操作成功'
     setTimeout(() => {
       close()
       emit('success')
@@ -248,101 +240,28 @@ const handleSubmit = async () => {
 </script>
 
 <style scoped>
-.login-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--color-bg-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.login-dialog {
-  background: var(--color-surface);
-  width: 90%;
-  max-width: 360px;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px var(--shadow-lg);
-  overflow: hidden;
-  animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.dialog-header h3 {
-  margin: 0;
-  color: var(--color-primary);
-  font-size: 18px;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: 8px;
-}
-
-.close-btn:hover {
-  color: var(--color-danger);
-}
 
 .dialog-body {
-  padding: 20px;
+  min-width: 0;
 }
 
 .tabs {
-  display: flex;
   margin-bottom: 20px;
-  border-radius: 8px;
-  background: var(--color-bg-subtle);
-  padding: 4px;
 }
 
-.tabs button {
-  flex: 1;
-  padding: 8px 0;
-  border: none;
-  background: transparent;
+.service-warning,
+.service-note {
+  margin-bottom: 16px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.service-warning {
+  color: var(--color-danger-text);
+}
+
+.service-note {
   color: var(--color-text-muted);
-  font-weight: 500;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.tabs button.active {
-  background: var(--color-surface);
-  color: var(--color-primary);
-  box-shadow: 0 1px 3px var(--shadow-sm);
 }
 
 .form-group {
@@ -355,22 +274,6 @@ const handleSubmit = async () => {
   color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 500;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
-  font-size: 15px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-sizing: border-box;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .error-message {
@@ -397,29 +300,6 @@ const handleSubmit = async () => {
   margin-top: 24px;
 }
 
-.btn-primary {
-  width: 100%;
-  padding: 12px;
-  background: var(--color-primary);
-  color: var(--color-surface);
-  border: none;
-  border-radius: 6px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 20%, transparent);
-}
-
-.btn-primary:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
 .password-requirements {
   margin-top: 8px;
   font-size: 12px;
@@ -442,24 +322,6 @@ const handleSubmit = async () => {
   margin-bottom: 16px;
 }
 
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-weight: normal;
-  margin-bottom: 6px;
-}
-
-.checkbox-label input[type="checkbox"] {
-  width: auto;
-  margin-right: 8px;
-  cursor: pointer;
-}
-
-.checkbox-label span {
-  color: var(--color-text-secondary);
-  font-size: 14px;
-}
 
 .checkbox-hint {
   font-size: 12px;

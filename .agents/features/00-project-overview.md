@@ -13,8 +13,8 @@ description: 作为项目的中枢级指南，概述技术栈、多端适配策�
 
 | 模块类别 | 路径入口 | 职责说明 |
 | :--- | :--- | :--- |
-| **浏览器入口** | `src/main.js` | 加载全局样式、注册 `vue-router` 并挂载应用。 |
-| **应用壳** | `src/App.vue` | 渲染 `RouterView`、全局拖拽区、登录与云工作区对话框。 |
+| **浏览器入口** | `src/main.ts` | 加载全局样式、注册 `vue-router` 并挂载应用。 |
+| **应用壳** | `src/App.vue` | 通过 `AppUiProvider` 提供 Naive UI 根级 API，并渲染路由、全局拖拽区和全局弹层。 |
 | **路由配置** | `src/router/index.ts` | hash 路由，包含编辑、文件、学生、导出和设置页面。 |
 | **编辑主界面** | `src/views/EditorView.vue`、`src/components/workbench/EditorWorkbench.vue` | 当前编辑器布局与工作台。 |
 | **用户手册** | `src/constants/userManual.ts`、`src/components/settings/panels/HelpPanel.vue` | 应用内完整用户手册，入口位于「设置 - 关于 - 帮助」，桌面端编辑页顶部问号会直接打开该分类。 |
@@ -26,6 +26,8 @@ description: 作为项目的中枢级指南，概述技术栈、多端适配策�
 
 ## 3. 技术栈规范 (Tech Stack & Conventions)
 - **渲染层**: Vue 3 (Composition API / `<script setup>`)。完全不使用 Class API。
+- **组件层**: 通用控件、反馈和弹层使用 Naive UI；座位热路径、拖拽预览和导出渲染保留自定义 DOM。
+- **类型门禁**: `src` 全部使用 TypeScript，`strict: true`、`allowJs: false`；外部数据按 `unknown` 进入解析或类型守卫。
 - **路由层**: 使用 `vue-router` hash 路由。当前已不是“无路由单页”结构。
 - **状态管理**: 未使用 Pinia。依靠 Vue3 reactivity (`ref`, `computed`) 封装在多个独立的 `useXXX` composables 中，通过单例模式共享状态。
 - **构建/包管理**: Vite + Tauri。
@@ -44,6 +46,7 @@ description: 作为项目的中枢级指南，概述技术栈、多端适配策�
 ```json
 {
   "@vueuse/core": "用于鼠标拖拽、窗口大小防抖等高级交互",
+  "naive-ui": "通用控件、表单、反馈和响应式弹层",
   "lucide-vue-next": "统一的图标库规范",
   "xlsx-js-style": "用于带有边框等样式的 Excel 导出"
 }
@@ -53,3 +56,5 @@ description: 作为项目的中枢级指南，概述技术栈、多端适配策�
 - **避免引入 Vuex或Pinia**: 项目强依赖 `composables/` 的自闭环状态树（Stateful Composables），如果要加新状态字段，直接去对应 `useXXX` 文件的顶层定义 `const myVar = ref(null)`。
 - **全平台兼容警示**: 项目需要编译为浏览器 Web 和 Tauri 桌面端。因此，绝对不要在 `src/components/` 或 `src/composables/` 内部直接调用 Node.js 内置模块（如 `fs`, `path`）。也不要在业务组件中静态导入 `@tauri-apps/*`，必须通过 `src/platform/` 的动态适配层隔离。
 - **用户手册同步**: 任何用户可见功能、入口、工作流、限制条件或排查步骤变化，都必须同步更新 `src/constants/userManual.ts`。手册内容由 `HelpPanel.vue` 结构化渲染，不要在面板模板中硬编码功能说明。
+- **UI 状态真源**: 全局主题和界面偏好只经 `useGlobalSettings` 更新；跨模式操作只经 `useEditorCommands` 协调；业务组件不直接创建 Naive UI 离散 API。
+- **弹层约定**: 普通业务弹层复用 `ResponsiveOverlay`，桌面显示 Modal、移动显示底部 Drawer；不要叠加旧弹窗壳或用全局原生控件选择器覆盖 Naive UI 内部结构。

@@ -58,19 +58,22 @@
         </ul>
       </div>
 
-      <button class="action-button" @click="openExportPreview">
-        <FileDown :size="18" />
-        <div class="button-content">
-          <span class="button-title">打开导出预览</span>
-          <span class="button-desc">配置详细导出选项并预览效果</span>
-        </div>
-      </button>
+      <NButton class="action-button" type="primary" secondary block @click="openExportPreview">
+        <span class="action-button-content">
+          <FileDown :size="18" />
+          <span class="button-content">
+            <span class="button-title">打开导出预览</span>
+            <span class="button-desc">配置详细导出选项并预览效果</span>
+          </span>
+        </span>
+      </NButton>
     </div>
 
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Image, FileSpreadsheet, FileDown } from 'lucide-vue-next'
@@ -236,25 +239,19 @@ const openExportPreview = () => {
 }
 
 .action-button {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
+  height: auto;
+  min-height: 72px;
+  justify-content: flex-start;
   text-align: left;
-  color: var(--color-primary);
-  width: 100%;
 }
 
-.action-button:hover {
-  border-color: var(--color-primary);
-  background: var(--color-bg-subtle);
-  transform: translateX(4px);
-  box-shadow: 0 2px 8px var(--color-primary-shadow);
+.action-button-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  white-space: normal;
 }
 
 .button-content {

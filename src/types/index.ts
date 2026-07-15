@@ -10,6 +10,7 @@ export type {
   GroupConfig,
   Zone,
   Rule,
+  RuleSubRule,
   RuleSubject,
   RulePriority,
   RulePredicate,

@@ -1,6 +1,5 @@
 import { computed, nextTick, ref } from 'vue'
 
-export type EditorTool = 'normal' | 'swap' | 'clear' | 'empty'
 export type WorkbenchDialog = 'seatConfig' | 'shiftRotation' | 'zoneRotation' | 'assignment' | 'rules' | null
 export type AssignmentWorkbenchPanel = 'run' | 'rules' | 'guide'
 export type RightRailTab = 'candidates' | 'selection' | 'activity'
@@ -18,7 +17,6 @@ export interface ZoneEditSession {
   subtitle?: string
 }
 
-const activeTool = ref<EditorTool>('normal')
 const activeWorkbenchDialog = ref<WorkbenchDialog>(null)
 const assignmentWorkbenchPanel = ref<AssignmentWorkbenchPanel>('run')
 const focusedRuleId = ref('')
@@ -33,7 +31,6 @@ const drawerBeforeDragOpen = ref<MobileDrawer>(null)
 const requestedFullscreenElement = ref<Element | null>(null)
 const isSeatFullscreen = computed(() => mobileViewMode.value === 'seatFullscreen')
 
-const validTools = new Set<EditorTool>(['normal', 'swap', 'clear', 'empty'])
 const validDialogs = new Set<Exclude<WorkbenchDialog, null>>([
   'seatConfig',
   'shiftRotation',
@@ -123,15 +120,6 @@ export function useEditorWorkbench() {
   const closeMobileSheet = () => {
     mobileSheet.value = null
     resetMobileDragState()
-  }
-
-  const setTool = (tool: EditorTool) => {
-    if (!validTools.has(tool)) return
-    activeTool.value = tool
-  }
-
-  const resetTool = () => {
-    activeTool.value = 'normal'
   }
 
   const openDialog = (
@@ -262,7 +250,6 @@ export function useEditorWorkbench() {
   }
 
   return {
-    activeTool,
     activeWorkbenchDialog,
     assignmentWorkbenchPanel,
     focusedRuleId,
@@ -275,8 +262,6 @@ export function useEditorWorkbench() {
     mobileDrawer,
     suspendedMobileDrawer,
     dragOpenedMobileDrawer,
-    setTool,
-    resetTool,
     openDialog,
     closeDialog,
     startZoneEditSession,

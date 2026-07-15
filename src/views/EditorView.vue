@@ -7,7 +7,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import AppHeader from '@/components/layout/AppHeader.vue'
 import EditorWorkbench from '@/components/workbench/EditorWorkbench.vue'
 

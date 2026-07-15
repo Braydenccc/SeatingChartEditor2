@@ -3,7 +3,7 @@ module_name: Zones & Rotation System
 description: 选区机制与周期性的座位大轮换。
 related_files:
   - src/composables/useZoneData.ts
-  - src/composables/useZoneRotation.js
+  - src/composables/useZoneRotation.ts
 ---
 
 # 06-区域与轮换系统 (Zones & Rotation System)
@@ -13,7 +13,7 @@ related_files:
 
 ## 2. 源代码入口 (Source Files)
 - 选区元数据: `src/composables/useZoneData.ts`
-- 轮换执行逻辑: `src/composables/useZoneRotation.js`
+- 轮换执行逻辑: `src/composables/useZoneRotation.ts`
 
 ## 3. 数据模型 / 核心API (Data Models & Core API)
 
@@ -26,7 +26,7 @@ interface Zone {
   seatIds: string[]; // 框选的确切座位 id 数组
 }
 
-// useZoneRotation.js
+// useZoneRotation.ts
 interface RotationGroup {
   id: number;
   type: 'cycle' | 'swap'; // cycle=无限制循环，swap=强制对换

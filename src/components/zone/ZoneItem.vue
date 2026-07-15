@@ -6,11 +6,11 @@
   >
     <div class="zone-header">
       <div class="zone-color-indicator" :style="{ background: zoneColor }"></div>
-      <input
+      <NInput
         v-if="isEditingName"
-        v-model="editedName"
-        type="text"
+        v-model:value="editedName"
         class="zone-name-input"
+        size="small"
         @blur="saveName"
         @keyup.enter="saveName"
         @click.stop
@@ -23,14 +23,12 @@
       >
         {{ zone.name }}
       </span>
-      <label class="zone-visible-checkbox" @click.stop>
-        <input
-          type="checkbox"
-          :checked="zone.visible"
-          @change="toggleVisible"
-        />
-        <span>显示</span>
-      </label>
+      <NCheckbox
+        class="zone-visible-checkbox"
+        :checked="zone.visible"
+        @click.stop
+        @update:checked="toggleVisible"
+      >显示</NCheckbox>
     </div>
 
     <div class="zone-body">
@@ -42,13 +40,41 @@
           :style="{ background: getTagColor(tagId) }"
         >
           {{ getTagName(tagId) }}
-          <button class="remove-tag-btn" @click.stop="removeTag(tagId)">
+          <NButton class="remove-tag-btn" size="tiny" text circle @click.stop="removeTag(tagId)">
             <X :size="10" stroke-width="2.5" />
-          </button>
+          </NButton>
         </span>
-        <button ref="addBtnRef" class="add-tag-btn" @click.stop="toggleTagPicker">
-          <Plus :size="12" stroke-width="2.5" />
-        </button>
+        <NPopover
+          v-model:show="showTagPicker"
+          trigger="click"
+          placement="bottom-start"
+          :show-arrow="false"
+          :width="200"
+        >
+          <template #trigger>
+            <NButton size="tiny" quaternary circle type="primary" title="添加标签" @click.stop>
+              <Plus :size="12" stroke-width="2.5" />
+            </NButton>
+          </template>
+          <NScrollbar class="tag-picker-scroll">
+            <div v-if="availableTagsForZone.length > 0" class="tag-picker-options">
+              <NButton
+                v-for="tag in availableTagsForZone"
+                :key="tag.id"
+                class="tag-option"
+                text
+                block
+                @click="addTagToZone(tag.id)"
+              >
+                <span class="tag-option-content">
+                  <span class="tag-dot" :style="{ background: tag.color }"></span>
+                  <span>{{ tag.name }}</span>
+                </span>
+              </NButton>
+            </div>
+            <NEmpty v-else size="small" description="暂无可添加的标签" />
+          </NScrollbar>
+        </NPopover>
       </div>
 
       <div class="zone-info">
@@ -56,87 +82,57 @@
       </div>
     </div>
 
-    <button class="delete-zone-btn" :class="{ confirming: isDeletingZone.value }" @click.stop="handleDelete">
-      {{ isDeletingZone.value ? '再次点击确认' : '删除' }}
-    </button>
-
-    <!-- 标签选择器保持稳定挂载，避免 Teleport 在条件切换时触发运行时锚点异常 -->
-    <Teleport to="body">
-      <div v-show="showTagPicker" class="tag-picker" ref="tagPickerRef" :style="tagPickerStyle" @click.stop>
-        <div
-          v-for="tag in availableTagsForZone"
-          :key="tag.id"
-          class="tag-option"
-          @click="addTagToZone(tag.id)"
-        >
-          <span class="tag-dot" :style="{ background: tag.color }"></span>
-          <span>{{ tag.name }}</span>
-        </div>
-        <div v-if="availableTagsForZone.length === 0" class="no-tags">
-          暂无可添加的标签
-        </div>
-      </div>
-    </Teleport>
+    <NPopconfirm positive-text="删除" negative-text="取消" @positive-click="handleDelete">
+      <template #trigger><NButton size="small" type="error" secondary block @click.stop>删除</NButton></template>
+      确认删除选区“{{ zone.name }}”？
+    </NPopconfirm>
   </div>
 </template>
 
-<script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+<script setup lang="ts">
+import { ref, computed, nextTick } from 'vue'
+import { NButton, NCheckbox, NEmpty, NInput, NPopover, NPopconfirm, NScrollbar } from 'naive-ui'
 import { X, Plus } from 'lucide-vue-next'
-import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useLogger } from '@/composables/useLogger'
+import type { Tag, Zone } from '@/types/models'
 
-const props = defineProps({
-  zone: {
-    type: Object,
-    required: true
-  },
-  isSelected: {
-    type: Boolean,
-    default: false
-  },
-  availableTags: {
-    type: Array,
-    required: false,
-    default: () => []
-  },
-  zoneColor: {
-    type: String,
-    required: true
-  }
+const props = withDefaults(defineProps<{
+  zone: Zone
+  isSelected?: boolean
+  availableTags?: Tag[]
+  zoneColor: string
+}>(), {
+  isSelected: false,
+  availableTags: () => []
 })
 
-const emit = defineEmits([
-  'select',
-  'update-zone',
-  'delete-zone',
-  'add-tag',
-  'remove-tag',
-  'toggle-visible'
-])
+const emit = defineEmits<{
+  select: [zoneId: number]
+  'update-zone': [zoneId: number, updates: Partial<Zone>]
+  'delete-zone': [zoneId: number]
+  'add-tag': [zoneId: number, tagId: number]
+  'remove-tag': [zoneId: number, tagId: number]
+  'toggle-visible': [zoneId: number]
+}>()
 
-const { requestConfirm, isConfirming } = useConfirmAction()
-const { warning, info, success } = useLogger()
+const { warning, success } = useLogger()
 
 const isEditingName = ref(false)
 const editedName = ref('')
-const nameInput = ref(null)
+const nameInput = ref<{ focus: () => void } | null>(null)
 const showTagPicker = ref(false)
-const tagPickerRef = ref(null)
-const addBtnRef = ref(null)
-const tagPickerStyle = ref({})
 
 // 获取可添加的标签(排除已添加的)
 const availableTagsForZone = computed(() => {
   return props.availableTags.filter(tag => !props.zone.tagIds.includes(tag.id))
 })
 
-const getTagName = (tagId) => {
+const getTagName = (tagId: number) => {
   const tag = props.availableTags.find(t => t.id === tagId)
   return tag ? tag.name : ''
 }
 
-const getTagColor = (tagId) => {
+const getTagColor = (tagId: number) => {
   const tag = props.availableTags.find(t => t.id === tagId)
   return tag ? tag.color : 'var(--color-text-disabled)'
 }
@@ -168,93 +164,21 @@ const toggleVisible = () => {
 }
 
 
-// 标签管理
-const computeTagPickerPosition = () => {
-  const btn = addBtnRef.value
-  if (!btn) return
-  const rect = btn.getBoundingClientRect()
-  const width = 200
-  const margin = 8
-  let left = rect.left + window.scrollX
-  if (left + width + margin > window.innerWidth) {
-    left = Math.max(margin, window.innerWidth - width - margin)
-  }
-  if (left < margin) left = margin
-  tagPickerStyle.value = {
-    position: 'absolute',
-    top: `${rect.bottom + window.scrollY + 4}px`,
-    left: `${left}px`,
-    minWidth: `${width}px`,
-    zIndex: 9999
-  }
-}
-
-const onWindowChange = () => {
-  computeTagPickerPosition()
-}
-
-const toggleTagPicker = async () => {
-  showTagPicker.value = !showTagPicker.value
-  if (showTagPicker.value) {
-    await nextTick()
-    computeTagPickerPosition()
-    window.addEventListener('resize', onWindowChange)
-    window.addEventListener('scroll', onWindowChange, true)
-  } else {
-    window.removeEventListener('resize', onWindowChange)
-    window.removeEventListener('scroll', onWindowChange, true)
-  }
-}
-
-const addTagToZone = (tagId) => {
+const addTagToZone = (tagId: number) => {
   emit('add-tag', props.zone.id, tagId)
   showTagPicker.value = false
 }
 
-const removeTag = (tagId) => {
+const removeTag = (tagId: number) => {
   emit('remove-tag', props.zone.id, tagId)
 }
 
 // 删除选区
-const deleteKey = computed(() => `deleteZone-${props.zone.id}`)
-const isDeletingZone = isConfirming(deleteKey.value)
-
 const handleDelete = () => {
-  if (!isDeletingZone.value) {
-    info(`请再次点击删除按钮以确认删除选区"${props.zone.name}"`)
-  }
-
-  requestConfirm(
-    deleteKey.value,
-    () => {
-      emit('delete-zone', props.zone.id)
-      success(`已成功删除选区"${props.zone.name}"`)
-    },
-    `确定要删除选区"${props.zone.name}"吗？`
-  )
+  emit('delete-zone', props.zone.id)
+  success(`已成功删除选区“${props.zone.name}”`)
 }
 
-// 点击外部关闭标签选择器
-const handleClickOutside = (event) => {
-  if (!showTagPicker.value) return
-
-  const clickedInsidePicker = tagPickerRef.value && tagPickerRef.value.contains(event.target)
-  const clickedAddBtn = event.target.closest && event.target.closest('.add-tag-btn')
-
-  if (!clickedInsidePicker && !clickedAddBtn) {
-    showTagPicker.value = false
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-  window.removeEventListener('resize', onWindowChange)
-  window.removeEventListener('scroll', onWindowChange, true)
-})
 </script>
 
 <style scoped>
@@ -314,12 +238,6 @@ onUnmounted(() => {
 
 .zone-name-input {
   flex: 1;
-  padding: 4px 8px;
-  font-size: 14px;
-  font-weight: 600;
-  border: 2px solid var(--color-primary);
-  border-radius: 4px;
-  outline: none;
 }
 
 .zone-visible-checkbox {
@@ -328,10 +246,6 @@ onUnmounted(() => {
   gap: 4px;
   font-size: 12px;
   color: var(--color-text-secondary);
-  cursor: pointer;
-}
-
-.zone-visible-checkbox input[type="checkbox"] {
   cursor: pointer;
 }
 
@@ -358,43 +272,7 @@ onUnmounted(() => {
 }
 
 .remove-tag-btn {
-  background: color-mix(in srgb, var(--color-text-inverse) 30%, transparent);
-  border: none;
   color: var(--color-text-inverse);
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  line-height: 1;
-  padding: 0;
-  transition: background 0.2s;
-}
-
-.remove-tag-btn:hover {
-  background: color-mix(in srgb, var(--color-text-inverse) 50%, transparent);
-}
-
-.add-tag-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--color-border);
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--color-text-secondary);
-  transition: all 0.2s;
-}
-
-.add-tag-btn:hover {
-  border-color: var(--color-primary);
-  background: var(--color-bg-secondary);
-  color: var(--color-primary);
 }
 
 .zone-info {
@@ -402,53 +280,22 @@ onUnmounted(() => {
   color: var(--color-text-secondary);
 }
 
-.delete-zone-btn {
-  width: 100%;
-  padding: 6px;
-  background: var(--color-danger);
-  color: var(--color-surface);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.delete-zone-btn:hover {
-  background: var(--color-danger-hover);
-}
-
-.delete-zone-btn.confirming {
-  background: var(--color-danger) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 20%, transparent);
-}
-
-.tag-picker {
-  position: absolute;
-  margin-top: 4px;
-  background: var(--color-surface);
-  border: 2px solid var(--color-primary);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px var(--shadow-lg);
-  z-index: 1000;
+.tag-picker-scroll {
   max-height: 200px;
-  overflow-y: auto;
 }
 
 .tag-option {
+  min-height: 36px;
+  justify-content: flex-start;
+}
+
+.tag-option-content {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  cursor: pointer;
-  transition: background 0.2s;
-  font-size: 13px;
   color: var(--color-text-primary);
-}
-
-.tag-option:hover {
-  background: var(--color-bg-hover);
+  font-size: 13px;
 }
 
 .tag-dot {
@@ -456,13 +303,6 @@ onUnmounted(() => {
   height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
-}
-
-.no-tags {
-  padding: 12px;
-  text-align: center;
-  color: var(--color-text-disabled);
-  font-size: 12px;
 }
 
 /* 响应式设计 - 移动设备 */
@@ -484,10 +324,6 @@ onUnmounted(() => {
     font-size: 11px;
   }
 
-  .delete-zone-btn {
-    font-size: 11px;
-    padding: 5px;
-  }
 }
 
 @media (max-width: 480px) {

@@ -16,29 +16,29 @@ npm run test:watch
 src/
 ├── composables/
 │   ├── __tests__/
-│   │   ├── useStudentData.test.js
-│   │   ├── useSeatChart.test.js
-│   │   ├── useAssignment.test.js
-│   │   ├── useTagData.test.js
-│   │   ├── useZoneData.test.js
-│   │   ├── useUndo.test.js
-│   │   ├── useSeatRules.test.js
-│   │   ├── useEditMode.test.js
-│   │   ├── integration.test.js
-│   │   └── edge-cases.test.js
+│   │   ├── useStudentData.test.ts
+│   │   ├── useSeatChart.test.ts
+│   │   ├── useAssignment.test.ts
+│   │   ├── useTagData.test.ts
+│   │   ├── useZoneData.test.ts
+│   │   ├── useUndo.test.ts
+│   │   ├── useSeatRules.test.ts
+│   │   ├── useEditMode.test.ts
+│   │   ├── integration.test.ts
+│   │   └── edge-cases.test.ts
 │   └── ...
 └── test-utils/
-    ├── setup.js
-    ├── mocks.js
-    ├── factories.js
-    └── assertions.js
+    ├── setup.ts
+    ├── mocks.ts
+    ├── factories.ts
+    └── assertions.ts
 ```
 
 ## 测试工具
 
 ### Mocks
 
-使用 `src/test-utils/mocks.js` 创建 mock 对象：
+使用 `src/test-utils/mocks.ts` 创建 mock 对象：
 
 ```javascript
 import { createMockSeatChart, createMockStudentData } from '@/test-utils/mocks'
@@ -49,7 +49,7 @@ const studentData = createMockStudentData()
 
 ### Factories
 
-使用 `src/test-utils/factories.js` 创建测试数据：
+使用 `src/test-utils/factories.ts` 创建测试数据：
 
 ```javascript
 import { createMockStudent, createMockSeats } from '@/test-utils/factories'
@@ -60,7 +60,7 @@ const seats = createMockSeats(4, 2, 7)
 
 ### Assertions
 
-使用 `src/test-utils/assertions.js` 进行断言：
+使用 `src/test-utils/assertions.ts` 进行断言：
 
 ```javascript
 import { expectSeatToHaveStudent, expectStudentToHaveTags } from '@/test-utils/assertions'

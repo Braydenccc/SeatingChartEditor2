@@ -8,14 +8,14 @@
   </AppPageShell>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useRouter } from 'vue-router'
 import AppPageShell from '@/components/layout/AppPageShell.vue'
 import StudentRosterDialog from '@/components/student/StudentRosterDialog.vue'
 
 const router = useRouter()
 
-const handleVisibleChange = (visible) => {
+const handleVisibleChange = (visible: boolean) => {
   if (!visible) router.push('/editor')
 }
 </script>

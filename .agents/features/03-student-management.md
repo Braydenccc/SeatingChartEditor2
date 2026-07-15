@@ -3,7 +3,7 @@ module_name: Student & Data Management
 description: 提供学生数据的增删改查、以及与 Excel 双向互通的完整实现。
 related_files:
   - src/composables/useStudentData.ts
-  - src/composables/useExcelData.js
+  - src/composables/useExcelData.ts
 ---
 
 # 03-学生与数据处理 (Student & Data Management)
@@ -14,7 +14,7 @@ related_files:
 ## 2. 源代码入口 (Source Files)
 - 学生数据 Store: `src/composables/useStudentData.ts`
 - 标签数据 Store: `src/composables/useTagData.ts`
-- Excel数据处理: `src/composables/useExcelData.js`
+- Excel数据处理: `src/composables/useExcelData.ts`
 
 ## 3. 核心 API 暴露 (Core Internal Logic)
 
@@ -54,7 +54,7 @@ interface NumericAttributeDefinition {
 ```
 
 ```javascript
-// useExcelData.js
+// useExcelData.ts
 // -> 巨无霸模块的“按需动态导入”优化点
 export const xlsxInstance = shallowRef(null)
 export const loadXlsx = async () => {
@@ -77,7 +77,7 @@ export const loadXlsx = async () => {
 - **标签去重与防腐**: 导进来的所有标签均会被推入全局 `useTagData` 进行统一管理，并通过生成颜色给前端赋能。在存入时依赖 `new Set()` 和 `.filter(Boolean)` 清洗空值。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
-- **Lazy Load 依赖**: `useExcelData.js` 由于引入了 `xlsx-js-style` 这个非常巨大的包，绝不能使用顶层 `import`，必须通过封装好的 `loadXlsx()` 来异步获取它。如果你在这个文件里写了顶层导入，会导致首屏构建体积爆炸。
+- **Lazy Load 依赖**: `useExcelData.ts` 由于引入了 `xlsx-js-style` 这个非常巨大的包，绝不能使用顶层 `import`，必须通过封装好的 `loadXlsx()` 来异步获取它。如果你在这个文件里写了顶层导入，会导致首屏构建体积爆炸。
 - **本地代理边界**: `server.cjs` 与 `vite.mock.plugin.js` 都实现了 `/api/fuckseats-proxy`，共享 `fuckseats-proxy.config.json` 与 `fuckseatsProxyHelper.cjs` 的校验；仅允许 GET 到本机 `23948` / `8000` 的 `/` 和 `/classroom/<id>/state/`，避免浏览器 CORS 失败，也避免任意 URL 代理。
 - **SDES 不是工作区备份**: SDES 导出为了互通只保证标准字段可读；`extensions.app.bsce` 中的规则、选区和导出配置是私有扩展，其他软件可以忽略。修改 SDES 支持时要同步维护 `src/constants/userManual.ts` 中的交换格式限制说明。
 - **选中态悬空**: 如果您编写了一个批量删除学生的组件，应复用 `useStudentData` 的删除/清空入口，避免绕过选中态与座位占用清理。

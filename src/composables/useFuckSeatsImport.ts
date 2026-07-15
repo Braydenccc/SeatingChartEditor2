@@ -63,7 +63,7 @@ interface FuckSeatsStatePayload {
   podium_guards?: Record<string, FuckSeatsStudentProfile | null>
 }
 
-interface ImportResult {
+export interface FuckSeatsImportResult {
   students: number
   tags: number
   assignedSeats: number
@@ -493,7 +493,7 @@ export function useFuckSeatsImport() {
     ) as Promise<FuckSeatsStatePayload>
   }
 
-  const importClassroom = async (classroom: FuckSeatsClassroomSummary): Promise<ImportResult> => {
+  const importClassroom = async (classroom: FuckSeatsClassroomSummary): Promise<FuckSeatsImportResult> => {
     const state = await fetchClassroomState(classroom)
     const workspace = buildWorkspaceFromFuckSeatsState(classroom, state)
     const imported = await applyWorkspaceData(workspace)
@@ -511,8 +511,8 @@ export function useFuckSeatsImport() {
     return {
       students: workspace.students.length,
       tags: workspace.tags.length,
-      assignedSeats: workspace.layout.seats.filter((seat: any) => seat.studentId != null).length,
-      emptySeats: workspace.layout.seats.filter((seat: any) => seat.empty).length
+      assignedSeats: workspace.layout.seats.filter(seat => seat.studentId != null).length,
+      emptySeats: workspace.layout.seats.filter(seat => seat.empty).length
     }
   }
 

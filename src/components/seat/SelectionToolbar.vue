@@ -1,35 +1,36 @@
 <template>
   <Transition name="sel-toolbar">
     <div v-if="visible" class="selection-toolbar" :style="positionStyle" @mousedown.stop @pointerdown.stop>
-      <button class="sel-btn sel-btn--edit" title="编辑学生" :disabled="!hasStudent" @click="handleEdit">
+      <NButton size="tiny" quaternary type="primary" title="编辑学生" :disabled="!hasStudent" @click="handleEdit">
         <Edit3 :size="15" stroke-width="2" />
         <span class="sel-btn-label">编辑</span>
-      </button>
-      <button class="sel-btn sel-btn--clear" title="移出学生" @click="handleClear">
+      </NButton>
+      <NButton size="tiny" quaternary type="error" title="移出学生" @click="handleClear">
         <UserMinus :size="15" stroke-width="2" />
         <span class="sel-btn-label">移出</span>
-      </button>
-      <button v-if="isExactlyTwo" class="sel-btn sel-btn--swap" title="交换座位" :disabled="!canShuffle" @click="handleShuffle">
+      </NButton>
+      <NButton v-if="isExactlyTwo" size="tiny" quaternary type="warning" title="交换座位" :disabled="!canShuffle" @click="handleShuffle">
         <ArrowLeftRight :size="15" stroke-width="2" />
         <span class="sel-btn-label">交换</span>
-      </button>
-      <button v-else class="sel-btn sel-btn--shuffle" title="打乱顺序" :disabled="!canShuffle" @click="handleShuffle">
+      </NButton>
+      <NButton v-else size="tiny" quaternary type="info" title="打乱顺序" :disabled="!canShuffle" @click="handleShuffle">
         <Shuffle :size="15" stroke-width="2" />
         <span class="sel-btn-label">打乱</span>
-      </button>
-      <button class="sel-btn sel-btn--assign" title="一键排入" :disabled="isFull" @click="handleAssign">
+      </NButton>
+      <NButton size="tiny" quaternary type="success" title="一键排入" :disabled="isFull" @click="handleAssign">
         <Sparkles :size="15" stroke-width="2" />
         <span class="sel-btn-label">排入</span>
-      </button>
+      </NButton>
       <div class="sel-divider"></div>
-      <button class="sel-btn sel-btn--cancel" title="取消多选" @click="handleCancel">
+      <NButton size="tiny" quaternary circle title="取消多选" @click="handleCancel">
         <X :size="14" stroke-width="2.5" />
-      </button>
+      </NButton>
     </div>
   </Transition>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { computed } from 'vue'
 import { Edit3, Shuffle, Sparkles, UserMinus, X, ArrowLeftRight } from 'lucide-vue-next'
 
@@ -74,94 +75,6 @@ const handleCancel = () => emit('cancel')
   user-select: none;
 }
 
-.sel-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 10px;
-  border: none;
-  background: transparent;
-  border-radius: 7px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
-
-.sel-btn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-primary);
-}
-
-.sel-btn:active {
-  transform: scale(0.95);
-}
-
-.sel-btn--edit:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-primary);
-}
-
-.sel-btn--edit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: transparent;
-  color: var(--color-text-disabled);
-}
-
-.sel-btn--clear:hover {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-
-.sel-btn--shuffle:hover {
-  background: var(--color-info-bg);
-  color: var(--color-info);
-}
-
-.sel-btn--shuffle:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: transparent;
-  color: var(--color-text-disabled);
-}
-
-.sel-btn--swap:hover {
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-}
-
-.sel-btn--swap:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: transparent;
-  color: var(--color-text-disabled);
-}
-
-.sel-btn--assign:hover {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.sel-btn--assign:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: transparent;
-  color: var(--color-text-disabled);
-}
-
-.sel-btn--cancel {
-  padding: 5px;
-  color: var(--color-text-disabled);
-}
-
-.sel-btn--cancel:hover {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
-}
-
 .sel-btn-label {
   line-height: 1;
 }
@@ -195,10 +108,6 @@ const handleCancel = () => emit('cancel')
 @media (max-width: 768px) {
   .sel-btn-label {
     display: none;
-  }
-
-  .sel-btn {
-    padding: 6px;
   }
 
   .selection-toolbar {

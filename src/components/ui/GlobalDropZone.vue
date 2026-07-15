@@ -12,7 +12,7 @@
   </Transition>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { FileSpreadsheet, LogOut } from 'lucide-vue-next'
 import { useDragState } from '@/composables/useDragState'
@@ -24,7 +24,7 @@ import { useSelection } from '@/composables/useSelection'
 import { useUndo } from '@/composables/useUndo'
 
 const { isDraggingFromSeat, endDragFromSeat } = useDragState()
-const { clearSeat, getStudentAtSeat } = useSeatChart()
+const { clearSeat, getStudentAtSeat, findSeatByStudent } = useSeatChart()
 const { students } = useStudentData()
 const { clearSelection: clearSeatSelection } = useSelection()
 const { recordBatch, createSnapshot } = useUndo()
@@ -37,7 +37,6 @@ const isImportingExcel = ref(false)
 
 const shouldShowSeatDropZone = computed(() => {
   const allAssigned = students.value.length > 0 && students.value.every(s => {
-    const { findSeatByStudent } = useSeatChart()
     return findSeatByStudent(s.id)
   })
   return isDraggingFromSeat.value && allAssigned
@@ -50,22 +49,26 @@ const dropZoneText = computed(() => {
   return '拖到此处移出座位'
 })
 
-const hasFileTransfer = (dataTransfer) => {
+const hasFileTransfer = (dataTransfer: DataTransfer | null) => {
   if (!dataTransfer?.types) return false
   return Array.from(dataTransfer.types).includes('Files')
 }
 
-const handleDragOver = (e) => {
-  e.dataTransfer.dropEffect = isFileDragActive.value ? 'copy' : 'move'
+const handleDragOver = (e: DragEvent) => {
+  if (e.dataTransfer) e.dataTransfer.dropEffect = isFileDragActive.value ? 'copy' : 'move'
   isDragOver.value = true
 }
 
-const handleDragLeave = (e) => {
-  if (e.currentTarget.contains(e.relatedTarget)) return
+const handleDragLeave = (e: DragEvent) => {
+  if (
+    e.currentTarget instanceof Node &&
+    e.relatedTarget instanceof Node &&
+    e.currentTarget.contains(e.relatedTarget)
+  ) return
   isDragOver.value = false
 }
 
-const handleDrop = async (e) => {
+const handleDrop = async (e: DragEvent) => {
   isDragOver.value = false
   if (hasFileTransfer(e.dataTransfer)) {
     await handleExcelDrop(e)
@@ -76,11 +79,11 @@ const handleDrop = async (e) => {
   if (!raw) return
 
   try {
-    const data = JSON.parse(raw)
-    if (data.type === 'seat' && data.seatId) {
-      if (data.selectedSeatIds && data.selectedSeatIds.length > 1) {
+    const value: unknown = JSON.parse(raw)
+    if (isSeatDragPayload(value)) {
+      if (value.selectedSeatIds && value.selectedSeatIds.length > 1) {
         const beforeSnapshot = createSnapshot()
-        data.selectedSeatIds.forEach(seatId => {
+        value.selectedSeatIds.forEach(seatId => {
           if (getStudentAtSeat(seatId) !== null) {
             clearSeat(seatId, false)
           }
@@ -88,9 +91,9 @@ const handleDrop = async (e) => {
         const afterSnapshot = createSnapshot()
         recordBatch(beforeSnapshot, afterSnapshot)
         clearSeatSelection()
-        success(`已将 ${data.selectedSeatIds.length} 名学生移出座位`)
+        success(`已将 ${value.selectedSeatIds.length} 名学生移出座位`)
       } else {
-        clearSeat(data.seatId)
+        clearSeat(value.seatId)
         clearSeatSelection()
         success('已将学生移出座位')
       }
@@ -102,19 +105,35 @@ const handleDrop = async (e) => {
   }
 }
 
-const getDragData = (e) => {
-  return e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain')
+interface SeatDragPayload {
+  type: 'seat'
+  seatId: string
+  selectedSeatIds?: string[]
 }
 
-const handleDocumentDragOver = (e) => {
+const isSeatDragPayload = (value: unknown): value is SeatDragPayload => {
+  if (typeof value !== 'object' || value === null) return false
+  const candidate = value as Record<string, unknown>
+  return candidate.type === 'seat' &&
+    typeof candidate.seatId === 'string' &&
+    (candidate.selectedSeatIds === undefined || (
+      Array.isArray(candidate.selectedSeatIds) && candidate.selectedSeatIds.every(id => typeof id === 'string')
+    ))
+}
+
+const getDragData = (e: DragEvent) => {
+  return e.dataTransfer?.getData('application/json') || e.dataTransfer?.getData('text/plain') || ''
+}
+
+const handleDocumentDragOver = (e: DragEvent) => {
   if (!hasFileTransfer(e.dataTransfer)) return
   e.preventDefault()
-  e.dataTransfer.dropEffect = 'copy'
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
   isFileDragActive.value = true
   isDragOver.value = true
 }
 
-const handleDocumentDragLeave = (e) => {
+const handleDocumentDragLeave = (e: DragEvent) => {
   if (!isFileDragActive.value) return
   const leftWindow = e.clientX <= 0 ||
     e.clientY <= 0 ||
@@ -125,13 +144,13 @@ const handleDocumentDragLeave = (e) => {
   isDragOver.value = false
 }
 
-const handleDocumentDrop = async (e) => {
+const handleDocumentDrop = async (e: DragEvent) => {
   if (!hasFileTransfer(e.dataTransfer)) return
   e.preventDefault()
   await handleExcelDrop(e)
 }
 
-const handleExcelDrop = async (e) => {
+const handleExcelDrop = async (e: DragEvent) => {
   isFileDragActive.value = false
   isDragOver.value = false
   if (isImportingExcel.value) return
@@ -148,7 +167,8 @@ const handleExcelDrop = async (e) => {
 
   isImportingExcel.value = true
   try {
-    await beginExcelRosterImport(excelFiles[0])
+    const firstFile = excelFiles[0]
+    if (firstFile) await beginExcelRosterImport(firstFile)
   } finally {
     isImportingExcel.value = false
   }

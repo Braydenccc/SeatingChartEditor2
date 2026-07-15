@@ -72,13 +72,15 @@
       <p class="section-desc">管理学生名单、数值属性和标签系统</p>
 
       <div class="action-buttons">
-        <button class="action-button" @click="openStudentRoster">
-          <Users :size="18" />
-          <div class="button-content">
-            <span class="button-title">名单与属性</span>
-            <span class="button-desc">添加、编辑学生、数值属性和标签</span>
-          </div>
-        </button>
+        <NButton class="action-button" type="primary" secondary block @click="openStudentRoster">
+          <span class="action-button-content">
+            <Users :size="18" />
+            <span class="button-content">
+              <span class="button-title">名单与属性</span>
+              <span class="button-desc">添加、编辑学生、数值属性和标签</span>
+            </span>
+          </span>
+        </NButton>
       </div>
     </div>
 
@@ -92,7 +94,8 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { computed, ref } from 'vue'
 import { Users, CheckCircle, Circle, Tag, Grid, Wand2 } from 'lucide-vue-next'
 import { useStudentData } from '@/composables/useStudentData'
@@ -211,24 +214,19 @@ const openStudentRoster = () => {
 }
 
 .action-button {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
+  height: auto;
+  min-height: 72px;
+  justify-content: flex-start;
   text-align: left;
-  color: var(--color-primary);
 }
 
-.action-button:hover {
-  border-color: var(--color-primary);
-  background: var(--color-bg-secondary);
-  transform: translateX(4px);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 10%, transparent);
+.action-button-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  white-space: normal;
 }
 
 .button-content {

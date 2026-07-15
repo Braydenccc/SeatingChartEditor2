@@ -31,7 +31,7 @@
             <span class="in-row-text">{{ renderRuleText(item.rule) }}</span>
             <span v-if="item.reason" class="in-row-reason">{{ item.reason }}</span>
             <div class="in-row-actions">
-              <button class="in-action-btn" @click="emit('focus-rule', item)">定位规则</button>
+              <NButton size="tiny" type="primary" secondary @click="emit('focus-rule', item)">定位规则</NButton>
             </div>
           </div>
         </div>
@@ -60,7 +60,8 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { ref, computed } from 'vue'
 import { AlertTriangle, Check, ChevronDown, CircleAlert, CircleX, ShieldCheck } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
@@ -252,23 +253,6 @@ const gradeIconComponent = computed(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.in-action-btn {
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-
-.in-action-btn.primary {
-  border-color: var(--color-info-text);
-  background: var(--color-info-bg);
-  color: var(--color-info);
 }
 
 .in-no-rules-tip {

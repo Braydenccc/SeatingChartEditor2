@@ -119,7 +119,8 @@ const buildPrecheckContext = (input: any) => {
     for (const studentId of studentIds) {
       coveredStudentIds.add(studentId)
       if (!rulesByStudentId.has(studentId)) rulesByStudentId.set(studentId, [])
-      rulesByStudentId.get(studentId).push(rule)
+      const studentRules = rulesByStudentId.get(studentId)
+      if (studentRules) studentRules.push(rule)
     }
   }
 

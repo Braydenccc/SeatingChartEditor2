@@ -1,26 +1,27 @@
 <template>
-  <div class="page-shell">
-    <header class="page-header">
+  <NLayout class="page-shell">
+    <NLayoutHeader class="page-header" bordered>
       <div class="page-title-group">
         <p v-if="eyebrow" class="page-eyebrow">{{ eyebrow }}</p>
         <h1>{{ title }}</h1>
       </div>
       <div class="page-actions">
         <slot name="actions"></slot>
-        <button class="back-button" type="button" aria-label="返回编辑器" title="返回编辑器" @click="goEditor">
-          <ArrowLeft :size="17" stroke-width="2.2" />
+        <NButton class="back-button" size="small" secondary aria-label="返回编辑器" title="返回编辑器" @click="goEditor">
+          <template #icon><NIcon><ArrowLeft :size="17" stroke-width="2.2" /></NIcon></template>
           <span>返回编辑器</span>
-        </button>
+        </NButton>
       </div>
-    </header>
-    <main class="page-body">
+    </NLayoutHeader>
+    <NLayoutContent class="page-body" :native-scrollbar="false">
       <slot></slot>
-    </main>
-  </div>
+    </NLayoutContent>
+  </NLayout>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ArrowLeft } from 'lucide-vue-next'
+import { NButton, NIcon, NLayout, NLayoutContent, NLayoutHeader } from 'naive-ui'
 import { useRouter } from 'vue-router'
 
 defineProps({
@@ -87,26 +88,6 @@ const goEditor = () => router.push('/editor')
   justify-content: flex-end;
 }
 
-.back-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-subtle);
-  color: var(--color-text-primary);
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.back-button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-surface);
-}
-
 .page-body {
   flex: 1;
   min-height: 0;
@@ -146,8 +127,7 @@ const goEditor = () => router.push('/editor')
 
   .back-button {
     min-width: 44px;
-    min-height: 40px;
-    padding: 0 10px;
+    min-height: 44px;
   }
 
   .page-body {

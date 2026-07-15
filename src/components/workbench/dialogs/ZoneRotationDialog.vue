@@ -1,31 +1,21 @@
 <template>
-  <div v-if="visible" class="dialog-overlay" @click.self="emit('close')">
-    <section class="workbench-dialog">
-      <header class="dialog-header">
-        <div>
-          <h2>选区轮换</h2>
-          <p>创建循环或互换组，在座位图上编辑选区后执行轮换</p>
-        </div>
-        <button class="icon-button" title="关闭" @click="emit('close')">
-          <X :size="18" stroke-width="2" />
-        </button>
-      </header>
-
+  <ResponsiveOverlay :show="visible" title="选区轮换" :desktop-width="760" @update:show="value => !value && emit('close')">
+      <p class="dialog-description">创建循环或互换组，在座位图上编辑选区后执行轮换</p>
       <div class="dialog-body">
         <div v-if="editingZoneId" class="editing-banner">
           <span>正在编辑选区，请在座位图上点击座位以选入或取消</span>
-          <button @click="stopEditing">完成</button>
+          <NButton size="small" type="primary" secondary @click="stopEditing">完成</NButton>
         </div>
 
         <div class="toolbar-row">
-          <button class="secondary-button" @click="addGroup('cycle')">
+          <NButton size="small" secondary @click="addGroup('cycle')">
             <RefreshCcw :size="15" stroke-width="2" />
             <span>循环组</span>
-          </button>
-          <button class="secondary-button" @click="addGroup('swap')">
+          </NButton>
+          <NButton size="small" secondary @click="addGroup('swap')">
             <ArrowLeftRight :size="15" stroke-width="2" />
             <span>互换组</span>
-          </button>
+          </NButton>
         </div>
 
         <div v-if="rotGroups.length === 0" class="empty-state">
@@ -35,10 +25,10 @@
         <article v-for="group in rotGroups" :key="group.id" class="rotation-group">
           <div class="group-header">
             <span class="type-badge" :class="group.type">{{ group.type === 'cycle' ? '循环' : '互换' }}</span>
-            <input v-model="group.name" type="text" />
-            <button class="icon-button small" title="删除轮换组" @click="deleteGroup(group.id)">
+            <NInput v-model:value="group.name" class="name-input" size="small" />
+            <NButton size="small" quaternary circle type="error" title="删除轮换组" @click="deleteGroup(group.id)">
               <Trash2 :size="14" stroke-width="2" />
-            </button>
+            </NButton>
           </div>
 
           <div class="zone-list">
@@ -48,24 +38,26 @@
               class="zone-row"
               :class="{ editing: editingZoneId === zone.id }"
             >
-              <button
+              <NButton
                 class="zone-dot"
-                :style="{ backgroundColor: getZoneColor(group.id, zone.id) }"
+                size="tiny"
+                circle
+                :color="getZoneColor(group.id, zone.id)"
                 :title="editingZoneId === zone.id ? '停止编辑此选区' : '编辑此选区'"
                 @click="selectZone(group, zone)"
-              ></button>
-              <input v-model="zone.name" type="text" />
+              ></NButton>
+              <NInput v-model:value="zone.name" class="name-input" size="small" />
               <span class="seat-count">{{ zone.seatIds.length }}座</span>
-              <button class="icon-button small" title="删除选区" @click="deleteZone(group.id, zone.id)">
+              <NButton size="small" quaternary circle type="error" title="删除选区" @click="deleteZone(group.id, zone.id)">
                 <X :size="14" stroke-width="2" />
-              </button>
+              </NButton>
             </div>
           </div>
 
-          <button class="add-zone-button" @click="addZone(group.id)">
+          <NButton class="add-zone-button" size="small" secondary block @click="addZone(group.id)">
             <Plus :size="14" stroke-width="2" />
             <span>添加选区</span>
-          </button>
+          </NButton>
 
           <div v-if="getGroupError(group)" class="group-error">
             {{ getGroupError(group) }}
@@ -73,41 +65,34 @@
         </article>
       </div>
 
-      <footer class="dialog-footer">
-        <button class="secondary-button" @click="stopEditing">退出编辑</button>
-        <button class="primary-button" @click="applyRotation">
+      <template #footer><footer class="dialog-footer">
+        <NButton secondary @click="stopEditing">退出编辑</NButton>
+        <NButton type="primary" @click="applyRotation">
           <RefreshCcw :size="16" stroke-width="2" />
           <span>应用选区轮换</span>
-        </button>
-      </footer>
-    </section>
-  </div>
+        </NButton>
+      </footer></template>
+  </ResponsiveOverlay>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton, NInput } from 'naive-ui'
 import { ArrowLeftRight, Plus, RefreshCcw, Trash2, X } from 'lucide-vue-next'
-import { useEditMode } from '@/composables/useEditMode'
-import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
+import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
+import { useEditorCommands } from '@/composables/useEditorCommands'
 import { useLogger } from '@/composables/useLogger'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useUndo } from '@/composables/useUndo'
-import { useZoneData } from '@/composables/useZoneData'
 import { useZoneRotation } from '@/composables/useZoneRotation'
+import type { RotationGroup, RotationZone } from '@/types/models'
 
-defineProps({
-  visible: {
-    type: Boolean,
-    default: false
-  }
-})
+withDefaults(defineProps<{ visible?: boolean }>(), { visible: false })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits<{ close: [] }>()
 const { seats } = useSeatChart()
 const { createSnapshot, recordBatch } = useUndo()
 const { success, warning } = useLogger()
-const { setMode, EditMode } = useEditMode()
-const { startZoneEditSession } = useEditorWorkbench()
-const { clearZoneSelection } = useZoneData()
+const { finishZoneEditing, startRotationZoneEditing } = useEditorCommands()
 const {
   rotGroups,
   editingZoneId,
@@ -115,28 +100,24 @@ const {
   deleteRotGroup,
   addZoneToGroup,
   deleteZoneFromGroup,
-  selectEditingZone,
-  clearEditingZone,
   getZoneColor,
   validateGroup,
   applyZoneRotation
 } = useZoneRotation()
 
-const addGroup = (type) => addRotGroup(type)
+const addGroup = (type: RotationGroup['type']) => addRotGroup(type)
 
-const deleteGroup = (groupId) => {
+const deleteGroup = (groupId: number) => {
   deleteRotGroup(groupId)
-  if (editingZoneId.value === null) setMode(EditMode.NORMAL)
+  if (editingZoneId.value === null) finishZoneEditing()
 }
 
-const startRotationZoneEdit = (group, zone) => {
+const startRotationZoneEdit = (
+  group: RotationGroup | null | undefined,
+  zone: RotationZone | null | undefined
+) => {
   if (!group || !zone) return
-  clearZoneSelection()
-  setMode(EditMode.ZONE_EDIT)
-  if (editingZoneId.value !== zone.id) {
-    selectEditingZone(zone.id)
-  }
-  startZoneEditSession({
+  startRotationZoneEditing(zone.id, {
     kind: 'rotation',
     sourceDialog: 'zoneRotation',
     groupId: group.id,
@@ -146,27 +127,26 @@ const startRotationZoneEdit = (group, zone) => {
   })
 }
 
-const addZone = (groupId) => {
+const addZone = (groupId: number) => {
   const zone = addZoneToGroup(groupId)
   const group = rotGroups.value.find(item => item.id === groupId)
   startRotationZoneEdit(group, zone)
 }
 
-const deleteZone = (groupId, zoneId) => {
+const deleteZone = (groupId: number, zoneId: number) => {
   deleteZoneFromGroup(groupId, zoneId)
-  if (editingZoneId.value === null) setMode(EditMode.NORMAL)
+  if (editingZoneId.value === null) finishZoneEditing()
 }
 
-const selectZone = (group, zone) => {
+const selectZone = (group: RotationGroup, zone: RotationZone) => {
   startRotationZoneEdit(group, zone)
 }
 
 const stopEditing = () => {
-  clearEditingZone()
-  setMode(EditMode.NORMAL)
+  finishZoneEditing()
 }
 
-const getGroupError = (group) => {
+const getGroupError = (group: RotationGroup) => {
   const { valid, error } = validateGroup(group)
   return valid ? '' : error
 }
@@ -192,99 +172,11 @@ const applyRotation = () => {
 </script>
 
 <style scoped>
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--color-bg-overlay);
-}
-
-.workbench-dialog {
-  width: min(720px, 100%);
-  max-height: min(760px, calc(100vh - 48px));
-  display: flex;
-  flex-direction: column;
-  background: var(--color-dialog-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-}
-
-.dialog-header,
-.dialog-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px;
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-
-.dialog-footer {
-  border-top: 1px solid var(--color-border);
-  border-bottom: none;
-}
-
-.dialog-header h2 {
-  margin: 0;
-  font-size: 18px;
-  color: var(--color-text-primary);
-}
-
-.dialog-header p {
-  margin: 4px 0 0;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-}
 
 .dialog-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
-}
-
-.icon-button,
-.secondary-button,
-.primary-button,
-.add-zone-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-height: 36px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  cursor: pointer;
-}
-
-.icon-button {
-  width: 34px;
-  padding: 0;
-}
-
-.icon-button.small {
-  width: 28px;
-  min-height: 28px;
-}
-
-.primary-button {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-text-inverse);
-  padding: 0 14px;
-}
-
-.secondary-button {
-  padding: 0 12px;
 }
 
 .toolbar-row {
@@ -305,13 +197,6 @@ const applyRotation = () => {
   background: var(--color-info-bg);
   color: var(--color-info-text);
   font-size: 13px;
-}
-
-.editing-banner button {
-  border: none;
-  background: transparent;
-  color: var(--color-primary);
-  cursor: pointer;
 }
 
 .empty-state {
@@ -355,15 +240,8 @@ const applyRotation = () => {
   background: var(--color-mode-swap);
 }
 
-.group-header input,
-.zone-row input {
+.name-input {
   min-width: 0;
-  min-height: 32px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-input-bg);
-  color: var(--color-text-primary);
-  padding: 0 8px;
 }
 
 .zone-list {
@@ -386,12 +264,7 @@ const applyRotation = () => {
 }
 
 .zone-dot {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--color-surface);
-  border-radius: 50%;
-  box-shadow: 0 0 0 1px var(--color-border);
-  cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .seat-count {
@@ -400,9 +273,7 @@ const applyRotation = () => {
 }
 
 .add-zone-button {
-  width: 100%;
   margin-top: 10px;
-  color: var(--color-primary);
 }
 
 .group-error {
@@ -414,16 +285,4 @@ const applyRotation = () => {
   font-size: 12px;
 }
 
-@media (max-width: 640px) {
-  .dialog-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .workbench-dialog {
-    width: 100%;
-    max-height: 92vh;
-    border-radius: 12px 12px 0 0;
-  }
-}
 </style>

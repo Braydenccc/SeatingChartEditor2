@@ -4,69 +4,51 @@
       <h1 class="header-text">BraydenSCE V2</h1>
 
       <!-- 用户菜单 -->
-      <div v-if="isLoggedIn" class="user-menu-container" ref="menuContainer">
-        <button ref="userButton" class="header-btn user-btn" :title="currentUser?.username || '账户'" @click="toggleDropdown">
-          <Cloud v-if="authType === 'webdav'" :size="18" stroke-width="2" />
-          <User v-else :size="18" stroke-width="2" />
+      <NDropdown v-if="isLoggedIn" trigger="click" :options="accountOptions" @select="handleAccountSelect">
+        <NButton class="header-btn user-btn" quaternary :title="currentUser?.username || '账户'">
+          <template #icon><NIcon><Cloud v-if="authType === 'webdav'" :size="18" /><User v-else :size="18" /></NIcon></template>
           <span class="btn-text">{{ currentUser?.username }}</span>
-          <ChevronDown class="dropdown-icon" :size="14" stroke-width="2" />
-        </button>
-
-        <Transition name="fade-slide">
-          <div v-if="showDropdown" class="user-dropdown" :style="dropdownStyle">
-            <button class="dropdown-item" @click="openUserPage">
-              <User :size="16" stroke-width="2" />
-              <span>账号中心</span>
-            </button>
-
-            <button v-if="!hasRetiehe" class="dropdown-item" @click="emit('open-login', 'login'); showDropdown = false">
-              <LogIn :size="16" stroke-width="2" />
-              <span>登录 SCE 账号</span>
-            </button>
-
-            <div class="dropdown-divider"></div>
-
-            <button class="dropdown-item danger" @click="handleLogout('all')">
-              <span>{{ hasRetiehe ? '退出 SCE 账号' : '退出 WebDAV' }}</span>
-            </button>
-          </div>
-        </Transition>
-      </div>
+          <ChevronDown class="dropdown-icon" :size="14" />
+        </NButton>
+      </NDropdown>
 
       <!-- 登录按钮 -->
-      <button v-else class="header-btn login-btn" title="登录" @click="emit('open-login')">
-        <Cloud :size="18" stroke-width="2" />
+      <NButton v-else class="header-btn login-btn" quaternary title="登录" @click="emit('open-login')">
+        <template #icon><NIcon><Cloud :size="18" /></NIcon></template>
         <span class="btn-text">登录</span>
-      </button>
+      </NButton>
 
       <!-- 设置按钮 -->
-      <button class="header-btn" @click="openFiles" title="文件">
-        <FileText :size="18" stroke-width="2" />
+      <NButton class="header-btn" quaternary @click="openFiles" title="文件">
+        <template #icon><NIcon><FileText :size="18" /></NIcon></template>
         <span class="btn-text">文件</span>
-      </button>
+      </NButton>
 
-      <button class="header-btn" @click="openStudents" title="学生">
-        <Users :size="18" stroke-width="2" />
+      <NButton class="header-btn" quaternary @click="openStudents" title="学生">
+        <template #icon><NIcon><Users :size="18" /></NIcon></template>
         <span class="btn-text">学生</span>
-      </button>
+      </NButton>
 
-      <button class="header-btn" @click="openExport" title="导出">
-        <FileOutput :size="18" stroke-width="2" />
+      <NButton class="header-btn" quaternary @click="openExport" title="导出">
+        <template #icon><NIcon><FileOutput :size="18" /></NIcon></template>
         <span class="btn-text">导出</span>
-      </button>
+      </NButton>
 
-      <button class="header-btn" @click="openUnifiedSettings" title="统一设置">
-        <Settings :size="18" stroke-width="2" />
+      <NButton class="header-btn" quaternary @click="openUnifiedSettings" title="统一设置">
+        <template #icon><NIcon><Settings :size="18" /></NIcon></template>
         <span class="btn-text">设置</span>
-      </button>
+      </NButton>
 
       <!-- 主题切换 -->
-      <div class="theme-switcher">
-        <button
+      <NButtonGroup class="theme-switcher">
+        <NButton
           v-for="mode in themeModes"
           :key="mode.value"
           class="theme-btn"
           :class="{ active: currentColorScheme === mode.value }"
+          size="small"
+          :type="currentColorScheme === mode.value ? 'primary' : 'default'"
+          :quaternary="currentColorScheme !== mode.value"
           @click="switchTheme(mode.value)"
           :title="themeTitleFor(mode)"
         >
@@ -77,51 +59,46 @@
           <Transition name="theme-label">
             <span v-if="currentColorScheme === mode.value" class="theme-label">{{ mode.label }}</span>
           </Transition>
-        </button>
-      </div>
+        </NButton>
+      </NButtonGroup>
 
-      <button class="header-btn mobile-theme-btn" :title="mobileThemeTitle" @click="cycleTheme">
+      <NButton class="header-btn mobile-theme-btn" quaternary :title="mobileThemeTitle" @click="cycleTheme">
         <span class="mobile-theme-icon" :class="{ auto: currentColorScheme === 'auto' }">
           <component :is="mobileThemeIcon" :size="18" stroke-width="2" />
           <span v-if="currentColorScheme === 'auto'" class="mobile-theme-auto-mark">A</span>
         </span>
         <span class="btn-text">主题</span>
-      </button>
+      </NButton>
     </div>
 
     <div class="header-right">
-      <button class="header-btn icon-only" @click="openHelp" title="帮助">
-        <CircleQuestionMark :size="18" stroke-width="2" />
-      </button>
+      <NButton class="header-btn icon-only" quaternary circle @click="openHelp" title="帮助">
+        <template #icon><NIcon><CircleQuestionMark :size="18" /></NIcon></template>
+      </NButton>
     </div>
   </header>
 </template>
 
-<script setup>
-import { onMounted, ref, onBeforeUnmount, computed } from 'vue'
+<script setup lang="ts">
+import { computed, h, onBeforeUnmount, onMounted, ref, type Component } from 'vue'
+import { NButton, NButtonGroup, NDropdown, NIcon, type DropdownOption } from 'naive-ui'
 import { ChevronDown, CircleQuestionMark, Cloud, FileOutput, FileText, LogIn, Moon, Settings, Sun, User, Users } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
 
-const emit = defineEmits(['open-login'])
+const emit = defineEmits<{ 'open-login': [tab?: string] }>()
 
 const { currentUser, token, webdavConfig, isLoggedIn, logout, authType } = useAuth()
 const { settings, saveToLocalStorage, applyColorScheme, applyThemeColor } = useGlobalSettings()
 const { openSettings, closeSettings } = useSettingsDialog()
 const router = useRouter()
 
-const showDropdown = ref(false)
-const menuContainer = ref(null)
-const userButton = ref(null)
-const dropdownStyle = ref({})
-
 const hasRetiehe = computed(() => !!token.value)
-const hasWebdav = computed(() => !!webdavConfig.value)
 
 // 主题切换
-const themeModes = [
+const themeModes: Array<{ value: 'light' | 'dark' | 'auto'; label: string; icon?: Component }> = [
   { value: 'light', label: '浅色', icon: Sun },
   { value: 'dark', label: '深色', icon: Moon },
   { value: 'auto', label: '自适应' }
@@ -132,7 +109,7 @@ const currentThemeMode = computed(() => (
   themeModes.find(mode => mode.value === currentColorScheme.value) || themeModes[2]
 ))
 const prefersDarkMode = ref(false)
-let prefersDarkQuery = null
+let prefersDarkQuery: MediaQueryList | null = null
 
 const updatePrefersDarkMode = () => {
   prefersDarkMode.value = Boolean(prefersDarkQuery?.matches)
@@ -140,12 +117,12 @@ const updatePrefersDarkMode = () => {
 
 const autoThemeIcon = computed(() => prefersDarkMode.value ? Moon : Sun)
 
-const themeIconFor = (mode) => {
+const themeIconFor = (mode: typeof themeModes[number]) => {
   if (mode.value === 'auto') return autoThemeIcon.value
   return mode.icon
 }
 
-const themeTitleFor = (mode) => {
+const themeTitleFor = (mode: typeof themeModes[number]) => {
   if (mode.value !== 'auto') return mode.label
   return `自适应（当前${prefersDarkMode.value ? '深色' : '浅色'}）`
 }
@@ -158,7 +135,7 @@ const mobileThemeTitle = computed(() => {
   return `主题：${themeTitleFor(currentThemeMode.value)}`
 })
 
-const switchTheme = (mode) => {
+const switchTheme = (mode: 'light' | 'dark' | 'auto') => {
   settings.value.ui.colorScheme = mode
   applyColorScheme()
   applyThemeColor()
@@ -171,67 +148,33 @@ const cycleTheme = () => {
   switchTheme(nextMode.value)
 }
 
-const updateDropdownPosition = () => {
-  const rect = userButton.value?.getBoundingClientRect()
-  if (!rect || typeof window === 'undefined') return
+const renderDropdownIcon = (icon: Component) => () => h(NIcon, null, { default: () => h(icon, { size: 16 }) })
+const accountOptions = computed<DropdownOption[]>(() => [
+  { label: '账号中心', key: 'user', icon: renderDropdownIcon(User) },
+  ...(!hasRetiehe.value ? [{ label: '登录 SCE 账号', key: 'login', icon: renderDropdownIcon(LogIn) }] : []),
+  { type: 'divider', key: 'divider' },
+  { label: hasRetiehe.value ? '退出 SCE 账号' : '退出 WebDAV', key: 'logout' }
+])
 
-  const menuMinWidth = 160
-  const viewportMargin = 8
-  const maxLeft = Math.max(viewportMargin, window.innerWidth - menuMinWidth - viewportMargin)
-  const left = Math.min(
-    Math.max(rect.left, viewportMargin),
-    maxLeft
-  )
-
-  dropdownStyle.value = {
-    top: `${rect.bottom + 12}px`,
-    left: `${left}px`,
-    minWidth: `${Math.max(rect.width, menuMinWidth)}px`
-  }
-}
-
-const toggleDropdown = () => {
-  const nextVisible = !showDropdown.value
-  showDropdown.value = nextVisible
-  if (nextVisible) updateDropdownPosition()
-}
-
-const openUserPage = () => {
-  router.push('/user')
-  showDropdown.value = false
+const handleAccountSelect = (key: string | number) => {
+  if (key === 'user') void router.push('/user')
+  if (key === 'login') emit('open-login', 'login')
+  if (key === 'logout') logout('all')
 }
 
 const openUnifiedSettings = () => {
   openSettings()
-  showDropdown.value = false
 }
 
 const openHelp = () => {
   openSettings('about', 'help')
-  showDropdown.value = false
 }
 
 const openFiles = () => router.push('/files')
 const openStudents = () => router.push('/students')
 const openExport = () => router.push({ path: '/export', query: { tab: 'image' } })
 
-const handleLogout = (target) => {
-  logout(target)
-  showDropdown.value = false
-}
-
-const closeDropdownOnOutsideClick = (e) => {
-  if (menuContainer.value && !menuContainer.value.contains(e.target)) {
-    showDropdown.value = false
-  }
-}
-
 onMounted(() => {
-  document.addEventListener('click', closeDropdownOnOutsideClick)
-  if (typeof window !== 'undefined') {
-    window.addEventListener('resize', updateDropdownPosition)
-    window.addEventListener('scroll', updateDropdownPosition, true)
-  }
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
     prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)')
     updatePrefersDarkMode()
@@ -240,11 +183,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', closeDropdownOnOutsideClick)
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', updateDropdownPosition)
-    window.removeEventListener('scroll', updateDropdownPosition, true)
-  }
   prefersDarkQuery?.removeEventListener('change', updatePrefersDarkMode)
   closeSettings()
 })
@@ -371,11 +309,6 @@ onBeforeUnmount(() => {
   border-color: color-mix(in srgb, var(--color-text-inverse) 30%, transparent);
 }
 
-/* ===== 用户菜单 ===== */
-.user-menu-container {
-  position: relative;
-}
-
 .user-btn .dropdown-icon {
   margin-left: 2px;
   transition: transform 0.25s;
@@ -384,56 +317,6 @@ onBeforeUnmount(() => {
 
 .user-btn:hover .dropdown-icon {
   transform: translateY(2px);
-}
-
-.user-dropdown {
-  position: fixed;
-  background: var(--color-surface);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  z-index: 100;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 12px 16px;
-  border: none;
-  background: transparent;
-  text-align: left;
-  font-size: 14px;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.dropdown-item:hover {
-  background: var(--color-bg-subtle);
-}
-
-.dropdown-item.danger {
-  color: var(--color-danger);
-}
-
-.dropdown-divider {
-  height: 1px;
-  background: var(--color-border);
-  margin: 4px 0;
-}
-
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.fade-slide-enter-from,
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
 }
 
 /* ===== 主题切换器 ===== */
@@ -678,18 +561,11 @@ onBeforeUnmount(() => {
   }
 
   /* 分层工具按钮 */
-  .user-menu-container,
   .login-btn,
   .header-btn {
     height: 42px;
     min-width: 0;
     flex: 1 1 0;
-  }
-
-  .user-menu-container {
-    display: flex;
-    align-items: center;
-    min-width: 0;
   }
 
   .header-btn {
@@ -729,15 +605,6 @@ onBeforeUnmount(() => {
 
   .user-btn .dropdown-icon {
     display: none;
-  }
-
-  .user-dropdown {
-    position: fixed;
-    top: calc(var(--app-header-height, calc(78px + env(safe-area-inset-top, 0px))) + 4px);
-    left: 8px;
-    border-radius: 10px;
-    max-width: calc(100vw - 16px);
-    z-index: 2000;
   }
 
   .theme-switcher {

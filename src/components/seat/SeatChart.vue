@@ -171,7 +171,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import SeatItem from './SeatItem.vue'
@@ -191,9 +191,10 @@ import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import { parseSeatId, generateSeatId } from '@/utils/seatHelpers'
 import { getRowNumber } from '@/utils/exportLayout'
+import type { RotationZone, Seat } from '@/types/models'
 
 // Fisher-Yates 洗牌算法
-const shuffleArray = (array) => {
+const shuffleArray = <T,>(array: readonly T[]): T[] => {
   const result = [...array]
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -238,6 +239,7 @@ const {
   selectedSeatsArray,
   selectedCount,
   addSeatToSelection,
+  selectSingleSeat,
   setSelection,
   startSelection,
   updateSelection,
@@ -257,17 +259,17 @@ const {
 } = useDragPreview()
 const { setRightRailTab, showMobileSheet, closeMobileDrawer } = useEditorWorkbench()
 
-const dragPreviewRef = ref(null)
-const viewportRef = ref(null)
-const chartRef = ref(null)
+const dragPreviewRef = ref<HTMLElement | null>(null)
+const viewportRef = ref<HTMLElement | null>(null)
+const chartRef = ref<HTMLElement | null>(null)
 const isPanning = ref(false)
 
 // 多选拖拽落点高亮
-const currentDragAnchorSeatId = ref(null)
-const currentDragTargetSeatId = ref(null)
+const currentDragAnchorSeatId = ref<string | null>(null)
+const currentDragTargetSeatId = ref<string | null>(null)
 const dropTargetSeatIds = computed(() => {
-  if (!currentDragTargetSeatId.value || !currentDragAnchorSeatId.value || selectedCount.value <= 1) return new Set()
-  if (isGuardSeatId(currentDragTargetSeatId.value) || isGuardSeatId(currentDragAnchorSeatId.value)) return new Set()
+  if (!currentDragTargetSeatId.value || !currentDragAnchorSeatId.value || selectedCount.value <= 1) return new Set<string>()
+  if (isGuardSeatId(currentDragTargetSeatId.value) || isGuardSeatId(currentDragAnchorSeatId.value)) return new Set<string>()
 
   const anchor = parseSeatId(currentDragAnchorSeatId.value)
   const target = parseSeatId(currentDragTargetSeatId.value)
@@ -275,7 +277,7 @@ const dropTargetSeatIds = computed(() => {
   const offsetCol = toGlobalCol(target) - toGlobalCol(anchor)
   const offsetRow = target.rowIndex - anchor.rowIndex
 
-  const targets = new Set()
+  const targets = new Set<string>()
   const gc = seatConfig.value.groupCount
   const cpg = seatConfig.value.columnsPerGroup
   const spc = seatConfig.value.seatsPerColumn
@@ -306,7 +308,7 @@ const candidateAreaHidden = computed(() => {
 // 是否显示功能栏的移出放置区
 const showDropZone = computed(() => globalIsDraggingFromSeat.value && candidateAreaHidden.value)
 
-const focusSeatContext = (seatId) => {
+const focusSeatContext = (seatId: string) => {
   if (!seatId || isGuardSeatId(seatId)) return
   selectSingleSeat(seatId)
   setRightRailTab('selection')
@@ -327,11 +329,11 @@ let startMouseY = 0
 let startPanX = 0
 let startPanY = 0
 let mouseMoved = false
-let panRafId = null
+let panRafId: number | null = null
 let suppressNextClick = false
 
 // rAF 批量更新 pan（避免每次 mousemove 都触发 Vue 重新渲染）
-const schedulePanUpdate = (x, y) => {
+const schedulePanUpdate = (x: number, y: number) => {
   if (panRafId) return // 已有待处理帧
   panRafId = requestAnimationFrame(() => {
     panRafId = null
@@ -341,7 +343,7 @@ const schedulePanUpdate = (x, y) => {
 }
 
 // 立即刷新 pan（用于最终位置）
-const flushPan = (x, y) => {
+const flushPan = (x: number, y: number) => {
   if (panRafId) { cancelAnimationFrame(panRafId); panRafId = null }
   panX.value = x
   panY.value = y
@@ -353,7 +355,7 @@ let pendingPanY = 0
 let rightMouseDown = false
 let rightStartX = 0
 let rightStartY = 0
-let rightStartSeatId = null
+let rightStartSeatId: string | null = null
 let leftSelectionMouseDown = false
 let leftSelectionStartX = 0
 let leftSelectionStartY = 0
@@ -363,7 +365,7 @@ const isRectSelecting = ref(false)
 const rectSelectStart = ref({ x: 0, y: 0 })
 const rectSelectEnd = ref({ x: 0, y: 0 })
 
-const handleMouseDown = (e) => {
+const handleMouseDown = (e: MouseEvent) => {
   if (e.button === 0 && isSelectionMode.value) {
     const seatEl = findSeatElement(e.target)
     const seatId = seatEl?.dataset?.seatId
@@ -396,7 +398,7 @@ const handleMouseDown = (e) => {
     rightStartY = e.clientY
     const seatEl = findSeatElement(e.target)
     rightStartSeatId = seatEl?.dataset.seatId || null
-    startSelection(null)
+    startSelection()
     e.preventDefault()
     return
   }
@@ -413,7 +415,7 @@ const handleMouseDown = (e) => {
   }
 }
 
-const handleMouseMove = (e) => {
+const handleMouseMove = (e: MouseEvent) => {
   // 矩形框选模式：更新结束位置
   if (isRectSelecting.value) {
     rectSelectEnd.value = { x: e.clientX, y: e.clientY }
@@ -459,7 +461,7 @@ const handleMouseMove = (e) => {
   schedulePanUpdate(pendingPanX, pendingPanY)
 }
 
-const handleMouseUp = (e) => {
+const handleMouseUp = (e: MouseEvent) => {
   // 完成矩形框选
   if (isRectSelecting.value) {
     selectSeatsInRect()
@@ -499,7 +501,7 @@ const handleMouseUp = (e) => {
   isPanning.value = false
 }
 
-const handleViewportClickCapture = (e) => {
+const handleViewportClickCapture = (e: MouseEvent) => {
   if (
     document.body?.classList.contains('student-dragging-from-candidate') ||
     document.body?.classList.contains('student-drag-ended-from-candidate')
@@ -525,7 +527,7 @@ const handleViewportClickCapture = (e) => {
   }
 }
 
-const isPannableEmptySeatTarget = (el) => {
+const isPannableEmptySeatTarget = (el: EventTarget | null) => {
   if (isSelectionMode.value) return false
   const seatEl = findSeatElement(el)
   if (!seatEl?.dataset?.seatId) return false
@@ -533,18 +535,18 @@ const isPannableEmptySeatTarget = (el) => {
   return Boolean(seat && seat.studentId === null)
 }
 
-const canStartPanFromTarget = (el) => {
+const canStartPanFromTarget = (el: EventTarget | null) => {
   return !isInteractiveTarget(el) || isPannableEmptySeatTarget(el)
 }
 
 // 判断是否为可交互元素（座位、按钮等）
-const isInteractiveTarget = (el) => {
-  let cur = el
+const isInteractiveTarget = (el: EventTarget | null) => {
+  let cur = el instanceof HTMLElement ? el : null
   while (cur && cur !== viewportRef.value) {
     if (cur.dataset?.seatId || cur.tagName === 'BUTTON' || cur.tagName === 'INPUT') {
       return true
     }
-    if (cur.classList?.contains('seat-item') || cur.classList?.contains('zoom-controls')) {
+    if (cur.classList?.contains('seat-item')) {
       return true
     }
     cur = cur.parentElement
@@ -560,12 +562,15 @@ let touchPanStartY = 0
 let touchStartPanX = 0
 let touchStartPanY = 0
 let touchPanMoved = false
-let touchMode = '' // 'pan' | 'pinch' | ''
-let touchRafId = null
+let touchMode: '' | 'pan' | 'pinch' = ''
+let touchRafId: number | null = null
 
-const getTouchDistance = (touches) => {
-  const dx = touches[0].clientX - touches[1].clientX
-  const dy = touches[0].clientY - touches[1].clientY
+const getTouchDistance = (touches: TouchList) => {
+  const first = touches.item(0)
+  const second = touches.item(1)
+  if (!first || !second) return 0
+  const dx = first.clientX - second.clientX
+  const dy = first.clientY - second.clientY
   return Math.sqrt(dx * dx + dy * dy)
 }
 
@@ -577,7 +582,7 @@ const cancelSeatTouchDragForPinch = () => {
   }
 }
 
-const startPinchTouch = (touches) => {
+const startPinchTouch = (touches: TouchList) => {
   cancelSeatTouchDragForPinch()
   touchMode = 'pinch'
   lastTouchDistance = getTouchDistance(touches)
@@ -586,15 +591,17 @@ const startPinchTouch = (touches) => {
   isPanning.value = false
 }
 
-const handleTouchStart = (e) => {
+const handleTouchStart = (e: TouchEvent) => {
   if (e.touches.length >= 2) {
     // 双指缩放
     startPinchTouch(e.touches)
   } else if (e.touches.length === 1 && canStartPanFromTarget(e.target)) {
     // 单指拖拽平移（空白区域或无学生座位）
     touchMode = 'pan'
-    touchPanStartX = e.touches[0].clientX
-    touchPanStartY = e.touches[0].clientY
+    const touch = e.touches.item(0)
+    if (!touch) return
+    touchPanStartX = touch.clientX
+    touchPanStartY = touch.clientY
     touchStartPanX = panX.value
     touchStartPanY = panY.value
     pendingPanX = touchStartPanX
@@ -603,7 +610,7 @@ const handleTouchStart = (e) => {
   }
 }
 
-const handleTouchMove = (e) => {
+const handleTouchMove = (e: TouchEvent) => {
   if (e.touches.length >= 2 && touchMode !== 'pinch') {
     startPinchTouch(e.touches)
   }
@@ -618,8 +625,10 @@ const handleTouchMove = (e) => {
       setScale(newScale)
     })
   } else if (touchMode === 'pan' && e.touches.length === 1) {
-    const dx = e.touches[0].clientX - touchPanStartX
-    const dy = e.touches[0].clientY - touchPanStartY
+    const touch = e.touches.item(0)
+    if (!touch) return
+    const dx = touch.clientX - touchPanStartX
+    const dy = touch.clientY - touchPanStartY
     pendingPanX = touchStartPanX + dx
     pendingPanY = touchStartPanY + dy
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
@@ -645,9 +654,9 @@ const handleTouchEnd = () => {
 }
 
 // ==================== 鼠标滚轮缩放 ====================
-let wheelRafId = null
+let wheelRafId: number | null = null
 
-const handleWheel = (e) => {
+const handleWheel = (e: WheelEvent) => {
   if (e.ctrlKey || e.metaKey) {
     // Ctrl+滚轮 = 缩放
     if (e.deltaY < 0) {
@@ -669,7 +678,7 @@ const handleWheel = (e) => {
 }
 
 // ==================== 拖放处理 ====================
-const handleDragStartSeat = (seatId, isSelection) => {
+const handleDragStartSeat = (seatId: string, isSelection: boolean) => {
   if (isSelection) {
     currentDragAnchorSeatId.value = seatId
   } else {
@@ -677,7 +686,7 @@ const handleDragStartSeat = (seatId, isSelection) => {
   }
 }
 
-const handleDragEnterSeat = (seatId) => {
+const handleDragEnterSeat = (seatId: string) => {
   currentDragTargetSeatId.value = seatId
 }
 
@@ -686,14 +695,38 @@ const handleDragEndSeat = () => {
   currentDragTargetSeatId.value = null
 }
 
-const handleDragOver = (e) => {
-  e.dataTransfer.dropEffect = 'move'
+type DragPayload =
+  | { type: 'student'; studentId: number }
+  | { type: 'seat'; seatId: string; selectedSeatIds?: string[] }
+
+const parseDragPayload = (raw: string): DragPayload | null => {
+  try {
+    const value: unknown = JSON.parse(raw)
+    if (!isRecord(value)) return null
+    if (value.type === 'student' && typeof value.studentId === 'number') {
+      return { type: 'student', studentId: value.studentId }
+    }
+    if (value.type === 'seat' && typeof value.seatId === 'string') {
+      return {
+        type: 'seat',
+        seatId: value.seatId,
+        ...(isStringArray(value.selectedSeatIds) ? { selectedSeatIds: value.selectedSeatIds } : {})
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+const handleDragOver = (e: DragEvent) => {
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
   if (dragPreviewState.isActive) {
     updateDragPreview(e.clientX, e.clientY)
   }
 }
 
-const handleDrop = (e) => {
+const handleDrop = (e: DragEvent) => {
   currentDragAnchorSeatId.value = null
   currentDragTargetSeatId.value = null
   const raw = getDragData(e)
@@ -703,7 +736,11 @@ const handleDrop = (e) => {
   }
 
   try {
-    const data = JSON.parse(raw)
+    const data = parseDragPayload(raw)
+    if (!data) {
+      endDragPreview()
+      return
+    }
     const targetEl = findSeatElement(e.target)
     if (!targetEl) {
       endDragPreview()
@@ -773,20 +810,21 @@ const handleDrop = (e) => {
 }
 
 // ==================== 功能栏拖放（移出学生） ====================
-const handleToolbarDragOver = (e) => {
-  e.dataTransfer.dropEffect = 'move'
+const handleToolbarDragOver = (e: DragEvent) => {
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
 }
 
 const handleToolbarDragLeave = () => {
   // 保持 isDraggingFromSeat 不变，仅用于视觉反馈
 }
 
-const handleToolbarDrop = (e) => {
+const handleToolbarDrop = (e: DragEvent) => {
   const raw = getDragData(e)
   if (!raw) return
 
   try {
-    const data = JSON.parse(raw)
+    const data = parseDragPayload(raw)
+    if (!data) return
     if (data.type === 'seat' && data.seatId) {
       clearSeat(data.seatId)
       clearSeatSelection()
@@ -796,8 +834,8 @@ const handleToolbarDrop = (e) => {
   }
 }
 
-const findSeatElement = (el) => {
-  let current = el
+const findSeatElement = (el: EventTarget | null): HTMLElement | null => {
+  let current = el instanceof HTMLElement ? el : null
   while (current && current !== viewportRef.value) {
     if (current.dataset && current.dataset.seatId) {
       return current
@@ -807,8 +845,8 @@ const findSeatElement = (el) => {
   return null
 }
 
-const getDragData = (e) => {
-  return e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain')
+const getDragData = (e: DragEvent) => {
+  return e.dataTransfer?.getData('application/json') || e.dataTransfer?.getData('text/plain') || ''
 }
 
 // 矩形框选：选中矩形区域内的所有座位
@@ -824,18 +862,19 @@ const selectSeatsInRect = () => {
   if (x2 - x1 < 5 && y2 - y1 < 5) return
 
   const viewportRect = viewportRef.value.getBoundingClientRect()
-  const seatElements = viewportRef.value.querySelectorAll('[data-seat-id]')
-  const seatIdsToSelect = []
+  const seatElements = viewportRef.value.querySelectorAll<HTMLElement>('[data-seat-id]')
+  const seatIdsToSelect: string[] = []
 
   seatElements.forEach(el => {
-    if (isGuardSeatId(el.dataset.seatId)) return
+    const seatId = el.dataset.seatId
+    if (!seatId || isGuardSeatId(seatId)) return
     const rect = el.getBoundingClientRect()
     const seatCenterX = rect.left + rect.width / 2
     const seatCenterY = rect.top + rect.height / 2
 
     // 判断座位中心点是否在矩形框内
     if (seatCenterX >= x1 && seatCenterX <= x2 && seatCenterY >= y1 && seatCenterY <= y2) {
-      seatIdsToSelect.push(el.dataset.seatId)
+      seatIdsToSelect.push(seatId)
     }
   })
 
@@ -845,8 +884,61 @@ const selectSeatsInRect = () => {
 }
 
 // ==================== 触摸自定义事件 ====================
-const handleTouchSeatDrop = (e) => {
-  const { sourceSeatId, targetSeatId, isSelection, selectedSeatIds } = e.detail
+interface TouchSeatDropDetail {
+  sourceSeatId: string
+  targetSeatId: string
+  isSelection: boolean
+  selectedSeatIds: string[]
+}
+
+interface TouchStudentDropDetail {
+  studentId: number
+  targetSeatId: string
+}
+
+interface TouchSeatToListDetail {
+  seatId: string
+  isSelection: boolean
+  selectedSeatIds: string[]
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  typeof value === 'object' && value !== null
+)
+
+const isStringArray = (value: unknown): value is string[] => (
+  Array.isArray(value) && value.every(item => typeof item === 'string')
+)
+
+const readCustomDetail = (event: Event): unknown => (
+  event instanceof CustomEvent ? event.detail : null
+)
+
+const isTouchSeatDropDetail = (value: unknown): value is TouchSeatDropDetail => (
+  isRecord(value) &&
+  typeof value.sourceSeatId === 'string' &&
+  typeof value.targetSeatId === 'string' &&
+  typeof value.isSelection === 'boolean' &&
+  isStringArray(value.selectedSeatIds)
+)
+
+const isTouchStudentDropDetail = (value: unknown): value is TouchStudentDropDetail => (
+  isRecord(value) &&
+  typeof value.studentId === 'number' &&
+  typeof value.targetSeatId === 'string'
+)
+
+const isTouchSeatToListDetail = (value: unknown): value is TouchSeatToListDetail => (
+  isRecord(value) &&
+  typeof value.seatId === 'string' &&
+  typeof value.isSelection === 'boolean' &&
+  isStringArray(value.selectedSeatIds)
+)
+
+const handleTouchSeatDrop = (e: Event) => {
+  const detail = readCustomDetail(e)
+  if (!isTouchSeatDropDetail(detail)) return
+  const { sourceSeatId, targetSeatId, isSelection, selectedSeatIds } = detail
 
   if (isSelection && selectedSeatIds && selectedSeatIds.length > 1) {
     if (isGuardSeatId(sourceSeatId) || isGuardSeatId(targetSeatId) || selectedSeatIds.some(isGuardSeatId)) {
@@ -869,14 +961,18 @@ const handleTouchSeatDrop = (e) => {
   }
 }
 
-const handleTouchStudentDrop = (e) => {
-  const { studentId, targetSeatId } = e.detail
+const handleTouchStudentDrop = (e: Event) => {
+  const detail = readCustomDetail(e)
+  if (!isTouchStudentDropDetail(detail)) return
+  const { studentId, targetSeatId } = detail
   handleAssignStudent(targetSeatId, studentId)
   focusSeatContext(targetSeatId)
 }
 
-const handleTouchSeatToList = (e) => {
-  const { seatId, isSelection, selectedSeatIds } = e.detail
+const handleTouchSeatToList = (e: Event) => {
+  const detail = readCustomDetail(e)
+  if (!isTouchSeatToListDetail(detail)) return
+  const { seatId, isSelection, selectedSeatIds } = detail
 
   if (isSelection && selectedSeatIds && selectedSeatIds.length > 1) {
     const beforeSnapshot = createSnapshot()
@@ -895,10 +991,10 @@ const handleTouchSeatToList = (e) => {
 }
 
 // ==================== 全局拖拽状态追踪 ====================
-const handleGlobalDragStart = (e) => {
-  const el = e.target
-  const seatEl = el.closest?.('[data-seat-id]')
-  if (!seatEl) return
+const handleGlobalDragStart = (e: DragEvent) => {
+  const el = e.target instanceof Element ? e.target : null
+  const seatEl = el?.closest('[data-seat-id]')
+  if (!(seatEl instanceof HTMLElement)) return
   const seatId = seatEl.dataset.seatId
   if (!seatId) return
   const seat = getSeat(seatId)
@@ -914,14 +1010,14 @@ const handleGlobalDragEnd = () => {
   endDragPreview()
 }
 
-const handleGlobalDragOver = (e) => {
+const handleGlobalDragOver = (e: DragEvent) => {
   if (dragPreviewState.isActive) {
     updateDragPreview(e.clientX, e.clientY)
   }
 }
 
 // ==================== 键盘快捷键 ====================
-const handleKeyDown = (e) => {
+const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
     if (isMobile.value && isSelectionMode.value) {
       toggleSelectionMode()
@@ -933,9 +1029,9 @@ const handleKeyDown = (e) => {
 
 // 学生编辑弹窗
 const showStudentEditDialog = ref(false)
-const editingStudentId = ref(null)
+const editingStudentId = ref<number | null>(null)
 
-const handleContextMenu = (e) => {
+const handleContextMenu = (e: MouseEvent) => {
   const seatEl = findSeatElement(e.target)
   const seatId = seatEl?.dataset?.seatId
   if (!seatId || isGuardSeatId(seatId)) return
@@ -947,7 +1043,7 @@ const handleContextMenu = (e) => {
 }
 
 // 处理双击编辑学生
-const handleEditStudent = (studentId) => {
+const handleEditStudent = (studentId: number) => {
   editingStudentId.value = studentId
   showStudentEditDialog.value = true
 }
@@ -1011,8 +1107,8 @@ watch(dragPreviewRef, (el) => {
 }, { flush: 'post' })
 
 // 窗口大小变化时重新自适应
-let resizeObserver = null
-let removeViewportResizeListener = null
+let resizeObserver: ResizeObserver | null = null
+let removeViewportResizeListener: (() => void) | null = null
 
 const startViewportResizeTracking = () => {
   if (!viewportRef.value) return
@@ -1048,7 +1144,7 @@ const totalSeats = computed(() => {
 })
 
 // 处理分配学生
-const handleAssignStudent = (seatId, studentId) => {
+const handleAssignStudent = (seatId: string, studentId: number) => {
   const existingSeat = findSeatByStudent(studentId)
   const previousSeatId = existingSeat ? existingSeat.id : null
   if (existingSeat) {
@@ -1060,17 +1156,17 @@ const handleAssignStudent = (seatId, studentId) => {
 }
 
 // 处理切换空置状态
-const handleToggleEmpty = (seatId) => {
+const handleToggleEmpty = (seatId: string) => {
   toggleEmpty(seatId)
 }
 
 // 处理清空座位
-const handleClearSeat = (seatId) => {
+const handleClearSeat = (seatId: string) => {
   clearSeat(seatId)
 }
 
 // 处理交换座位
-const handleSwapSeat = (seatId, sourceSeatId = null) => {
+const handleSwapSeat = (seatId: string, sourceSeatId: string | null = null) => {
   if (sourceSeatId) {
     swapSeats(sourceSeatId, seatId)
   } else {
@@ -1092,7 +1188,7 @@ const { settings } = useGlobalSettings()
 
 const showEditorRowNumbers = computed(() => settings.value.ui.showEditorRowNumbers !== false)
 
-const getGuardSeatInVisualSlot = (visualSide) => {
+const getGuardSeatInVisualSlot = (visualSide: 'left' | 'right') => {
   const seat = visibleGuardSeats.value.find(seat => seat.guardSide === visualSide) || null
   if (seat) {
     void seat.studentId
@@ -1105,7 +1201,7 @@ const guardSeatLeft = computed(() => getGuardSeatInVisualSlot('left'))
 
 const guardSeatRight = computed(() => getGuardSeatInVisualSlot('right'))
 
-const getGuardSeatRenderKey = (seat) => (
+const getGuardSeatRenderKey = (seat: Seat | null) => (
   seat ? `${seat.id}:${seat.studentId ?? 'empty'}:${seat.isEmpty ? '1' : '0'}` : 'none'
 )
 
@@ -1113,7 +1209,7 @@ const guardSeatLeftRenderKey = computed(() => getGuardSeatRenderKey(guardSeatLef
 
 const guardSeatRightRenderKey = computed(() => getGuardSeatRenderKey(guardSeatRight.value))
 
-const getColumnRowCount = (groupIndex, columnIndex) => {
+const getColumnRowCount = (groupIndex: number, columnIndex: number) => {
   const column = organizedSeats.value?.[groupIndex]?.[columnIndex] || []
   if (column.length === 0) return 0
   return Math.max(column.length, ...column.map(seat => seat.rowIndex + 1))
@@ -1136,7 +1232,7 @@ const editorRowNumbers = computed(() => {
   ))
 })
 
-const getGroupColumnCount = (groupIndex) => {
+const getGroupColumnCount = (groupIndex: number) => {
   return seatConfig.value.groups?.[groupIndex]?.columns || seatConfig.value.columnsPerGroup
 }
 
@@ -1148,12 +1244,12 @@ const getPodiumTopOffset = () => {
   return seatConfig.value.podiumPosition === 'top' ? L.PODIUM_ROW_H + L.PODIUM_GAP : 0
 }
 
-const getGroupWidth = (groupIndex) => {
+const getGroupWidth = (groupIndex: number) => {
   const columnCount = getGroupColumnCount(groupIndex)
   return columnCount * L.SEAT_W + Math.max(0, columnCount - 1) * L.COL_GAP
 }
 
-const getGroupLeft = (groupIndex) => {
+const getGroupLeft = (groupIndex: number) => {
   let left = L.PAD_L + getRowNumberSpace()
   for (let i = 0; i < groupIndex; i++) {
     left += getGroupWidth(i) + L.GROUP_GAP
@@ -1161,7 +1257,12 @@ const getGroupLeft = (groupIndex) => {
   return left
 }
 
-const getSeatCenter = (seatId) => {
+interface Point {
+  x: number
+  y: number
+}
+
+const getSeatCenter = (seatId: string): Point | null => {
   if (typeof seatId !== 'string') return null
   const {
     groupIndex: g,
@@ -1182,7 +1283,7 @@ const getSeatCenter = (seatId) => {
   }
 }
 
-const getZoneCentroid = (zone) => {
+const getZoneCentroid = (zone: RotationZone): Point | null => {
   if (!zone.seatIds?.length) return null
   let sx = 0, sy = 0
   let count = 0
@@ -1198,7 +1299,7 @@ const getZoneCentroid = (zone) => {
 }
 
 // 计算从 from 到 to 的调整端点（距圆心 R 处，留出箭头空间）
-const adjustLine = (from, to, R = 24, endGap = 6) => {
+const adjustLine = (from: Point, to: Point, R = 24, endGap = 6) => {
   const dx = to.x - from.x, dy = to.y - from.y
   const len = Math.sqrt(dx * dx + dy * dy)
   if (len < 1) return { x1: from.x, y1: from.y, x2: to.x, y2: to.y }
@@ -1211,7 +1312,7 @@ const adjustLine = (from, to, R = 24, endGap = 6) => {
 }
 
 // 互换双向偏移线
-const biDirLines = (cA, cB, offset = 8) => {
+const biDirLines = (cA: Point, cB: Point, offset = 8) => {
   const dx = cB.x - cA.x, dy = cB.y - cA.y
   const len = Math.sqrt(dx * dx + dy * dy)
   if (len < 1) return []
@@ -1231,21 +1332,30 @@ const zoneArrowData = computed(() => {
     const zones = group.zones
     const colors = zones.map(() => PALETTE[colorIdx++ % PALETTE.length])
     const centroids = zones.map(z => getZoneCentroid(z))
-    if (centroids.some(c => !c) || centroids.length < 2) continue
+    const validCentroids = centroids.filter((centroid): centroid is Point => centroid !== null)
+    if (validCentroids.length !== centroids.length || validCentroids.length < 2) continue
+    const firstCentroid = validCentroids[0]
+    const secondCentroid = validCentroids[1]
+    if (!firstCentroid || !secondCentroid) continue
 
     const arrows = []
-    const circles = centroids.map((c, i) => ({ ...c, color: colors[i], label: zones[i].name }))
+    const circles = validCentroids.map((centroid, index) => ({
+      ...centroid,
+      color: colors[index] ?? 'var(--color-primary)',
+      label: zones[index]?.name ?? ''
+    }))
 
     if (group.type === 'swap') {
-      biDirLines(centroids[0], centroids[1]).forEach(({ from, to }, idx) => {
+      biDirLines(firstCentroid, secondCentroid).forEach(({ from, to }, idx) => {
         const adj = adjustLine(from, to, 24, 6)
         arrows.push({ ...adj, color: 'var(--color-mode-swap)', markerId: `sw-${group.id}-${idx}` })
       })
     } else {
       // cycle arrows: 0→1→2→...→n-1→0
-      for (let i = 0; i < centroids.length; i++) {
-        const from = centroids[i]
-        const to = centroids[(i + 1) % centroids.length]
+      for (let i = 0; i < validCentroids.length; i++) {
+        const from = validCentroids[i]
+        const to = validCentroids[(i + 1) % validCentroids.length]
+        if (!from || !to) continue
         const adj = adjustLine(from, to, 24, 6)
         arrows.push({ ...adj, color: 'var(--color-primary)', markerId: `cy-${group.id}-${i}` })
       }
@@ -1347,36 +1457,6 @@ const rectSelectStyle = computed(() => {
   overflow: hidden;
 }
 
-/* ==================== 顶部功能栏 ==================== */
-.seat-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 16px;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  z-index: 10;
-  pointer-events: auto;
-  flex-shrink: 0;
-  min-height: 40px;
-}
-
-.toolbar-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
-.info-item {
-  font-weight: 500;
-  color: var(--color-text-muted);
-}
-
-.info-separator {
-  color: var(--color-border);
-}
 
 /* 缩放视口 — 无滚动条 */
 .seat-chart-viewport {
@@ -1546,74 +1626,8 @@ const rectSelectStyle = computed(() => {
   width: var(--seat-card-width);
 }
 
-/* ==================== 缩放控件 ==================== */
-.zoom-controls {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.zoom-btn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-primary);
-  transition: all 0.15s ease;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.zoom-btn:hover:not(:disabled) {
-  background: var(--color-bg-selected);
-}
-
-.zoom-btn:active:not(:disabled) {
-  background: var(--color-bg-hover);
-  transform: scale(0.92);
-}
-
-.zoom-btn:disabled {
-  color: var(--color-text-disabled);
-  cursor: not-allowed;
-}
-
-.zoom-label {
-  min-width: 52px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  transition: all 0.15s ease;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.zoom-label:hover {
-  background: var(--color-bg-secondary);
-  color: var(--color-primary);
-}
 
 @media (max-width: 1366px) and (min-width: 1025px) {
-  .seat-toolbar {
-    padding: 8px 14px;
-  }
-
-  .toolbar-info {
-    font-size: 12px;
-    gap: 6px;
-  }
 
   .seat-chart {
     --chart-main-gap: 26px;
@@ -1656,14 +1670,6 @@ const rectSelectStyle = computed(() => {
 
 /* 小高度屏幕优化 */
 @media (max-height: 820px) and (min-width: 1025px) {
-  .seat-toolbar {
-    padding: 6px 12px;
-  }
-
-  .toolbar-info {
-    font-size: 11px;
-    gap: 4px;
-  }
 
   .seat-chart {
     --chart-main-gap: 24px;
@@ -1708,75 +1714,6 @@ const rectSelectStyle = computed(() => {
     flex-direction: column;
   }
 
-  .seat-toolbar {
-    display: flex;
-    justify-content: space-between;
-    padding: 5px 10px;
-    min-height: 36px;
-    flex-shrink: 0;
-  }
-
-  .toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .mobile-select-btn {
-    height: 36px;
-    padding: 0 14px;
-    font-size: 13px;
-    border-radius: 6px;
-    background: var(--color-surface);
-    color: var(--color-primary);
-    border: 1px solid var(--color-primary);
-    transition: all 0.2s;
-    cursor: pointer;
-  }
-
-  .mobile-select-btn.active {
-    background: var(--color-primary);
-    color: var(--color-surface);
-  }
-
-  .mobile-undo-btn,
-  .mobile-redo-btn {
-    height: 36px;
-    width: 36px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    background: var(--color-surface);
-    color: var(--color-primary);
-    border: 1px solid var(--color-border);
-    transition: all 0.2s;
-    cursor: pointer;
-  }
-
-  .mobile-undo-btn:disabled,
-  .mobile-redo-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .mobile-undo-btn:not(:disabled):active,
-  .mobile-redo-btn:not(:disabled):active {
-    background: var(--color-bg-hover);
-  }
-
-  .toolbar-info {
-    flex-wrap: wrap;
-    justify-content: center;
-    font-size: 10px;
-    gap: 3px;
-  }
-
-  .info-item {
-    color: var(--color-primary);
-    font-weight: 500;
-  }
 
   .seat-chart-viewport {
     flex: 1;
@@ -1823,21 +1760,6 @@ const rectSelectStyle = computed(() => {
 }
 
 @media (max-width: 480px) {
-  .seat-toolbar {
-    padding: 4px 8px;
-    flex-direction: column;
-    gap: 4px;
-    min-height: 32px;
-  }
-
-  .toolbar-info {
-    font-size: 9px;
-    justify-content: center;
-  }
-
-  .zoom-controls {
-    padding: 2px;
-  }
 
   .seat-chart {
     --chart-main-gap: 10px;
@@ -1888,16 +1810,5 @@ const rectSelectStyle = computed(() => {
     border-radius: 8px;
   }
 
-  .zoom-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 16px;
-  }
-
-  .zoom-label {
-    min-width: 48px;
-    height: 36px;
-    font-size: 11px;
-  }
 }
 </style>

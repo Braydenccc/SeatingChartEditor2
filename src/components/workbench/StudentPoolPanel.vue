@@ -5,45 +5,47 @@
         <h2>候选学生</h2>
         <p>{{ poolSubtitle }}</p>
       </div>
-      <button class="icon-action" title="名单与属性" @click="router.push('/students')">
+      <NButton size="small" quaternary circle title="名单与属性" @click="router.push('/students')">
         <Users :size="16" stroke-width="2" />
-      </button>
+      </NButton>
     </header>
 
     <div class="pool-controls">
-      <label class="search-field">
-        <Search :size="15" stroke-width="2" />
-        <input v-model="searchText" type="search" placeholder="搜索姓名或学号" />
-      </label>
+      <NInput v-model:value="searchText" size="small" clearable placeholder="搜索姓名或学号">
+        <template #prefix><Search :size="15" stroke-width="2" /></template>
+      </NInput>
 
       <div class="filter-row">
         <div class="filter-tabs" role="tablist" aria-label="学生过滤">
-          <button :class="{ active: filterMode === 'unassigned' }" @click="filterMode = 'unassigned'">未入座</button>
-          <button :class="{ active: filterMode === 'all' }" @click="filterMode = 'all'">全部</button>
-          <button :class="{ active: filterMode === 'assigned' }" @click="filterMode = 'assigned'">已入座</button>
+          <NButton size="tiny" :type="filterMode === 'unassigned' ? 'primary' : 'default'" :secondary="filterMode !== 'unassigned'" @click="filterMode = 'unassigned'">未入座</NButton>
+          <NButton size="tiny" :type="filterMode === 'all' ? 'primary' : 'default'" :secondary="filterMode !== 'all'" @click="filterMode = 'all'">全部</NButton>
+          <NButton size="tiny" :type="filterMode === 'assigned' ? 'primary' : 'default'" :secondary="filterMode !== 'assigned'" @click="filterMode = 'assigned'">已入座</NButton>
         </div>
-        <button
+        <NButton
           v-if="hasActiveFilters"
-          class="reset-filters-button"
-          type="button"
+          size="tiny"
+          secondary
+          attr-type="button"
           title="清空入座状态和标签筛选"
           @click="resetFilters"
         >
           清空筛选
-        </button>
+        </NButton>
       </div>
 
       <div v-if="visibleTags.length > 0" class="tag-filter-list">
-        <button
+        <NButton
           v-for="tag in visibleTags"
           :key="tag.id"
           class="tag-filter"
-          :class="{ active: activeTagIds.includes(tag.id) }"
+          size="tiny"
+          secondary
+          :type="activeTagIds.includes(tag.id) ? 'primary' : 'default'"
           @click="toggleTag(tag.id)"
         >
           <span class="tag-dot" :style="{ backgroundColor: tag.color }"></span>
           <span>{{ tag.name }}</span>
-        </button>
+        </NButton>
       </div>
     </div>
 
@@ -58,7 +60,8 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton, NInput } from 'naive-ui'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Users } from 'lucide-vue-next'
@@ -73,8 +76,8 @@ const { findSeatByStudent } = useSeatChart()
 const { tags } = useTagData()
 
 const searchText = ref('')
-const filterMode = ref('unassigned')
-const activeTagIds = ref([])
+const filterMode = ref<'unassigned' | 'all' | 'assigned'>('unassigned')
+const activeTagIds = ref<number[]>([])
 
 const unassignedCount = computed(() => (
   students.value.filter(student => !findSeatByStudent(student.id)).length
@@ -114,7 +117,7 @@ const poolSubtitle = computed(() => {
   return `当前显示 ${visibleStudentCount.value} 名 · ${parts.join(' · ')}`
 })
 
-const toggleTag = (tagId) => {
+const toggleTag = (tagId: number) => {
   if (activeTagIds.value.includes(tagId)) {
     activeTagIds.value = activeTagIds.value.filter(id => id !== tagId)
   } else {
@@ -161,24 +164,6 @@ const resetFilters = () => {
   color: var(--color-text-secondary);
 }
 
-.icon-action {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
-
-.icon-action:hover {
-  color: var(--color-primary);
-  border-color: var(--color-border-strong);
-}
-
 .pool-controls {
   display: flex;
   flex-direction: column;
@@ -186,28 +171,6 @@ const resetFilters = () => {
   padding: 12px;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
-}
-
-.search-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-input-bg);
-  color: var(--color-text-secondary);
-}
-
-.search-field input {
-  width: 100%;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--color-text-primary);
-  font-size: 13px;
 }
 
 .filter-row {
@@ -221,44 +184,6 @@ const resetFilters = () => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
-  padding: 3px;
-  border-radius: 6px;
-  background: var(--color-bg-secondary);
-}
-
-.filter-tabs button {
-  min-height: 30px;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.filter-tabs button.active {
-  background: var(--color-surface);
-  color: var(--color-primary);
-  font-weight: 600;
-  box-shadow: var(--shadow-sm);
-}
-
-.reset-filters-button {
-  min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.reset-filters-button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
 }
 
 .tag-filter-list {
@@ -269,32 +194,15 @@ const resetFilters = () => {
 }
 
 .tag-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
   flex: 0 0 auto;
   max-width: 160px;
-  min-height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 12px;
   white-space: nowrap;
-  cursor: pointer;
 }
 
 .tag-filter span:last-child {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.tag-filter.active {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
 }
 
 .tag-dot {
@@ -327,18 +235,6 @@ const resetFilters = () => {
     padding: 10px 12px;
   }
 
-  .search-field {
-    min-height: 40px;
-  }
-
-  .search-field input {
-    font-size: 15px;
-  }
-
-  .filter-tabs button {
-    min-height: 36px;
-  }
-
   .tag-filter-list {
     scrollbar-width: none;
   }
@@ -347,9 +243,6 @@ const resetFilters = () => {
     display: none;
   }
 
-  .tag-filter {
-    min-height: 34px;
-  }
 }
 
 @media (max-width: 1024px) and (orientation: landscape) and (max-height: 540px) {
@@ -370,26 +263,10 @@ const resetFilters = () => {
     font-size: 11px;
   }
 
-  .icon-action {
-    width: 30px;
-    height: 30px;
-  }
-
   .pool-controls {
     gap: 6px;
     padding: 8px 10px;
   }
 
-  .search-field {
-    min-height: 32px;
-  }
-
-  .filter-tabs button {
-    min-height: 30px;
-  }
-
-  .tag-filter {
-    min-height: 28px;
-  }
 }
 </style>

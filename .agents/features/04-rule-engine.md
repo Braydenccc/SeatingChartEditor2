@@ -2,8 +2,8 @@
 module_name: Rule Engine
 description: 将用户对“座位安排”的自然语言需求转化为结构化的拓扑冲突约束，支持排位前自检。
 related_files:
-  - src/composables/useSeatRules.js
-  - src/constants/ruleTypes.js
+  - src/composables/useSeatRules.ts
+  - src/constants/ruleTypes.ts
 ---
 
 # 04-规则引擎方案 (Rule Engine Strategy)
@@ -12,8 +12,8 @@ related_files:
 定义、校验以及人类语言化渲染所有排位规则。规则引擎不直接执行排座位操作，它是给【05-自动排位算法】和【人工排位时 UI 报错机制】提供一个通用的“合规性检测器” (Compliance Checker)。
 
 ## 2. 源代码入口 (Source Files)
-- 规则配置字典: `src/constants/ruleTypes.js` (存放枚举、默认参数、谓词元数据)
-- 规则中枢逻辑: `src/composables/useSeatRules.js`
+- 规则配置字典: `src/constants/ruleTypes.ts` (存放枚举、默认参数、谓词元数据)
+- 规则中枢逻辑: `src/composables/useSeatRules.ts`
 
 ## 3. 数据模型 / 核心API (Data Models & Core API)
 
@@ -57,9 +57,10 @@ const PREDICATE_META = {
 - **高级拓扑冲突 (`detectConflicts`)**: 利用笛卡尔组合判断所有激活的规则是否存在矛盾。这是整个系统的最强亮点。比如判定：“规则A要求张三离李四超过 3 步”，同时“规则B要求张三离李四不得超过 2 步”，就会抛出异常。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
-- **前后兼容坑**: 由于该项目持续演进到 v2，存在历史存档的解析版本差异。`useSeatRules.js` 首部有一个长达几十行的 `normalizeRuleShape`，它是用来兼容 `version=3`, `version=4` 到最新的 `version=5`（即统一使用 `subjects: []`）的桥梁。如果修改 `Rule` 结构，务必同步更新并测试此 Normalize 方法。
+- **前后兼容坑**: 由于该项目持续演进到 v2，存在历史存档的解析版本差异。`useSeatRules.ts` 首部的 `normalizeRuleShape` 用来兼容旧版本到最新规则结构。如果修改 `Rule` 结构，务必同步更新并测试此 Normalize 方法。
 - **添加新规则**: 若要添加一种全新的排位逻辑：
-  1. `ruleTypes.js` 中添加对应的 `PREDICATE_META`。
-  2. `useSeatRules.js` 的 `renderRuleText` 中加上 switch-case 的文案。
-  3. `useAssignment.js`（核心算法层）中补齐其惩罚函数的实现。不需要改动已有 UI！它会自动识别 `meta` 渲染出参数框。
+  1. `ruleTypes.ts` 中添加对应的 `PREDICATE_META`。
+  2. `useSeatRules.ts` 的 `renderRuleText` 中加上 switch-case 的文案。
+  3. `useAssignment.ts`（核心算法层）中补齐其惩罚函数的实现。不需要改动已有 UI，它会自动识别 `meta` 渲染出参数框。
+- **数值参数边界**: 规则编辑器的 `NInputNumber` 必须先通过 `normalizeNumberInput` 处理空值、最小值和整数精度，再写入 `RuleParams`。
 - **复合规则落盘**: 工作区保存必须保留 `not`、`logicOperator`、`subRules`，否则规则工作台创建的复合规则和数值参数会在保存后丢失。

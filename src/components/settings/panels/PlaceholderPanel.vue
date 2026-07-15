@@ -8,7 +8,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { Settings } from 'lucide-vue-next'
 
 defineProps({

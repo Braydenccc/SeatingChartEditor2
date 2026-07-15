@@ -45,7 +45,7 @@ export default defineConfig({
     },
     include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     exclude: [...configDefaults.exclude, '**/node_modules/**', '**/dist/**'],
-    setupFiles: ['./src/test-utils/setup.js'],
+    setupFiles: ['./src/test-utils/setup.ts'],
     testTimeout: 10000,
     hookTimeout: 10000,
     reporters: process.env.CI ? ['dot', 'json', 'html'] : ['verbose'],

@@ -10,16 +10,16 @@ description: 定义系统最底层的“座位”、“学生”与“工作区�
 
 ## 2. 源代码入口 (Source Files)
 - 学生数据源: `src/composables/useStudentData.ts`
-- 座位数据源: `src/composables/useSeatChart.js`
-- 数据中枢与格式定义: `src/composables/useWorkspace.js`
-- 自动保存备份: `src/composables/useAutoSave.js`
+- 座位数据源: `src/composables/useSeatChart.ts`
+- 数据中枢与格式定义: `src/composables/useWorkspace.ts`
+- 自动保存备份: `src/composables/useAutoSave.ts`
 - 工作区结构校验: `src/utils/workspaceValidation.ts`
 
 ## 3. 数据模型定义 (TypeScript Interfaces)
 
 ```typescript
 // --- 核心拓扑单元 (Seat) ---
-// 定义在 useSeatChart.js 中
+// 定义在 useSeatChart.ts 中
 interface Seat {
   id: string;          // 普通座位格式: `seat-{groupIndex}-{columnIndex}-{rowIndex}`；护法座位为 `guard-left` / `guard-right`
   groupIndex: number;  // 大组索引 (0-indexed，左->右)

@@ -37,7 +37,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, onUnmounted, shallowRef, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useStudentData } from '@/composables/useStudentData'
@@ -52,19 +52,24 @@ import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import { useZoom } from '@/composables/useZoom'
 import StudentCardFace from '@/components/student/StudentCardFace.vue'
+import type { Seat, Student } from '@/types/models'
 
-const props = defineProps({
-  seat: {
-    type: Object,
-    required: true
-  },
-  isDropTarget: {
-    type: Boolean,
-    default: false
-  }
+const props = withDefaults(defineProps<{
+  seat: Seat
+  isDropTarget?: boolean
+}>(), {
+  isDropTarget: false
 })
 
-const emit = defineEmits(['assign-student', 'toggle-empty', 'clear-seat', 'swap-seat', 'toggle-zone-seat', 'drag-start-seat', 'drag-enter-seat', 'drag-end-seat', 'edit-student'])
+const emit = defineEmits<{
+  (e: 'assign-student', seatId: string, studentId: number): void
+  (e: 'toggle-empty' | 'clear-seat' | 'drag-enter-seat', seatId: string): void
+  (e: 'swap-seat', seatId: string, sourceSeatId?: string): void
+  (e: 'toggle-zone-seat', seatId: string): void
+  (e: 'drag-start-seat', seatId: string, isSelection: boolean): void
+  (e: 'drag-end-seat'): void
+  (e: 'edit-student', studentId: number): void
+}>()
 
 const { students, selectedStudentId } = useStudentData()
 const { currentMode, firstSelectedSeat, EditMode } = useEditMode()
@@ -93,30 +98,37 @@ const { setRightRailTab, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDr
 const isDragOver = ref(false)
 const isDragging = ref(false)
 let dragEnterCount = 0
-let transparentDragImageEl = null
+let transparentDragImageEl: HTMLElement | null = null
 
 // 响应式断点检测
 const isMobile = useMediaQuery('(max-width: 768px)')
 
 // 触摸拖拽状态
-let touchDragTimer = null
+let touchDragTimer: ReturnType<typeof setTimeout> | null = null
 const TOUCH_SELECTION_MODE = {
   ADD: 'add',
   REMOVE: 'remove'
+} as const
+
+type TouchSelectionMode = typeof TOUCH_SELECTION_MODE[keyof typeof TOUCH_SELECTION_MODE]
+
+interface TouchDragData {
+  isSelection: boolean
+  seatIds: string[]
 }
 
 let touchDragActive = false
 let touchSelectionActive = false
-let touchSelectionMode = null
-let touchSelectionVisited = new Set()
-let touchMoveRafId = null
-let autoPanRafId = null
-let autoPanPoint = null
+let touchSelectionMode: TouchSelectionMode | null = null
+let touchSelectionVisited = new Set<string>()
+let touchMoveRafId: number | null = null
+let autoPanRafId: number | null = null
+let autoPanPoint: { clientX: number; clientY: number } | null = null
 let touchStartX = 0
 let touchStartY = 0
-let activeTouchDragData = null
+let activeTouchDragData: TouchDragData | null = null
 let suppressNextClick = false
-let suppressClickTimer = null
+let suppressClickTimer: ReturnType<typeof setTimeout> | null = null
 // 当前是否通过触摸交互（动态判断，解决触摸屏笔记本问题）
 // 使用 shallowRef 让 isDraggable computed 能追踪其变化
 const lastPointerWasTouch = shallowRef(false)
@@ -131,9 +143,15 @@ const hasStudent = computed(() => {
   return props.seat.studentId !== null && !props.seat.isEmpty
 })
 
-const studentInfo = computed(() => {
+const studentInfo = computed<Student | null>(() => {
   if (!hasStudent.value) return null
-  return students.value.find(s => s.id === props.seat.studentId) || { name: '未知', studentNumber: null, tags: [] }
+  return students.value.find(s => s.id === props.seat.studentId) || {
+    id: props.seat.studentId ?? -1,
+    name: '未知',
+    studentNumber: null,
+    tags: [],
+    numericAttributes: {}
+  }
 })
 
 const isFirstSelected = computed(() => {
@@ -243,7 +261,7 @@ const consumeSuppressedClick = () => {
 }
 
 // 记录指针类型，用于判断是否为触摸操作
-const handlePointerDown = (e) => {
+const handlePointerDown = (e: PointerEvent) => {
   lastPointerWasTouch.value = e.pointerType === 'touch' || e.pointerType === 'pen'
 }
 
@@ -319,12 +337,14 @@ const handleContextMenuAction = () => {
 // 双击处理
 const handleDoubleClick = () => {
   if (!hasStudent.value) return
+  const student = studentInfo.value
+  if (!student) return
 
   const doubleClickAction = settings.value.editor.doubleClickAction
 
   if (doubleClickAction === 'edit') {
     // 编辑学生信息
-    emit('edit-student', studentInfo.value.id)
+    emit('edit-student', student.id)
   } else if (doubleClickAction === 'random') {
     // 随机移出 - 将学生从座位移除到候选区
     emit('clear-seat', props.seat.id)
@@ -333,7 +353,7 @@ const handleDoubleClick = () => {
 
 // ==================== HTML5 拖拽 ====================
 
-const handleDragStart = (e) => {
+const handleDragStart = (e: DragEvent) => {
   if (!isDraggable.value) {
     e.preventDefault()
     return
@@ -344,6 +364,7 @@ const handleDragStart = (e) => {
   }
   if (shouldOpenCandidateDrawerForSeatDrag.value) openMobileDrawerForDrag('candidates')
   startDragFromSeat()
+  if (!e.dataTransfer) return
   e.dataTransfer.effectAllowed = 'move'
 
   const isSelection = !lastPointerWasTouch.value && isInSelection.value && selectedSeatsArray.value.length > 1
@@ -396,8 +417,8 @@ const handleDragEnd = () => {
   emit('drag-end-seat')
 }
 
-const handleDragOverSeat = (e) => {
-  e.dataTransfer.dropEffect = 'move'
+const handleDragOverSeat = (e: DragEvent) => {
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
 }
 
 const handleDragEnter = () => {
@@ -425,14 +446,15 @@ watch(dragCleanupVersion, () => {
 
 // ==================== 触摸拖拽模拟 ====================
 
-const handleTouchStart = (e) => {
+const handleTouchStart = (e: TouchEvent) => {
   lastPointerWasTouch.value = true
   if (e.touches.length !== 1) {
     cleanupTouchDrag()
     return
   }
 
-  const touch = e.touches[0]
+  const touch = e.touches.item(0)
+  if (!touch) return
   const startX = touch.clientX
   const startY = touch.clientY
   touchStartX = startX
@@ -458,13 +480,14 @@ const handleTouchStart = (e) => {
   }, 300)
 }
 
-const handleTouchMove = (e) => {
+const handleTouchMove = (e: TouchEvent) => {
   if (e.touches.length !== 1) {
     cleanupTouchDrag()
     return
   }
 
-  const touch = e.touches[0]
+  const touch = e.touches.item(0)
+  if (!touch) return
   const dx = touch.clientX - touchStartX
   const dy = touch.clientY - touchStartY
   const moved = Math.abs(dx) > 5 || Math.abs(dy) > 5
@@ -604,7 +627,7 @@ const handleTouchCancel = () => {
   cleanupTouchDrag()
 }
 
-const handleTouchEnd = (e) => {
+const handleTouchEnd = (e: TouchEvent) => {
   // 涂抹选择模式结束
   if (touchSelectionActive) {
     touchSelectionActive = false
@@ -632,7 +655,8 @@ const handleTouchEnd = (e) => {
   suppressUpcomingClick()
 
   // 获取 drop 目标
-  const touch = e.changedTouches[0]
+  const touch = e.changedTouches.item(0)
+  if (!touch) return
   const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)
 
   clearAllTouchHighlights()
@@ -684,15 +708,15 @@ const handleTouchEnd = (e) => {
   seatEl.dispatchEvent(event)
 }
 
-const findParentSeat = (el) => {
-  let current = el
+const findParentSeat = (el: Element | null): HTMLElement | null => {
+  let current = el instanceof HTMLElement ? el : null
   while (current && !current.dataset?.seatId) {
     current = current.parentElement
   }
   return current
 }
 
-const findParentByClass = (el, className) => {
+const findParentByClass = (el: Element | null, className: string): Element | null => {
   let current = el
   while (current) {
     if (current.classList?.contains(className)) return current
@@ -713,7 +737,7 @@ const clearAllTouchHighlights = () => {
   })
 }
 
-const autoPanNearEdge = (clientX, clientY) => {
+const autoPanNearEdge = (clientX: number, clientY: number) => {
   autoPanPoint = { clientX, clientY }
   if (!autoPanRafId) {
     autoPanRafId = requestAnimationFrame(runAutoPanNearEdge)

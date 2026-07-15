@@ -5,67 +5,70 @@
         <h3>数值属性</h3>
         <p>用于身高、成绩等智能排位参考</p>
       </div>
-      <button class="add-attribute-btn" @click="handleAdd">
+      <NButton class="add-attribute-btn" size="small" type="primary" secondary @click="handleAdd">
         <Plus :size="14" />
         <span>添加属性</span>
-      </button>
+      </NButton>
     </div>
 
     <div class="attribute-list">
       <div v-for="attribute in attributeDefinitions" :key="attribute.id" class="attribute-row">
-        <input
+        <NInput
           class="attr-input name-input"
+          size="small"
           :value="attribute.name"
           aria-label="属性名"
           placeholder="属性名"
-          @change="updateAttribute(attribute.id, { name: $event.target.value })"
+          @update:value="value => updateAttribute(attribute.id, { name: value })"
         />
-        <input
+        <NInput
           class="attr-input unit-input"
+          size="small"
           :value="attribute.unit"
           aria-label="单位"
           placeholder="单位"
-          @change="updateAttribute(attribute.id, { unit: $event.target.value })"
+          @update:value="value => updateAttribute(attribute.id, { unit: value })"
         />
         <div class="range-compact" aria-label="数值范围">
-          <input
+          <NInputNumber
             class="attr-input number-input"
-            type="number"
-            :value="attribute.min ?? ''"
+            size="small"
+            :value="attribute.min"
             aria-label="最小值"
             placeholder="最小"
-            @change="updateAttribute(attribute.id, { min: parseOptionalNumber($event.target.value) })"
+            @update:value="value => updateAttributeRange(attribute.id, 'min', value)"
           />
           <span>至</span>
-          <input
+          <NInputNumber
             class="attr-input number-input"
-            type="number"
-            :value="attribute.max ?? ''"
+            size="small"
+            :value="attribute.max"
             aria-label="最大值"
             placeholder="最大"
-            @change="updateAttribute(attribute.id, { max: parseOptionalNumber($event.target.value) })"
+            @update:value="value => updateAttributeRange(attribute.id, 'max', value)"
           />
         </div>
 
-        <label class="attr-enabled" title="启用为表格列">
-          <input
-            type="checkbox"
-            :checked="attribute.enabled !== false"
-            @change="updateAttribute(attribute.id, { enabled: $event.target.checked })"
-          />
-          <span class="switch-track"></span>
-        </label>
-        <button class="icon-btn danger" title="删除属性" @click="handleDelete(attribute.id)">
+        <NSwitch
+          class="attr-enabled"
+          :value="attribute.enabled !== false"
+          title="启用为表格列"
+          aria-label="启用为表格列"
+          @update:value="value => updateAttribute(attribute.id, { enabled: value })"
+        />
+        <NButton class="icon-btn" size="small" quaternary circle type="error" title="删除属性" @click="handleDelete(attribute.id)">
           <Trash2 :size="14" />
-        </button>
+        </NButton>
       </div>
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton, NInput, NInputNumber, NSwitch } from 'naive-ui'
 import { Plus, Trash2 } from 'lucide-vue-next'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
+import { normalizeNumberInput } from '@/utils/inputNormalization'
 
 const {
   attributeDefinitions,
@@ -73,12 +76,6 @@ const {
   updateAttribute,
   deleteAttribute
 } = useStudentAttributes()
-
-const parseOptionalNumber = (value) => {
-  if (value === '' || value === null || value === undefined) return null
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
 
 const handleAdd = () => {
   const customCount = attributeDefinitions.value.filter(attribute =>
@@ -95,8 +92,16 @@ const handleAdd = () => {
   })
 }
 
-const handleDelete = (attributeId) => {
+const handleDelete = (attributeId: string) => {
   deleteAttribute(attributeId)
+}
+
+const updateAttributeRange = (
+  attributeId: string,
+  key: 'min' | 'max',
+  value: number | null
+) => {
+  updateAttribute(attributeId, { [key]: normalizeNumberInput(value) })
 }
 </script>
 
@@ -129,37 +134,12 @@ const handleDelete = (attributeId) => {
   color: var(--color-text-secondary);
 }
 
-.add-attribute-btn,
-.icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-  border-radius: 6px;
-  min-height: 28px;
-  padding: 0 9px;
-  cursor: pointer;
+.add-attribute-btn {
   white-space: nowrap;
 }
 
-.add-attribute-btn:hover,
-.icon-btn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
 .icon-btn {
-  width: 30px;
-  padding: 0;
-}
-
-.icon-btn.danger:hover {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-  background: var(--color-danger-bg);
+  flex: 0 0 auto;
 }
 
 .attribute-list {
@@ -208,14 +188,6 @@ const handleDelete = (attributeId) => {
 .attr-input {
   width: 100%;
   min-width: 0;
-  box-sizing: border-box;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  min-height: 28px;
-  padding: 0 7px;
-  font-size: 12px;
 }
 
 .number-input {
@@ -225,59 +197,8 @@ const handleDelete = (attributeId) => {
   font-variant-numeric: tabular-nums;
 }
 
-.attr-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
-
 .attr-enabled {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 28px;
-  user-select: none;
-}
-
-.attr-enabled input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.switch-track {
-  position: relative;
-  width: 28px;
-  height: 16px;
-  border-radius: 999px;
-  background: var(--color-border-strong);
-  flex-shrink: 0;
-  transition: background 0.18s ease;
-}
-
-.switch-track::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--color-surface);
-  box-shadow: 0 1px 3px var(--shadow-md);
-  transition: transform 0.18s ease;
-}
-
-.attr-enabled input:checked + .switch-track {
-  background: var(--color-primary);
-}
-
-.attr-enabled input:checked + .switch-track::after {
-  transform: translateX(12px);
-}
-
-.attr-enabled:focus-within .switch-track {
-  outline: 2px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
-  outline-offset: 2px;
+  justify-self: center;
 }
 
 @container (min-width: 520px) {

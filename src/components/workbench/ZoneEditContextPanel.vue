@@ -5,10 +5,10 @@
         <h2>选区编辑</h2>
         <p>{{ headerText }}</p>
       </div>
-      <button class="primary-action" type="button" @click="finishEditing">
+      <NButton size="small" type="primary" attr-type="button" @click="finishEditing">
         <Check :size="15" stroke-width="2.4" />
         <span>完成</span>
-      </button>
+      </NButton>
     </header>
 
     <div class="panel-body">
@@ -35,18 +35,18 @@
       <div class="context-section">
         <div class="section-title">选区操作</div>
         <div class="action-grid">
-          <button type="button" :disabled="activeSeatCount === 0" @click="clearActiveZoneSeats">
+          <NButton size="small" secondary attr-type="button" :disabled="activeSeatCount === 0" @click="clearActiveZoneSeats">
             <Eraser :size="14" stroke-width="2.2" />
             <span>清空座位</span>
-          </button>
-          <button v-if="isAssignmentZone" type="button" @click="toggleActiveZoneVisible">
+          </NButton>
+          <NButton v-if="isAssignmentZone" size="small" secondary attr-type="button" @click="toggleActiveZoneVisible">
             <Eye :size="14" stroke-width="2.2" />
             <span>{{ activeGlobalZone?.visible ? '隐藏高亮' : '显示高亮' }}</span>
-          </button>
-          <button type="button" class="danger" @click="deleteActiveZone">
+          </NButton>
+          <NButton size="small" type="error" secondary attr-type="button" @click="deleteActiveZone">
             <Trash2 :size="14" stroke-width="2.2" />
             <span>删除选区</span>
-          </button>
+          </NButton>
         </div>
       </div>
 
@@ -74,32 +74,31 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { computed } from 'vue'
 import { Check, Eraser, Eye, Trash2 } from 'lucide-vue-next'
-import { useEditMode } from '@/composables/useEditMode'
+import { useEditorCommands } from '@/composables/useEditorCommands'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import { useLogger } from '@/composables/useLogger'
 import { useTagData } from '@/composables/useTagData'
 import { useZoneData } from '@/composables/useZoneData'
 import { useZoneRotation } from '@/composables/useZoneRotation'
 
-const { setMode, EditMode } = useEditMode()
-const { zoneEditSession, finishZoneEditSession } = useEditorWorkbench()
-const { success, warning } = useLogger()
+const { finishZoneEditing } = useEditorCommands()
+const { zoneEditSession } = useEditorWorkbench()
+const { success, warning, confirm } = useLogger()
 const { tags } = useTagData()
 const {
   zones,
   updateZone,
   deleteZone,
   getZoneColor,
-  clearZoneSelection,
   toggleZoneVisible
 } = useZoneData()
 const {
   rotGroups,
   deleteZoneFromGroup,
-  clearEditingZone,
   buildZoneColorMap
 } = useZoneRotation()
 
@@ -165,10 +164,7 @@ const flowText = computed(() => {
 })
 
 const finishEditing = () => {
-  clearZoneSelection()
-  clearEditingZone()
-  setMode(EditMode.NORMAL)
-  finishZoneEditSession()
+  finishZoneEditing()
   success('选区编辑已完成')
 }
 
@@ -189,7 +185,14 @@ const toggleActiveZoneVisible = () => {
   toggleZoneVisible(activeGlobalZone.value.id)
 }
 
-const deleteActiveZone = () => {
+const deleteActiveZone = async () => {
+  const confirmed = await confirm({
+    title: '删除选区',
+    content: `确认删除“${activeName.value}”？`,
+    positiveText: '删除',
+    type: 'error'
+  })
+  if (!confirmed) return
   if (activeGlobalZone.value) {
     deleteZone(activeGlobalZone.value.id)
     warning('已删除选区')
@@ -242,30 +245,6 @@ const deleteActiveZone = () => {
   min-height: 0;
   overflow-y: auto;
   padding: 12px;
-}
-
-.primary-action,
-.action-grid button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 34px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.primary-action {
-  flex-shrink: 0;
-  padding: 0 10px;
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-text-inverse);
 }
 
 .zone-card,
@@ -350,23 +329,8 @@ const deleteActiveZone = () => {
   gap: 8px;
 }
 
-.action-grid button {
+.action-grid > * {
   width: 100%;
-}
-
-.action-grid button:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.action-grid button.danger:hover:not(:disabled) {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-}
-
-.action-grid button:disabled {
-  color: var(--color-text-disabled);
-  cursor: not-allowed;
 }
 
 .tag-list {

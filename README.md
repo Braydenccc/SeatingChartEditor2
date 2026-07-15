@@ -129,7 +129,8 @@ GitHub Actions 发布和 Web 部署会自动执行版本同步。手动发布前
 - Vue Router 4 hash 路由
 - Vite 7
 - Tauri 2
-- TypeScript / JavaScript 混合代码库
+- TypeScript 严格模式
+- Naive UI 2
 - lucide-vue-next
 - xlsx-js-style
 - @vueuse/core
@@ -139,12 +140,13 @@ GitHub Actions 发布和 Web 部署会自动执行版本同步。手动发布前
 ## 项目结构
 
 ```text
-src/main.js
+src/main.ts
 └── src/App.vue
-    ├── RouterView
-    ├── GlobalDropZone
-    ├── LoginDialog
-    └── CloudWorkspaceDialog
+    └── AppUiProvider
+        ├── RouterView
+        ├── GlobalDropZone
+        ├── LoginDialog
+        └── CloudWorkspaceDialog
 
 src/router/index.ts
 ├── /editor   -> src/views/EditorView.vue
@@ -175,6 +177,7 @@ EditorView.vue
 | `useTagData` | 学生标签系统。 |
 | `useZoneData` | 座位选区管理。 |
 | `useEditMode` | 编辑模式状态机。 |
+| `useEditorCommands` | 协调编辑模式、选区、工作台弹层和区域编辑。 |
 | `useEditorWorkbench` | 编辑工作台右栏、移动抽屉、区域编辑会话状态。 |
 | `useDragState` / `useStudentDragging` | 拖拽分配。 |
 | `useSelection` | 多选操作。 |
@@ -190,6 +193,7 @@ EditorView.vue
 | `useImageExport` | 导出高清 PNG。 |
 | `useExcelData` | Excel 导入导出。 |
 | `useExportSettings` | 导出配置。 |
+| `useGlobalSettings` | 全局主题、界面设置迁移与即时持久化。 |
 
 ## 数据模型
 
@@ -218,7 +222,8 @@ EditorView.vue
 - 常量使用 camelCase。
 - 图标统一使用 `lucide-vue-next`。
 - CSS 颜色应使用 `src/assets/main.css` 中的 `var(--color-*)` 变量。
-- 新文件优先使用 `.ts`，类型定义放在 `src/types/`。
+- `src` 只使用 TypeScript，Vue 脚本使用 `lang="ts"`，类型定义放在 `src/types/`。
+- 通用控件和弹层使用 Naive UI；座位画布、学生卡片、拖拽预览与导出渲染保留轻量自定义 DOM。
 - 不要直接修改 `dist/`。
 - 涉及用户可见功能、入口、工作流、限制条件或排查步骤的变更，需要同步更新 `src/constants/userManual.ts`。
 

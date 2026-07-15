@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import type { Workspace } from '@/types/models'
 import { validateWorkspaceDocument } from '../workspaceValidation'
 
-const createWorkspace = () => ({
+const createWorkspace = (): Workspace => ({
   meta: { version: '2.2', app: 'SeatingChartEditor', createdAt: '2026-07-15T00:00:00.000Z' },
   students: [{ id: 1, name: '张三', studentNumber: 1, tags: [] }],
   tags: [],
@@ -35,7 +36,10 @@ describe('workspaceValidation', () => {
 
   it('reports nested layout and tag contract violations', () => {
     const workspace = createWorkspace()
-    workspace.tags = [{ id: 1, name: '重点', color: '#000000' }, { id: 1, name: '重复', color: '#000000' }]
+    workspace.tags = [
+      { id: 1, name: '重点', color: '#000000', showInSeatChart: true },
+      { id: 1, name: '重复', color: '#000000', showInSeatChart: true }
+    ]
     workspace.layout.config.groups = []
 
     const result = validateWorkspaceDocument(workspace)

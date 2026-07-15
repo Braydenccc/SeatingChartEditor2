@@ -50,8 +50,8 @@
 ### 代码路径
 
 **客户端：**
-- [src/utils/crypto.js](../../src/utils/crypto.js) — `encryptPasswordForTransport()` 函数
-- [src/composables/useAuth.js](../../src/composables/useAuth.js) — `callAuthApi()` 函数
+- [src/utils/crypto.ts](../../src/utils/crypto.ts) — `encryptPasswordForTransport()` 函数
+- [src/composables/useAuth.ts](../../src/composables/useAuth.ts) — `callAuthApi()` 函数
 
 **服务器端：**
 - [public/api/auth.php](../../public/api/auth.php) — `decryptPasswordFromTransport()` 函数
@@ -138,7 +138,7 @@
 
 **客户端：**
 - [src/utils/workspaceValidation.ts](../../src/utils/workspaceValidation.ts) — 完整工作区结构校验
-- [src/composables/useWorkspace.js](../../src/composables/useWorkspace.js) — 迁移、原子提交与失败回滚
+- [src/composables/useWorkspace.ts](../../src/composables/useWorkspace.ts) — 迁移、原子提交与失败回滚
 
 ### 错误响应
 

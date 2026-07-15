@@ -3,7 +3,6 @@
     <SeatConfigDialog
       v-if="activeWorkbenchDialog === 'seatConfig'"
       :visible="activeWorkbenchDialog === 'seatConfig' && !isWorkbenchDialogHidden"
-      :is-confirming="isConfirming('applyConfig').value"
       @update:visible="handleDialogVisible"
       @confirm="handleSeatConfigConfirm"
     />
@@ -30,13 +29,13 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
 import SeatConfigDialog from '@/components/layout/SeatConfigDialog.vue'
-import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import { useLogger } from '@/composables/useLogger'
 import { useSeatChart } from '@/composables/useSeatChart'
+import type { SeatConfig } from '@/types'
 
 const ShiftRotationDialog = defineAsyncComponent(() => import('./dialogs/ShiftRotationDialog.vue'))
 const ZoneRotationDialog = defineAsyncComponent(() => import('./dialogs/ZoneRotationDialog.vue'))
@@ -49,24 +48,24 @@ const {
   isWorkbenchDialogHidden,
   closeDialog
 } = useEditorWorkbench()
-const { requestConfirm, isConfirming } = useConfirmAction()
 const { updateConfig } = useSeatChart()
-const { success, warning } = useLogger()
+const { success, confirm } = useLogger()
 
-const handleDialogVisible = (visible) => {
+const handleDialogVisible = (visible: boolean) => {
   if (!visible) closeDialog()
 }
 
-const handleSeatConfigConfirm = (newConfig) => {
-  const confirmed = requestConfirm('applyConfig', () => {
-    updateConfig(newConfig)
-    closeDialog()
-    success('座位配置已更新')
-  }, '再次点击确认应用')
-
-  if (!confirmed) {
-    warning('再次点击"应用配置"按钮以确认更新座位布局')
-  }
+const handleSeatConfigConfirm = async (newConfig: SeatConfig) => {
+  const confirmed = await confirm({
+    title: '应用座位配置',
+    content: '修改座位布局会重新生成座位并清除现有分配，是否继续？',
+    positiveText: '应用配置',
+    type: 'warning'
+  })
+  if (!confirmed) return
+  updateConfig(newConfig)
+  closeDialog()
+  success('座位配置已更新')
 }
 </script>
 

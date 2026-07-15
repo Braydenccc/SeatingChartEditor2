@@ -6,7 +6,7 @@ export interface Student {
   name: string
   studentNumber: number | null
   tags: number[]
-  numericAttributes: Record<string, number | null>
+  numericAttributes?: Record<string, number | null>
 }
 
 // 学生数值属性定义
@@ -52,6 +52,10 @@ export interface SeatConfig {
   shiftDistance: number
   podiumPosition: 'top' | 'bottom'
   guardSeats?: GuardSeatsConfig
+  shiftColShift?: number
+  shiftDirection?: number
+  alignment?: 'top' | 'bottom'
+  seatAlignment?: 'top' | 'bottom'
 }
 
 export interface GroupConfig {
@@ -111,9 +115,13 @@ export type RulePredicate =
 
 // 规则参数类型
 export interface RuleParams {
+  minRow?: number
+  maxRow?: number
+  minGroup?: number
+  maxGroup?: number
   rowStart?: number
   rowEnd?: number
-  columnType?: 'left' | 'middle' | 'right'
+  columnType?: 'left' | 'middle' | 'right' | 'edge' | 'aisle' | 'wall' | 'center'
   zoneId?: number
   groupStart?: number
   groupEnd?: number
@@ -125,7 +133,58 @@ export interface RuleParams {
   bandCount?: number
   maxDelta?: number
   minDelta?: number
+  tolerance?: number
   [key: string]: unknown
+}
+
+export interface RotationZone {
+  id: number
+  name: string
+  seatIds: string[]
+}
+
+export interface RotationGroup {
+  id: number
+  name: string
+  type: 'cycle' | 'swap'
+  zones: RotationZone[]
+}
+
+export interface RuleSubRule {
+  predicate: RulePredicate | string
+  not: boolean
+  params: RuleParams
+  subjects?: RuleSubject[]
+}
+
+export interface LegacyRuleSubject {
+  kind?: 'student' | 'tag' | 'pair' | 'tag_pair'
+  id?: number | null
+  id1?: number | null
+  id2?: number | null
+  tagId?: number | null
+  tagId1?: number | null
+  tagId2?: number | null
+}
+
+export interface RuleInput {
+  id?: string
+  priority?: RulePriority
+  subjects?: RuleSubject[]
+  subjectMode?: 'single' | 'dual'
+  subjectsA?: RuleSubject[]
+  subjectsB?: RuleSubject[]
+  subject?: LegacyRuleSubject
+  predicate?: RulePredicate | string
+  params?: RuleParams
+  version?: number
+  not?: boolean
+  enabled?: boolean
+  description?: string
+  logicOperator?: 'AND' | 'OR' | null
+  subRules?: Array<Partial<RuleSubRule>> | null
+  createdAt?: number
+  updatedAt?: number
 }
 
 // 规则数据模型
@@ -133,9 +192,20 @@ export interface Rule {
   id: string
   priority: RulePriority
   subjects: RuleSubject[]
-  predicates: RulePredicate[]
+  subjectMode: 'single' | 'dual'
+  subjectsA: RuleSubject[]
+  subjectsB: RuleSubject[]
+  predicate: RulePredicate | string
   params: RuleParams
   version: number
+  not: boolean
+  enabled: boolean
+  description: string
+  logicOperator: 'AND' | 'OR' | null
+  subRules: RuleSubRule[] | null
+  createdAt: number
+  updatedAt: number
+  predicates?: RulePredicate[]
 }
 
 // 工作区元数据
@@ -171,8 +241,8 @@ export interface Workspace {
   tagSettings?: TagSettings
   layout: WorkspaceLayout
   zones: Zone[]
-  rules: Record<string, unknown>[]
-  exportSettings?: ExportSettings
+  rules: RuleInput[]
+  exportSettings?: Partial<ExportSettings>
 }
 
 // 导出设置
@@ -193,6 +263,21 @@ export interface TagSettings {
 // 学生数值属性显示设置
 export interface StudentAttributeSettings {
   showNumericAttributesInEditor: boolean
+}
+
+export interface AuthUser {
+  username: string
+}
+
+export type AuthType = 'retiehe' | 'webdav'
+
+export interface WebDavConfig {
+  url: string
+  username?: string
+  password?: string
+  encryptedPassword?: string
+  authorization?: string
+  useProxy?: boolean
 }
 
 // 座位位置解析结果

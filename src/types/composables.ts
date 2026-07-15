@@ -26,7 +26,13 @@ export interface UseStudentDataReturn {
   getSelectedStudent: ComputedRef<Student | null>
   addStudent: () => number
   setStudentCount: (targetCount: number) => boolean
-  updateStudent: (studentId: number, studentData: Partial<Student>) => void
+  updateStudent: (
+    studentId: number,
+    studentData: Partial<Omit<Student, 'tags' | 'numericAttributes'>> & {
+      tags?: (number | null | undefined)[]
+      numericAttributes?: Record<string, unknown>
+    }
+  ) => void
   deleteStudent: (studentId: number) => void
   addTagToStudents: (tagId: number, studentIds: number[]) => void
   removeTagFromStudent: (tagId: number, studentId: number) => void
@@ -62,7 +68,7 @@ export interface UseZoneDataReturn {
   addSeatToZone: (zoneId: number, seatId: string) => void
   removeSeatFromZone: (zoneId: number, seatId: string) => void
   toggleSeatInZone: (zoneId: number, seatId: string) => void
-  getZoneForSeat: (seatId: string) => Zone | null
+  getZoneForSeat: (seatId: unknown) => Zone | null
   getZoneColor: (zoneId: number) => string
   selectZone: (zoneId: number) => void
   clearZoneSelection: () => void

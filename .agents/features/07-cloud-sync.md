@@ -2,9 +2,9 @@
 module_name: Cloud Sync & Authentication
 description: 官方账号认证机制及泛底层的 WebDAV 私有同步双轨方案。
 related_files:
-  - src/composables/useAuth.js
-  - src/composables/useWebDav.js
-  - src/composables/useCloudWorkspace.js
+  - src/composables/useAuth.ts
+  - src/composables/useWebDav.ts
+  - src/composables/useCloudWorkspace.ts
 ---
 
 # 07-云端同步与认证 (Cloud Sync & Authentication)
@@ -13,15 +13,15 @@ related_files:
 由于本软件定位“开箱即用”且部署在 Retinbox 上，因此提供了非常轻量的 `api/auth.php` 和 `api/workspace.php` 用于储存 `.sce` 存档。同时考虑到部分敏感学校不用公有云，所以内嵌了纯前端的纯原生 WebDAV 协议引擎。
 
 ## 2. 源代码入口 (Source Files)
-- 登录认证态: `src/composables/useAuth.js`
-- WebDAV 底层驱动: `src/composables/useWebDav.js`
-- 聚合存储操作平台: `src/composables/useCloudWorkspace.js`
+- 登录认证态: `src/composables/useAuth.ts`
+- WebDAV 底层驱动: `src/composables/useWebDav.ts`
+- 聚合存储操作平台: `src/composables/useCloudWorkspace.ts`
 - 桌面端 HTTP/API 适配: `src/platform/apiClient.ts`、`src/platform/webdavTransport.ts`
 
 ## 3. 数据模型 / 核心API (Data Models & Core API)
 
 ```typescript
-// useAuth.js 控制着当前的全局读写源
+// useAuth.ts 控制着当前的全局读写源
 const authType = ref<'retiehe' | 'webdav'>('retiehe')
 const backupMode = ref<boolean>(false) // 若开启，存入 retiehe 时会静默镜像抄送到 webdav
 ```
@@ -35,6 +35,6 @@ const backupMode = ref<boolean>(false) // 若开启，存入 retiehe 时会静�
 - **工作区列表管理**: SCE 云端工作区列表以 `users` 库中的 `{username}_files` 数组为准；删除工作区会在 `scefiles` 对应记录的 `metadata` 上写入 `deleted` 标记和 `deletedAt` 时间，不删除数据库值。`list`、`load`、`rename` 和覆盖保存都会忽略已标记删除的工作区。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
-- **多数据源混淆**: 在写上传/下载界面时，务必调用 `useCloudWorkspace.js` 里的封装函数（例如 `listWorkspaces()`），**绝对不要**去绕过它直接调用底层的 `useWebDav.js`，因为它负责把官方接口和 DAV 接口的数据拼合成无缝的列表给 UI 消费。
+- **多数据源混淆**: 在写上传/下载界面时，务必调用 `useCloudWorkspace.ts` 里的封装函数（例如 `listWorkspaces()`），**绝对不要**去绕过它直接调用底层的 `useWebDav.ts`，因为它负责把官方接口和 DAV 接口的数据拼合成无缝的列表给 UI 消费。
 - **凭证存储**: Retiehe 密码不储存在前端。WebDAV 的密码是**明文**存放在 `localStorage`（通过 Cookie 代理保存的 `sce_webdav_config` JSON 里）的。如果有安全审计要求，需提醒用户。
 - **Tauri 导入规则**: 不要在 `useAuth`、`useCloudWorkspace` 或组件中直接静态导入 Tauri HTTP 插件；所有桌面端 HTTP 行为都应留在 `src/platform/`。

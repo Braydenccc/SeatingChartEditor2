@@ -93,7 +93,8 @@ export function useZoneData(): UseZoneDataReturn {
   }
 
   // 获取座位所属的选区
-  const getZoneForSeat = (seatId: string): Zone | null => {
+  const getZoneForSeat = (seatId: unknown): Zone | null => {
+    if (typeof seatId !== 'string') return null
     return zones.value.find(z => z.seatIds.includes(seatId)) || null
   }
 

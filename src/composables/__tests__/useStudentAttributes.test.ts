@@ -31,12 +31,12 @@ describe('useStudentAttributes', () => {
       numericAttributes: {
         height: '150',
         score: 'invalid'
-      } as any
+      }
     })
 
     const student = studentData.students.value.find(s => s.id === id)
-    expect(student?.numericAttributes.height).toBe(150)
-    expect(student?.numericAttributes.score).toBeNull()
+    expect(student?.numericAttributes?.height).toBe(150)
+    expect(student?.numericAttributes?.score).toBeNull()
   })
 
   it('removes deleted attributes from all students', () => {
@@ -52,7 +52,7 @@ describe('useStudentAttributes', () => {
     attributes.deleteAttribute(customId)
 
     const student = studentData.students.value.find(s => s.id === id)
-    expect(student?.numericAttributes[customId]).toBeUndefined()
+    expect(student?.numericAttributes?.[customId]).toBeUndefined()
   })
 
   it('matches explicit Excel numeric headers', () => {

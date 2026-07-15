@@ -111,7 +111,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 // 这个组件仅包含模板和样式，便于在 docs 文件夹中编辑
 </script>
 

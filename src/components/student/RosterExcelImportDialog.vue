@@ -1,29 +1,14 @@
 <template>
-  <Transition name="dialog-fade">
-    <div v-if="previewDialogVisible" class="import-overlay" @mousedown.self="cancelExcelRosterImport">
-      <section class="import-dialog">
-        <header class="dialog-header">
-          <div>
-            <h3>确认导入 Excel 名单</h3>
-            <p>{{ importFileName }} · {{ totalStudents }} 行学生 · {{ importableStudents.length }} 行可导入</p>
-          </div>
-          <button class="icon-button" type="button" aria-label="关闭" @click="cancelExcelRosterImport">
-            <X :size="18" />
-          </button>
-        </header>
-
+  <ResponsiveOverlay :show="previewDialogVisible" title="确认导入 Excel 名单" :busy="isCommittingImport" :desktop-width="1180" mobile-height="94dvh" @update:show="value => !value && cancelExcelRosterImport()">
+        <p class="dialog-description">{{ importFileName }} · {{ totalStudents }} 行学生 · {{ importableStudents.length }} 行可导入</p>
         <div class="dialog-body">
           <aside class="summary-panel">
             <div class="mode-card">
               <span class="panel-label">导入方式</span>
-              <div class="segmented">
-                <button type="button" :class="{ active: importMode === 'replace' }" @click="importMode = 'replace'">
-                  覆盖所有
-                </button>
-                <button type="button" :class="{ active: importMode === 'append' }" @click="importMode = 'append'">
-                  新增
-                </button>
-              </div>
+              <NRadioGroup v-model:value="importMode" class="segmented" size="small">
+                <NRadioButton value="replace">覆盖所有</NRadioButton>
+                <NRadioButton value="append">新增</NRadioButton>
+              </NRadioGroup>
               <p>{{ modeHint }}</p>
             </div>
 
@@ -95,34 +80,38 @@
                   <tr v-for="student in previewStudents" :key="student.rowNumber" :class="{ skipped: isSkipped(student.rowNumber) }">
                     <td>{{ student.rowNumber }}</td>
                     <td>
-                      <input
+                      <NInputNumber
                         class="cell-input number-input"
-                        type="number"
-                        :value="student.studentNumber ?? ''"
-                        @input="handleStudentNumberInput(student.rowNumber, $event.target.value)"
+                        size="small"
+                        :value="student.studentNumber ?? null"
+                        :show-button="false"
+                        @update:value="value => handleStudentNumberInput(student.rowNumber, value)"
                       />
                     </td>
                     <td>
-                      <input
+                      <NInput
                         class="cell-input"
+                        size="small"
                         :value="student.name"
-                        @input="updatePreviewStudent(student.rowNumber, { name: $event.target.value })"
+                        @update:value="value => updatePreviewStudent(student.rowNumber, { name: value })"
                       />
                     </td>
                     <td v-for="attribute in numericAttributes" :key="attribute.id">
-                      <input
+                      <NInputNumber
                         class="cell-input number-input"
-                        type="number"
-                        :value="formatNumericValue(student.numericAttributes?.[attribute.id])"
-                        @input="handleNumericInput(student.rowNumber, attribute.id, $event.target.value)"
+                        size="small"
+                        :value="student.numericAttributes?.[attribute.id] ?? null"
+                        :show-button="false"
+                        @update:value="value => handleNumericInput(student.rowNumber, attribute.id, value)"
                       />
                     </td>
                     <td>
-                      <input
+                      <NInput
                         class="cell-input"
+                        size="small"
                         :value="student.tagNames.join('、')"
                         placeholder="用顿号或逗号分隔"
-                        @change="updatePreviewTagNames(student.rowNumber, $event.target.value)"
+                        @update:value="value => updatePreviewTagNames(student.rowNumber, value)"
                       />
                     </td>
                     <td>
@@ -139,30 +128,29 @@
           </section>
         </div>
 
-        <footer class="dialog-footer">
+        <template #footer><footer class="dialog-footer">
           <span v-if="skippedRowNumbers.size > 0" class="footer-warning">
             有 {{ skippedRowNumbers.size }} 行存在问题，确认后会自动跳过这些行。
           </span>
           <span v-else class="footer-ok">所有识别到的学生都可导入。</span>
           <div class="footer-actions">
-            <button class="secondary-btn" type="button" @click="cancelExcelRosterImport">取消</button>
-            <button class="primary-btn" type="button" :disabled="!canCommitImport || isCommittingImport" @click="handleCommit">
-              <Loader2 v-if="isCommittingImport" :size="15" class="spin-icon" />
-              <Check v-else :size="15" />
+            <NButton secondary attr-type="button" @click="cancelExcelRosterImport">取消</NButton>
+            <NButton type="primary" attr-type="button" :disabled="!canCommitImport" :loading="isCommittingImport" @click="handleCommit">
               <span>{{ isCommittingImport ? '导入中' : '确认导入' }}</span>
-            </button>
+            </NButton>
           </div>
-        </footer>
-      </section>
-    </div>
-  </Transition>
+        </footer></template>
+  </ResponsiveOverlay>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
+import { NButton, NInput, NInputNumber, NRadioButton, NRadioGroup } from 'naive-ui'
 import { useRouter } from 'vue-router'
-import { AlertTriangle, BarChart3, Check, Loader2, Tag, X } from 'lucide-vue-next'
+import { AlertTriangle, BarChart3, Tag } from 'lucide-vue-next'
+import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 import { useRosterExcelImport } from '@/composables/useRosterExcelImport'
+import { normalizeNumberInput } from '@/utils/inputNormalization'
 
 const router = useRouter()
 const {
@@ -192,22 +180,15 @@ const modeHint = computed(() => importMode.value === 'replace'
   : '导入后会保留当前名单，只新增无冲突的学生、标签和数值属性。'
 )
 
-const isSkipped = (rowNumber) => skippedRowNumbers.value.has(rowNumber)
-const formatNumericValue = (value) => value === null || value === undefined ? '' : value
+const isSkipped = (rowNumber: number) => skippedRowNumbers.value.has(rowNumber)
+const formatNumericValue = (value: number | null | undefined) => value === null || value === undefined ? '' : value
 
-const parseOptionalNumber = (value) => {
-  if (value === '' || value === null || value === undefined) return null
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : value
+const handleStudentNumberInput = (rowNumber: number, value: number | null) => {
+  updatePreviewStudent(rowNumber, { studentNumber: normalizeNumberInput(value) })
 }
 
-const handleStudentNumberInput = (rowNumber, value) => {
-  updatePreviewStudent(rowNumber, { studentNumber: parseOptionalNumber(value) })
-}
-
-const handleNumericInput = (rowNumber, attributeId, value) => {
-  const parsed = value === '' ? null : Number(value)
-  updatePreviewNumericValue(rowNumber, attributeId, Number.isFinite(parsed) || parsed === null ? parsed : null)
+const handleNumericInput = (rowNumber: number, attributeId: string, value: number | null) => {
+  updatePreviewNumericValue(rowNumber, attributeId, normalizeNumberInput(value))
 }
 
 const handleCommit = async () => {
@@ -217,62 +198,6 @@ const handleCommit = async () => {
 </script>
 
 <style scoped>
-.import-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: var(--color-bg-overlay);
-}
-
-.import-dialog {
-  width: min(1180px, 96vw);
-  height: min(780px, 92vh);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  box-shadow: 0 18px 40px var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.dialog-header,
-.dialog-footer {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-subtle);
-}
-
-.dialog-header h3 {
-  margin: 0;
-  color: var(--color-text-primary);
-  font-size: 18px;
-}
-
-.dialog-header p {
-  margin: 4px 0 0;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-}
-
-.icon-button {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
 
 .dialog-body {
   flex: 1;
@@ -317,25 +242,6 @@ const handleCommit = async () => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin: 8px 0;
-}
-
-.segmented button,
-.secondary-btn,
-.primary-btn {
-  min-height: 34px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.segmented button.active,
-.primary-btn {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
 }
 
 .mode-card p,
@@ -454,26 +360,9 @@ const handleCommit = async () => {
   background: var(--color-danger-bg);
 }
 
-.tag-text {
-  color: var(--color-primary);
-}
 
 .cell-input {
   width: 100%;
-  min-height: 30px;
-  box-sizing: border-box;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  padding: 0 8px;
-  font-size: 13px;
-}
-
-.cell-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 14%, transparent);
 }
 
 .number-input {
@@ -509,8 +398,7 @@ const handleCommit = async () => {
 }
 
 .dialog-footer {
-  border-top: 1px solid var(--color-border);
-  border-bottom: none;
+  min-width: 0;
 }
 
 .footer-warning {
@@ -529,48 +417,8 @@ const handleCommit = async () => {
   gap: 8px;
 }
 
-.secondary-btn,
-.primary-btn {
-  padding: 0 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.primary-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.spin-icon {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.dialog-fade-enter-active,
-.dialog-fade-leave-active {
-  transition: opacity 0.18s ease;
-}
-
-.dialog-fade-enter-from,
-.dialog-fade-leave-to {
-  opacity: 0;
-}
 
 @media (max-width: 860px) {
-  .import-overlay {
-    padding: 0;
-  }
-
-  .import-dialog {
-    width: 100vw;
-    height: 100dvh;
-    border-radius: 0;
-  }
 
   .dialog-body {
     grid-template-columns: 1fr;
@@ -582,5 +430,6 @@ const handleCommit = async () => {
     border-right: none;
     border-bottom: 1px solid var(--color-border);
   }
+
 }
 </style>

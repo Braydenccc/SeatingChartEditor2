@@ -16,38 +16,40 @@
           </span>
         </div>
         <div class="header-actions">
-          <button v-if="currentMode !== EditMode.NORMAL" class="icon-btn btn-ghost" title="退出当前模式" @click="exitCurrentMode">
+          <NButton v-if="currentMode !== EditMode.NORMAL" size="small" quaternary title="退出当前模式" @click="exitCurrentMode">
             <X :size="14" stroke-width="2.5" />
             <span>{{ currentMode === EditMode.ZONE_EDIT ? '完成' : '取消' }}</span>
-          </button>
-          <button v-else class="icon-btn" title="开始导出" @click="openExportView">
+          </NButton>
+          <NButton v-else size="small" secondary title="开始导出" @click="openExportView">
             <FileOutput :size="14" stroke-width="2.5" />
             <span>导出</span>
-          </button>
+          </NButton>
         </div>
       </template>
     </div>
     <div class="header-divider"></div>
     <div class="header-right">
-      <button v-if="unassignedCount > 0" class="icon-btn" title="随机排位" @click="handleRandomAssign">
+      <NButton v-if="unassignedCount > 0" size="small" type="primary" secondary title="随机排位" @click="handleRandomAssign">
         <Shuffle :size="15" stroke-width="2.5" />
         <span>一键排入</span>
-      </button>
-      <button class="icon-btn" title="名单与属性" @click="openStudentsView">
+      </NButton>
+      <NButton size="small" secondary title="名单与属性" @click="openStudentsView">
         <Users :size="15" stroke-width="2.5" />
         <span>名单与属性</span>
-      </button>
+      </NButton>
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Shuffle, Users, X, FileOutput } from 'lucide-vue-next'
 import { useStudentData } from '@/composables/useStudentData'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useEditMode } from '@/composables/useEditMode'
+import { useEditorCommands } from '@/composables/useEditorCommands'
 import { useLogger } from '@/composables/useLogger'
 import { useUndo } from '@/composables/useUndo'
 
@@ -63,7 +65,8 @@ const router = useRouter()
 
 const { students } = useStudentData()
 const { findSeatByStudent, getEmptySeats, assignStudent } = useSeatChart()
-const { currentMode, setMode, EditMode, clearFirstSelectedSeat } = useEditMode()
+const { currentMode, EditMode } = useEditMode()
+const { activateTool } = useEditorCommands()
 const { success, warning } = useLogger()
 const { recordBatch, createSnapshot } = useUndo()
 
@@ -100,8 +103,7 @@ const modeLabel = computed(() => {
 })
 
 const exitCurrentMode = () => {
-  setMode(EditMode.NORMAL)
-  clearFirstSelectedSeat()
+  activateTool('normal')
 }
 
 const handleRandomAssign = () => {
@@ -228,45 +230,6 @@ const openExportView = () => router.push({ path: '/export', query: { tab: 'image
   flex-shrink: 0;
 }
 
-.icon-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  background: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  line-height: 1;
-}
-
-.icon-btn:hover {
-  background: var(--color-bg-secondary);
-  color: var(--color-primary);
-  border-color: var(--color-border-strong);
-}
-
-.icon-btn:active {
-  transform: scale(0.97);
-}
-
-.icon-btn.btn-ghost {
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-bg-secondary);
-}
-
-.icon-btn.btn-ghost:hover {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-  border-color: var(--color-border-strong);
-}
-
 @media (max-width: 1366px) and (min-width: 1025px) {
   .student-list-header {
     padding: 8px 12px;
@@ -275,11 +238,6 @@ const openExportView = () => router.push({ path: '/export', query: { tab: 'image
 
   .header-divider {
     height: 20px;
-  }
-
-  .icon-btn {
-    padding: 4px 8px;
-    font-size: 11px;
   }
 
   .status-text {
@@ -295,11 +253,6 @@ const openExportView = () => router.push({ path: '/export', query: { tab: 'image
 
   .header-divider {
     height: 18px;
-  }
-
-  .icon-btn {
-    padding: 4px 7px;
-    font-size: 11px;
   }
 
   .status-text {
@@ -337,11 +290,6 @@ const openExportView = () => router.push({ path: '/export', query: { tab: 'image
   .header-right {
     flex-shrink: 0;
     gap: 4px;
-  }
-
-  .icon-btn {
-    padding: 5px 7px;
-    font-size: 11px;
   }
 
   .status-text {

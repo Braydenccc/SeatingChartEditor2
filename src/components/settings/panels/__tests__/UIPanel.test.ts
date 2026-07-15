@@ -45,7 +45,7 @@ describe('UIPanel theme switching', () => {
 
     expect(document.documentElement.style.getPropertyValue('--color-surface')).toBe('#123456')
 
-    await wrapper.get('.mode-tab').trigger('click')
+    await wrapper.get('input[value="simple"]').setValue(true)
 
     expect(document.documentElement.dataset.theme).toBe('light')
     expect(document.documentElement.style.getPropertyValue('--color-surface')).toBe('')

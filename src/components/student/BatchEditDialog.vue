@@ -1,15 +1,11 @@
 <template>
-  <transition name="dialog-fade">
-    <div v-if="visible" class="batch-edit-overlay" @mousedown.self="close">
-      <div class="batch-edit-dialog">
-        <div class="dialog-header">
-          <h3>批量编辑</h3>
-          <span class="selected-count">已选中 {{ selectedStudents.length }} 人</span>
-          <button class="close-btn" type="button" aria-label="关闭" @click="close">
-            <X :size="18" stroke-width="2" />
-          </button>
-        </div>
-
+  <ResponsiveOverlay
+    v-model:show="isShown"
+    title="批量编辑"
+    :desktop-width="560"
+    :mobile-height="'min(88dvh, 760px)'"
+  >
+        <span class="selected-count">已选中 {{ selectedStudents.length }} 人</span>
         <div class="dialog-body">
           <div class="student-list-section">
             <div class="section-header">
@@ -23,29 +19,30 @@
               >
                 <div class="student-info">
                   <div class="input-wrapper name-wrapper">
-                    <input
+                    <NInput
                       v-if="editData[student.id]"
                       class="info-input input-name"
-                      v-model="editData[student.id].name"
+                      size="small"
+                      v-model:value="editData[student.id].name"
                       @blur="handleSaveStudent(student.id)"
                       @keyup.enter="handleSaveStudent(student.id)"
                       placeholder="姓名"
                       title="学生姓名"
                     />
-                    <div class="input-line"></div>
                   </div>
                   <div class="input-wrapper number-wrapper">
-                    <span class="number-prefix">#</span>
-                    <input
+                    <NInput
                       v-if="editData[student.id]"
                       class="info-input input-number"
-                      v-model="editData[student.id].studentNumber"
+                      size="small"
+                      v-model:value="editData[student.id].studentNumber"
                       @blur="handleSaveStudent(student.id)"
                       @keyup.enter="handleSaveStudent(student.id)"
                       placeholder="学号 (可选)"
                       title="学生学号"
-                    />
-                    <div class="input-line"></div>
+                    >
+                      <template #prefix>#</template>
+                    </NInput>
                   </div>
                 </div>
                 <div class="student-tags-display">
@@ -74,12 +71,14 @@
               <span class="hint">点击标签为所有选中学生添加/移除</span>
             </div>
             <div class="tags-grid">
-              <button
+              <NButton
                 v-for="tag in tags"
                 :key="tag.id"
                 class="tag-action-btn"
                 :class="{ 'all-have': tagStatus[tag.id]?.allHave, 'some-have': tagStatus[tag.id]?.someHave }"
-                :style="{ '--tag-color': tag.color }"
+                size="small"
+                secondary
+                :type="tagStatus[tag.id]?.allHave ? 'primary' : (tagStatus[tag.id]?.someHave ? 'warning' : 'default')"
                 @click="handleToggleTag(tag.id)"
               >
                 <span class="tag-dot" :style="{ backgroundColor: tag.color }"></span>
@@ -92,35 +91,54 @@
                     ({{ tagStatus[tag.id].count }}/{{ selectedStudents.length }})
                   </template>
                 </span>
-              </button>
+              </NButton>
               <div v-if="tags.length === 0" class="no-tags-available">
                 暂无标签，请先在名单与属性中创建标签
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  </transition>
+  </ResponsiveOverlay>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Check, X } from 'lucide-vue-next'
+import { NButton, NInput } from 'naive-ui'
+import { Check } from 'lucide-vue-next'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
+import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 
-const props = defineProps({
-  visible: { type: Boolean, default: false },
-  studentIds: { type: Array, default: () => [] }
+const props = withDefaults(defineProps<{
+  visible?: boolean
+  studentIds?: number[]
+}>(), {
+  visible: false,
+  studentIds: () => []
 })
 
-const emit = defineEmits(['update:visible'])
+const emit = defineEmits<{ 'update:visible': [value: boolean] }>()
+
+const isShown = computed({
+  get: () => props.visible,
+  set: value => emit('update:visible', value)
+})
 
 const { students, updateStudent, addTagToStudents, removeTagFromStudent } = useStudentData()
 const { tags } = useTagData()
 
-const editData = ref({})
+interface StudentEditDraft {
+  name: string
+  studentNumber: string
+}
+
+interface TagStatus {
+  count: number
+  allHave: boolean
+  someHave: boolean
+}
+
+const editData = ref<Record<number, StudentEditDraft>>({})
 const updateKey = ref(0)
 
 const selectedStudents = computed(() => {
@@ -129,7 +147,7 @@ const selectedStudents = computed(() => {
   const allStudents = students.value
   return studentIds
     .map(id => allStudents.find(s => s.id === id))
-    .filter(Boolean)
+    .filter((student): student is NonNullable<typeof student> => student !== undefined)
     .map(student => ({
       ...student,
       tags: [...(student.tags || [])]
@@ -137,7 +155,7 @@ const selectedStudents = computed(() => {
 })
 
 const tagStatus = computed(() => {
-  const status = {}
+  const status: Record<number, TagStatus> = {}
   const studentList = selectedStudents.value
   
   tags.value.forEach(tag => {
@@ -163,12 +181,12 @@ const initEditData = () => {
   selectedStudents.value.forEach(student => {
     editData.value[student.id] = {
       name: student.name || '',
-      studentNumber: student.studentNumber || ''
+      studentNumber: student.studentNumber?.toString() ?? ''
     }
   })
 }
 
-const handleSaveStudent = (studentId) => {
+const handleSaveStudent = (studentId: number) => {
   const data = editData.value[studentId]
   if (!data) return
   
@@ -177,13 +195,16 @@ const handleSaveStudent = (studentId) => {
   
   updateStudent(studentId, {
     name: data.name,
-    studentNumber: data.studentNumber || null,
+    studentNumber: data.studentNumber.trim() && Number.isFinite(Number(data.studentNumber))
+      ? Number(data.studentNumber)
+      : null,
     tags: student.tags
   })
 }
 
-const handleToggleTag = (tagId) => {
+const handleToggleTag = (tagId: number) => {
   const status = tagStatus.value[tagId]
+  if (!status) return
   const studentList = selectedStudents.value
   
   if (status.allHave) {
@@ -196,12 +217,12 @@ const handleToggleTag = (tagId) => {
   updateKey.value++
 }
 
-const getTagName = (tagId) => {
+const getTagName = (tagId: number) => {
   const tag = tags.value.find(t => t.id === tagId)
   return tag?.name || '未知'
 }
 
-const getTagColor = (tagId) => {
+const getTagColor = (tagId: number) => {
   const tag = tags.value.find(t => t.id === tagId)
   return tag?.color || 'var(--color-text-disabled)'
 }
@@ -212,77 +233,12 @@ const close = () => {
 </script>
 
 <style scoped>
-.batch-edit-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--color-bg-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.batch-edit-dialog {
-  background: var(--color-surface);
-  width: 90%;
-  max-width: 560px;
-  max-height: 85vh;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  overflow: hidden;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.dialog-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  background: var(--color-bg-subtle);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.dialog-header h3 {
-  margin: 0;
-  color: var(--color-primary);
-  font-size: 18px;
-}
-
 .selected-count {
   font-size: 13px;
   color: var(--color-text-secondary);
   background: var(--color-bg-selected);
   padding: 2px 10px;
   border-radius: 12px;
-}
-
-.close-btn {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: var(--color-text-disabled);
-  cursor: pointer;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: 8px;
-}
-
-.close-btn:hover {
-  color: var(--color-text-primary);
 }
 
 .dialog-body {
@@ -354,74 +310,20 @@ const close = () => {
 }
 
 .input-wrapper {
-  position: relative;
   display: flex;
   align-items: center;
-  background: var(--color-bg-secondary);
-  border-radius: 6px;
-  transition: background 0.3s ease;
-}
-
-.input-wrapper:hover,
-.input-wrapper:focus-within {
-  background: var(--color-bg-subtle);
-}
-
-.input-line {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 0;
-  height: 2px;
-  background: var(--color-primary);
-  transition: width 0.3s ease, left 0.3s ease;
-  border-radius: 2px;
-}
-
-.input-wrapper:focus-within .input-line {
-  left: 0;
-  width: 100%;
 }
 
 .info-input {
-  border: none;
-  background: transparent;
-  padding: 7px 10px;
-  font-size: 13px;
-  color: var(--color-text-primary);
   width: 100%;
-  outline: none;
-  font-family: inherit;
-}
-
-.info-input::placeholder {
-  color: var(--color-text-disabled);
-  font-weight: 400;
 }
 
 .name-wrapper {
   width: 90px;
 }
 
-.name-wrapper .info-input {
-  font-weight: 600;
-  color: var(--color-primary);
-}
-
 .number-wrapper {
   width: 110px;
-  padding-left: 8px;
-}
-
-.number-prefix {
-  color: var(--color-text-disabled);
-  font-size: 12px;
-  font-weight: bold;
-  user-select: none;
-}
-
-.number-wrapper .info-input {
-  padding-left: 4px;
 }
 
 .student-tags-display {
@@ -467,33 +369,7 @@ const close = () => {
 }
 
 .tag-action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--color-text-primary);
-  transition: all 0.2s ease;
-}
-
-.tag-action-btn:hover {
-  background: var(--color-bg-subtle);
-  border-color: var(--color-border-strong);
-}
-
-.tag-action-btn.all-have {
-  background: var(--color-bg-selected);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.tag-action-btn.some-have {
-  background: var(--color-warning-bg-light);
-  border-color: var(--color-warning);
+  max-width: 100%;
 }
 
 .tag-dot {
@@ -514,10 +390,6 @@ const close = () => {
   color: var(--color-text-secondary);
 }
 
-.tag-action-btn.all-have .tag-status {
-  color: var(--color-primary);
-}
-
 .no-tags-available {
   width: 100%;
   text-align: center;
@@ -526,23 +398,4 @@ const close = () => {
   font-size: 12px;
 }
 
-.dialog-fade-enter-active,
-.dialog-fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.dialog-fade-enter-from,
-.dialog-fade-leave-to {
-  opacity: 0;
-}
-
-.dialog-fade-enter-active .batch-edit-dialog {
-  animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.dialog-fade-leave-active .batch-edit-dialog {
-  transform: translateY(20px);
-  opacity: 0;
-  transition: all 0.3s ease;
-}
 </style>

@@ -13,35 +13,34 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useStudentDragging } from '@/composables/useStudentDragging'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useStudentData } from '@/composables/useStudentData'
 import { useEditMode } from '@/composables/useEditMode'
+import { useEditorCommands } from '@/composables/useEditorCommands'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useLogger } from '@/composables/useLogger'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import StudentCardFace from './StudentCardFace.vue'
+import type { Student } from '@/types/models'
 
-const props = defineProps({
-  student: {
-    type: Object,
-    required: true
-  },
-  displayMode: {
-    type: String,
-    default: 'grid'
-  }
+const props = withDefaults(defineProps<{
+  student: Student
+  displayMode?: 'grid' | 'compact'
+}>(), {
+  displayMode: 'grid'
 })
 
-const emit = defineEmits(['edit-student'])
+const emit = defineEmits<{ 'edit-student': [studentId: number] }>()
 
-const itemRef = ref(null)
+const itemRef = ref<HTMLElement | null>(null)
 const { getEmptySeats, assignStudent } = useSeatChart()
 const { selectedStudentId, selectStudent, clearSelection } = useStudentData()
-const { currentMode, setMode, EditMode } = useEditMode()
+const { currentMode, EditMode } = useEditMode()
+const { activateTool } = useEditorCommands()
 const { settings } = useGlobalSettings()
 const { success, warning } = useLogger()
 const {
@@ -84,7 +83,7 @@ const handleClick = () => {
     return
   }
   if (currentMode.value !== EditMode.NORMAL) {
-    setMode(EditMode.NORMAL)
+    activateTool('normal')
   }
   selectStudent(props.student.id)
   setRightRailTab('selection')

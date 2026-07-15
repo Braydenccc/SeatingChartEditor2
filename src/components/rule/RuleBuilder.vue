@@ -3,10 +3,10 @@
     <div class="builder-content">
       <div class="builder-heading">
         <h4 class="builder-title">{{ isEditing ? '编辑规则' : '添加新规则' }}</h4>
-        <button class="template-button" @click="showTemplateDialog = true">
+        <NButton size="small" secondary type="primary" @click="showTemplateDialog = true">
           <Wand2 :size="15" stroke-width="2" />
           <span>快捷方案</span>
-        </button>
+        </NButton>
       </div>
 
       <div class="sentence-builder">
@@ -16,26 +16,25 @@
           <div class="subject-section inline-subject">
             <div class="subject-slot">
               <div v-for="(entry, entryIndex) in sharedSubjects" :key="`s-${entryIndex}`" class="subject-row">
-                <select v-model="entry.type" class="detail-select" @change="onEntryTypeChange(entry)">
-                  <option value="all">全体</option>
-                  <option value="person">个人</option>
-                  <option value="tag">标签</option>
-                </select>
+                <NSelect
+                  v-model:value="entry.type"
+                  class="detail-select"
+                  :options="subjectTypeOptions"
+                  @update:value="onEntryTypeChange(entry)"
+                />
 
-                <select v-if="entry.type !== 'all'" v-model="entry.id" class="detail-select">
-                  <option :value="null">{{ entry.type === 'person' ? '选择学生…' : '选择标签…' }}</option>
-                  <option
-                    v-for="opt in getEntryOptions(entry.type)"
-                    :key="opt.id"
-                    :value="opt.id"
-                  >
-                    {{ opt.label }}
-                  </option>
-                </select>
+                <NSelect
+                  v-if="entry.type !== 'all'"
+                  v-model:value="entry.id"
+                  class="detail-select"
+                  :options="getEntryOptions(entry.type).map(opt => ({ label: opt.label, value: opt.id }))"
+                  :placeholder="entry.type === 'person' ? '选择学生…' : '选择标签…'"
+                  clearable
+                />
 
-                <button class="mini-btn danger" @click="removeSharedEntry(entryIndex)">删除</button>
+                <NButton size="small" quaternary type="error" @click="removeSharedEntry(entryIndex)">删除</NButton>
               </div>
-              <button class="mini-btn" @click="addSharedEntry">+ 添加对象</button>
+              <NButton size="small" dashed @click="addSharedEntry">+ 添加对象</NButton>
             </div>
           </div>
         </div>
@@ -48,52 +47,56 @@
           <div v-for="(subRule, ruleIndex) in subRules" :key="`rule-${ruleIndex}`" class="sub-rule-item">
             <div class="rule-header-row">
               <!-- 逻辑操作符（多规则时显示，第一条不显示或显示为默认） -->
-              <button
+              <NButton
                 v-if="subRules.length > 1"
                 class="logic-toggle"
                 :class="{ active: selectedLogicOperator === 'AND', or: selectedLogicOperator === 'OR' }"
+                size="small"
+                secondary
+                :type="selectedLogicOperator === 'OR' ? 'warning' : 'info'"
                 @click="selectedLogicOperator = selectedLogicOperator === 'AND' ? 'OR' : 'AND'"
                 title="点击切换与/或"
               >
                 {{ selectedLogicOperator === 'AND' ? '且' : '或' }}
-              </button>
+              </NButton>
               <span v-else class="logic-placeholder"></span>
 
               <!-- 是/非 切换 -->
-              <button
+              <NButton
                 class="not-toggle"
                 :class="{ active: subRule.not }"
+                size="small"
+                secondary
+                :type="subRule.not ? 'error' : 'default'"
                 @click="toggleNot(ruleIndex)"
                 title="点击切换是否取反该规则"
               >
                 {{ subRule.not ? '非' : '是' }}
-              </button>
+              </NButton>
 
               <div class="rule-selector-wrap flex-1">
-                <select
-                  v-model="subRule.predicate"
+                <NSelect
+                  v-model:value="subRule.predicate"
                   class="seg-select pred-select"
-                  @change="onPredicateChange(ruleIndex)"
-                >
-                  <option value="" disabled>请选择规则类型...</option>
-                  <optgroup v-for="group in filteredPredicateGroups" :key="group.label" :label="group.label">
-                    <option v-for="p in group.predicates" :key="p.key" :value="p.key">
-                      {{ p.label }}
-                    </option>
-                  </optgroup>
-                </select>
-                <div class="select-arrow"></div>
+                  :options="predicateOptions"
+                  placeholder="请选择规则类型..."
+                  @update:value="onPredicateChange(ruleIndex)"
+                />
               </div>
 
               <!-- 删除子规则按钮 -->
-              <button
+              <NButton
                 v-if="subRules.length > 1"
                 class="mini-btn danger remove-rule-btn"
+                size="small"
+                quaternary
+                circle
+                type="error"
                 @click="removeSubRule(ruleIndex)"
                 title="删除此规则"
               >
                 <X :size="14" />
-              </button>
+              </NButton>
             </div>
 
             <!-- 参数（仅当选择了谓词时显示） -->
@@ -101,64 +104,65 @@
               <template v-for="param in getParamSpecs(ruleIndex)" :key="param.key">
                 <div class="input-group inline-param">
                   <label>{{ param.label }}</label>
-                  <input
+                  <NInputNumber
                     v-if="param.type === 'number'"
-                    v-model.number="subRule.params[param.key]"
-                    type="number"
+                    :value="getNumberParam(ruleIndex, param.key)"
                     :min="param.min ?? 1"
                     class="detail-input"
+                    @update:value="value => setNumberParamValue(ruleIndex, param, value)"
                   />
-                  <select
+                  <NSelect
                     v-else-if="param.type === 'select'"
-                    v-model="subRule.params[param.key]"
+                    :value="getSelectParam(ruleIndex, param.key)"
                     class="detail-select"
-                  >
-                    <option v-for="opt in param.options" :key="opt.value" :value="opt.value">
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                  <select
+                    :options="normalizeParamOptions(param.options)"
+                    @update:value="value => setParamValue(ruleIndex, param.key, value)"
+                  />
+                  <NSelect
                     v-else-if="param.type === 'attribute'"
-                    v-model="subRule.params[param.key]"
+                    :value="getSelectParam(ruleIndex, param.key)"
                     class="detail-select"
-                  >
-                    <option value="">选择数值属性…</option>
-                    <option v-for="opt in attributeOptions" :key="opt.id" :value="opt.id">
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                  <select
+                    :options="attributeOptions.map(opt => ({ label: opt.label, value: opt.id }))"
+                    placeholder="选择数值属性…"
+                    clearable
+                    @update:value="value => setParamValue(ruleIndex, param.key, value)"
+                  />
+                  <NSelect
                     v-else-if="param.type === 'zone'"
-                    v-model="subRule.params[param.key]"
+                    :value="getSelectParam(ruleIndex, param.key)"
                     class="detail-select"
-                  >
-                    <option :value="null">选择选区…</option>
-                    <option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option>
-                  </select>
+                    :options="zoneOptions"
+                    placeholder="选择选区…"
+                    clearable
+                    @update:value="value => setParamValue(ruleIndex, param.key, value)"
+                  />
                 </div>
               </template>
             </div>
           </div>
 
           <!-- 添加子规则按钮 -->
-          <button class="add-sub-rule-btn" @click="addSubRule">
+          <NButton size="small" type="primary" secondary @click="addSubRule">
             + 添加规则条件（{{ selectedLogicOperator === 'AND' ? '与' : '或' }}组合）
-          </button>
+          </NButton>
         </div>
 
         <div class="builder-segment">
           <label class="seg-label">重要程度</label>
           <div class="priority-pills">
-            <button
+            <NButton
               v-for="p in priorities"
               :key="p.key"
               class="priority-pill"
               :class="[p.key, { active: selectedPriority === p.key }]"
+              size="small"
+              :secondary="selectedPriority === p.key"
+              :type="selectedPriority === p.key ? priorityButtonType(p.key) : 'default'"
               @click="selectedPriority = p.key"
             >
               <span class="pill-dot"></span>
               {{ p.label }}
-            </button>
+            </NButton>
           </div>
         </div>
       </div>
@@ -180,52 +184,49 @@
     </div>
 
     <div class="builder-footer">
-      <button class="btn-add" :disabled="!canAdd" @click="handleAdd">{{ isEditing ? '保存修改' : '添加规则' }}</button>
-      <button class="btn-reset" @click="handleReset">{{ isEditing ? '取消编辑' : '重置' }}</button>
+      <NButton type="primary" :disabled="!canAdd" @click="handleAdd">{{ isEditing ? '保存修改' : '添加规则' }}</NButton>
+      <NButton secondary @click="handleReset">{{ isEditing ? '取消编辑' : '重置' }}</NButton>
     </div>
 
-    <Teleport to="body">
-      <div v-if="showTemplateDialog" class="template-overlay" @click.self="showTemplateDialog = false">
-        <section class="template-dialog" role="dialog" aria-modal="true" aria-labelledby="quick-template-title">
-          <header class="template-dialog-header">
-            <div>
-              <h3 id="quick-template-title">快捷方案</h3>
-              <p>选择后会覆盖当前编辑草稿的对象、规则类型和默认参数。</p>
-            </div>
-            <button class="template-close-button" title="关闭" @click="showTemplateDialog = false">
-              <X :size="18" stroke-width="2" />
-            </button>
-          </header>
+    <ResponsiveOverlay v-model:show="showTemplateDialog" title="快捷方案" :desktop-width="760" mobile-height="88dvh">
+          <p class="template-description">选择后会覆盖当前编辑草稿的对象、规则类型和默认参数。</p>
 
           <div class="template-groups">
             <section v-for="group in quickTemplateGroups" :key="group.title" class="template-group">
               <h4>{{ group.title }}</h4>
-              <button
+              <NButton
                 v-for="option in group.options"
                 :key="option.key"
                 class="template-option"
+                size="small"
+                secondary
+                block
                 @click="handleQuickTemplate(option.key)"
               >
-                <span>{{ option.title }}</span>
-                <small>{{ option.desc }}</small>
-              </button>
+                <span class="template-option-content">
+                  <span>{{ option.title }}</span>
+                  <small>{{ option.desc }}</small>
+                </span>
+              </NButton>
             </section>
           </div>
-        </section>
-      </div>
-    </Teleport>
+    </ResponsiveOverlay>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton, NInputNumber, NSelect } from 'naive-ui'
+import type { ButtonProps, SelectOption } from 'naive-ui'
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { Wand2, X } from 'lucide-vue-next'
+import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useZoneData } from '@/composables/useZoneData'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useLogger } from '@/composables/useLogger'
+import { normalizeNumberInput } from '@/utils/inputNormalization'
 import {
   RulePriority,
   RULE_TYPE_LABELS,
@@ -233,14 +234,23 @@ import {
   getDefaultParams,
   LogicOperator,
   LOGIC_OPERATOR_LABELS
-} from '@/constants/ruleTypes.js'
+} from '@/constants/ruleTypes'
+import type { PredicateParamSpec } from '@/constants/ruleTypes'
+import type {
+  Rule,
+  RuleInput,
+  RuleParams,
+  RulePriority as RulePriorityValue,
+  RuleSubject,
+  SubjectType
+} from '@/types/models'
 
-const emit = defineEmits(['added', 'cancel-edit'])
-const props = defineProps({
-  editingRule: {
-    type: Object,
-    default: null
-  }
+const emit = defineEmits<{
+  (e: 'added', rule: Rule | string): void
+  (e: 'cancel-edit'): void
+}>()
+const props = withDefaults(defineProps<{ editingRule?: Rule | null }>(), {
+  editingRule: null
 })
 
 const { students } = useStudentData()
@@ -260,23 +270,38 @@ const QUICK_TEMPLATE_KEYS = {
   HEIGHT_GRADIENT: 'height-gradient',
   SCORE_BALANCE: 'score-balance',
   SCORE_BANDS: 'score-bands'
+} as const
+
+type QuickTemplateKey = typeof QUICK_TEMPLATE_KEYS[keyof typeof QUICK_TEMPLATE_KEYS]
+
+interface QuickTemplate {
+  priority: RulePriorityValue
+  predicate: string
+  subjects: () => RuleSubject[]
+  params: () => RuleParams
+}
+
+interface BuilderSubRule {
+  predicate: string
+  not: boolean
+  params: RuleParams
 }
 
 // 新数据结构：支持多规则组合
-const selectedPriority = ref(RulePriority.PREFER)
+const selectedPriority = ref<RulePriorityValue>(RulePriority.PREFER)
 const description = ref('')
-const selectedLogicOperator = ref(LogicOperator.AND)
+const selectedLogicOperator = ref<'AND' | 'OR'>(LogicOperator.AND)
 
 // 共享的对象集合（所有子规则共用）
-const sharedSubjects = ref([{ type: 'person', id: null }])
+const sharedSubjects = ref<RuleSubject[]>([{ type: 'person', id: null }])
 
 // 子规则列表（不再包含 subjects）
-const subRules = ref([
+const subRules = ref<BuilderSubRule[]>([
   createEmptySubRule()
 ])
 
 // 创建空的子规则（不含 subjects）
-function createEmptySubRule() {
+function createEmptySubRule(): BuilderSubRule {
   return {
     predicate: '',
     not: false,
@@ -310,10 +335,22 @@ const paramValues = computed({
 
 const isEditing = computed(() => !!props.editingRule?.id)
 
-const priorities = [
+const priorities: Array<{ key: RulePriorityValue; label: string }> = [
   { key: 'required', label: '强制必须' },
   { key: 'prefer', label: '建议尽量' },
   { key: 'optional', label: '可选参考' }
+]
+
+const priorityButtonType = (priority: RulePriorityValue): ButtonProps['type'] => {
+  if (priority === 'required') return 'error'
+  if (priority === 'prefer') return 'warning'
+  return 'default'
+}
+
+const subjectTypeOptions: Array<{ value: SubjectType; label: string }> = [
+  { value: 'all', label: '全体' },
+  { value: 'person', label: '个人' },
+  { value: 'tag', label: '标签' }
 ]
 
 const predicateGroups = [
@@ -363,6 +400,16 @@ const filteredPredicateGroups = computed(() => {
     .filter(group => group.predicates.length > 0)
 })
 
+const predicateOptions = computed(() => filteredPredicateGroups.value.map(group => ({
+  type: 'group',
+  key: group.label,
+  label: group.label,
+  children: group.predicates.map(predicate => ({
+    label: predicate.label,
+    value: predicate.key
+  }))
+})))
+
 const studentOptions = computed(() =>
   students.value.map(s => ({ id: s.id, label: `${s.studentNumber || '-'} ${s.name || '未命名'}` }))
 )
@@ -372,26 +419,68 @@ const tagOptions = computed(() =>
 )
 
 const attributeOptions = computed(() => getAttributeOptions())
+const zoneOptions = computed(() => zones.value.map(zone => ({
+  label: zone.name,
+  value: zone.id
+})))
+
+const getNumberParam = (ruleIndex: number, key: string): number | null => {
+  const value = subRules.value[ruleIndex]?.params[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+const getSelectParam = (ruleIndex: number, key: string): string | number | null => {
+  const value = subRules.value[ruleIndex]?.params[key]
+  return typeof value === 'string' || typeof value === 'number' ? value : null
+}
+
+const setParamValue = (ruleIndex: number, key: string, value: string | number | null) => {
+  const rule = subRules.value[ruleIndex]
+  if (!rule) return
+  if (value === null) {
+    delete rule.params[key]
+    return
+  }
+  rule.params[key] = value
+}
+
+const setNumberParamValue = (
+  ruleIndex: number,
+  param: PredicateParamSpec,
+  value: number | null
+) => {
+  setParamValue(ruleIndex, param.key, normalizeNumberInput(value, {
+    min: param.min ?? 1,
+    precision: 0
+  }))
+}
+
+const normalizeParamOptions = (
+  options: Array<{ label: string; value: string | number }> | undefined
+): SelectOption[] => (
+  options?.map(option => ({ label: option.label, value: option.value })) ?? []
+)
 
 // 获取指定子规则的参数规格
-const getParamSpecs = (ruleIndex) => {
+const getParamSpecs = (ruleIndex: number) => {
   const predicate = subRules.value[ruleIndex]?.predicate
   if (!predicate) return []
   return PREDICATE_META[predicate]?.params ?? []
 }
 
 // 获取指定子规则的最小对象数提示
-const getSubjectHint = (ruleIndex) => {
+const getSubjectHint = (ruleIndex: number) => {
   const predicate = subRules.value[ruleIndex]?.predicate
   if (!predicate) return ''
   const minSubjects = PREDICATE_META[predicate]?.minSubjects ?? 1
   return minSubjects > 1 ? `当前规则至少需要 ${minSubjects} 个对象` : ''
 }
 
-const currentRulePayload = computed(() => {
+const currentRulePayload = computed<RuleInput>(() => {
+  const firstRule = subRules.value[0]
   // 如果只有一条子规则且未取反，保持兼容的扁平结构
-  if (subRules.value.length === 1 && !subRules.value[0].not) {
-    const sr = subRules.value[0]
+  if (subRules.value.length === 1 && firstRule && !firstRule.not) {
+    const sr = firstRule
     return {
       subjects: sharedSubjects.value.map(s => ({ ...s })),
       predicate: sr.predicate,
@@ -404,9 +493,9 @@ const currentRulePayload = computed(() => {
   // 多规则或有取反，使用复合结构
   return {
     subjects: sharedSubjects.value.map(s => ({ ...s })),
-    predicate: subRules.value[0]?.predicate || '',
+    predicate: firstRule?.predicate || '',
     priority: selectedPriority.value,
-    params: { ...(subRules.value[0]?.params || {}) },
+    params: { ...(firstRule?.params || {}) },
     description: description.value,
     // 新增字段
     not: subRules.value.length === 1 ? subRules.value[0].not : false,
@@ -420,11 +509,11 @@ const currentRulePayload = computed(() => {
   }
 })
 
-const validationWarnings = ref([])
+const validationWarnings = ref<string[]>([])
 const canAdd = ref(false)
 const previewText = ref('')
 const showTemplateDialog = ref(false)
-let feedbackTimer = null
+let feedbackTimer: number | null = null
 
 const quickTemplateGroups = [
   {
@@ -458,7 +547,7 @@ const buildFeedbackState = () => {
   if (!firstPredicate) return { valid: false, warnings: [], preview: '' }
 
   // 验证每条子规则
-  const allWarnings = []
+  const allWarnings: string[] = []
   for (const sr of subRules.value) {
     if (!sr.predicate) continue
     const result = validateRule({
@@ -506,13 +595,13 @@ const scheduleFeedbackUpdate = () => {
   }, 120)
 }
 
-const getEntryOptions = (type) => {
+const getEntryOptions = (type: SubjectType) => {
   if (type === 'all') return []
   if (type === 'person') return studentOptions.value
   return tagOptions.value
 }
 
-const onEntryTypeChange = (entry) => {
+const onEntryTypeChange = (entry: RuleSubject) => {
   entry.id = null
   if (entry.type === 'all') {
     sharedSubjects.value = [{ type: 'all', id: null }]
@@ -520,7 +609,7 @@ const onEntryTypeChange = (entry) => {
 }
 
 // 切换子规则的 not 状态
-const toggleNot = (ruleIndex) => {
+const toggleNot = (ruleIndex: number) => {
   if (subRules.value[ruleIndex]) {
     subRules.value[ruleIndex].not = !subRules.value[ruleIndex].not
   }
@@ -532,7 +621,7 @@ const addSubRule = () => {
 }
 
 // 删除子规则
-const removeSubRule = (ruleIndex) => {
+const removeSubRule = (ruleIndex: number) => {
   subRules.value.splice(ruleIndex, 1)
   if (subRules.value.length === 0) {
     subRules.value.push(createEmptySubRule())
@@ -545,7 +634,7 @@ const addSharedEntry = () => {
 }
 
 // 共享对象管理：删除对象
-const removeSharedEntry = (entryIndex) => {
+const removeSharedEntry = (entryIndex: number) => {
   sharedSubjects.value.splice(entryIndex, 1)
   if (sharedSubjects.value.length === 0) {
     sharedSubjects.value.push({ type: 'person', id: null })
@@ -566,7 +655,7 @@ const ensureMinimumSharedSubjects = () => {
   }
 }
 
-const onPredicateChange = (ruleIndex) => {
+const onPredicateChange = (ruleIndex: number) => {
   const sr = subRules.value[ruleIndex]
   if (sr?.predicate) {
     sr.params = getDefaultParams(sr.predicate)
@@ -582,10 +671,11 @@ const handleAdd = () => {
   }
   applyFeedbackState()
   if (!canAdd.value) return
-  if (isEditing.value) {
-    const updated = updateRule(props.editingRule.id, currentRulePayload.value)
+  const editingRule = props.editingRule
+  if (isEditing.value && editingRule) {
+    const updated = updateRule(editingRule.id, currentRulePayload.value)
     if (updated) {
-      emit('added', props.editingRule.id)
+      emit('added', editingRule.id)
       resetForm()
       return
     }
@@ -593,7 +683,7 @@ const handleAdd = () => {
     return
   }
   const result = addRule(currentRulePayload.value)
-  if (result.success) {
+  if (result.success && result.rule) {
     emit('added', result.rule)
     resetForm()
   }
@@ -614,7 +704,7 @@ const handleReset = () => {
   }
 }
 
-const applyEditingRule = (rule) => {
+const applyEditingRule = (rule: Rule | null | undefined) => {
   if (!rule?.id) {
     resetForm()
     return
@@ -648,8 +738,8 @@ const applyEditingRule = (rule) => {
   }
 }
 
-const applyQuickTemplate = (key) => {
-  const quickTemplates = {
+const applyQuickTemplate = (key: QuickTemplateKey) => {
+  const quickTemplates: Record<QuickTemplateKey, QuickTemplate> = {
     [QUICK_TEMPLATE_KEYS.FRONT_ROW]: {
       priority: RulePriority.REQUIRED,
       predicate: 'IN_ROW_RANGE',
@@ -719,7 +809,7 @@ const applyQuickTemplate = (key) => {
   ensureMinimumSharedSubjects()
 }
 
-const handleQuickTemplate = (key) => {
+const handleQuickTemplate = (key: QuickTemplateKey) => {
   applyQuickTemplate(key)
   showTemplateDialog.value = false
   applyFeedbackState()
@@ -781,26 +871,6 @@ defineExpose({
 }
 
 .builder-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--color-primary); }
-.template-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--color-primary);
-  border-radius: 8px;
-  background: var(--color-surface);
-  color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.template-button:hover {
-  background: var(--color-bg-subtle);
-}
-
 .sentence-builder { display: flex; flex-direction: column; gap: 16px; padding: 16px; background: var(--color-surface); border-radius: 12px; border: 1px solid var(--color-border-light); }
 .builder-segment { display: flex; flex-direction: column; gap: 8px; }
 .seg-label { font-size: 12px; color: var(--color-text-muted); font-weight: 600; }
@@ -843,28 +913,6 @@ defineExpose({
   width: 36px;
   height: 36px;
   flex-shrink: 0;
-  border: 2px solid var(--color-border-light);
-  background: var(--color-surface);
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.logic-toggle:hover { border-color: var(--color-text-disabled); }
-.logic-toggle.active {
-  background: var(--color-info-bg);
-  border-color: var(--color-info);
-  color: var(--color-link);
-}
-.logic-toggle.or {
-  background: var(--color-warning-bg);
-  border-color: var(--color-warning);
-  color: var(--color-warning-hover);
 }
 
 /* 占位符（第一条规则不显示逻辑符） */
@@ -883,23 +931,6 @@ defineExpose({
   width: 36px;
   height: 36px;
   flex-shrink: 0;
-  border: 2px solid var(--color-border);
-  background: var(--color-surface);
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.not-toggle:hover { border-color: var(--color-text-disabled); }
-.not-toggle.active {
-  background: var(--color-danger-bg);
-  border-color: var(--color-danger);
-  color: var(--color-danger);
 }
 
 /* 内联参数区域 */
@@ -927,39 +958,15 @@ defineExpose({
   flex-shrink: 0;
 }
 
-/* 添加子规则按钮 */
-.add-sub-rule-btn {
-  border: 1px solid var(--color-border-light);
-  background: var(--color-surface);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: normal;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.add-sub-rule-btn:hover {
-  border-color: var(--color-text-disabled);
-}
-
-.chip-group { display: flex; gap: 8px; flex-wrap: wrap; }
-.chip-item { border: 1px solid var(--color-border-light); background: var(--color-surface); color: var(--color-text-primary); border-radius: 999px; font-size: 12px; padding: 6px 12px; cursor: pointer; }
-.chip-item.active { background: var(--color-primary); color: var(--color-text-inverse); border-color: var(--color-primary); }
 .rule-selector-wrap { position: relative; }
-.seg-select { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--color-border-light); }
+.seg-select { width: 100%; }
 .priority-pills { display: flex; gap: 8px; }
-.priority-pill { border: 1px solid var(--color-border-light); background: var(--color-surface); border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
-.priority-pill.active { border-color: var(--color-primary); color: var(--color-primary); }
 .subject-section { display: flex; flex-direction: column; gap: 12px; }
 .subject-slot { display: flex; flex-direction: column; gap: 8px; }
-.slot-title { font-size: 12px; color: var(--color-text-primary); font-weight: 600; }
 .subject-row { display: grid; grid-template-columns: 120px 1fr auto; gap: 8px; }
-.mini-btn { border: 1px solid var(--color-border-light); background: var(--color-surface); border-radius: 8px; font-size: 12px; padding: 6px 10px; cursor: pointer; }
-.mini-btn.danger { color: var(--color-danger); border-color: var(--color-danger-bg); }
 .input-group { display: flex; flex-direction: column; gap: 6px; }
 .input-group label { font-size: 12px; font-weight: 600; color: var(--color-text-primary); }
-.detail-select, .detail-input { width: 100%; padding: 8px 10px; border: 1px solid var(--color-border-light); border-radius: 8px; }
-.params-section { display: flex; flex-direction: column; gap: 10px; }
+.detail-select, .detail-input { width: 100%; }
 .builder-preview-section { display: flex; flex-direction: column; gap: 8px; }
 .smart-preview-card { border: 1px solid var(--color-border); border-radius: 10px; padding: 10px 12px; background: var(--color-bg-secondary); }
 .preview-text-content { font-size: 13px; color: var(--color-text-primary); }
@@ -974,75 +981,13 @@ defineExpose({
   border-top: 1px solid var(--color-border-light);
   background: var(--color-dialog-bg);
 }
-.btn-add, .btn-reset { border-radius: 8px; padding: 8px 12px; border: 1px solid var(--color-border-light); background: var(--color-surface); cursor: pointer; }
-.btn-add[disabled] { opacity: 0.5; cursor: not-allowed; }
-
-.template-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--color-bg-overlay);
-}
-
-.template-dialog {
-  width: min(560px, calc(100vw - 48px));
-  max-height: min(720px, calc(100vh - 48px));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-dialog-bg);
-  box-shadow: var(--shadow-lg);
-}
-
-.template-dialog-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.template-dialog-header h3 {
-  margin: 0;
-  color: var(--color-text-primary);
-  font-size: 16px;
-}
-
-.template-dialog-header p {
-  margin: 4px 0 0;
-  color: var(--color-text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.template-close-button {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  cursor: pointer;
-}
-
 .template-groups {
   display: flex;
   flex-direction: column;
   gap: 14px;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  padding: 4px 0;
 }
 
 .template-group {
@@ -1059,23 +1004,17 @@ defineExpose({
 }
 
 .template-option {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
   width: 100%;
   min-height: 54px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
   text-align: left;
-  cursor: pointer;
 }
 
-.template-option:hover {
-  border-color: var(--color-primary);
-  background: var(--color-bg-subtle);
+.template-option-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
 }
 
 .template-option span {
@@ -1100,10 +1039,6 @@ defineExpose({
 
   .builder-heading {
     align-items: stretch;
-  }
-
-  .template-button {
-    min-height: 40px;
   }
 
   .sentence-builder {
@@ -1139,10 +1074,7 @@ defineExpose({
   .detail-select,
   .detail-input,
   .mini-btn,
-  .add-sub-rule-btn,
-  .priority-pill,
-  .btn-add,
-  .btn-reset {
+  .priority-pill {
     min-height: 44px;
   }
 
@@ -1158,22 +1090,6 @@ defineExpose({
 
   .builder-footer {
     padding-bottom: env(safe-area-inset-bottom, 0);
-  }
-
-  .builder-footer .btn-add,
-  .builder-footer .btn-reset {
-    flex: 1;
-  }
-
-  .template-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .template-dialog {
-    width: 100%;
-    max-height: 82vh;
-    border-radius: 12px 12px 0 0;
   }
 
   .template-groups {

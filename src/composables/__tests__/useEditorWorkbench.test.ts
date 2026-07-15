@@ -6,20 +6,11 @@ describe('useEditorWorkbench', () => {
 
   beforeEach(() => {
     workbench = useEditorWorkbench()
-    workbench.resetTool()
     workbench.closeDialog()
     workbench.finishZoneEditSession()
     workbench.setRightRailTab('candidates')
     workbench.closeMobileDrawer()
     workbench.exitSeatFullscreen()
-  })
-
-  it('tracks active tool', () => {
-    workbench.setTool('swap')
-    expect(workbench.activeTool.value).toBe('swap')
-
-    workbench.resetTool()
-    expect(workbench.activeTool.value).toBe('normal')
   })
 
   it('opens and closes a workbench dialog', () => {

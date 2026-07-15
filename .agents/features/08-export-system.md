@@ -2,8 +2,8 @@
 module_name: Export System
 description: 极度复杂的高精度排版导出系统，包括 HTML5 Canvas 画布渲染与 Excel 特效输出。
 related_files:
-  - src/composables/useImageExport.js
-  - src/composables/useExcelData.js
+  - src/composables/useImageExport.ts
+  - src/composables/useExcelData.ts
   - src/platform/files.ts
 ---
 
@@ -13,8 +13,8 @@ related_files:
 将屏幕上的纯 HTML 节点转化为无损/A4 贴合的高清位图 (PNG/JPEG) 和带颜色、带合并单元格的高级 XLSX 文件，供给班主任进行打印机直接落地。
 
 ## 2. 源代码入口 (Source Files)
-- 画布渲染引擎: `src/composables/useImageExport.js`
-- 专属设定表单数据: `src/composables/useExportSettings.js`
+- 画布渲染引擎: `src/composables/useImageExport.ts`
+- 专属设定表单数据: `src/composables/useExportSettings.ts`
 - 文件保存适配层: `src/platform/files.ts`
 
 ## 3. 极简 API 封装

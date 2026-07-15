@@ -91,31 +91,23 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useTagData } from '@/composables/useTagData'
+import type { Student } from '@/types/models'
 
-const props = defineProps({
-  student: {
-    type: Object,
-    default: null
-  },
-  variant: {
-    type: String,
-    default: 'seat',
-    validator: value => ['seat', 'candidate', 'preview'].includes(value)
-  },
-  density: {
-    type: String,
-    default: 'standard',
-    validator: value => ['standard', 'compact'].includes(value)
-  },
-  fallbackName: {
-    type: String,
-    default: '未命名'
-  }
+const props = withDefaults(defineProps<{
+  student?: Student | null
+  variant?: 'seat' | 'candidate' | 'preview'
+  density?: 'standard' | 'compact'
+  fallbackName?: string
+}>(), {
+  student: null,
+  variant: 'seat',
+  density: 'standard',
+  fallbackName: '未命名'
 })
 
 const { settings } = useGlobalSettings()
@@ -136,7 +128,7 @@ const allVisibleTags = computed(() => {
   return tags.value.filter(tag => tag.showInSeatChart !== false)
 })
 
-const hasTag = (tagId) => {
+const hasTag = (tagId: number) => {
   if (!props.student?.tags) return false
   return props.student.tags.includes(tagId)
 }
@@ -155,7 +147,7 @@ const visibleStudentAttributes = computed(() => {
     .filter(attribute => attribute.showInEditor !== false)
     .map(attribute => {
       const rawValue = numericAttributes[attribute.id]
-      if (rawValue === null || rawValue === undefined || rawValue === '') return null
+      if (rawValue === null || rawValue === undefined) return null
       const numberValue = Number(rawValue)
       if (!Number.isFinite(numberValue)) return null
       const formattedValue = formatNumericValue(numberValue, attribute.id)
@@ -167,7 +159,7 @@ const visibleStudentAttributes = computed(() => {
         title: `${attribute.name}: ${formattedValue}`
       }
     })
-    .filter(Boolean)
+    .filter((attribute): attribute is { id: string; displayText: string; title: string } => attribute !== null)
 })
 
 const hasNumericAttributes = computed(() => visibleStudentAttributes.value.length > 0)

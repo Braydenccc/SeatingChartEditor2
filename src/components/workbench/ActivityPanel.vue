@@ -5,7 +5,7 @@
         <h2>状态</h2>
         <p>{{ logs.length > 0 ? '最近操作与提示' : '暂无操作记录' }}</p>
       </div>
-      <button v-if="logs.length > 0" class="text-action" @click="clearLogs">清空</button>
+      <NButton v-if="logs.length > 0" class="text-action" @click="clearLogs">清空</NButton>
     </header>
 
     <div class="activity-list">
@@ -18,12 +18,13 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { useLogger } from '@/composables/useLogger'
 
 const { logs, clearLogs } = useLogger()
 
-const formatLogTime = (timestamp) => {
+const formatLogTime = (timestamp: string | number | Date) => {
   const date = new Date(timestamp)
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')

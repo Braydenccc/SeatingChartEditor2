@@ -452,17 +452,7 @@ a:hover,
     -webkit-text-size-adjust: 100%;
   }
 
-  /* 确保触摸区域足够大 */
-  button,
-  input[type="button"],
-  input[type="submit"],
-  .clickable {
-    min-height: 44px;
-    min-width: 44px;
-  }
-
   /* 优化触摸反馈 */
-  button:active,
   .clickable:active {
     background-color: var(--color-bg-hover);
     transition: background-color 0.1s ease;

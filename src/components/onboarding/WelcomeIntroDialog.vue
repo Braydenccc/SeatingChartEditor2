@@ -1,18 +1,18 @@
 <template>
-  <Teleport to="body">
-    <div class="intro-overlay" role="presentation">
-      <section class="intro-dialog" role="dialog" aria-modal="true" aria-labelledby="welcome-intro-title">
-        <button class="close-button" type="button" aria-label="关闭简介" title="关闭简介" @click="dismiss">
-          <X :size="18" />
-        </button>
-
+  <ResponsiveOverlay
+    :show="true"
+    title="欢迎使用 BraydenSCE V2"
+    :desktop-width="680"
+    mobile-height="90dvh"
+    @update:show="value => !value && dismiss()"
+  >
         <div class="intro-heading">
           <span class="intro-icon">
             <Sparkles :size="24" />
           </span>
           <div>
             <p class="intro-kicker">欢迎使用</p>
-            <h2 id="welcome-intro-title">BraydenSCE V2</h2>
+            <h2>BraydenSCE V2</h2>
           </div>
         </div>
 
@@ -38,22 +38,22 @@
           </div>
         </div>
 
-        <footer class="intro-actions">
-          <button class="secondary-action" type="button" @click="dismiss">稍后再说</button>
-          <button class="primary-action" type="button" @click="startTutorial">
+        <template #footer><div class="intro-actions">
+          <NButton class="intro-action" attr-type="button" secondary @click="dismiss">稍后再说</NButton>
+          <NButton class="intro-action" attr-type="button" type="primary" @click="startTutorial">
             <BookOpen :size="18" />
             <span>用户手册</span>
-          </button>
-        </footer>
-      </section>
-    </div>
-  </Teleport>
+          </NButton>
+        </div></template>
+  </ResponsiveOverlay>
 </template>
 
 <script setup lang="ts">
-import { BookOpen, Cloud, Grid, Sparkles, Users, Wand2, X } from 'lucide-vue-next'
+import { NButton } from 'naive-ui'
+import { BookOpen, Cloud, Grid, Sparkles, Users, Wand2 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { dismissWelcomeIntro } from '@/composables/useWelcomeOnboarding'
+import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 
 const router = useRouter()
 
@@ -91,50 +91,6 @@ const startTutorial = async () => {
 </script>
 
 <style scoped>
-.intro-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  background: var(--color-bg-overlay);
-}
-
-.intro-dialog {
-  position: relative;
-  width: min(680px, 100%);
-  max-height: min(720px, calc(100dvh - 36px));
-  overflow: auto;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  box-shadow: 0 18px 52px var(--shadow-lg);
-  padding: 22px;
-}
-
-.close-button {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-subtle);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
-
-.close-button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
 
 .intro-heading {
   display: flex;
@@ -235,50 +191,9 @@ const startTutorial = async () => {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 20px;
-}
-
-.primary-action,
-.secondary-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 42px;
-  border-radius: 8px;
-  padding: 0 15px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.primary-action {
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.primary-action:hover {
-  background: var(--color-primary-hover);
-}
-
-.secondary-action {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-}
-
-.secondary-action:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
 }
 
 @media (max-width: 640px) {
-  .intro-dialog {
-    padding: 18px;
-  }
-
   .feature-grid {
     grid-template-columns: 1fr;
   }
@@ -287,9 +202,9 @@ const startTutorial = async () => {
     flex-direction: column-reverse;
   }
 
-  .primary-action,
-  .secondary-action {
+  .intro-action {
     width: 100%;
+    min-height: 44px;
   }
 }
 </style>

@@ -2,7 +2,7 @@
 module_name: Auto-Assignment Algorithm
 description: 座位表的核心大脑。利用“模拟退火”实现满足多维约束（同桌、分区、排数、隔离距离、正前方防遮挡）的最优座次计算。
 related_files:
-  - src/composables/useAssignment.js
+  - src/composables/useAssignment.ts
 ---
 
 # 05-自动排位算法 (Auto-Assignment Algorithm)
@@ -11,9 +11,9 @@ related_files:
 将所有被放到右侧工作区的学生，根据《04-规则引擎》里定义的上百条冲突和偏好，找出一个最优（总体扣分最少）的坐法。它不再是 $O(n^2)$ 的贪婪分配，而是一种启发式暴力搜索过程。
 
 ## 2. 源代码入口 (Source Files)
-- 退火算法核心: `src/composables/useAssignment.js`
-- 规则惩罚依赖: `src/constants/ruleTypes.js`
-- 座位拓扑判定库: `src/composables/useSeatChart.js` (依赖里面的 `validateRepulsion` 等方法)
+- 退火算法核心: `src/composables/useAssignment.ts`
+- 规则惩罚依赖: `src/constants/ruleTypes.ts`
+- 座位拓扑判定库: `src/composables/useSeatChart.ts` (依赖里面的 `validateRepulsion` 等方法)
 
 ## 3. 算法核心概念 (The Heuristic Approach Context)
 
@@ -41,7 +41,7 @@ let currentReverse = new Map<SeatId, StudentId>() // 用于以 O(1) 交换两人
   - `ATTRIBUTE_DISTRIBUTE_BANDS`: 按属性排序分层后，惩罚同一层在大组间分布不均。
 - **数值缺失策略**: 学生缺失某个属性值时跳过该数值规则，不视为违规，不阻断排位。
 - **数值初始解**: 对 `prefer` 级 `ATTRIBUTE_ROW_GRADIENT` 会先按属性排序分配前后排座位，再交给退火继续优化；同值学生和同排候选座位会随机打破平局，避免数组顺序固定化；`required` 规则仍主要靠评分保证，避免抢占同桌绑定等硬约束的初始位置。
-- **偏向变异 (`violatingStudents` list + ruleAffectedStudentIds)**: 正常退火是随机抽 2 人换位置，但在 `useAssignment.js` 中，每次循环都会预先整理出一批**“正在犯规的人的名单”**。变异时优先移动违规学生；若暂无明确违规学生，则优先从被规则覆盖的学生池中抽取；最后才回落到全体已分配学生。这样无规则学生更多承担随机填空角色，但仍可参与交换，避免局部子问题封死。
+- **偏向变异 (`violatingStudents` list + ruleAffectedStudentIds)**: 正常退火是随机抽 2 人换位置，但在 `useAssignment.ts` 中，每次循环都会预先整理出一批**“正在犯规的人的名单”**。变异时优先移动违规学生；若暂无明确违规学生，则优先从被规则覆盖的学生池中抽取；最后才回落到全体已分配学生。这样无规则学生更多承担随机填空角色，但仍可参与交换，避免局部子问题封死。
 - **线程脱离避卡 (`setTimeout(0)`)**: JavaScript 是单线程的，死循环 5w 次计算会锁死标签页。本项目规定每隔 1000 次执行一次 `await new Promise(r => setTimeout(r, 0))`，向主 UI 框架注入呼吸孔，使画面进度条 `assignmentProgress.value` 可以持续滚动更新。
 - **护法位参与排位**: `getAvailableSeats()` 默认不返回左右护法位；只有 `seatConfig.guardSeats.includeInAutoAssignment === true` 时，智能排位才会把 `guard-left` / `guard-right` 纳入基础候选座位。护法位没有普通行列坐标：单人行/组/区域正向规则会视为不满足，负向规则视为不违规；同桌、同组、相邻排、最大距离等需要普通坐标才能满足的正向关系会视为不满足；分散/聚集这类整体坐标统计会跳过护法位，避免 `parseSeatId()` 读取出 `NaN`。
 
