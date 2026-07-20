@@ -1,4 +1,4 @@
-name: Deploy to Retinbox Web Hosting
+name: Deploy to Retinbox
 
 permissions:
   contents: read
