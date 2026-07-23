@@ -4,7 +4,7 @@
       <div class="builder-heading">
         <h4 class="builder-title">{{ isEditing ? '编辑规则' : '添加新规则' }}</h4>
         <NButton size="small" secondary type="primary" @click="showTemplateDialog = true">
-          <Wand2 :size="15" stroke-width="2" />
+          <template #icon><Wand2 :size="15" stroke-width="2" /></template>
           <span>快捷方案</span>
         </NButton>
       </div>

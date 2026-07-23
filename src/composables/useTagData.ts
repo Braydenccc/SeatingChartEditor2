@@ -77,6 +77,14 @@ export function useTagData(): UseTagDataReturn {
     colorIndex = 0
   }
 
+  const replaceTagData = (nextTags: Tag[]): void => {
+    tags.value = nextTags.map(tag => ({ ...tag }))
+    nextTagId = tags.value.length > 0
+      ? Math.max(...tags.value.map(tag => tag.id)) + 1
+      : 1
+    colorIndex = tags.value.length
+  }
+
   // 设置全局标签显示开关
   const setShowTagsInSeatChart = (show: boolean): void => {
     showTagsInSeatChart.value = show
@@ -97,6 +105,7 @@ export function useTagData(): UseTagDataReturn {
     getTagById,
     deleteTag,
     clearAllTags,
+    replaceTagData,
     setShowTagsInSeatChart,
     setTagDisplayMode
   }

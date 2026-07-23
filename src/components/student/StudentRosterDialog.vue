@@ -28,11 +28,11 @@
 
               <div class="quick-actions">
                 <NButton size="small" type="primary" secondary @click="handleAddAttributeFromHeader">
-                  <BarChart3 :size="15" />
+                  <template #icon><BarChart3 :size="15" /></template>
                   <span>新增数值属性</span>
                 </NButton>
                 <NButton size="small" type="primary" secondary @click="handleAddTagFromHeader">
-                  <Tag :size="15" />
+                  <template #icon><Tag :size="15" /></template>
                   <span>新增标签</span>
                 </NButton>
               </div>
@@ -141,7 +141,7 @@
                 <div v-if="!showNumericAttributesInEditor" class="global-disabled-notice">
                   <span>全局数值显示已关闭</span>
                   <NButton size="small" text type="primary" @click="goToNumericDisplaySettings">
-                    <Settings :size="13" />
+                    <template #icon><Settings :size="13" /></template>
                     <span>前往界面偏好</span>
                   </NButton>
                 </div>
@@ -149,11 +149,11 @@
 
               <div class="context-footer">
                 <NButton size="small" secondary @click="showOverviewContext">
-                  <PanelLeft :size="15" />
+                  <template #icon><PanelLeft :size="15" /></template>
                   <span>返回总览</span>
                 </NButton>
                 <NButton size="small" type="error" secondary @click="handleDeleteActiveAttribute">
-                  <Trash2 :size="15" />
+                  <template #icon><Trash2 :size="15" /></template>
                   <span>删除属性</span>
                 </NButton>
               </div>
@@ -173,7 +173,7 @@
                 <label class="field-row">
                   <span>颜色</span>
                   <NColorPicker
-                    class="context-input color-input"
+                    class="context-input"
                     :value="activeTag.color"
                     :modes="['hex']"
                     :show-alpha="false"
@@ -196,11 +196,11 @@
 
               <div class="context-footer">
                 <NButton size="small" secondary @click="showOverviewContext">
-                  <PanelLeft :size="15" />
+                  <template #icon><PanelLeft :size="15" /></template>
                   <span>返回总览</span>
                 </NButton>
                 <NButton size="small" type="primary" secondary @click="applyActiveTagStudents">
-                  <Check :size="15" />
+                  <template #icon><Check :size="15" /></template>
                   <span>应用学生范围</span>
                 </NButton>
                 <NButton
@@ -209,7 +209,7 @@
                   secondary
                   @click="handleDeleteActiveTag"
                 >
-                  <Trash2 :size="15" />
+                  <template #icon><Trash2 :size="15" /></template>
                   <span>删除标签</span>
                 </NButton>
               </div>
@@ -237,11 +237,11 @@
                 <label>人</label>
               </div>
               <NButton size="small" secondary attr-type="button" @click="goFilesView">
-                <FileInput :size="15" />
+                <template #icon><FileInput :size="15" /></template>
                 <span>到文件页导入</span>
               </NButton>
               <NButton size="small" type="primary" @click="handleAddStudent">
-                <Plus :size="15" />
+                <template #icon><Plus :size="15" /></template>
                 <span>添加学生</span>
               </NButton>
             </div>
@@ -400,7 +400,7 @@ const activeContext = ref<RosterContext>({ type: 'overview', id: null })
 const selectedTagStudentIds = ref<number[]>([])
 const enabledAttributes = computed(() => enabledAttributeDefinitions.value)
 const tagOptions = computed(() => tags.value.map(tag => ({ label: tag.name, value: tag.id })))
-const tableScrollX = computed(() => 400 + enabledAttributes.value.length * 128 + tags.value.length * 104)
+const tableScrollX = computed(() => 342 + enabledAttributes.value.length * 112 + tags.value.length * 76)
 const tableMaxHeight = 'calc(100dvh - 270px)'
 const activeAttribute = computed(() => {
   if (activeContext.value.type !== 'attribute') return null
@@ -429,14 +429,14 @@ const tableColumns = computed<DataTableColumns<Student>>(() => [
   {
     title: '#',
     key: 'index',
-    width: 54,
+    width: 48,
     fixed: 'left',
     render: (_row, index) => index + 1
   },
   {
     title: '学号',
     key: 'studentNumber',
-    width: 120,
+    width: 86,
     fixed: 'left',
     render: (student) => h(NInputNumber, {
       value: student.studentNumber,
@@ -450,7 +450,7 @@ const tableColumns = computed<DataTableColumns<Student>>(() => [
   {
     title: '姓名',
     key: 'name',
-    width: 160,
+    width: 150,
     fixed: 'left',
     render: (student) => h(NInput, {
       value: student.name,
@@ -462,7 +462,7 @@ const tableColumns = computed<DataTableColumns<Student>>(() => [
   },
   ...enabledAttributes.value.map(attribute => ({
     key: `attribute-${attribute.id}`,
-    width: 128,
+    width: 112,
     title: () => h(NButton, {
       size: 'tiny',
       text: true,
@@ -486,7 +486,7 @@ const tableColumns = computed<DataTableColumns<Student>>(() => [
   })),
   ...tags.value.map(tag => ({
     key: `tag-${tag.id}`,
-    width: 104,
+    width: 76,
     align: 'center' as const,
     title: () => h(NButton, {
       size: 'tiny',
@@ -503,7 +503,7 @@ const tableColumns = computed<DataTableColumns<Student>>(() => [
   {
     title: '操作',
     key: 'actions',
-    width: 64,
+    width: 58,
     fixed: 'right',
     align: 'center',
     render: (student) => h(NPopconfirm, {
@@ -974,10 +974,6 @@ const close = () => {
 
 .context-input {
   width: 100%;
-}
-
-.color-input {
-  padding: 3px;
 }
 
 .switch-row {

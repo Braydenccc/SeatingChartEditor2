@@ -5,6 +5,63 @@
  * 提供独立的权限表机制，不依赖文件元数据
  */
 
+function getFilePermissionKey($fileId, $username) {
+    return 'perm_v2_' . hash('sha256', $fileId . "\0" . $username);
+}
+
+function getLegacyFilePermissionKey($fileId, $username) {
+    return sanitizeDbKey("perm_{$fileId}_{$username}");
+}
+
+function decodeMatchingFilePermission($rawPermission, $fileId, $username) {
+    if (!is_string($rawPermission) || $rawPermission === '') {
+        return null;
+    }
+
+    $permission = json_decode($rawPermission, true);
+    if (
+        !is_array($permission) ||
+        !isset($permission['username'], $permission['fileId'], $permission['permission']) ||
+        $permission['username'] !== $username ||
+        $permission['fileId'] !== $fileId ||
+        !in_array($permission['permission'], ['read', 'write', 'owner'], true)
+    ) {
+        return null;
+    }
+
+    return $permission;
+}
+
+function getFilePermissionRecord($permDb, $fileId, $username, $migrateLegacy = true) {
+    if (!isValidUsername($username) || !isValidFileId($fileId)) {
+        return null;
+    }
+
+    $permission = decodeMatchingFilePermission(
+        $permDb->get(getFilePermissionKey($fileId, $username)),
+        $fileId,
+        $username
+    );
+    if ($permission !== null) {
+        return $permission;
+    }
+
+    $legacyPermission = decodeMatchingFilePermission(
+        $permDb->get(getLegacyFilePermissionKey($fileId, $username)),
+        $fileId,
+        $username
+    );
+    if ($legacyPermission === null) {
+        return null;
+    }
+
+    if ($migrateLegacy) {
+        grantFilePermission($permDb, $fileId, $username, $legacyPermission['permission']);
+    }
+
+    return $legacyPermission;
+}
+
 /**
  * 授予用户对文件的访问权限
  *
@@ -15,19 +72,24 @@
  * @return bool 是否成功
  */
 function grantFilePermission($permDb, $fileId, $username, $permission = 'owner') {
-    if (!isValidUsername($username) || !isValidFileId($fileId)) {
+    if (
+        !isValidUsername($username) ||
+        !isValidFileId($fileId) ||
+        !in_array($permission, ['read', 'write', 'owner'], true)
+    ) {
         return false;
     }
 
-    $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
+    $permKey = getFilePermissionKey($fileId, $username);
     $permData = json_encode([
+        'schemaVersion' => 2,
         'username' => $username,
         'fileId' => $fileId,
         'permission' => $permission,
         'grantedAt' => time()
     ]);
 
-    return $permDb->set($permKey, $permData);
+    return databaseSetVerified($permDb, $permKey, $permData);
 }
 
 /**
@@ -43,8 +105,17 @@ function revokeFilePermission($permDb, $fileId, $username) {
         return false;
     }
 
-    $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
-    return $permDb->delete($permKey);
+    $newKey = getFilePermissionKey($fileId, $username);
+    $newResult = databaseDeleteVerified($permDb, $newKey);
+
+    $legacyKey = getLegacyFilePermissionKey($fileId, $username);
+    $legacyPermission = decodeMatchingFilePermission($permDb->get($legacyKey), $fileId, $username);
+    if ($legacyPermission !== null) {
+        $legacyResult = databaseDeleteVerified($permDb, $legacyKey);
+        return $newResult && $legacyResult;
+    }
+
+    return $newResult;
 }
 
 /**
@@ -61,15 +132,8 @@ function hasFilePermission($permDb, $fileId, $username, $requiredPermission = 'r
         return false;
     }
 
-    $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
-    $permData = $permDb->get($permKey);
-
-    if (!$permData) {
-        return false;
-    }
-
-    $perm = json_decode($permData, true);
-    if (!$perm || !isset($perm['permission'])) {
+    $perm = getFilePermissionRecord($permDb, $fileId, $username);
+    if ($perm === null) {
         return false;
     }
 
@@ -94,15 +158,8 @@ function isFileOwner($permDb, $fileId, $username) {
         return false;
     }
 
-    $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
-    $permData = $permDb->get($permKey);
-
-    if (!$permData) {
-        return false;
-    }
-
-    $perm = json_decode($permData, true);
-    return $perm && isset($perm['permission']) && $perm['permission'] === 'owner';
+    $perm = getFilePermissionRecord($permDb, $fileId, $username);
+    return $perm !== null && $perm['permission'] === 'owner';
 }
 
 /**
@@ -190,8 +247,7 @@ function migrateFilePermissions($permDb, $dbFiles) {
         }
 
         // 检查是否已有权限记录
-        $permKey = sanitizeDbKey("perm_{$fileId}_{$author}");
-        if ($permDb->get($permKey)) {
+        if (getFilePermissionRecord($permDb, $fileId, $author) !== null) {
             $skipped++;
             continue;
         }

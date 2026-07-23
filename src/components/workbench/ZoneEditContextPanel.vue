@@ -6,7 +6,7 @@
         <p>{{ headerText }}</p>
       </div>
       <NButton size="small" type="primary" attr-type="button" @click="finishEditing">
-        <Check :size="15" stroke-width="2.4" />
+        <template #icon><Check :size="15" stroke-width="2.4" /></template>
         <span>完成</span>
       </NButton>
     </header>
@@ -36,15 +36,15 @@
         <div class="section-title">选区操作</div>
         <div class="action-grid">
           <NButton size="small" secondary attr-type="button" :disabled="activeSeatCount === 0" @click="clearActiveZoneSeats">
-            <Eraser :size="14" stroke-width="2.2" />
+            <template #icon><Eraser :size="14" stroke-width="2.2" /></template>
             <span>清空座位</span>
           </NButton>
           <NButton v-if="isAssignmentZone" size="small" secondary attr-type="button" @click="toggleActiveZoneVisible">
-            <Eye :size="14" stroke-width="2.2" />
+            <template #icon><Eye :size="14" stroke-width="2.2" /></template>
             <span>{{ activeGlobalZone?.visible ? '隐藏高亮' : '显示高亮' }}</span>
           </NButton>
           <NButton size="small" type="error" secondary attr-type="button" @click="deleteActiveZone">
-            <Trash2 :size="14" stroke-width="2.2" />
+            <template #icon><Trash2 :size="14" stroke-width="2.2" /></template>
             <span>删除选区</span>
           </NButton>
         </div>

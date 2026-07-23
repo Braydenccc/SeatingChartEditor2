@@ -1,5 +1,5 @@
 <template>
-  <ResponsiveOverlay :show="visible" title="智能排位与规则" :desktop-width="1120" mobile-height="92dvh" @update:show="value => !value && emit('close')">
+  <ResponsiveOverlay :show="visible" title="智能排位与规则" :desktop-width="1280" mobile-height="92dvh" @update:show="value => !value && emit('close')">
     <div
       class="workbench-dialog"
       :class="{ 'rule-mobile-editor-active': activePanel === 'rules' && mobileRulePage === 'editor' }"
@@ -17,7 +17,7 @@
           :type="activePanel === tab.key ? 'primary' : 'default'"
           @click="activePanel = tab.key"
         >
-          <component :is="tab.icon" :size="15" stroke-width="2" />
+          <template #icon><component :is="tab.icon" :size="15" stroke-width="2" /></template>
           <span>{{ tab.label }}</span>
           <span v-if="tab.badge" class="tab-badge">{{ tab.badge }}</span>
         </NButton>
@@ -36,7 +36,7 @@
             <div class="section-heading">
               <h3>规则与选区</h3>
               <NButton size="small" text type="primary" @click="activePanel = 'rules'">
-                <Scale :size="14" stroke-width="2" />
+                <template #icon><Scale :size="14" stroke-width="2" /></template>
                 <span>管理规则</span>
               </NButton>
             </div>
@@ -47,7 +47,7 @@
             <div class="section-heading">
               <h3>执行前预检查</h3>
               <NButton size="small" text type="primary" @click="() => runAssignmentPrecheck()">
-                <Sliders :size="14" stroke-width="2" />
+                <template #icon><Sliders :size="14" stroke-width="2" /></template>
                 <span>运行预检查</span>
               </NButton>
             </div>
@@ -103,7 +103,7 @@
           <div class="rule-workbench" :class="{ 'show-mobile-editor': mobileRulePage === 'editor' }">
             <section class="rule-pane rule-left-pane">
               <NButton type="primary" size="small" @click="handleCreateRule">
-                <Plus :size="15" stroke-width="2" />
+                <template #icon><Plus :size="15" stroke-width="2" /></template>
                 <span>添加规则</span>
               </NButton>
               <RuleList
@@ -135,7 +135,7 @@
                   <p>也可以新建规则，在编辑窗口中使用快捷方案快速填充常见约束。</p>
                 </div>
                 <NButton type="primary" size="small" @click="handleCreateRule">
-                  <Plus :size="15" stroke-width="2" />
+                  <template #icon><Plus :size="15" stroke-width="2" /></template>
                   <span>添加规则</span>
                 </NButton>
               </div>
@@ -163,9 +163,11 @@
             :loading="isAssignmentCancelRequested"
             @click="handleRunAssignment"
           >
-          <X v-if="isAssigning && !isAssignmentCancelRequested" :size="16" stroke-width="2" />
-          <Play v-else :size="16" stroke-width="2" />
-          <span>{{ isAssignmentCancelRequested ? '正在中断' : (isAssigning ? '中断排位' : '开始排位') }}</span>
+            <template #icon>
+              <X v-if="isAssigning && !isAssignmentCancelRequested" :size="16" stroke-width="2" />
+              <Play v-else :size="16" stroke-width="2" />
+            </template>
+            <span>{{ isAssignmentCancelRequested ? '正在中断' : (isAssigning ? '中断排位' : '开始排位') }}</span>
           </NButton>
         </div>
       </footer></template>
@@ -684,8 +686,8 @@ onBeforeUnmount(() => {
 @media (max-width: 720px) {
   .workbench-dialog {
     width: 100%;
-    height: calc(92dvh - 128px);
-    max-height: none;
+    height: 100%;
+    max-height: 100%;
   }
 
   .summary-strip {
@@ -745,7 +747,7 @@ onBeforeUnmount(() => {
   }
 
   .workbench-dialog.rule-mobile-editor-active {
-    height: calc(92dvh - 96px);
+    height: 100%;
   }
 
   .rule-mobile-editor-active .dialog-body {

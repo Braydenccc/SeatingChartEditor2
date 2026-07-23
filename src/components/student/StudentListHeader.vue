@@ -17,11 +17,11 @@
         </div>
         <div class="header-actions">
           <NButton v-if="currentMode !== EditMode.NORMAL" size="small" quaternary title="退出当前模式" @click="exitCurrentMode">
-            <X :size="14" stroke-width="2.5" />
+            <template #icon><X :size="14" stroke-width="2.5" /></template>
             <span>{{ currentMode === EditMode.ZONE_EDIT ? '完成' : '取消' }}</span>
           </NButton>
           <NButton v-else size="small" secondary title="开始导出" @click="openExportView">
-            <FileOutput :size="14" stroke-width="2.5" />
+            <template #icon><FileOutput :size="14" stroke-width="2.5" /></template>
             <span>导出</span>
           </NButton>
         </div>
@@ -30,11 +30,11 @@
     <div class="header-divider"></div>
     <div class="header-right">
       <NButton v-if="unassignedCount > 0" size="small" type="primary" secondary title="随机排位" @click="handleRandomAssign">
-        <Shuffle :size="15" stroke-width="2.5" />
+        <template #icon><Shuffle :size="15" stroke-width="2.5" /></template>
         <span>一键排入</span>
       </NButton>
       <NButton size="small" secondary title="名单与属性" @click="openStudentsView">
-        <Users :size="15" stroke-width="2.5" />
+        <template #icon><Users :size="15" stroke-width="2.5" /></template>
         <span>名单与属性</span>
       </NButton>
     </div>

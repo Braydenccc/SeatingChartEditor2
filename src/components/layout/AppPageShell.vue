@@ -1,9 +1,12 @@
 <template>
-  <NLayout class="page-shell">
+  <NLayout
+    class="page-shell"
+    :content-style="{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }"
+  >
     <NLayoutHeader class="page-header" bordered>
       <div class="page-title-group">
         <p v-if="eyebrow" class="page-eyebrow">{{ eyebrow }}</p>
-        <h1>{{ title }}</h1>
+        <h1 data-route-heading tabindex="-1">{{ title }}</h1>
       </div>
       <div class="page-actions">
         <slot name="actions"></slot>
@@ -13,13 +16,18 @@
         </NButton>
       </div>
     </NLayoutHeader>
-    <NLayoutContent class="page-body" :native-scrollbar="false">
+    <NLayoutContent
+      class="page-body"
+      :native-scrollbar="contained"
+      :content-style="contained ? containedBodyStyle : undefined"
+    >
       <slot></slot>
     </NLayoutContent>
   </NLayout>
 </template>
 
 <script setup lang="ts">
+import type { CSSProperties } from 'vue'
 import { ArrowLeft } from 'lucide-vue-next'
 import { NButton, NIcon, NLayout, NLayoutContent, NLayoutHeader } from 'naive-ui'
 import { useRouter } from 'vue-router'
@@ -32,8 +40,20 @@ defineProps({
   eyebrow: {
     type: String,
     default: ''
+  },
+  contained: {
+    type: Boolean,
+    default: false
   }
 })
+
+const containedBodyStyle: CSSProperties = {
+  height: '100%',
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden'
+}
 
 const router = useRouter()
 const goEditor = () => router.push('/editor')
@@ -80,6 +100,12 @@ const goEditor = () => router.push('/editor')
   color: var(--color-primary);
 }
 
+.page-title-group h1:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
 .page-actions {
   display: flex;
   align-items: center;
@@ -91,7 +117,7 @@ const goEditor = () => router.push('/editor')
 .page-body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: 0;
 }
 

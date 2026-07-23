@@ -1,7 +1,7 @@
 <template>
   <AppPageShell title="账号中心" eyebrow="用户与云端工作区">
     <div class="user-layout">
-      <NCard class="user-section account-section" :bordered="false">
+      <NCard class="user-section account-section" :bordered="false" content-style="padding: 0">
         <div class="section-header">
           <User :size="20" stroke-width="2" />
           <div>
@@ -29,13 +29,13 @@
           <Cloud :size="18" stroke-width="2" />
           <span>登录 SCE 账号后可查看账号云端工作区统计并修改密码。</span>
           <NButton class="inline-button" size="small" type="primary" @click="openLoginDialog">
-            <LogIn :size="16" stroke-width="2" />
+            <template #icon><LogIn :size="16" stroke-width="2" /></template>
             <span>登录 SCE</span>
           </NButton>
         </div>
       </NCard>
 
-      <NCard class="user-section workspace-section" :bordered="false">
+      <NCard class="user-section workspace-section" :bordered="false" content-style="padding: 0">
         <div class="section-header">
           <Cloud :size="20" stroke-width="2" />
           <div>
@@ -45,35 +45,35 @@
         </div>
 
         <div class="stats-grid">
-          <NStatistic class="stat-card" label="工作区" :value="workspaceCount" />
-          <NStatistic class="stat-card" label="总大小" :value="totalSizeText" />
-          <NStatistic class="stat-card" label="最近更新" :value="recentWorkspaceTimeText" />
-          <NStatistic class="stat-card wide" label="最近工作区" :value="recentWorkspaceName" />
+          <NStatistic class="stat-card" label="工作区" :value="workspaceCount" :theme-overrides="statisticThemeOverrides" />
+          <NStatistic class="stat-card" label="总大小" :value="totalSizeText" :theme-overrides="statisticThemeOverrides" />
+          <NStatistic class="stat-card" label="最近更新" :value="recentWorkspaceTimeText" :theme-overrides="statisticThemeOverrides" />
+          <NStatistic class="stat-card wide" label="最近工作区" :value="recentWorkspaceName" :theme-overrides="statisticThemeOverrides" />
         </div>
 
         <p v-if="errorMessage" class="status-text danger">{{ errorMessage }}</p>
 
         <div class="action-row">
           <NButton class="action-button" secondary :loading="isRefreshing" :disabled="!token" @click="refresh">
-            <RefreshCw :size="18" stroke-width="2" />
+            <template #icon><RefreshCw :size="18" stroke-width="2" /></template>
             <span>{{ isRefreshing ? '刷新中' : '刷新统计' }}</span>
           </NButton>
           <NButton class="action-button" secondary :title="cloudLoadTitle" @click="openCloudLoad">
-            <CloudDownload :size="18" stroke-width="2" />
+            <template #icon><CloudDownload :size="18" stroke-width="2" /></template>
             <span>{{ cloudLoadLabel }}</span>
           </NButton>
           <NButton class="action-button" secondary :title="cloudSaveTitle" @click="openCloudSave">
-            <CloudUpload :size="18" stroke-width="2" />
+            <template #icon><CloudUpload :size="18" stroke-width="2" /></template>
             <span>{{ cloudSaveLabel }}</span>
           </NButton>
           <NButton class="action-button" secondary @click="router.push('/files')">
-            <FolderOpen :size="18" stroke-width="2" />
+            <template #icon><FolderOpen :size="18" stroke-width="2" /></template>
             <span>前往文件页</span>
           </NButton>
         </div>
       </NCard>
 
-      <NCard class="user-section password-section" :bordered="false">
+      <NCard class="user-section password-section" :bordered="false" content-style="padding: 0">
         <div class="section-header">
           <KeyRound :size="20" stroke-width="2" />
           <div>
@@ -108,7 +108,7 @@
 
           <div class="form-actions">
             <NButton class="submit-button" type="primary" attr-type="submit" :loading="isChangingPassword">
-              <KeyRound :size="18" stroke-width="2" />
+              <template #icon><KeyRound :size="18" stroke-width="2" /></template>
               <span>{{ isChangingPassword ? '提交中' : '修改密码' }}</span>
             </NButton>
           </div>
@@ -164,6 +164,7 @@ const confirmPassword = ref('')
 const isChangingPassword = ref(false)
 const passwordMessage = ref('')
 const passwordMessageType = ref('')
+const statisticThemeOverrides = { valueFontSize: '16px' }
 
 const accountTypeText = computed(() => {
   if (token.value) return 'SCE 账号'
@@ -313,6 +314,7 @@ watch(token, (value) => {
   border-radius: 8px;
   background: var(--color-bg-subtle);
   min-width: 0;
+  overflow: hidden;
 }
 
 .stat-card.wide {
@@ -325,8 +327,7 @@ watch(token, (value) => {
   font-weight: 600;
 }
 
-.info-item strong,
-.stat-card strong {
+.info-item strong {
   font-size: 16px;
   color: var(--color-text-primary);
   overflow: hidden;

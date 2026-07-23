@@ -85,4 +85,15 @@ describe('useGlobalSettings', () => {
     expect(globalSettings.getSetting('ui.showStudentName')).toBe(true)
     expect(storageMocks.set).toHaveBeenCalledTimes(1)
   })
+
+  it('uses a darker semantic header background for dark component bases', () => {
+    globalSettings.updateSetting('ui.colorScheme', 'dark', { immediate: true })
+
+    expect(document.documentElement.style.getPropertyValue('--color-header-accent-bg'))
+      .toContain('var(--color-bg-card)')
+
+    globalSettings.updateSetting('ui.colorScheme', 'light', { immediate: true })
+    expect(document.documentElement.style.getPropertyValue('--color-header-accent-bg'))
+      .toBe('var(--color-primary)')
+  })
 })

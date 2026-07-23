@@ -1,48 +1,69 @@
-import fs from 'fs';
-import { execSync } from 'child_process';
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const TEST_HOST = 'https://testsce.jbyc.cc';
+export const defaultTestHost = 'https://testsce.jbyc.cc'
 
-try {
-  // 解决 GitHub Actions 容器环境下的 git 目录所有权安全限制
-  try {
-    execSync("git config --global --add safe.directory '*'");
-  } catch (e) {
-    // Ignore errors if this fails (e.g. locally without perms)
+export const testEnvironmentFiles = [
+  'index.html',
+  'src/components/auth/LoginDialog.vue',
+  'src/components/layout/AppHeader.vue'
+]
+
+const loginWarning = '本账号服务不保证可用性，请妥善备份您的数据'
+const headerTitle = '<h1 class="header-text">BraydenSCE V2</h1>'
+
+const countOccurrences = (content, anchor) => content.split(anchor).length - 1
+
+const replaceSingleAnchor = (content, anchor, replacement, description) => {
+  const count = countOccurrences(content, anchor)
+  if (count !== 1) {
+    throw new Error(`${description} 应恰好出现 1 次，实际为 ${count} 次`)
   }
+  return content.replace(anchor, replacement)
+}
 
-  console.log(`Patching test environment markers for ${TEST_HOST}`);
+const createPatchPlan = ({ repositoryRoot, testHost, fileSystem }) => {
+  const originalContents = new Map(
+    testEnvironmentFiles.map(relativePath => [
+      relativePath,
+      Buffer.from(fileSystem.readFileSync(path.join(repositoryRoot, relativePath)))
+    ])
+  )
+  const contents = new Map(
+    [...originalContents].map(([relativePath, content]) => [relativePath, content.toString('utf8')])
+  )
 
-  // 1. index.html - 添加 [test] 前缀到标题
-  let indexHtml = fs.readFileSync('index.html', 'utf8');
-  indexHtml = indexHtml.replace(/(<title(?:\s[^>]*)?>)([\s\S]*?)(<\/title>)/, (_, openTag, title, closeTag) => {
-    const cleanedTitle = String(title).trim().replace(/^\[test\]\s*/i, '');
-    return `${openTag}[test] ${cleanedTitle}${closeTag}`;
-  });
-  fs.writeFileSync('index.html', indexHtml);
+  const indexHtml = contents.get('index.html')
+  const titlePattern = /(<title(?:\s[^>]*)?>)([\s\S]*?)(<\/title>)/gi
+  const titleMatches = [...indexHtml.matchAll(titlePattern)]
+  if (titleMatches.length !== 1) {
+    throw new Error(`index.html 的 title 标签应恰好出现 1 次，实际为 ${titleMatches.length} 次`)
+  }
+  const patchedIndexHtml = indexHtml.replace(titlePattern, (_, openTag, title, closeTag) => {
+    const cleanedTitle = String(title).trim().replace(/^\[test\]\s*/i, '')
+    return `${openTag}[test] ${cleanedTitle}${closeTag}`
+  })
 
-  // 2. LoginDialog.vue - 添加测试环境警告
-  const loginPath = 'src/components/auth/LoginDialog.vue';
-  let loginVue = fs.readFileSync(loginPath, 'utf8');
-  loginVue = loginVue.replace(
-    '本账号服务不保证可用性，请妥善备份您的数据',
-    `测试环境（${TEST_HOST}）：账号与正式版不互通，用户数据可能随时被清除，请勿使用真实账号`
-  );
-  fs.writeFileSync(loginPath, loginVue);
+  const loginPath = 'src/components/auth/LoginDialog.vue'
+  const patchedLogin = replaceSingleAnchor(
+    contents.get(loginPath),
+    loginWarning,
+    `测试环境（${testHost}）：账号与正式版不互通，用户数据可能随时被清除，请勿使用真实账号`,
+    `${loginPath} 的账号服务提示锚点`
+  )
 
-  // 3. AppHeader.vue - 添加测试版标识
-  const headerPath = 'src/components/layout/AppHeader.vue';
-  let appHeader = fs.readFileSync(headerPath, 'utf8');
+  const headerPath = 'src/components/layout/AppHeader.vue'
+  let patchedHeader = replaceSingleAnchor(
+    contents.get(headerPath),
+    headerTitle,
+    '<h1 class="header-text">BraydenSCE V2<span class="test-badge">测试版</span></h1>',
+    `${headerPath} 的标题锚点`
+  )
 
-  // 在标题后添加测试版标识
-  appHeader = appHeader.replace(
-    '<h1 class="header-text">BraydenSCE V2</h1>',
-    '<h1 class="header-text">BraydenSCE V2<span class="test-badge">测试版</span></h1>'
-  );
-
-  // 添加测试版标识样式
-  if (!appHeader.includes('.test-badge')) {
-    appHeader = appHeader.replace(
+  if (!patchedHeader.includes('.test-badge')) {
+    patchedHeader = replaceSingleAnchor(
+      patchedHeader,
       '</style>',
       `.test-badge {
   display: inline-block;
@@ -90,13 +111,77 @@ try {
     margin-left: 6px;
   }
 }
-</style>`
-    );
+</style>`,
+      `${headerPath} 的 style 结束标签`
+    )
   }
-  fs.writeFileSync(headerPath, appHeader);
 
-  console.log('Successfully patched files for test environment.');
-} catch (e) {
-  console.error('Failed to patch test environment:', e);
-  process.exit(1);
+  return {
+    originalContents,
+    patchedContents: new Map([
+      ['index.html', Buffer.from(patchedIndexHtml, 'utf8')],
+      [loginPath, Buffer.from(patchedLogin, 'utf8')],
+      [headerPath, Buffer.from(patchedHeader, 'utf8')]
+    ])
+  }
+}
+
+export const patchTestEnvironment = ({
+  repositoryRoot = process.cwd(),
+  testHost = defaultTestHost,
+  fileSystem = fs
+} = {}) => {
+  const resolvedRoot = path.resolve(repositoryRoot)
+  const { originalContents, patchedContents } = createPatchPlan({
+    repositoryRoot: resolvedRoot,
+    testHost,
+    fileSystem
+  })
+  const attemptedFiles = []
+
+  // 所有锚点均验证完成后再写入，避免锚点漂移导致部分文件被修改。
+  try {
+    for (const [relativePath, content] of patchedContents) {
+      attemptedFiles.push(relativePath)
+      fileSystem.writeFileSync(path.join(resolvedRoot, relativePath), content)
+    }
+  } catch (writeError) {
+    const rollbackErrors = []
+    for (const relativePath of [...attemptedFiles].reverse()) {
+      try {
+        fileSystem.writeFileSync(
+          path.join(resolvedRoot, relativePath),
+          originalContents.get(relativePath)
+        )
+      } catch (rollbackError) {
+        rollbackErrors.push(new Error(`${relativePath} 回滚失败`, { cause: rollbackError }))
+      }
+    }
+
+    if (rollbackErrors.length > 0) {
+      throw new AggregateError(
+        [writeError, ...rollbackErrors],
+        `测试环境 patch 事务写入失败，且 ${rollbackErrors.length} 个文件回滚失败`
+      )
+    }
+    throw new Error('测试环境 patch 事务写入失败，已回滚所有尝试写入的文件', {
+      cause: writeError
+    })
+  }
+
+  return patchedContents
+}
+
+const isMainModule = process.argv[1]
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isMainModule) {
+  try {
+    console.log(`Patching test environment markers for ${defaultTestHost}`)
+    patchTestEnvironment()
+    console.log('Successfully patched files for test environment.')
+  } catch (error) {
+    console.error('Failed to patch test environment:', error)
+    process.exitCode = 1
+  }
 }

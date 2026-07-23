@@ -1,7 +1,7 @@
 <template>
   <AppPageShell title="文件" eyebrow="工作区与名单导入导出">
     <div class="files-layout">
-      <NCard class="panel-section" :bordered="false">
+      <NCard class="panel-section" :bordered="false" content-style="padding: 0">
         <div class="section-header">
           <FolderOpen :size="20" stroke-width="2" />
           <div>
@@ -21,15 +21,15 @@
           </div>
           <div class="cloud-summary-actions">
             <NButton size="small" secondary attr-type="button" :loading="isRefreshing" :disabled="!token || isRefreshing" @click="refresh">
-              <RefreshCw :size="16" stroke-width="2" />
+              <template #icon><RefreshCw :size="16" stroke-width="2" /></template>
               <span>{{ isRefreshing ? '刷新中' : '刷新' }}</span>
             </NButton>
             <NButton size="small" secondary attr-type="button" :title="cloudLoadTitle" @click="openCloudLoad">
-              <CloudDownload :size="16" stroke-width="2" />
+              <template #icon><CloudDownload :size="16" stroke-width="2" /></template>
               <span>{{ cloudLoadShortLabel }}</span>
             </NButton>
             <NButton size="small" secondary attr-type="button" :title="cloudSaveTitle" @click="openCloudSave">
-              <CloudUpload :size="16" stroke-width="2" />
+              <template #icon><CloudUpload :size="16" stroke-width="2" /></template>
               <span>{{ cloudSaveShortLabel }}</span>
             </NButton>
           </div>
@@ -37,27 +37,27 @@
         <p v-if="errorMessage" class="cloud-error">{{ errorMessage }}</p>
         <div class="action-grid">
           <NButton class="action-button" type="error" secondary attr-type="button" @click="handleNewWorkspace">
-            <FilePlus :size="18" stroke-width="2" />
+            <template #icon><FilePlus :size="18" stroke-width="2" /></template>
             <span>新建工作区</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" @click="handleLoadWorkspace">
-            <FolderOpen :size="18" stroke-width="2" />
+            <template #icon><FolderOpen :size="18" stroke-width="2" /></template>
             <span>加载本地</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" @click="handleSaveWorkspace">
-            <Save :size="18" stroke-width="2" />
+            <template #icon><Save :size="18" stroke-width="2" /></template>
             <span>保存到本地</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" @click="handleSaveWorkspaceAs">
-            <Save :size="18" stroke-width="2" />
+            <template #icon><Save :size="18" stroke-width="2" /></template>
             <span>另存为</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" :title="cloudLoadTitle" @click="openCloudLoad">
-            <CloudDownload :size="18" stroke-width="2" />
+            <template #icon><CloudDownload :size="18" stroke-width="2" /></template>
             <span>{{ cloudLoadLabel }}</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" :title="cloudSaveTitle" @click="openCloudSave">
-            <CloudUpload :size="18" stroke-width="2" />
+            <template #icon><CloudUpload :size="18" stroke-width="2" /></template>
             <span>{{ cloudSaveLabel }}</span>
           </NButton>
         </div>
@@ -80,7 +80,7 @@
               :disabled="isCloudActionBusy || !newCloudWorkspaceName.trim()"
               @click="handleCreateCloudWorkspace"
             >
-              <Plus :size="16" stroke-width="2" />
+              <template #icon><Plus :size="16" stroke-width="2" /></template>
               <span>新增</span>
             </NButton>
           </div>
@@ -199,7 +199,7 @@
         </div>
       </NCard>
 
-      <NCard class="panel-section" :bordered="false">
+      <NCard class="panel-section" :bordered="false" content-style="padding: 0">
         <div class="section-header">
           <Users :size="20" stroke-width="2" />
           <div>
@@ -210,31 +210,31 @@
 
         <div class="action-grid">
           <NButton class="action-button" secondary attr-type="button" @click="router.push('/students')">
-            <Users :size="18" stroke-width="2" />
+            <template #icon><Users :size="18" stroke-width="2" /></template>
             <span>名单与属性</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" @click="handleDownloadTemplate">
-            <Download :size="18" stroke-width="2" />
+            <template #icon><Download :size="18" stroke-width="2" /></template>
             <span>下载名单模板</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" @click="handleImportExcel">
-            <FileInput :size="18" stroke-width="2" />
+            <template #icon><FileInput :size="18" stroke-width="2" /></template>
             <span>从 Excel 导入名单</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" @click="openFuckSeatsImport">
-            <FileInput :size="18" stroke-width="2" />
+            <template #icon><FileInput :size="18" stroke-width="2" /></template>
             <span>从不想排座位导入</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" @click="handleExportExcel">
-            <FileOutput :size="18" stroke-width="2" />
+            <template #icon><FileOutput :size="18" stroke-width="2" /></template>
             <span>导出名单到 Excel</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" @click="handleImportSdes">
-            <FileInput :size="18" stroke-width="2" />
+            <template #icon><FileInput :size="18" stroke-width="2" /></template>
             <span>导入 SDES</span>
           </NButton>
           <NButton class="action-button" secondary attr-type="button" @click="handleExportSdes">
-            <FileOutput :size="18" stroke-width="2" />
+            <template #icon><FileOutput :size="18" stroke-width="2" /></template>
             <span>导出 SDES</span>
           </NButton>
         </div>
@@ -691,7 +691,9 @@ const handleExportSdes = async () => {
 }
 
 onMounted(() => {
-  getAutoSaveBackup()
+  void getAutoSaveBackup().catch((autoSaveError) => {
+    error(`读取自动保存备份失败：${getErrorMessage(autoSaveError)}`)
+  })
   if (token.value) refresh()
 })
 </script>

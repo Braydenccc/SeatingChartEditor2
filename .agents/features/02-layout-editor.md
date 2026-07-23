@@ -21,6 +21,9 @@ description: 用户核心视窗交互域。负责可视化整个三维数组的�
 - 多选管理: `src/composables/useSelection.ts`
 - 拖拽预览: `src/composables/useDragPreview.ts`
 - 工作台状态: `src/composables/useEditorWorkbench.ts`
+- 基础座位配置: `src/components/settings/panels/SeatConfigPanel.vue`
+- 高级座位配置: `src/components/layout/SeatConfigDialog.vue`
+- 座位配置约束: `src/constants/seatConfig.ts`
 
 ## 3. 核心 API 暴露 (Core Internal Logic)
 
@@ -44,6 +47,7 @@ export const EditMode = {
 - **自适应居中计算 (`autoCenter`)**: 编辑器加载时或按恢复键时，会读取父盒子的 clientW/H 和 内部内容的 W/H 自动应用最佳比例参数，使得居中呈现。
 - **选区拖拽 (`useDragPreview`)**: 支持多选座位后整体拖拽移动。通过 `clientToChartLocal` 将鼠标坐标转换为画布本地坐标，再通过 `chartLocalToGrid` 计算目标网格位置。拖拽预览返回 `student`、`isEmptySeat`、`isAnchor` 等结构化数据，由 `SeatChart` 复用 `StudentCardFace` 渲染，不再克隆座位 DOM 的 `innerHTML`。触摸端长按拖拽也按起点判断：起点在当前多选内则带动选区，起点不在多选内则只移动单个座位。
 - **右侧固定上下文面板**: 桌面端普通模式下左键点击座位会将选区收敛为单个座位；多选模式下按住左键拖过座位可涂抹加入多选，右键座位仍可加入当前多选并切换到右侧上下文面板。移动端普通模式点击座位不创建选区，必须通过底部「多选」工具进入涂抹选择；退出多选工具不会清空已有选区。面板复用选区操作能力，提供编辑、移出、交换/打乱、排入、切换空置与取消选择。点击空白处会清空选区。
+- **座位配置草稿交接**: 基础与高级配置统一使用 `maxSeatGroupCount` 的 50 组上限。`SeatConfigPanel` 进入编辑器前把完整草稿快照交给 `useEditorWorkbench`，`WorkbenchDialogs` 在用户确认后将高级布局结果覆盖到该草稿再应用，避免尚未应用的护法位、错位距离等设置在跳转时丢失。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **DOM重排开销**: 绝对不要在 `SeatChart.vue` 内去循环写 `margin/width` 的 `style` 计算（除了全局控制的Gap）。

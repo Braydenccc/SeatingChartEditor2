@@ -259,6 +259,92 @@ describe('useSeatRules', () => {
     })
   })
 
+  describe('detectConflicts', () => {
+    it('canonicalizes supported negation before checking opposite pair rules', () => {
+      seatRules.addRule({
+        priority: 'required',
+        predicate: 'MUST_BE_SEATMATES',
+        not: true,
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: {}
+      })
+      seatRules.addRule({
+        priority: 'required',
+        predicate: 'MUST_NOT_BE_SEATMATES',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: {}
+      })
+
+      expect(seatRules.detectConflicts()).toEqual([])
+    })
+
+    it('still detects a positive opposite pair-rule contradiction', () => {
+      seatRules.addRule({
+        priority: 'required',
+        predicate: 'MUST_BE_SEATMATES',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: {}
+      })
+      seatRules.addRule({
+        priority: 'required',
+        predicate: 'MUST_NOT_BE_SEATMATES',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: {}
+      })
+
+      const conflicts = seatRules.detectConflicts()
+
+      expect(conflicts).toHaveLength(1)
+      expect(conflicts[0].type).toBe('contradiction')
+    })
+
+    it('detects contradictory same-group conditions inside a required AND rule', () => {
+      const added = seatRules.addRule({
+        priority: 'required',
+        predicate: 'MUST_BE_SAME_GROUP',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: {},
+        logicOperator: 'AND',
+        subRules: [
+          { predicate: 'MUST_BE_SAME_GROUP', not: false, params: {} },
+          { predicate: 'MUST_NOT_BE_SAME_GROUP', not: false, params: {} }
+        ]
+      })
+
+      const conflicts = seatRules.detectConflicts()
+
+      expect(added.success).toBe(true)
+      expect(conflicts).toHaveLength(1)
+      expect(conflicts[0]).toMatchObject({
+        type: 'contradiction',
+        ruleIds: [added.rule?.id, added.rule?.id]
+      })
+    })
+
+    it('detects incompatible distance bounds inside a required AND rule', () => {
+      const added = seatRules.addRule({
+        priority: 'required',
+        predicate: 'DISTANCE_AT_MOST',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: { distance: 1 },
+        logicOperator: 'AND',
+        subRules: [
+          { predicate: 'DISTANCE_AT_MOST', not: false, params: { distance: 1 } },
+          { predicate: 'DISTANCE_AT_LEAST', not: false, params: { distance: 3 } }
+        ]
+      })
+
+      const conflicts = seatRules.detectConflicts()
+
+      expect(added.success).toBe(true)
+      expect(conflicts).toHaveLength(1)
+      expect(conflicts[0]).toMatchObject({
+        type: 'infeasible',
+        ruleIds: [added.rule?.id, added.rule?.id]
+      })
+    })
+  })
+
   describe('clearAllRules', () => {
     it('should remove all rules', () => {
       seatRules.addRule({

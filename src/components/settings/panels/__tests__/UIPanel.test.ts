@@ -52,4 +52,29 @@ describe('UIPanel theme switching', () => {
 
     wrapper.unmount()
   })
+
+  it('retains the original compact preference controls while using Naive UI', () => {
+    const wrapper = mount(UIPanel, {
+      props: { settings: settings.value.ui }
+    })
+
+    expect(wrapper.text()).toContain('语言')
+    expect(wrapper.text()).toContain('多语言功能即将推出')
+    expect(wrapper.findAll('.scheme-button')).toHaveLength(3)
+    expect(wrapper.findAll('.tag-mode-option')).toHaveLength(3)
+    expect(wrapper.find('.element-toggles').text()).toContain('姓名')
+    expect(wrapper.find('.element-toggles').text()).toContain('学号')
+    expect(wrapper.find('.element-toggles').text()).toContain('数值')
+    expect(wrapper.findAll('.toggle-label').map(label => label.text())).toEqual([
+      '姓名',
+      '姓名大字号',
+      '学号',
+      '学号大字号',
+      '标签',
+      '数值',
+      '行号'
+    ])
+
+    wrapper.unmount()
+  })
 })

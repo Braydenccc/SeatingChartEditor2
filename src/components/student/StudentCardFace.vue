@@ -100,7 +100,7 @@ import type { Student } from '@/types/models'
 
 const props = withDefaults(defineProps<{
   student?: Student | null
-  variant?: 'seat' | 'candidate' | 'preview'
+  variant?: 'seat' | 'candidate'
   density?: 'standard' | 'compact'
   fallbackName?: string
 }>(), {

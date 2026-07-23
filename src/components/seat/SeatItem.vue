@@ -15,7 +15,14 @@
     'student-selected': isStudentSelected,
     'drag-ghost': isGhost
   }" :style="zoneHighlightStyle" :data-seat-id="seat.id" :draggable="isDraggable"
+    role="button"
+    :tabindex="isKeyboardActionable ? 0 : -1"
+    :aria-label="accessibleLabel"
+    :aria-disabled="!isKeyboardActionable"
+    :aria-pressed="isInSelection || isFirstSelected || isStudentSelected"
     @click="handleClick"
+    @keydown.enter.prevent="handleKeyboardActivate"
+    @keydown.space.prevent="handleKeyboardActivate"
     @dblclick="handleDoubleClick"
     @dragstart="handleDragStart" @dragend="handleDragEnd" @dragover.prevent="handleDragOverSeat"
     @dragenter.prevent="handleDragEnter" @dragleave="handleDragLeave" @drop.prevent="handleDrop"
@@ -40,6 +47,7 @@
 <script setup lang="ts">
 import { computed, ref, onUnmounted, shallowRef, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
+import { mobileWorkbenchMediaQuery } from '@/constants/layout'
 import { useStudentData } from '@/composables/useStudentData'
 import { useEditMode } from '@/composables/useEditMode'
 import { useZoneData } from '@/composables/useZoneData'
@@ -93,7 +101,13 @@ const {
 const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
 const { settings } = useGlobalSettings()
 const { panX, panY, setPan } = useZoom()
-const { setRightRailTab, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDrag, isSeatFullscreen } = useEditorWorkbench()
+const {
+  setRightRailTab,
+  showMobileSheet,
+  openMobileDrawerForDrag,
+  restoreMobileDrawerOpenedForDrag,
+  isSeatFullscreen
+} = useEditorWorkbench()
 
 const isDragOver = ref(false)
 const isDragging = ref(false)
@@ -101,7 +115,7 @@ let dragEnterCount = 0
 let transparentDragImageEl: HTMLElement | null = null
 
 // 响应式断点检测
-const isMobile = useMediaQuery('(max-width: 768px)')
+const isMobileWorkbench = useMediaQuery(mobileWorkbenchMediaQuery)
 
 // 触摸拖拽状态
 let touchDragTimer: ReturnType<typeof setTimeout> | null = null
@@ -174,7 +188,7 @@ const zoneHighlightStyle = computed(() => {
 
 const isClickable = computed(() => {
   // 手机端选择模式：所有座位都可点击
-  if (isMobile.value && isSelectionMode.value) return !isGuardSeat.value
+  if (isMobileWorkbench.value && isSelectionMode.value) return !isGuardSeat.value
   if (isSelectionMode.value) return !isGuardSeat.value
 
   if (currentMode.value === EditMode.NORMAL) {
@@ -185,6 +199,27 @@ const isClickable = computed(() => {
   if (currentMode.value === EditMode.CLEAR) return hasStudent.value
   if (currentMode.value === EditMode.ZONE_EDIT) return !isGuardSeat.value
   return false
+})
+
+const isKeyboardActionable = computed(() => {
+  if (isClickable.value) return true
+  return !isMobileWorkbench.value &&
+    currentMode.value === EditMode.NORMAL &&
+    !isGuardSeat.value
+})
+
+const accessibleLabel = computed(() => {
+  const position = `第 ${props.seat.groupIndex + 1} 组，第 ${props.seat.columnIndex + 1} 列，第 ${props.seat.rowIndex + 1} 行`
+  let state = props.seat.isEmpty
+    ? '空置座位'
+    : isGuardSeat.value
+      ? `${guardSeatLabel.value}，${hasStudent.value ? `学生 ${studentInfo.value?.name || '未知'}` : '空位'}`
+      : hasStudent.value
+        ? `学生 ${studentInfo.value?.name || '未知'}`
+        : '空位'
+
+  if (isInSelection.value || isFirstSelected.value || isStudentSelected.value) state += '，已选中'
+  return `${position}，${state}`
 })
 
 const undoHighlighted = computed(() => isHighlighted(props.seat.id))
@@ -227,7 +262,7 @@ const isDraggable = computed(() => {
 })
 
 const shouldOpenCandidateDrawerForSeatDrag = computed(() => {
-  return isMobile.value && isSeatFullscreen.value
+  return isMobileWorkbench.value && isSeatFullscreen.value
 })
 
 const getDragSeatData = () => {
@@ -271,7 +306,7 @@ const handleClick = () => {
   if (consumeSuppressedClick()) return
 
   // 手机端选择模式：点击切换选中状态
-  if (isMobile.value && isSelectionMode.value && !isGuardSeat.value) {
+  if (isMobileWorkbench.value && isSelectionMode.value && !isGuardSeat.value) {
     toggleSeatInSelection(props.seat.id)
     return
   }
@@ -287,7 +322,7 @@ const handleClick = () => {
     return
   }
 
-  if (isMobile.value && currentMode.value === EditMode.NORMAL) {
+  if (isMobileWorkbench.value && currentMode.value === EditMode.NORMAL) {
     return
   }
 
@@ -327,11 +362,17 @@ const handleClick = () => {
   }
 }
 
+const handleKeyboardActivate = () => {
+  if (!isKeyboardActionable.value) return
+  handleClick()
+}
+
 const handleContextMenuAction = () => {
   if (consumeContextSelectionSuppression()) return
-  if (lastPointerWasTouch.value || isMobile.value || isGuardSeat.value) return
+  if (lastPointerWasTouch.value || isGuardSeat.value) return
   selectSingleSeat(props.seat.id)
   setRightRailTab('selection')
+  if (isMobileWorkbench.value) showMobileSheet('context')
 }
 
 // 双击处理
@@ -492,7 +533,7 @@ const handleTouchMove = (e: TouchEvent) => {
   const dy = touch.clientY - touchStartY
   const moved = Math.abs(dx) > 5 || Math.abs(dy) > 5
 
-  if (!isGuardSeat.value && isMobile.value && isSelectionMode.value && !touchDragActive && !touchSelectionActive && moved) {
+  if (!isGuardSeat.value && isMobileWorkbench.value && isSelectionMode.value && !touchDragActive && !touchSelectionActive && moved) {
     if (touchDragTimer) {
       clearTimeout(touchDragTimer)
       touchDragTimer = null
@@ -811,6 +852,12 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
+.seat-item:focus-visible {
+  outline: 3px solid var(--color-info);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-selection-ring);
+}
+
 .seat-item:not(.dragging):hover {
   box-shadow: var(--seat-card-shadow-hover);
 }
@@ -904,7 +951,7 @@ onUnmounted(() => {
 }
 
 .empty-text {
-  font-size: 13px;
+  font-size: var(--seat-card-placeholder-size);
   color: var(--color-text-secondary);
   font-weight: 500;
 }
@@ -940,7 +987,7 @@ onUnmounted(() => {
 }
 
 .seat-placeholder {
-  font-size: 13px;
+  font-size: var(--seat-card-placeholder-size);
   color: var(--color-text-disabled);
   font-weight: 400;
 }
@@ -1030,16 +1077,15 @@ onUnmounted(() => {
 /* 拖拽吸附幽灵 */
 .seat-item.drag-ghost {
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-info) 30%, transparent);
-  background: color-mix(in srgb, var(--color-info) 8%, var(--color-bg-card));
   position: relative;
 }
 
 .seat-item.drag-ghost::before {
   content: '';
   position: absolute;
-  inset: -3px;
+  inset: var(--seat-card-border-width);
   border: 2px dashed var(--color-info);
-  border-radius: 10px;
+  border-radius: var(--seat-card-radius);
   pointer-events: none;
 }
 
@@ -1047,32 +1093,4 @@ onUnmounted(() => {
   background: color-mix(in srgb, var(--zone-color, var(--color-border-strong)) 40%, var(--color-bg-selected));
 }
 
-@media (max-width: 1366px) and (min-width: 1025px) {
-  .empty-text,
-  .seat-placeholder {
-    font-size: 11px;
-  }
-}
-
-/* 小高度屏幕优化 */
-@media (max-height: 820px) and (min-width: 1025px) {
-  .empty-text,
-  .seat-placeholder {
-    font-size: 10px;
-  }
-}
-
-@media (max-width: 768px) {
-  .empty-text,
-  .seat-placeholder {
-    font-size: 11px;
-  }
-}
-
-@media (max-width: 480px) {
-  .empty-text,
-  .seat-placeholder {
-    font-size: 10px;
-  }
-}
 </style>

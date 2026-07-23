@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NButton } from 'naive-ui'
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterView } from 'vue-router'
 import { History, RotateCcw } from 'lucide-vue-next'
 import GlobalDropZone from './components/ui/GlobalDropZone.vue'
@@ -23,7 +23,7 @@ import { useAutoSave } from '@/composables/useAutoSave'
 import { useWelcomeOnboarding } from '@/composables/useWelcomeOnboarding'
 import { initializeTags } from '@/composables/useTagData'
 
-const { isLoginDialogVisible, initAuth, isLoggedIn } = useAuth()
+const { isLoginDialogVisible, initAuth, token, webdavConfig } = useAuth()
 const { loadWorkspaceFromCloud } = useCloudWorkspace()
 const { applyWorkspaceData, getLastWorkspace } = useWorkspace()
 const { success, warning, error } = useLogger()
@@ -32,6 +32,7 @@ const { showCloudDialog, cloudDialogMode, handleCloudSuccess } = useCloudWorkspa
 const { settings, applyThemeColor, applyColorScheme } = useGlobalSettings()
 const {
   startAutoSave,
+  flushAutoSave,
   autoSaveBackup,
   getAutoSaveBackup,
   restoreAutoSaveBackup
@@ -73,7 +74,7 @@ const autoSavePromptMeta = computed(() => {
   return `${formatAutoSaveTime(backup.time || backup.timeIso)} · ${studentCount} 名学生 · ${assignedCount} 个已排座位`
 })
 
-const restoreLastWorkspaceIfNeeded = () => {
+const restoreLastWorkspaceIfNeeded = async () => {
   if (lastWorkspaceRestoreStarted) return
   lastWorkspaceRestoreStarted = true
 
@@ -82,33 +83,40 @@ const restoreLastWorkspaceIfNeeded = () => {
   if (lastWs && lastWs.type === 'cloud' && lastWs.fileId) {
     const lastFileId = lastWs.fileId
     const lastSource = lastWs.source === 'webdav' ? 'webdav' : 'retiehe'
-    const unwatch = watch(() => isLoggedIn.value, async (loggedIn) => {
-      if (loggedIn) {
-        try {
-          const result = await loadWorkspaceFromCloud(lastFileId, lastSource)
-          if (result.success && result.data && result.data.content) {
-            const workspaceData = typeof result.data.content === 'string'
-              ? JSON.parse(result.data.content)
-              : result.data.content
+    const hasRequiredCredential = lastSource === 'webdav'
+      ? Boolean(webdavConfig.value)
+      : Boolean(token.value)
 
-            await applyWorkspaceData(workspaceData)
-            success(`已自动恢复上次任务：${lastWs.name}`)
-          }
-        } catch (e) {
-          console.error('Auto restore failed:', e)
-          warning(`自动恢复云端任务失败：${e instanceof Error ? e.message : '网络错误，请检查连接后手动重试'}`)
-        } finally {
-          unwatch()
-        }
-      }
-    }, { immediate: true })
+    if (!hasRequiredCredential) {
+      warning(`未连接${lastSource === 'webdav' ? ' WebDAV' : ' SCE 账号'}，无法自动恢复上次云端任务：${lastWs.name}`)
+      return
+    }
 
-    setTimeout(() => {
-      if (!isLoggedIn.value) {
-        warning(`未登录，无法自动恢复上次云端任务：${lastWs.name}`)
-        unwatch()
+    try {
+      const result = await loadWorkspaceFromCloud(lastFileId, lastSource)
+      if (!result.success) {
+        warning(`自动恢复云端任务失败：${result.message || '云端服务未返回可用内容，请手动重试'}`)
+        return
       }
-    }, 2000)
+      if (!result.data || result.data.content == null) {
+        warning('自动恢复云端任务失败：云端工作区内容为空')
+        return
+      }
+
+      const workspaceData = typeof result.data.content === 'string'
+        ? JSON.parse(result.data.content)
+        : result.data.content
+      const applied = await applyWorkspaceData(workspaceData)
+      if (!applied) {
+        warning('自动恢复云端任务失败：工作区内容无法应用，请手动加载并检查文件')
+        return
+      }
+
+      success(`已自动恢复上次任务：${lastWs.name}`)
+    } catch (e) {
+      console.error('Auto restore failed:', e)
+      warning(`自动恢复云端任务失败：${e instanceof Error ? e.message : '网络错误，请检查连接后手动重试'}`)
+    }
   } else if (lastWs && lastWs.type === 'local') {
     success(`欢迎回来！上次任务：${lastWs.name} (本地文件需手动再次加载)`)
   }
@@ -116,7 +124,44 @@ const restoreLastWorkspaceIfNeeded = () => {
 
 const continueStartup = () => {
   showWelcomeIntroIfNeeded()
-  restoreLastWorkspaceIfNeeded()
+  void restoreLastWorkspaceIfNeeded()
+}
+
+const isEditableShortcutTarget = (event: KeyboardEvent) => event.composedPath().some((target) => {
+  if (!(target instanceof HTMLElement)) return false
+  const tagName = target.tagName.toLowerCase()
+  return tagName === 'input' ||
+    tagName === 'textarea' ||
+    tagName === 'select' ||
+    target.isContentEditable ||
+    target.getAttribute('role') === 'textbox'
+})
+
+const handleGlobalKeyDown = (event: KeyboardEvent) => {
+  if (event.defaultPrevented || event.isComposing || event.altKey || isEditableShortcutTarget(event)) return
+  if (!(event.ctrlKey || event.metaKey)) return
+
+  const key = event.key.toLowerCase()
+  const isUndo = key === 'z' && !event.shiftKey
+  const isRedo = key === 'y' || (key === 'z' && event.shiftKey)
+
+  if (isUndo && canUndo.value) {
+    event.preventDefault()
+    undo()
+  } else if (isRedo && canRedo.value) {
+    event.preventDefault()
+    redo()
+  }
+}
+
+const flushAutoSaveBestEffort = () => {
+  void flushAutoSave().catch((flushError) => {
+    console.error('Failed to flush auto save:', flushError)
+  })
+}
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'hidden') flushAutoSaveBestEffort()
 }
 
 const handleRestoreAutoSavePrompt = async () => {
@@ -159,42 +204,48 @@ onMounted(async () => {
     document.documentElement.classList.toggle('disable-animations', !settings.value.ui.enableAnimations)
   }
 
-  const backup = await getAutoSaveBackup()
-  startAutoSave()
-  if (backup) {
-    showAutoSavePrompt.value = true
-  } else {
+  try {
+    const backup = await getAutoSaveBackup()
+    startAutoSave()
+    if (backup) {
+      showAutoSavePrompt.value = true
+    } else {
+      continueStartup()
+    }
+  } catch (autoSaveError) {
+    const detail = autoSaveError instanceof Error ? autoSaveError.message : String(autoSaveError)
+    console.error('Failed to initialize auto save:', autoSaveError)
+    error(`自动保存备份读取失败，已暂停本次运行的自动保存以保护原备份：${detail}`)
     continueStartup()
   }
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    const isCtrl = e.ctrlKey || e.metaKey
-
-    if (isCtrl && e.key === 'z' && !e.shiftKey) {
-      e.preventDefault()
-      if (canUndo.value) undo()
-    }
-
-    if (isCtrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-      e.preventDefault()
-      if (canRedo.value) redo()
-    }
-  }
-
-  document.addEventListener('keydown', handleKeyDown)
+  document.addEventListener('keydown', handleGlobalKeyDown)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('pagehide', flushAutoSaveBestEffort)
 
   const prefetchAsyncComponents = () => {
     const idleCallback = window.requestIdleCallback || ((cb) => setTimeout(cb, 2000))
     idleCallback(() => {
-      import('./components/auth/LoginDialog.vue')
-      import('./components/layout/ExportPreview.vue')
-      import('./components/workspace/CloudWorkspaceDialog.vue')
-      import('./components/student/StudentRosterDialog.vue')
-      import('xlsx-js-style')
+      const prefetch = (request: Promise<unknown>, label: string) => {
+        void request.catch((prefetchError) => {
+          console.warn(`Optional prefetch failed: ${label}`, prefetchError)
+        })
+      }
+      prefetch(import('./components/auth/LoginDialog.vue'), 'LoginDialog')
+      prefetch(import('./components/layout/ExportPreview.vue'), 'ExportPreview')
+      prefetch(import('./components/workspace/CloudWorkspaceDialog.vue'), 'CloudWorkspaceDialog')
+      prefetch(import('./components/student/StudentRosterDialog.vue'), 'StudentRosterDialog')
+      prefetch(import('xlsx-js-style'), 'xlsx-js-style')
     })
   }
 
   prefetchAsyncComponents()
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleGlobalKeyDown)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('pagehide', flushAutoSaveBestEffort)
 })
 </script>
 
@@ -244,7 +295,7 @@ onMounted(async () => {
               稍后处理
             </NButton>
             <NButton class="autosave-primary" attr-type="button" type="primary" :loading="isRestoringAutoSave" @click="handleRestoreAutoSavePrompt">
-              <RotateCcw :size="16" stroke-width="2" />
+              <template #icon><RotateCcw :size="16" stroke-width="2" /></template>
               <span>{{ isRestoringAutoSave ? '恢复中' : '恢复自动保存' }}</span>
             </NButton>
           </div></template>

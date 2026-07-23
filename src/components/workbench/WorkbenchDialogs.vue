@@ -3,6 +3,7 @@
     <SeatConfigDialog
       v-if="activeWorkbenchDialog === 'seatConfig'"
       :visible="activeWorkbenchDialog === 'seatConfig' && !isWorkbenchDialogHidden"
+      :initial-config="seatConfigDialogInitialConfig"
       @update:visible="handleDialogVisible"
       @confirm="handleSeatConfigConfirm"
     />
@@ -45,6 +46,7 @@ const {
   activeWorkbenchDialog,
   assignmentWorkbenchPanel,
   focusedRuleId,
+  seatConfigDialogInitialConfig,
   isWorkbenchDialogHidden,
   closeDialog
 } = useEditorWorkbench()
@@ -55,7 +57,7 @@ const handleDialogVisible = (visible: boolean) => {
   if (!visible) closeDialog()
 }
 
-const handleSeatConfigConfirm = async (newConfig: SeatConfig) => {
+const handleSeatConfigConfirm = async (newConfig: Partial<SeatConfig>) => {
   const confirmed = await confirm({
     title: '应用座位配置',
     content: '修改座位布局会重新生成座位并清除现有分配，是否继续？',
@@ -63,7 +65,14 @@ const handleSeatConfigConfirm = async (newConfig: SeatConfig) => {
     type: 'warning'
   })
   if (!confirmed) return
-  updateConfig(newConfig)
+  const configToApply: Partial<SeatConfig> = {
+    ...(seatConfigDialogInitialConfig.value ?? {}),
+    ...newConfig
+  }
+  if (newConfig.groups) {
+    configToApply.groups = newConfig.groups.map(group => ({ ...group }))
+  }
+  updateConfig(configToApply)
   closeDialog()
   success('座位配置已更新')
 }

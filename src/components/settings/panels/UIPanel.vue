@@ -2,27 +2,46 @@
   <div class="settings-panel">
     <NForm label-placement="top" size="medium">
       <section class="setting-section">
-        <h3>界面主题</h3>
-        <p>主题调整会立即预览并自动保存。</p>
+        <h3 class="section-title">界面偏好</h3>
+        <p class="section-desc">自定义界面外观和行为，修改会立即预览并自动保存。</p>
 
-        <NFormItem label="颜色模式">
-          <NRadioGroup v-model:value="colorModeModel" size="small">
-            <NRadioButton value="simple">简单模式</NRadioButton>
-            <NRadioButton value="custom">高级定制</NRadioButton>
+        <NFormItem class="setting-item" label="语言" :show-feedback="false">
+          <div class="field-stack">
+            <NSelect :value="localSettings.language" :options="languageOptions" disabled />
+            <span class="hint-text">多语言功能即将推出</span>
+          </div>
+        </NFormItem>
+
+        <NFormItem class="setting-item" label="颜色模式" :show-feedback="false">
+          <NRadioGroup v-model:value="colorModeModel" class="mode-tabs" size="small">
+            <NRadioButton class="mode-tab" value="simple">简单模式</NRadioButton>
+            <NRadioButton class="mode-tab" value="custom">定制模式</NRadioButton>
           </NRadioGroup>
         </NFormItem>
 
         <template v-if="localSettings.colorMode === 'simple'">
-          <NFormItem label="配色方案">
-            <NRadioGroup v-model:value="colorSchemeModel" size="small">
-              <NRadioButton value="light">浅色</NRadioButton>
-              <NRadioButton value="dark">深色</NRadioButton>
-              <NRadioButton value="auto">跟随浏览器（当前{{ prefersDarkMode ? '深色' : '浅色' }}）</NRadioButton>
+          <NFormItem class="setting-item" label="配色方案" :show-feedback="false">
+            <NRadioGroup v-model:value="colorSchemeModel" class="scheme-options" size="small">
+              <NRadioButton class="scheme-button" value="light">
+                <span class="scheme-button-content"><Sun :size="18" /><span>浅色</span></span>
+              </NRadioButton>
+              <NRadioButton class="scheme-button" value="dark">
+                <span class="scheme-button-content"><Moon :size="18" /><span>深色</span></span>
+              </NRadioButton>
+              <NRadioButton class="scheme-button" value="auto">
+                <span class="scheme-button-content">
+                  <span class="scheme-icon">
+                    <component :is="autoSchemeIcon" :size="18" />
+                    <span class="scheme-auto-mark">A</span>
+                  </span>
+                  <span>跟随浏览器</span>
+                </span>
+              </NRadioButton>
             </NRadioGroup>
           </NFormItem>
-          <NFormItem label="主题色">
+          <NFormItem class="setting-item" label="主题色" :show-feedback="false">
             <div class="color-row">
-              <NColorPicker v-model:value="themeColorModel" :show-alpha="false" :modes="['hex']" />
+              <NColorPicker class="theme-color-picker" v-model:value="themeColorModel" :show-alpha="false" :modes="['hex']" />
               <NButton secondary :disabled="localSettings.themeColor === defaultSettings.ui.themeColor" @click="resetUiSetting('themeColor')">
                 <template #icon><RotateCcw :size="15" /></template>恢复默认
               </NButton>
@@ -31,14 +50,15 @@
         </template>
 
         <template v-else>
-          <NFormItem label="定制主题基底">
+          <NFormItem class="setting-item" label="定制主题基底" :show-feedback="false">
             <NRadioGroup v-model:value="customBaseSchemeModel" size="small">
               <NRadioButton value="light">浅色组件基底</NRadioButton>
               <NRadioButton value="dark">深色组件基底</NRadioButton>
             </NRadioGroup>
           </NFormItem>
 
-          <NCard v-for="group in customColorGroups" :key="group.title" size="small" :title="group.title" class="color-group">
+          <div v-for="group in customColorGroups" :key="group.title" class="color-category">
+            <h4 class="category-title">{{ group.title }}</h4>
             <NGrid cols="1 520:2" :x-gap="14" :y-gap="12">
               <NGridItem v-for="field in group.fields" :key="field.key">
                 <NFormItem :label="field.label" :show-feedback="false">
@@ -46,9 +66,9 @@
                 </NFormItem>
               </NGridItem>
             </NGrid>
-          </NCard>
+          </div>
 
-          <NAlert v-if="hasContrastWarning" type="warning" :show-icon="true">
+          <NAlert v-if="hasContrastWarning" class="contrast-alert" type="warning" :show-icon="true">
             当前部分文字或主色与背景的对比度未达到 WCAG AA，建议继续调整。
           </NAlert>
           <NButton secondary @click="resetCustomColors"><template #icon><RotateCcw :size="15" /></template>重置全部定制颜色</NButton>
@@ -56,37 +76,58 @@
       </section>
 
       <section class="setting-section">
-        <h3>显示与交互</h3>
-        <p>调整默认缩放、动画和座位卡信息密度。</p>
+        <h3 class="section-title">显示与交互</h3>
+        <p class="section-desc">调整默认缩放、动画和座位卡信息密度。</p>
 
-        <NFormItem label="默认缩放">
-          <div class="slider-row">
-            <NSlider v-model:value="defaultZoomModel" :min="50" :max="200" :step="10" />
-            <NInputNumber class="zoom-number-input" :value="localSettings.defaultZoom" :min="50" :max="200" :step="10" @update:value="updateDefaultZoom" />
+        <NFormItem class="setting-item" label="默认缩放比例（%）" :show-feedback="false">
+          <div class="field-stack">
+            <div class="slider-row">
+              <NSlider v-model:value="defaultZoomModel" :min="50" :max="200" :step="10" />
+              <NInputNumber class="zoom-number-input" :value="localSettings.defaultZoom" :min="50" :max="200" :step="10" @update:value="updateDefaultZoom" />
+            </div>
+            <span class="hint-text">打开工作区时的初始缩放比例（50-200%）</span>
           </div>
         </NFormItem>
 
-        <NFormItem label="界面动画">
+        <NFormItem class="setting-item" label="启用动画效果" :show-feedback="false">
           <NSwitch v-model:value="enableAnimationsModel" />
         </NFormItem>
 
-        <NFormItem label="标签显示模式">
-          <NRadioGroup v-model:value="localTagDisplayMode" size="small">
-            <NRadioButton value="dot">颜色点</NRadioButton>
-            <NRadioButton value="corner">右上角文字</NRadioButton>
-            <NRadioButton value="bottom">座位下部文字</NRadioButton>
-          </NRadioGroup>
+        <NFormItem class="setting-item" label="标签显示模式" :show-feedback="false">
+          <div class="field-stack">
+            <NRadioGroup v-model:value="localTagDisplayMode" class="tag-mode-options">
+              <NRadio class="tag-mode-option" :class="{ active: localTagDisplayMode === 'dot' }" value="dot">
+                <span class="mode-icon dot-icon"></span><span class="mode-text">颜色点</span>
+              </NRadio>
+              <NRadio class="tag-mode-option" :class="{ active: localTagDisplayMode === 'corner' }" value="corner">
+                <span class="mode-icon corner-icon"></span><span class="mode-text">右上角文字</span>
+              </NRadio>
+              <NRadio class="tag-mode-option" :class="{ active: localTagDisplayMode === 'bottom' }" value="bottom">
+                <span class="mode-icon bottom-icon"></span><span class="mode-text">座位下部文字</span>
+              </NRadio>
+            </NRadioGroup>
+            <span class="hint-text">控制标签在座位表中的显示方式</span>
+          </div>
         </NFormItem>
 
-        <NGrid cols="1 620:2" :x-gap="18" :y-gap="12">
-          <NGridItem><NFormItem label="显示姓名"><NSwitch v-model:value="showStudentNameModel" /></NFormItem></NGridItem>
-          <NGridItem><NFormItem label="姓名大字号"><NSwitch v-model:value="largeNameModeModel" :disabled="!canEnableLargeName" /></NFormItem></NGridItem>
-          <NGridItem><NFormItem label="显示学号"><NSwitch v-model:value="showStudentNumberModel" /></NFormItem></NGridItem>
-          <NGridItem><NFormItem label="学号大字号"><NSwitch v-model:value="largeNumberModeModel" :disabled="!canEnableLargeNumber" /></NFormItem></NGridItem>
-          <NGridItem><NFormItem label="显示标签"><NSwitch v-model:value="localShowTags" /></NFormItem></NGridItem>
-          <NGridItem><NFormItem label="显示数值属性"><NSwitch v-model:value="localShowNumericAttributes" /></NFormItem></NGridItem>
-          <NGridItem><NFormItem label="显示行号"><NSwitch v-model:value="showEditorRowNumbersModel" /></NFormItem></NGridItem>
-        </NGrid>
+        <NFormItem class="setting-item" label="座位表元素显示" :show-feedback="false">
+          <div class="field-stack">
+            <div class="element-toggles">
+              <div class="element-toggle-group">
+                <div class="toggle-item"><span class="toggle-label">姓名</span><NSwitch v-model:value="showStudentNameModel" aria-label="显示姓名" /></div>
+                <div class="toggle-item sub-toggle" :class="{ disabled: !canEnableLargeName }"><span class="toggle-label">姓名大字号</span><NSwitch v-model:value="largeNameModeModel" :disabled="!canEnableLargeName" aria-label="姓名大字号" /></div>
+              </div>
+              <div class="element-toggle-group">
+                <div class="toggle-item"><span class="toggle-label">学号</span><NSwitch v-model:value="showStudentNumberModel" aria-label="显示学号" /></div>
+                <div class="toggle-item sub-toggle" :class="{ disabled: !canEnableLargeNumber }"><span class="toggle-label">学号大字号</span><NSwitch v-model:value="largeNumberModeModel" :disabled="!canEnableLargeNumber" aria-label="学号大字号" /></div>
+              </div>
+              <div class="toggle-item single-toggle"><span class="toggle-label">标签</span><NSwitch v-model:value="localShowTags" aria-label="显示标签" /></div>
+              <div class="toggle-item single-toggle"><span class="toggle-label">数值</span><NSwitch v-model:value="localShowNumericAttributes" aria-label="显示数值属性" /></div>
+              <div class="toggle-item single-toggle"><span class="toggle-label">行号</span><NSwitch v-model:value="showEditorRowNumbersModel" aria-label="显示行号" /></div>
+            </div>
+            <span class="hint-text">行号会根据座位表配置中的讲台位置自动调整前后方向</span>
+          </div>
+        </NFormItem>
       </section>
     </NForm>
   </div>
@@ -97,19 +138,20 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   NAlert,
   NButton,
-  NCard,
   NColorPicker,
   NForm,
   NFormItem,
   NGrid,
   NGridItem,
   NInputNumber,
+  NRadio,
   NRadioButton,
   NRadioGroup,
+  NSelect,
   NSlider,
   NSwitch
 } from 'naive-ui'
-import { RotateCcw } from 'lucide-vue-next'
+import { Moon, RotateCcw, Sun } from 'lucide-vue-next'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
@@ -128,6 +170,10 @@ const { tagDisplayMode, setTagDisplayMode, showTagsInSeatChart, setShowTagsInSea
 const { showNumericAttributesInEditor, setShowNumericAttributesInEditor } = useStudentAttributes()
 
 const localSettings = computed(() => props.settings)
+const languageOptions = [
+  { label: '简体中文', value: 'zh-CN' },
+  { label: 'English（即将推出）', value: 'en-US' }
+]
 const colorModeModel = computed({
   get: () => localSettings.value.colorMode,
   set: value => updateSetting('ui.colorMode', value, { immediate: true })
@@ -205,6 +251,7 @@ const customColorGroups: Array<{ title: string; fields: ColorField[] }> = [
 const prefersDarkMode = ref(false)
 let prefersDarkQuery: MediaQueryList | null = null
 const updatePrefersDarkMode = () => { prefersDarkMode.value = Boolean(prefersDarkQuery?.matches) }
+const autoSchemeIcon = computed(() => prefersDarkMode.value ? Moon : Sun)
 
 const hasHiddenElement = computed(() => !localSettings.value.showStudentName ||
   !localSettings.value.showStudentNumber || !localShowTags.value || !localShowNumericAttributes.value)
@@ -260,15 +307,308 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.settings-panel { max-width: 920px; }
-.setting-section { display: grid; gap: 16px; margin-bottom: 30px; }
-.setting-section h3 { margin: 0; color: var(--color-text-primary); font-size: 16px; }
-.setting-section > p { margin: -10px 0 0; color: var(--color-text-secondary); font-size: 13px; }
-.color-row, .slider-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; width: 100%; align-items: center; }
-.color-group { background: var(--color-bg-subtle); }
-.zoom-number-input { width: 112px; }
+.settings-panel {
+  max-width: 920px;
+}
+
+.setting-section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  margin: 0 0 8px;
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.section-desc {
+  margin: 0 0 20px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.setting-item {
+  margin-bottom: 20px;
+}
+
+.field-stack {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+}
+
+.hint-text {
+  color: var(--color-text-disabled);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.mode-tabs {
+  display: flex;
+  width: 100%;
+}
+
+.mode-tab {
+  flex: 1;
+}
+
+.scheme-options {
+  display: flex;
+  width: 100%;
+}
+
+.scheme-button {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  height: 64px;
+}
+
+.scheme-button-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.scheme-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.scheme-auto-mark {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--color-primary-light);
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.color-row,
+.slider-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  width: 100%;
+  align-items: center;
+}
+
+.theme-color-picker {
+  min-width: 0;
+}
+
+.zoom-number-input {
+  width: 112px;
+}
+
+.color-category {
+  margin-bottom: 24px;
+}
+
+.category-title {
+  margin: 0 0 12px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.contrast-alert {
+  margin-bottom: 14px;
+}
+
+.tag-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.tag-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 54px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-subtle);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.tag-mode-option:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-soft);
+}
+
+.tag-mode-option.active {
+  border-color: var(--color-primary);
+  background: var(--color-bg-selected);
+}
+
+.mode-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 36px;
+  flex: 0 0 48px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-secondary);
+}
+
+.mode-icon::before {
+  content: '张三';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.bottom-icon::before {
+  top: 40%;
+}
+
+.dot-icon::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 16px;
+  height: 4px;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(circle, var(--color-danger) 1.5px, transparent 1.5px) 0 0,
+    radial-gradient(circle, var(--color-primary) 1.5px, transparent 1.5px) 6px 0,
+    radial-gradient(circle, var(--color-warning) 1.5px, transparent 1.5px) 12px 0;
+  background-repeat: no-repeat;
+  background-size: 4px 4px, 4px 4px, 4px 4px;
+}
+
+.corner-icon::after,
+.bottom-icon::after {
+  content: 'A';
+  position: absolute;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.corner-icon::after {
+  top: 2px;
+  right: 2px;
+}
+
+.bottom-icon::after {
+  bottom: 2px;
+  left: 50%;
+  padding-inline: 5px;
+  transform: translateX(-50%);
+}
+
+.mode-text {
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+.element-toggles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 16px;
+}
+
+.element-toggle-group,
+.toggle-item {
+  display: flex;
+  align-items: center;
+}
+
+.element-toggle-group {
+  gap: 10px;
+}
+
+.element-toggle-group,
+.single-toggle {
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-subtle);
+}
+
+.toggle-item {
+  gap: 7px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.toggle-item.sub-toggle {
+  padding-left: 10px;
+  border-left: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.toggle-label {
+  white-space: nowrap;
+}
+
+.toggle-item.disabled {
+  opacity: 0.5;
+}
+
 @media (max-width: 620px) {
-  .color-row, .slider-row { grid-template-columns: 1fr; }
-  .zoom-number-input { width: 100%; }
+  .scheme-button {
+    height: 56px;
+  }
+
+  .color-row,
+  .slider-row {
+    grid-template-columns: 1fr;
+  }
+
+  .zoom-number-input {
+    width: 100%;
+  }
+
+  .element-toggles {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .element-toggle-group,
+  .single-toggle {
+    width: 100%;
+  }
 }
 </style>

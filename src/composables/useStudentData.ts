@@ -1,7 +1,9 @@
 import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
 import type { Student, UseStudentDataReturn } from '@/types'
+import { normalizeNumberInput } from '@/utils/inputNormalization'
 import { useSeatChart } from './useSeatChart'
+import { attributeDefinitions } from './studentAttributeState'
 
 // 学生数据管理
 const students = ref<Student[]>([])
@@ -18,14 +20,19 @@ const normalizeNumericAttributes = (
   const normalized: Record<string, number | null> = {}
   if (!attributes || typeof attributes !== 'object') return normalized
 
+  const definitionsById = new Map(
+    attributeDefinitions.value.map(definition => [definition.id, definition])
+  )
+
   Object.entries(attributes).forEach(([key, value]) => {
     if (!key) return
-    if (value === null || value === undefined || value === '') {
-      normalized[key] = null
-      return
-    }
-    const numberValue = typeof value === 'number' ? value : Number(value)
-    normalized[key] = Number.isFinite(numberValue) ? numberValue : null
+    const definition = definitionsById.get(key)
+    if (!definition) return
+    normalized[key] = normalizeNumberInput(value, {
+      min: definition.min ?? undefined,
+      max: definition.max ?? undefined,
+      precision: definition.precision
+    })
   })
   return normalized
 }
@@ -208,6 +215,15 @@ export function useStudentData(): UseStudentDataReturn {
     nextStudentId = 1
   }
 
+  const replaceStudentData = (nextStudents: Student[]): void => {
+    students.value = nextStudents.map(student => ({
+      ...student,
+      tags: [...student.tags],
+      numericAttributes: { ...(student.numericAttributes || {}) }
+    }))
+    syncStudentIdCounter()
+  }
+
   // 同步学生 ID 计数器（工作区加载后调用）
   const syncStudentIdCounter = (): void => {
     if (students.value.length === 0) {
@@ -237,6 +253,7 @@ export function useStudentData(): UseStudentDataReturn {
     removeTagFromStudent,
     removeTagFromStudents,
     clearAllStudents,
+    replaceStudentData,
     syncStudentIdCounter
   }
 }

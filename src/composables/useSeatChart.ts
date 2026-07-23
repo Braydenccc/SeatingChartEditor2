@@ -147,6 +147,18 @@ function rebuildSeatMap() {
   seatMap = newMap
 }
 
+const replaceSeatChartState = (nextConfig: SeatConfig, nextSeats: Seat[]) => {
+  seatConfig.value = {
+    ...nextConfig,
+    groups: nextConfig.groups.map(group => ({ ...group })),
+    guardSeats: nextConfig.guardSeats
+      ? { ...nextConfig.guardSeats }
+      : { ...DEFAULT_GUARD_SEATS_CONFIG }
+  }
+  seats.value = nextSeats.map(seat => ({ ...seat }))
+  rebuildSeatMap()
+}
+
 // 单座位状态更新（带撤销记录）
 const updateSeatState = (seatId: string, updates: SeatStateUpdate, recordUndo = true) => {
   const seat = seatMap.get(seatId)
@@ -155,32 +167,18 @@ const updateSeatState = (seatId: string, updates: SeatStateUpdate, recordUndo = 
     return false
   }
 
-  const before = { studentId: seat.studentId, isEmpty: seat.isEmpty }
+  const undo = recordUndo ? useUndo() : null
+  const beforeSnapshot = undo?.createSnapshot()
 
   // 如果要分配新学生，先找到该学生之前所在的座位
-  let previousSeatId: string | null = null
-  if (updates.studentId !== undefined && updates.studentId !== null && updates.studentId !== before.studentId) {
+  if (updates.studentId !== undefined && updates.studentId !== null && updates.studentId !== seat.studentId) {
     const previousSeat = seats.value.find(s => s.studentId === updates.studentId && s.id !== seatId)
-    previousSeatId = previousSeat?.id || null
     if (previousSeat) previousSeat.studentId = null
   }
 
   Object.assign(seat, updates)
-  const after = { studentId: seat.studentId, isEmpty: seat.isEmpty }
-
-  if (recordUndo) {
-    const { recordAssign, recordClear, recordToggleEmpty } = useUndo()
-
-    // 根据变更类型调用对应的 record 函数
-    if (before.isEmpty !== after.isEmpty) {
-      recordToggleEmpty(seatId)
-    } else if (before.studentId !== after.studentId) {
-      if (after.studentId === null) {
-        recordClear(seatId, before.studentId)
-      } else {
-        recordAssign(seatId, after.studentId, previousSeatId)
-      }
-    }
+  if (undo && beforeSnapshot) {
+    undo.recordBatch(beforeSnapshot, undo.createSnapshot())
   }
 
   return true
@@ -326,21 +324,83 @@ const visibleGuardSeats = computed(() => {
   ))
 })
 
+// 学生到座位的反向索引：座位状态变化时懒重建，同一稳定状态下供所有调用端复用。
+const studentSeatMap = computed(() => {
+  const index = new Map<number, Seat>()
+  for (const seat of seats.value) {
+    if (seat.studentId !== null && !index.has(seat.studentId)) {
+      index.set(seat.studentId, seat)
+    }
+  }
+  return index
+})
+
 export function useSeatChart() {
   const { cleanupInvalidSeats } = useZoneData()
+
+  const getTotalColumns = () => {
+    ensureGroupsArray()
+    let total = 0
+    for (let groupIndex = 0; groupIndex < seatConfig.value.groupCount; groupIndex++) {
+      total += getGroupConfig(groupIndex).columns
+    }
+    return total
+  }
+
+  const toGlobalCol = (seat: Pick<SeatPosition, 'groupIndex' | 'columnIndex'>) => {
+    if (!Number.isInteger(seat.groupIndex) || !Number.isInteger(seat.columnIndex)) return -1
+    if (seat.groupIndex < 0 || seat.groupIndex >= seatConfig.value.groupCount) return -1
+
+    const groupConfig = getGroupConfig(seat.groupIndex)
+    if (seat.columnIndex < 0 || seat.columnIndex >= groupConfig.columns) return -1
+
+    let globalColumn = seat.columnIndex
+    for (let groupIndex = 0; groupIndex < seat.groupIndex; groupIndex++) {
+      globalColumn += getGroupConfig(groupIndex).columns
+    }
+    return globalColumn
+  }
+
+  const fromGlobalCol = (globalColumn: number): Pick<SeatPosition, 'groupIndex' | 'columnIndex'> | null => {
+    if (!Number.isInteger(globalColumn) || globalColumn < 0) return null
+
+    let remaining = globalColumn
+    for (let groupIndex = 0; groupIndex < seatConfig.value.groupCount; groupIndex++) {
+      const columns = getGroupConfig(groupIndex).columns
+      if (remaining < columns) {
+        return { groupIndex, columnIndex: remaining }
+      }
+      remaining -= columns
+    }
+    return null
+  }
+
+  const getTranslatedSeatId = (seatId: string, columnOffset: number, rowOffset: number) => {
+    const source = seatMap.get(seatId)
+    if (!source || source.kind === 'guard' || isGuardSeatId(source.id)) return null
+
+    const sourceGlobalColumn = toGlobalCol(source)
+    if (sourceGlobalColumn < 0) return null
+    const destination = fromGlobalCol(sourceGlobalColumn + columnOffset)
+    if (!destination) return null
+
+    const destinationRow = source.rowIndex + rowOffset
+    if (destinationRow < 0) return null
+    const destinationId = generateSeatId(destination.groupIndex, destination.columnIndex, destinationRow)
+    return seatMap.has(destinationId) ? destinationId : null
+  }
 
   // 分配学生到座位
   const assignStudent = (seatId: string, studentId: number, recordUndo = true) => {
     const seat = seatMap.get(seatId)
     if (seat && !seat.isEmpty) {
+      const undo = recordUndo ? useUndo() : null
+      const beforeSnapshot = undo?.createSnapshot()
       const previousSeat = seats.value.find(s => s.studentId === studentId && s.id !== seatId)
       if (previousSeat) previousSeat.studentId = null
-      if (recordUndo) {
-        const { recordAssign } = useUndo()
-        seat.studentId = studentId
-        recordAssign(seatId, studentId, previousSeat?.id || null)
-      } else {
-        seat.studentId = studentId
+      seat.studentId = studentId
+      if (undo && beforeSnapshot) {
+        undo.recordBatch(beforeSnapshot, undo.createSnapshot())
       }
       return true
     }
@@ -352,13 +412,14 @@ export function useSeatChart() {
     const seat = seatMap.get(seatId)
     if (seat) {
       if (seat.kind === 'guard' || isGuardSeatId(seat.id)) return
-      if (recordUndo) {
-        const { recordToggleEmpty } = useUndo()
-        recordToggleEmpty(seatId)
-      }
+      const undo = recordUndo ? useUndo() : null
+      const beforeSnapshot = undo?.createSnapshot()
       seat.isEmpty = !seat.isEmpty
       if (seat.isEmpty) {
         seat.studentId = null
+      }
+      if (undo && beforeSnapshot) {
+        undo.recordBatch(beforeSnapshot, undo.createSnapshot())
       }
     }
   }
@@ -395,105 +456,87 @@ export function useSeatChart() {
     if (!selectedSeatIds || selectedSeatIds.length === 0) return false
 
     const targetSeat = seatMap.get(targetSeatId)
-    if (!targetSeat) return false
+    if (!targetSeat || targetSeat.isEmpty || targetSeat.kind === 'guard' || isGuardSeatId(targetSeat.id)) return false
 
     const anchorSeat = seatMap.get(anchorId)
-    if (!anchorSeat) return false
+    if (!anchorSeat || anchorSeat.isEmpty || anchorSeat.kind === 'guard' || isGuardSeatId(anchorSeat.id)) return false
 
-    const offsetCol = toGlobalCol(targetSeat) - toGlobalCol(anchorSeat)
+    const anchorGlobalColumn = toGlobalCol(anchorSeat)
+    const targetGlobalColumn = toGlobalCol(targetSeat)
+    if (anchorGlobalColumn < 0 || targetGlobalColumn < 0) return false
+
+    const offsetCol = targetGlobalColumn - anchorGlobalColumn
     const offsetRow = targetSeat.rowIndex - anchorSeat.rowIndex
+    if (offsetCol === 0 && offsetRow === 0) return false
 
-    // 收集源->目标映射，以及超出边界的座位
+    // 先计算并验证全部源->目标映射；任何目标无效时不修改当前座位状态。
     const moves: SelectionMove[] = []
-    const outOfBoundsSeats: Array<{ srcId: string; studentId: number }> = []
-
-    for (const sid of selectedSeatIds) {
+    for (const sid of new Set(selectedSeatIds)) {
       const src = seatMap.get(sid)
-      if (!src || src.isEmpty || src.studentId === null) continue
+      if (!src || src.isEmpty || src.kind === 'guard' || isGuardSeatId(src.id)) return false
+      if (src.studentId === null) continue
 
-      const newGC = toGlobalCol(src) + offsetCol
-      const newR = src.rowIndex + offsetRow
-      const { groupIndex: newG, columnIndex: newC } = fromGlobalCol(newGC)
-      const destId = generateSeatId(newG, newC, newR)
+      const destId = getTranslatedSeatId(src.id, offsetCol, offsetRow)
+      if (!destId) return false
       const dest = seatMap.get(destId)
+      if (!dest || dest.isEmpty || dest.kind === 'guard' || isGuardSeatId(dest.id)) return false
 
-      if (dest && !dest.isEmpty) {
-        moves.push({ srcId: sid, destId, studentId: src.studentId })
-      } else {
-        // 目标座位不存在或为空置，记录为超出边界
-        outOfBoundsSeats.push({ srcId: sid, studentId: src.studentId })
-      }
+      moves.push({ srcId: sid, destId, studentId: src.studentId })
     }
 
-    if (moves.length === 0 && outOfBoundsSeats.length === 0) return false
+    if (moves.length === 0) return false
 
-    // 快照所有涉及座位的当前学生（原子读取）
-    const snapshot = new Map<string, number | null>()
-    for (const m of moves) {
-      const srcSeat = seatMap.get(m.srcId)
-      const destSeat = seatMap.get(m.destId)
-      if (!srcSeat || !destSeat) return false
-      if (!snapshot.has(m.srcId)) snapshot.set(m.srcId, srcSeat.studentId)
-      if (!snapshot.has(m.destId)) snapshot.set(m.destId, destSeat.studentId)
-    }
-
-    // 目标座位集合
+    const sourceIdSet = new Set(moves.map(move => move.srcId))
     const destIdSet = new Set(moves.map(m => m.destId))
+    if (destIdSet.size !== moves.length) return false
 
-    // 计算每个座位的最终学生
+    const studentIdsBefore = seats.value
+      .flatMap(seat => seat.studentId === null ? [] : [seat.studentId])
+      .sort((a, b) => a - b)
     const finalState = new Map<string, number | null>()
 
-    // 1. 目标位置填入选区学生
-    for (const m of moves) {
-      finalState.set(m.destId, m.studentId)
-    }
-
-    // 2. 收集所有被挤掉的学生（目标位置原有的非选区学生）
+    // 目标位置原有且不属于选区的学生，需要回填到被腾出的源座位。
     const displacedStudents: number[] = []
-    for (const m of moves) {
-      const origDestStudent = snapshot.get(m.destId)
-      if (origDestStudent !== null && origDestStudent !== undefined) {
-        const isMovingStudent = moves.some(mv => mv.studentId === origDestStudent)
-        if (!isMovingStudent) {
-          displacedStudents.push(origDestStudent)
-        }
+    for (const move of moves) {
+      const destinationStudentId = seatMap.get(move.destId)?.studentId ?? null
+      if (destinationStudentId !== null && !sourceIdSet.has(move.destId)) {
+        displacedStudents.push(destinationStudentId)
       }
     }
 
-    // 3. 找出所有空闲的源位置（不是其他 move 的目标）
-    const availableSources: string[] = []
-    for (const m of moves) {
-      if (!destIdSet.has(m.srcId)) {
-        availableSources.push(m.srcId)
-      }
+    const availableSources = moves
+      .map(move => move.srcId)
+      .filter(sourceId => !destIdSet.has(sourceId))
+    if (displacedStudents.length > availableSources.length) return false
+
+    for (const sourceId of availableSources) {
+      finalState.set(sourceId, null)
+    }
+    for (const move of moves) {
+      finalState.set(move.destId, move.studentId)
+    }
+    displacedStudents.forEach((studentId, index) => {
+      finalState.set(availableSources[index], studentId)
+    })
+
+    const studentIdsAfter = seats.value
+      .flatMap(seat => {
+        const studentId = finalState.has(seat.id) ? finalState.get(seat.id) : seat.studentId
+        return studentId === null || studentId === undefined ? [] : [studentId]
+      })
+      .sort((a, b) => a - b)
+    if (studentIdsBefore.length !== studentIdsAfter.length || studentIdsBefore.some((id, index) => id !== studentIdsAfter[index])) {
+      return false
     }
 
-    // 4. 清空超出边界的源座位
-    for (const { srcId } of outOfBoundsSeats) {
-      finalState.set(srcId, null)
-    }
-
-    // 5. 将被挤掉的学生依次放入空闲源位置
-    for (let i = 0; i < displacedStudents.length && i < availableSources.length; i++) {
-      finalState.set(availableSources[i], displacedStudents[i])
-    }
-
-    // 6. 剩余的空闲源位置清空
-    for (let i = displacedStudents.length; i < availableSources.length; i++) {
-      finalState.set(availableSources[i], null)
-    }
-
-    // 原子性批量写入（预先验证所有座位存在）
     const updates: Array<{ seat: Seat; studentId: number | null }> = []
     for (const [seatId, studentId] of finalState) {
       const seat = seatMap.get(seatId)
       if (!seat) return false
       updates.push({ seat, studentId })
     }
-
-    // 执行批量更新
-    for (const { seat, studentId } of updates) {
-      seat.studentId = studentId
+    for (const update of updates) {
+      update.seat.studentId = update.studentId
     }
 
     return true
@@ -506,39 +549,60 @@ export function useSeatChart() {
    * @param {number} direction - 溢出时的列偏移量（正=溢出时向左，负=向右）
    * @param {number} colShift  - 直接列偏移量（不依赖溢出，正=向右，负=向左）
    *
-   * 内部坐标系：
-   *   globalCol = groupIndex * columnsPerGroup + columnIndex
-   *   totalCols = groupCount * columnsPerGroup
+   * 内部坐标系使用 groups[] 的实际列数前缀和。
    */
   const shiftSeats = (distance: number, direction = 0, colShift = 0) => {
-    const { groupCount, columnsPerGroup, seatsPerColumn } = seatConfig.value
-    const totalCols = groupCount * columnsPerGroup
+    const totalCols = getTotalColumns()
+    if (totalCols <= 0) return false
 
-    // 1. 拍快照：记录每个非空置座位当前的学生 ID
-    const snapshot = new Map<string, number | null>()
-    for (const seat of getAvailableSeats()) {
-      const globalCol = seat.groupIndex * columnsPerGroup + seat.columnIndex
-      snapshot.set(`${globalCol},${seat.rowIndex}`, seat.studentId)
-    }
+    const availableSeats = getAvailableSeats()
+    if (availableSeats.length === 0) return false
+    const availableSeatIds = new Set(availableSeats.map(seat => seat.id))
+    const sourceIds = new Set<string>()
+    const updates: Array<{ seat: Seat; studentId: number | null }> = []
 
-    if (snapshot.size === 0) return
-
-    // 2. 对每个目标座位，反向推算"谁应该坐到这里"
-    for (const seat of getAvailableSeats()) {
-      const globalCol = seat.groupIndex * columnsPerGroup + seat.columnIndex
+    // 对每个目标座位反向推算来源；全部映射通过后再一次性写入。
+    for (const seat of availableSeats) {
+      const globalCol = toGlobalCol(seat)
+      if (globalCol < 0) return false
+      const rowCount = getGroupConfig(seat.groupIndex).rows
+      if (rowCount <= 0) return false
 
       // 行方向：反推源行
       const srcRow_raw = seat.rowIndex - distance
-      const overflow = Math.floor(srcRow_raw / seatsPerColumn)
-      const srcRow = ((srcRow_raw % seatsPerColumn) + seatsPerColumn) % seatsPerColumn
+      const overflow = Math.floor(srcRow_raw / rowCount)
+      const srcRow = ((srcRow_raw % rowCount) + rowCount) % rowCount
 
       // 列方向：直接列偏移 + 溢出换列（两者叠加）
       //   colShift>0 表示学生向右移动，源在左侧（globalCol - colShift）
       //   overflow 部分同旧逻辑
       const srcCol = ((globalCol - colShift - overflow * direction) % totalCols + totalCols) % totalCols
+      const sourcePosition = fromGlobalCol(srcCol)
+      if (!sourcePosition) return false
+      const sourceId = generateSeatId(sourcePosition.groupIndex, sourcePosition.columnIndex, srcRow)
+      const sourceSeat = seatMap.get(sourceId)
+      if (!sourceSeat || sourceSeat.isEmpty || !availableSeatIds.has(sourceId) || sourceIds.has(sourceId)) {
+        return false
+      }
 
-      seat.studentId = snapshot.get(`${srcCol},${srcRow}`) ?? null
+      sourceIds.add(sourceId)
+      updates.push({ seat, studentId: sourceSeat.studentId })
     }
+
+    const studentIdsBefore = availableSeats
+      .flatMap(seat => seat.studentId === null ? [] : [seat.studentId])
+      .sort((a, b) => a - b)
+    const studentIdsAfter = updates
+      .flatMap(update => update.studentId === null ? [] : [update.studentId])
+      .sort((a, b) => a - b)
+    if (studentIdsBefore.length !== studentIdsAfter.length || studentIdsBefore.some((id, index) => id !== studentIdsAfter[index])) {
+      return false
+    }
+
+    for (const update of updates) {
+      update.seat.studentId = update.studentId
+    }
+    return true
   }
 
   // 更新配置
@@ -572,7 +636,7 @@ export function useSeatChart() {
 
   // 查找学生所在座位
   const findSeatByStudent = (studentId: number) => {
-    return seats.value.find(s => s.studentId === studentId)
+    return studentSeatMap.value.get(studentId)
   }
 
   // 清空所有座位
@@ -860,21 +924,13 @@ export function useSeatChart() {
   const hasSeat = (seatId: string) => seatMap.has(seatId)
   const getSeat = (seatId: string) => seatMap.get(seatId) ?? null
 
-  // 全局列坐标转换工具
-  const toGlobalCol = (seat: Pick<SeatPosition, 'groupIndex' | 'columnIndex'>) => (
-    seat.groupIndex * seatConfig.value.columnsPerGroup + seat.columnIndex
-  )
-  const fromGlobalCol = (gc: number): Pick<SeatPosition, 'groupIndex' | 'columnIndex'> => ({
-    groupIndex: Math.floor(gc / seatConfig.value.columnsPerGroup),
-    columnIndex: gc % seatConfig.value.columnsPerGroup
-  })
-
   return {
     seatConfig,
     seats,
     organizedSeats,
     guardSeats,
     visibleGuardSeats,
+    studentSeatMap,
     initializeSeats,
     assignStudent,
     toggleEmpty,
@@ -894,6 +950,7 @@ export function useSeatChart() {
     // 统一状态修改接口
     updateSeatState,
     batchUpdateSeats,
+    replaceSeatChartState,
     // 距离与相邻性
     getSeatDistance,
     getAdjacentSeats,
@@ -918,6 +975,7 @@ export function useSeatChart() {
     isGuardSeatId,
     normalizeGuardSeatsConfig,
     toGlobalCol,
-    fromGlobalCol
+    fromGlobalCol,
+    getTranslatedSeatId
   }
 }

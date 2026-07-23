@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { useSeatChart } from './useSeatChart'
-import { parseSeatId } from '@/utils/seatHelpers'
+import { isGuardSeatId, parseSeatId } from '@/utils/seatHelpers'
 import type { RotationGroup, RotationZone, Seat } from '@/types/models'
 
 /**
@@ -16,6 +16,56 @@ let nextGroupId = 1
 let nextZoneId = 1   // 全局递增，避免选区名重复
 
 const editingZoneId = ref<number | null>(null)
+
+const cloneRotationGroups = (groups: RotationGroup[]): RotationGroup[] => groups.map(group => ({
+  id: group.id,
+  name: group.name,
+  type: group.type,
+  zones: group.zones.map(zone => ({
+    id: zone.id,
+    name: zone.name,
+    seatIds: [...zone.seatIds]
+  }))
+}))
+
+const validateRotationDataShape = (groups: unknown) => {
+  if (!Array.isArray(groups)) {
+    return { valid: false, error: '轮换数据必须是数组' }
+  }
+
+  const groupIds = new Set<number>()
+  const zoneIds = new Set<number>()
+
+  for (const group of groups) {
+    if (!group || typeof group !== 'object') {
+      return { valid: false, error: '轮换组数据格式无效' }
+    }
+    const candidateGroup = group as Partial<RotationGroup>
+    if (!Number.isInteger(candidateGroup.id) || (candidateGroup.id ?? 0) <= 0 || groupIds.has(candidateGroup.id as number)) {
+      return { valid: false, error: '轮换组 ID 必须是唯一正整数' }
+    }
+    if (typeof candidateGroup.name !== 'string' || (candidateGroup.type !== 'cycle' && candidateGroup.type !== 'swap') || !Array.isArray(candidateGroup.zones)) {
+      return { valid: false, error: `轮换组 ${candidateGroup.id} 的数据格式无效` }
+    }
+    groupIds.add(candidateGroup.id as number)
+
+    for (const zone of candidateGroup.zones) {
+      if (!zone || typeof zone !== 'object') {
+        return { valid: false, error: '轮换选区数据格式无效' }
+      }
+      const candidateZone = zone as Partial<RotationZone>
+      if (!Number.isInteger(candidateZone.id) || (candidateZone.id ?? 0) <= 0 || zoneIds.has(candidateZone.id as number)) {
+        return { valid: false, error: '轮换选区 ID 必须是全局唯一正整数' }
+      }
+      if (typeof candidateZone.name !== 'string' || !Array.isArray(candidateZone.seatIds) || candidateZone.seatIds.some(seatId => typeof seatId !== 'string')) {
+        return { valid: false, error: `轮换选区 ${candidateZone.id} 的数据格式无效` }
+      }
+      zoneIds.add(candidateZone.id as number)
+    }
+  }
+
+  return { valid: true, error: '' }
+}
 
 // ——— 调色板 ———
 const PALETTE = [
@@ -61,6 +111,33 @@ const buildZoneColorMap = () => {
 
 export function useZoneRotation() {
   const { batchUpdateSeats } = useSeatChart()
+
+  const syncZoneRotationIdCounter = () => {
+    let maxGroupId = 0
+    let maxZoneId = 0
+    for (const group of rotGroups.value) {
+      if (group.id > maxGroupId) maxGroupId = group.id
+      for (const zone of group.zones) {
+        if (zone.id > maxZoneId) maxZoneId = zone.id
+      }
+    }
+    nextGroupId = maxGroupId > 0 ? maxGroupId + 1 : 1
+    nextZoneId = maxZoneId > 0 ? maxZoneId + 1 : 1
+  }
+
+  const getRotationData = () => cloneRotationGroups(rotGroups.value)
+
+  const replaceRotationData = (groups: unknown) => {
+    const validation = validateRotationDataShape(groups)
+    if (!validation.valid) {
+      return { success: false, error: validation.error }
+    }
+
+    rotGroups.value = cloneRotationGroups(groups as RotationGroup[])
+    editingZoneId.value = null
+    syncZoneRotationIdCounter()
+    return { success: true, error: '' }
+  }
 
   // ==================== 轮换组 ====================
 
@@ -163,13 +240,39 @@ export function useZoneRotation() {
 
   const applyZoneRotation = (seatMap: Map<string, Seat>) => {
     const errors: string[] = []
-    let moved = 0
-    const updates: Array<{ seatId: string; studentId: number | null }> = []
+    const claimedSeatIds = new Map<string, string>()
 
     for (const group of rotGroups.value) {
       const { valid, error } = validateGroup(group)
-      if (!valid) { errors.push(`[${group.name}] ${error}`); continue }
+      if (!valid) {
+        errors.push(`[${group.name}] ${error}`)
+        continue
+      }
 
+      for (const zone of group.zones) {
+        for (const seatId of zone.seatIds) {
+          const previousOwner = claimedSeatIds.get(seatId)
+          if (previousOwner) {
+            errors.push(`[${group.name}/${zone.name}] 座位 ${seatId} 与 ${previousOwner} 重叠`)
+            continue
+          }
+          claimedSeatIds.set(seatId, `${group.name}/${zone.name}`)
+
+          const seat = seatMap.get(seatId)
+          if (!seat) {
+            errors.push(`[${group.name}/${zone.name}] 座位 ${seatId} 不存在`)
+          } else if (seat.isEmpty || seat.kind === 'guard' || isGuardSeatId(seat.id)) {
+            errors.push(`[${group.name}/${zone.name}] 座位 ${seatId} 当前不可用于轮换`)
+          }
+        }
+      }
+    }
+
+    if (errors.length > 0) return { moved: 0, errors }
+
+    const finalStudentBySeatId = new Map<string, number | null>()
+
+    for (const group of rotGroups.value) {
       if (group.type === 'swap') {
         // 互换：先按位置排序再配对，消除点击顺序影响
         const zA = group.zones[0], zB = group.zones[1]
@@ -179,22 +282,10 @@ export function useZoneRotation() {
         const snapA = idsA.map(sid => seatMap.get(sid)?.studentId ?? null)
         const snapB = idsB.map(sid => seatMap.get(sid)?.studentId ?? null)
         idsA.forEach((sid, i) => {
-          const seat = seatMap.get(sid)
-          if (seat && !seat.isEmpty) {
-            if (seat.studentId !== snapB[i]) {
-              updates.push({ seatId: sid, studentId: snapB[i] })
-              moved++
-            }
-          }
+          finalStudentBySeatId.set(sid, snapB[i] ?? null)
         })
         idsB.forEach((sid, i) => {
-          const seat = seatMap.get(sid)
-          if (seat && !seat.isEmpty) {
-            if (seat.studentId !== snapA[i]) {
-              updates.push({ seatId: sid, studentId: snapA[i] })
-              moved++
-            }
-          }
+          finalStudentBySeatId.set(sid, snapA[i] ?? null)
         })
       } else {
         // 循环：zone[i] 的学生来自 zone[i-1]，按位置排序配对
@@ -206,24 +297,49 @@ export function useZoneRotation() {
           const src = snaps[(idx - 1 + group.zones.length) % group.zones.length]
           if (!src) return
           ids.forEach((sid, i) => {
-            const seat = seatMap.get(sid)
-            if (seat && !seat.isEmpty) {
-              if (seat.studentId !== src[i]) {
-                updates.push({ seatId: sid, studentId: src[i] })
-                moved++
-              }
-            }
+            finalStudentBySeatId.set(sid, src[i] ?? null)
           })
         })
       }
     }
 
-    // 使用统一接口批量更新座位，recordUndo=false 因为外层已使用 recordBatch
+    const buildStudentMultiset = (resolveStudentId: (seat: Seat) => number | null) => {
+      const multiset = new Map<number, number>()
+      for (const seat of seatMap.values()) {
+        const studentId = resolveStudentId(seat)
+        if (studentId === null) continue
+        multiset.set(studentId, (multiset.get(studentId) ?? 0) + 1)
+      }
+      return multiset
+    }
+    const beforeMultiset = buildStudentMultiset(seat => seat.studentId)
+    const afterMultiset = buildStudentMultiset(seat => (
+      finalStudentBySeatId.has(seat.id) ? finalStudentBySeatId.get(seat.id) ?? null : seat.studentId
+    ))
+    const hasDuplicateStudent = [...afterMultiset.values()].some(count => count > 1)
+    const preservesStudentMultiset = beforeMultiset.size === afterMultiset.size &&
+      [...beforeMultiset].every(([studentId, count]) => afterMultiset.get(studentId) === count)
+
+    if (hasDuplicateStudent || !preservesStudentMultiset) {
+      return {
+        moved: 0,
+        errors: ['轮换结果未通过学生分配完整性校验，操作已取消']
+      }
+    }
+
+    const updates: Array<{ seatId: string; studentId: number | null }> = []
+    for (const [seatId, studentId] of finalStudentBySeatId) {
+      if (seatMap.get(seatId)?.studentId !== studentId) {
+        updates.push({ seatId, studentId })
+      }
+    }
+
+    // 使用统一接口一次提交，recordUndo=false 因为外层已使用 recordBatch
     if (updates.length > 0) {
       batchUpdateSeats(updates, false)
     }
 
-    return { moved, errors }
+    return { moved: updates.length, errors }
   }
 
   const cleanupInvalidRotSeats = (validSeatIds: string[]) => {
@@ -242,16 +358,7 @@ export function useZoneRotation() {
     nextZoneId = 1
   }
 
-  // 同步轮换选区 ID 计数器（工作区加载后调用）
-  const syncZoneRotationIdCounter = () => {
-    let maxZoneId = 0
-    for (const g of rotGroups.value) {
-      for (const z of g.zones) {
-        if (z.id > maxZoneId) maxZoneId = z.id
-      }
-    }
-    nextZoneId = maxZoneId > 0 ? maxZoneId + 1 : 1
-  }
+  const resetRotationData = () => clearAllRotData()
 
   return {
     rotGroups,
@@ -271,6 +378,9 @@ export function useZoneRotation() {
     applyZoneRotation,
     cleanupInvalidRotSeats,
     clearAllRotData,
+    resetRotationData,
+    getRotationData,
+    replaceRotationData,
     syncZoneRotationIdCounter,
     sortedBySeatPos,
     PALETTE,

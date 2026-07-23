@@ -41,7 +41,7 @@
         <template #footer><div class="intro-actions">
           <NButton class="intro-action" attr-type="button" secondary @click="dismiss">稍后再说</NButton>
           <NButton class="intro-action" attr-type="button" type="primary" @click="startTutorial">
-            <BookOpen :size="18" />
+            <template #icon><BookOpen :size="18" /></template>
             <span>用户手册</span>
           </NButton>
         </div></template>

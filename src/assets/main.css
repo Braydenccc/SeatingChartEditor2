@@ -91,6 +91,7 @@
   --seat-card-transition: 0.18s ease;
   --seat-card-shadow-hover: 0 4px 12px var(--shadow-lg);
   --seat-card-shadow-drag: 0 8px 24px color-mix(in srgb, var(--color-info) 32%, transparent);
+  --seat-card-placeholder-size: 13px;
   --candidate-card-height: 68px;
   --candidate-card-radius: 8px;
   --student-card-face-gap: 4px;
@@ -476,6 +477,7 @@ a:hover,
     --seat-card-width: 102px;
     --seat-card-height: 68px;
     --seat-card-radius: 10px;
+    --seat-card-placeholder-size: 11px;
     --student-card-face-gap: 3px;
     --student-card-face-padding: 5px;
     --student-card-name-size: 14px;
@@ -494,6 +496,7 @@ a:hover,
     --seat-card-width: 96px;
     --seat-card-height: 64px;
     --seat-card-radius: 9px;
+    --seat-card-placeholder-size: 10px;
     --student-card-face-gap: 2px;
     --student-card-face-padding: 4px;
     --student-card-name-size: 13px;
@@ -512,6 +515,7 @@ a:hover,
     --seat-card-width: 92px;
     --seat-card-height: 62px;
     --seat-card-radius: 10px;
+    --seat-card-placeholder-size: 11px;
     --student-card-face-gap: 3px;
     --student-card-face-padding: 5px;
     --student-card-name-size: 12px;
@@ -530,6 +534,7 @@ a:hover,
     --seat-card-width: 78px;
     --seat-card-height: 50px;
     --seat-card-radius: 8px;
+    --seat-card-placeholder-size: 10px;
     --student-card-face-gap: 2px;
     --student-card-face-padding: 4px;
     --student-card-name-size: 10px;

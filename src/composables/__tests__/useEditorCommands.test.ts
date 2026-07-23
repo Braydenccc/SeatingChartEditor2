@@ -10,6 +10,7 @@ describe('useEditorCommands', () => {
   beforeEach(() => {
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
+      writable: true,
       value: vi.fn((query: string) => ({
         matches: false,
         media: query,

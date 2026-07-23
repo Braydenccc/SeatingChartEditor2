@@ -129,7 +129,7 @@
 
           <div class="rule-actions">
             <NButton size="tiny" quaternary title="编辑规则" @click.stop="emit('edit', rule.id)">
-              <Pencil :size="14" stroke-width="2" />
+              <template #icon><Pencil :size="14" stroke-width="2" /></template>
               <span>编辑</span>
             </NButton>
             <span class="rule-chevron" :class="{ open: expandedId === rule.id }">

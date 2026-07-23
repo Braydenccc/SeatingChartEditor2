@@ -8,10 +8,17 @@
 </template>
 
 <script setup lang="ts">
+import { onBeforeUnmount } from 'vue'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import EditorWorkbench from '@/components/workbench/EditorWorkbench.vue'
+import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
 const emit = defineEmits(['open-login'])
+const { resetTransientWorkbenchState } = useEditorWorkbench()
+
+onBeforeUnmount(() => {
+  void resetTransientWorkbenchState()
+})
 </script>
 
 <style scoped>

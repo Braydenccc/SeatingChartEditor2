@@ -4,27 +4,27 @@
       <h3>工作流</h3>
       <div class="tool-grid">
         <NButton class="tool-action" attr-type="button" secondary block @click="openWorkbenchDialog('seatConfig')">
-          <Settings :size="18" stroke-width="2" />
+          <template #icon><Settings :size="18" stroke-width="2" /></template>
           <span>座位配置</span>
         </NButton>
         <NButton class="tool-action" attr-type="button" secondary block @click="openWorkbenchDialog('shiftRotation')">
-          <MoveDiagonal2 :size="18" stroke-width="2" />
+          <template #icon><MoveDiagonal2 :size="18" stroke-width="2" /></template>
           <span>位移轮换</span>
         </NButton>
         <NButton class="tool-action" attr-type="button" secondary block @click="openWorkbenchDialog('zoneRotation')">
-          <RefreshCcw :size="18" stroke-width="2" />
+          <template #icon><RefreshCcw :size="18" stroke-width="2" /></template>
           <span>选区轮换</span>
         </NButton>
         <NButton class="tool-action" attr-type="button" secondary block @click="openWorkbenchDialog('assignment')">
-          <Shuffle :size="18" stroke-width="2" />
+          <template #icon><Shuffle :size="18" stroke-width="2" /></template>
           <span>智能排位</span>
         </NButton>
         <NButton class="tool-action" attr-type="button" secondary block @click="openWorkbenchDialog('rules')">
-          <Scale :size="18" stroke-width="2" />
+          <template #icon><Scale :size="18" stroke-width="2" /></template>
           <span>规则管理</span>
         </NButton>
         <NButton class="tool-action" attr-type="button" secondary block @click="openExportPage">
-          <FileOutput :size="18" stroke-width="2" />
+          <template #icon><FileOutput :size="18" stroke-width="2" /></template>
           <span>导出图片</span>
         </NButton>
       </div>
@@ -34,14 +34,14 @@
       <h3>视图</h3>
       <div class="zoom-row">
         <NButton class="tool-action" attr-type="button" secondary :disabled="scale <= MIN_SCALE" @click="zoomOut">
-          <Minus :size="18" stroke-width="2" />
+          <template #icon><Minus :size="18" stroke-width="2" /></template>
           <span>缩小</span>
         </NButton>
         <NButton attr-type="button" class="tool-action zoom-value" type="primary" secondary @click="fitToViewport">
           {{ Math.round(scale * 100) }}%
         </NButton>
         <NButton class="tool-action" attr-type="button" secondary :disabled="scale >= MAX_SCALE" @click="zoomIn">
-          <Plus :size="18" stroke-width="2" />
+          <template #icon><Plus :size="18" stroke-width="2" /></template>
           <span>放大</span>
         </NButton>
       </div>

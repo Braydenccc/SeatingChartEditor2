@@ -49,7 +49,12 @@ export default defineConfig({
     testTimeout: 10000,
     hookTimeout: 10000,
     reporters: process.env.CI ? ['dot', 'json', 'html'] : ['verbose'],
-    threads: false,
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: true
+      }
+    },
     mockReset: true,
     restoreMocks: true,
     clearMocks: true,

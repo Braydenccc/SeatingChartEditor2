@@ -51,7 +51,7 @@
             :loading="isImporting"
             @click="handleImport"
           >
-            <Download v-if="!isImporting" :size="15" />
+            <template #icon><Download v-if="!isImporting" :size="15" /></template>
             <span>{{ importButtonText }}</span>
           </NButton>
           </footer>

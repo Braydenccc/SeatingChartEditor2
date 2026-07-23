@@ -26,9 +26,7 @@ const getRuleSubjects = (rule: any) => {
 
 const cloneRuleForPrecheck = (rule: any, subRule: any = null, index: number | null = null) => {
   const source = subRule || rule
-  const subjects = Array.isArray(source.subjects) && source.subjects.length > 0
-    ? source.subjects
-    : getRuleSubjects(rule)
+  const subjects = getRuleSubjects(rule)
 
   return {
     ...rule,
@@ -144,17 +142,14 @@ const buildPrecheckContext = (input: any) => {
   }
 }
 
-const detectDeskmateBindingConflicts = (ctx: any) => {
-  const activeRules = ctx.activeRules.filter((rule: any) => !rule.not && rule.predicate === 'MUST_BE_SEATMATES')
+const detectDeskmateBindingConflicts = (
+  ctx: any,
+  ruleFilter: (rule: any) => boolean = () => true
+) => {
+  const activeRules = ctx.activeRules.filter((rule: any) => (
+    ruleFilter(rule) && !rule.not && rule.predicate === 'MUST_BE_SEATMATES'
+  ))
   if (activeRules.length === 0) return { count: 0, details: [] }
-
-  const columnsPerGroup = Number(ctx.config?.columnsPerGroup || 0)
-  if (columnsPerGroup <= 1) {
-    return {
-      count: 1,
-      details: ['当前每大组列数为 1，不存在同桌位，所有“必须同桌”规则不可满足']
-    }
-  }
 
   const adjacency = new Map()
   const pairKeys = new Set()
@@ -179,30 +174,42 @@ const detectDeskmateBindingConflicts = (ctx: any) => {
   }
 
   const details = []
-  const seatsByGroupRow = new Map()
-  for (const seat of ctx.availableSeats) {
-    if (isGuardSeatLike(seat)) continue
-    const key = `${seat.groupIndex}:${seat.rowIndex}`
-    seatsByGroupRow.set(key, (seatsByGroupRow.get(key) || 0) + 1)
-  }
-
+  const availableRegularSeats = ctx.availableSeats.filter((seat: any) => !isGuardSeatLike(seat))
+  const topologyDegreeBySeatId = new Map<any, number>()
   let maxFeasiblePairs = 0
-  for (const count of seatsByGroupRow.values()) {
-    maxFeasiblePairs += Math.floor((count * Math.max(0, count - 1)) / 2)
+  for (let i = 0; i < availableRegularSeats.length; i++) {
+    const seatA = availableRegularSeats[i]
+    const configuredColumns = Number(
+      ctx.config?.groups?.[seatA.groupIndex]?.columns ?? ctx.config?.columnsPerGroup ?? 0
+    )
+    if (configuredColumns <= 1) continue
+
+    for (let j = i + 1; j < availableRegularSeats.length; j++) {
+      const seatB = availableRegularSeats[j]
+      if (seatA.groupIndex !== seatB.groupIndex || seatA.rowIndex !== seatB.rowIndex) continue
+      const columnDistance = Math.abs(Number(seatA.columnIndex) - Number(seatB.columnIndex))
+      if (!Number.isFinite(columnDistance) || columnDistance < 1 || columnDistance > 2) continue
+
+      maxFeasiblePairs++
+      topologyDegreeBySeatId.set(seatA.id, (topologyDegreeBySeatId.get(seatA.id) || 0) + 1)
+      topologyDegreeBySeatId.set(seatB.id, (topologyDegreeBySeatId.get(seatB.id) || 0) + 1)
+    }
   }
   if (expandedPairs.length > maxFeasiblePairs) {
-    details.push(`同桌容量不足：当前最多可满足约 ${maxFeasiblePairs} 对同桌关系，但规则展开后需要 ${expandedPairs.length} 对`)
+    details.push(`同桌容量不足：按当前可用座位拓扑最多存在 ${maxFeasiblePairs} 对同桌位，但规则展开后需要 ${expandedPairs.length} 对`)
   }
 
-  const maxDeskmatesPerStudent = columnsPerGroup - 1
+  const maxDeskmatesPerStudent = Math.max(0, ...topologyDegreeBySeatId.values())
   for (const [studentId, mates] of adjacency.entries()) {
     if (mates.size <= maxDeskmatesPerStudent) continue
     const selfName = ctx.studentNameMap.get(studentId) || `学生#${studentId}`
     const mateNames = [...mates].map((id: any) => ctx.studentNameMap.get(id) || `学生#${id}`)
-    details.push(`同桌绑定冲突：${selfName} 绑定了 ${mateNames.join('、')}，超过当前列数可容纳上限（${maxDeskmatesPerStudent}）`)
+    details.push(`同桌绑定冲突：${selfName} 绑定了 ${mateNames.join('、')}，超过当前可用座位拓扑上限（${maxDeskmatesPerStudent}）`)
   }
 
-  const forbidRules = ctx.activeRules.filter((rule: any) => !rule.not && rule.predicate === 'MUST_NOT_BE_SEATMATES')
+  const forbidRules = ctx.activeRules.filter((rule: any) => (
+    ruleFilter(rule) && !rule.not && rule.predicate === 'MUST_NOT_BE_SEATMATES'
+  ))
   if (forbidRules.length > 0 && expandedPairs.length > 0) {
     const forbidPairKeys = new Set()
     for (const rule of forbidRules) {
@@ -227,11 +234,14 @@ const detectDeskmateBindingConflicts = (ctx: any) => {
   return { count: details.length, details }
 }
 
-const detectSeatCapacityConflicts = (ctx: any) => {
+const detectSeatCapacityConflicts = (
+  ctx: any,
+  ruleFilter: (rule: any) => boolean = () => true
+) => {
   const details = []
   const renderRuleText = ctx.renderRuleText || ((rule: any) => rule.predicate)
 
-  for (const rule of ctx.activeRules.filter((r: any) => !r.not && r.predicate === 'IN_ZONE')) {
+  for (const rule of ctx.activeRules.filter((r: any) => ruleFilter(r) && !r.not && r.predicate === 'IN_ZONE')) {
     const studentIds = ctx.expandEntriesToStudentIds(getRuleSubjects(rule))
     const zone = ctx.zoneById.get(rule.params?.zoneId)
     if (!zone) continue
@@ -244,7 +254,7 @@ const detectSeatCapacityConflicts = (ctx: any) => {
     }
   }
 
-  for (const rule of ctx.activeRules.filter((r: any) => !r.not && r.predicate === 'IN_ROW_RANGE')) {
+  for (const rule of ctx.activeRules.filter((r: any) => ruleFilter(r) && !r.not && r.predicate === 'IN_ROW_RANGE')) {
     const studentIds = ctx.expandEntriesToStudentIds(getRuleSubjects(rule))
     const { minRow, maxRow } = rule.params || {}
     const eligibleSeats = ctx.availableSeats.filter((seat: any) =>
@@ -255,7 +265,7 @@ const detectSeatCapacityConflicts = (ctx: any) => {
     }
   }
 
-  for (const rule of ctx.activeRules.filter((r: any) => !r.not && r.predicate === 'IN_GROUP_RANGE')) {
+  for (const rule of ctx.activeRules.filter((r: any) => ruleFilter(r) && !r.not && r.predicate === 'IN_GROUP_RANGE')) {
     const studentIds = ctx.expandEntriesToStudentIds(getRuleSubjects(rule))
     const { minGroup, maxGroup } = rule.params || {}
     const eligibleSeats = ctx.availableSeats.filter((seat: any) => {
@@ -275,57 +285,59 @@ const getEligibleSeatIdsForStudent = (ctx: any, studentId: any, rules: any[]) =>
   let eligibleSeats = new Set(ctx.availableSeatIds)
 
   for (const rule of rules) {
-    if (rule.not || !POSITION_RULES.has(rule.predicate)) continue
+    if (!POSITION_RULES.has(rule.predicate)) continue
 
-    if (rule.predicate === 'IN_ZONE') {
-      const zone = ctx.zoneById.get(rule.params?.zoneId)
-      if (zone) {
-        const zoneSeats = new Set((zone.seatIds || []).filter((seatId: any) => {
-          const seat = ctx.seatById.get(seatId)
-          return seat && !isGuardSeatLike(seat)
-        }))
-        eligibleSeats = new Set([...eligibleSeats].filter(id => zoneSeats.has(id)))
+    const zone = rule.predicate === 'IN_ZONE' || rule.predicate === 'NOT_IN_ZONE'
+      ? ctx.zoneById.get(rule.params?.zoneId)
+      : null
+    if ((rule.predicate === 'IN_ZONE' || rule.predicate === 'NOT_IN_ZONE') && !zone) continue
+    const zoneSeatIds = zone ? new Set(zone.seatIds || []) : null
+
+    const matchesPositiveRule = (seatId: any) => {
+      const seat = ctx.seatById.get(seatId)
+      if (!seat) return false
+
+      if (rule.predicate === 'IN_ZONE') {
+        return !isGuardSeatLike(seat) && zoneSeatIds?.has(seatId) === true
       }
-    } else if (rule.predicate === 'NOT_IN_ZONE') {
-      const zone = ctx.zoneById.get(rule.params?.zoneId)
-      if (zone) {
-        const zoneSeats = new Set(zone.seatIds || [])
-        eligibleSeats = new Set([...eligibleSeats].filter(id => !zoneSeats.has(id)))
+      if (rule.predicate === 'NOT_IN_ZONE') {
+        return isGuardSeatLike(seat) || zoneSeatIds?.has(seatId) !== true
       }
-    } else if (rule.predicate === 'IN_ROW_RANGE') {
-      const { minRow, maxRow } = rule.params || {}
-      eligibleSeats = new Set([...eligibleSeats].filter(id => {
-        const seat = ctx.seatById.get(id)
-        if (!seat || isGuardSeatLike(seat)) return false
-        return ctx.isInRowRange(id, minRow, maxRow)
-      }))
-    } else if (rule.predicate === 'IN_GROUP_RANGE') {
-      const { minGroup, maxGroup } = rule.params || {}
-      eligibleSeats = new Set([...eligibleSeats].filter(id => {
-        const seat = ctx.seatById.get(id)
-        if (!seat || isGuardSeatLike(seat)) return false
+      if (rule.predicate === 'IN_ROW_RANGE') {
+        if (isGuardSeatLike(seat)) return false
+        const { minRow, maxRow } = rule.params || {}
+        return ctx.isInRowRange(seatId, minRow, maxRow)
+      }
+      if (rule.predicate === 'IN_GROUP_RANGE') {
+        if (isGuardSeatLike(seat)) return false
+        const { minGroup, maxGroup } = rule.params || {}
         const group1 = seat.groupIndex + 1
         return group1 >= minGroup && group1 <= maxGroup
-      }))
-    } else if (rule.predicate === 'NOT_IN_COLUMN_TYPE') {
-      const columnType = rule.params?.columnType
-      eligibleSeats = new Set([...eligibleSeats].filter(id => {
-        const seat = ctx.seatById.get(id)
-        if (!seat) return false
+      }
+      if (rule.predicate === 'NOT_IN_COLUMN_TYPE') {
         if (isGuardSeatLike(seat)) return true
-        return !ctx.isColumnType(id, columnType)
-      }))
+        return !ctx.isColumnType(seatId, rule.params?.columnType)
+      }
+      return true
     }
+
+    eligibleSeats = new Set([...eligibleSeats].filter(seatId => {
+      const positiveMatch = matchesPositiveRule(seatId)
+      return rule.not ? !positiveMatch : positiveMatch
+    }))
   }
 
   return eligibleSeats
 }
 
-const detectStudentFeasibilityConflicts = (ctx: any) => {
+const detectStudentFeasibilityConflicts = (
+  ctx: any,
+  ruleFilter: (rule: any) => boolean = () => true
+) => {
   const details = []
 
   for (const student of ctx.studentList) {
-    const studentRules = ctx.rulesByStudentId.get(student.id) || []
+    const studentRules = (ctx.rulesByStudentId.get(student.id) || []).filter(ruleFilter)
     const eligibleSeats = getEligibleSeatIdsForStudent(ctx, student.id, studentRules)
 
     if (eligibleSeats.size === 0 && studentRules.length > 0) {
@@ -342,7 +354,7 @@ const detectRequiredPositionMatchingConflicts = (ctx: any) => {
 
   for (const student of ctx.studentList) {
     const requiredRules = (ctx.rulesByStudentId.get(student.id) || []).filter((rule: any) =>
-      rule.priority === REQUIRED_PRIORITY && !rule.not && POSITION_RULES.has(rule.predicate)
+      rule.priority === REQUIRED_PRIORITY && POSITION_RULES.has(rule.predicate)
     )
     if (requiredRules.length === 0) continue
     const eligibleSeatIds = [...getEligibleSeatIdsForStudent(ctx, student.id, requiredRules)]
@@ -502,29 +514,65 @@ export const createAssignmentPrecheck = (input: any) => {
     blockingReasons.push(`可用座位不足（学生 ${studentCount} 人 / 座位 ${availableSeatCount} 个）`)
   }
 
-  const hardConflictCount = conflictList.filter((item: any) => item.type === 'infeasible' || item.type === 'contradiction').length
-  if (hardConflictCount > 0) {
-    blockingReasons.push(`存在 ${hardConflictCount} 条不可满足或逻辑矛盾规则`)
-    conflictList.slice(0, 5).forEach((item: any) => blockingReasons.push(item.message))
+  const priorityEntries: Array<[string, any]> = []
+  for (const rule of ctx.rawActiveRules) {
+    if (!rule?.id) continue
+    priorityEntries.push([String(rule.id), rule.priority])
+    if (!Array.isArray(rule.subRules)) continue
+    rule.subRules.forEach((subRule: any, index: number) => {
+      if (subRule?.predicate) priorityEntries.push([`${rule.id}:${index}`, rule.priority])
+    })
+  }
+  const priorityByRuleId = new Map(priorityEntries)
+  const hardConflicts = conflictList.filter((item: any) => (
+    (item.type === 'infeasible' || item.type === 'contradiction') &&
+    Array.isArray(item.ruleIds) && item.ruleIds.length > 0 &&
+    item.ruleIds.every((ruleId: any) => priorityByRuleId.get(String(ruleId)) === REQUIRED_PRIORITY)
+  ))
+  const softConflicts = conflictList.filter((item: any) => !hardConflicts.includes(item))
+  if (hardConflicts.length > 0) {
+    blockingReasons.push(`存在 ${hardConflicts.length} 条必须级不可满足或逻辑矛盾规则`)
+    hardConflicts.slice(0, 5).forEach((item: any) => blockingReasons.push(item.message))
+  }
+  if (softConflicts.length > 0) {
+    warnings.push(`存在 ${softConflicts.length} 条建议或可选规则冲突，排位将尽量满足`)
+    softConflicts.slice(0, 5).forEach((item: any) => warnings.push(item.message))
   }
 
-  const deskmateBindingConflict = detectDeskmateBindingConflicts(ctx)
-  if (deskmateBindingConflict.count > 0) {
-    blockingReasons.push(`存在 ${deskmateBindingConflict.count} 处同桌绑定冲突`)
-    blockingReasons.push(...deskmateBindingConflict.details.slice(0, 5))
+  const requiredRuleFilter = (rule: any) => rule.priority === REQUIRED_PRIORITY
+  const appendDetectorResults = (
+    label: string,
+    allResult: { count: number; details: string[] },
+    requiredResult: { count: number; details: string[] }
+  ) => {
+    if (requiredResult.count > 0) {
+      blockingReasons.push(`存在 ${requiredResult.count} 处必须级${label}`)
+      blockingReasons.push(...requiredResult.details.slice(0, 5))
+    }
+
+    const requiredDetails = new Set(requiredResult.details)
+    const softDetails = allResult.details.filter(detail => !requiredDetails.has(detail))
+    if (softDetails.length > 0) {
+      warnings.push(`存在 ${softDetails.length} 处建议或可选规则${label}`)
+      warnings.push(...softDetails.slice(0, 5))
+    }
   }
 
-  const seatCapacityConflict = detectSeatCapacityConflicts(ctx)
-  if (seatCapacityConflict.count > 0) {
-    blockingReasons.push(`存在 ${seatCapacityConflict.count} 处座位容量冲突`)
-    blockingReasons.push(...seatCapacityConflict.details.slice(0, 5))
-  }
-
-  const studentFeasibilityConflict = detectStudentFeasibilityConflicts(ctx)
-  if (studentFeasibilityConflict.count > 0) {
-    blockingReasons.push(`存在 ${studentFeasibilityConflict.count} 处学生位置不可行问题`)
-    blockingReasons.push(...studentFeasibilityConflict.details.slice(0, 5))
-  }
+  appendDetectorResults(
+    '同桌绑定冲突',
+    detectDeskmateBindingConflicts(ctx),
+    detectDeskmateBindingConflicts(ctx, requiredRuleFilter)
+  )
+  appendDetectorResults(
+    '座位容量冲突',
+    detectSeatCapacityConflicts(ctx),
+    detectSeatCapacityConflicts(ctx, requiredRuleFilter)
+  )
+  appendDetectorResults(
+    '学生位置不可行问题',
+    detectStudentFeasibilityConflicts(ctx),
+    detectStudentFeasibilityConflicts(ctx, requiredRuleFilter)
+  )
 
   const requiredPositionMatchingConflict = detectRequiredPositionMatchingConflicts(ctx)
   if (requiredPositionMatchingConflict.count > 0) {

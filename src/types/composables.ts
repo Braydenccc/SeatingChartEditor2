@@ -38,6 +38,7 @@ export interface UseStudentDataReturn {
   removeTagFromStudent: (tagId: number, studentId: number) => void
   removeTagFromStudents: (tagId: number) => void
   clearAllStudents: () => void
+  replaceStudentData: (students: Student[]) => void
   syncStudentIdCounter: () => void
 }
 
@@ -52,6 +53,7 @@ export interface UseTagDataReturn {
   getTagById: (tagId: number) => Tag | undefined
   deleteTag: (tagId: number) => void
   clearAllTags: () => void
+  replaceTagData: (tags: Tag[]) => void
   setShowTagsInSeatChart: (show: boolean) => void
   setTagDisplayMode: (mode: 'dot' | 'corner' | 'bottom') => void
 }
@@ -77,6 +79,7 @@ export interface UseZoneDataReturn {
   removeTagFromAllZones: (tagId: number) => void
   cleanupInvalidSeats: (validSeatIds: string[]) => void
   clearAllZones: () => void
+  replaceZoneData: (zones: Zone[]) => void
   syncZoneIdCounter: () => void
 }
 
@@ -92,6 +95,7 @@ export interface UseSeatChartReturn {
   swapSeats: (seatId1: string, seatId2: string, recordUndo?: boolean) => void
   toggleEmpty: (seatId: string, recordUndo?: boolean) => void
   updateConfig: (newConfig: Partial<SeatConfig>) => void
+  replaceSeatChartState: (config: SeatConfig, seats: Seat[]) => void
   getGroupConfig: (groupIndex: number) => GroupConfig
   parseSeatId: (seatId: string) => SeatPosition | null
   generateSeatId: (groupIndex: number, columnIndex: number, rowIndex: number) => string

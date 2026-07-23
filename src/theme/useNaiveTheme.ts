@@ -3,6 +3,10 @@ import { darkTheme, type GlobalThemeOverrides } from 'naive-ui'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import type { CustomThemeColors, ThemeBaseScheme } from '@/types/settings'
 
+interface ResolvedNaiveColors extends CustomThemeColors {
+  textInverse: string
+}
+
 const prefersDark = () => typeof window !== 'undefined' &&
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -14,14 +18,19 @@ const effectiveBaseScheme = (): ThemeBaseScheme => {
   return ui.colorScheme
 }
 
-const resolvedColors = (): CustomThemeColors => {
+const resolvedColors = (): ResolvedNaiveColors => {
   const { settings, defaultSettings } = useGlobalSettings()
   const { ui } = settings.value
-  if (ui.colorMode === 'custom') return ui.customColors
-
   const style = getComputedStyle(document.documentElement)
   const read = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback
   const fallback = defaultSettings.ui.customColors
+  if (ui.colorMode === 'custom') {
+    return {
+      ...ui.customColors,
+      textInverse: read('--color-text-inverse', fallback.surface)
+    }
+  }
+
   return {
     ...ui.customColors,
     primary: read('--color-primary', ui.themeColor),
@@ -48,7 +57,8 @@ const resolvedColors = (): CustomThemeColors => {
     warning: read('--color-warning', fallback.warning),
     warningHover: read('--color-warning-hover', fallback.warningHover),
     info: read('--color-info', fallback.info),
-    infoHover: read('--color-info-hover', fallback.infoHover)
+    infoHover: read('--color-info-hover', fallback.infoHover),
+    textInverse: read('--color-text-inverse', fallback.surface)
   }
 }
 
@@ -98,11 +108,26 @@ export function useNaiveTheme() {
         dividerColor: colors.border,
         borderRadius: '8px'
       },
-      Button: { borderRadiusSmall: '7px', heightSmall: '34px' },
+      Button: {
+        borderRadiusSmall: '7px',
+        heightSmall: '34px',
+        textColorPrimary: colors.textInverse,
+        textColorHoverPrimary: colors.textInverse,
+        textColorPressedPrimary: colors.textInverse,
+        textColorFocusPrimary: colors.textInverse,
+        textColorDisabledPrimary: colors.textInverse
+      },
       Input: { borderRadius: '8px' },
       Card: { borderRadius: '8px' },
       Drawer: { color: colors.surface },
-      Tabs: { tabTextColorActiveLine: colors.primary },
+      Tabs: {
+        colorSegment: colors.bgSubtle,
+        tabColorSegment: colors.bgSelected,
+        tabTextColorSegment: colors.textSecondary,
+        tabTextColorHoverSegment: colors.textPrimary,
+        tabTextColorActiveSegment: colors.primary,
+        tabTextColorActiveLine: colors.primary
+      },
       Menu: { itemTextColorActive: colors.primary }
     }
   })

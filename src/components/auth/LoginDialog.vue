@@ -1,125 +1,156 @@
 <template>
-  <ResponsiveOverlay :show="visible" :title="isLoginMode ? '账号登录' : '注册账号'" :busy="loading" :desktop-width="480" @update:show="value => !value && close()">
+  <ResponsiveOverlay :show="visible" :title="dialogTitle" :busy="loading" :desktop-width="480" @update:show="value => !value && close()">
       <div class="dialog-body">
         <NTabs v-model:value="tabMode" class="tabs" type="segment" size="small">
-          <NTabPane name="login" tab="登录" />
-          <NTabPane name="register" tab="注册" />
-          <NTabPane name="webdav" tab="WebDAV" />
+          <NTabPane
+            v-for="mode in accountTabModes"
+            :key="mode.value"
+            :name="mode.value"
+            :tab="mode.label"
+            :disabled="loading"
+          >
+            <div class="tab-content">
+              <div class="service-warning">本账号服务不保证可用性，请妥善备份您的数据</div>
+              <form @submit.prevent="handleSubmit">
+                <div class="form-group">
+                  <label :for="accountInputId(mode.value, 'username')">用户名</label>
+                  <NInput
+                    v-model:value="username"
+                    type="text"
+                    placeholder="请输入字母或数字"
+                    required
+                    maxlength="32"
+                    pattern="[A-Za-z0-9_\-]{1,32}"
+                    title="只能包含字母、数字、下划线和连字符"
+                    autocomplete="username"
+                    :input-props="inputAccessibilityProps(accountInputId(mode.value, 'username'), 'username')"
+                    @update:value="clearInvalidField('username')"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label :for="accountInputId(mode.value, 'password')">密码</label>
+                  <NInput
+                    v-model:value="password"
+                    type="password"
+                    show-password-on="click"
+                    placeholder="请输入密码"
+                    required
+                    :minlength="mode.value === 'register' ? PASSWORD_MIN_LENGTH : 6"
+                    :autocomplete="mode.value === 'register' ? 'new-password' : 'current-password'"
+                    :input-props="inputAccessibilityProps(
+                      accountInputId(mode.value, 'password'),
+                      'password',
+                      mode.value === 'register' ? passwordRequirementsId : undefined
+                    )"
+                    @update:value="clearInvalidField('password')"
+                  />
+                  <div
+                    v-if="mode.value === 'register' && passwordValidation"
+                    :id="passwordRequirementsId"
+                    class="password-requirements"
+                    role="list"
+                    aria-live="polite"
+                  >
+                    <div role="listitem" :class="['requirement', { met: passwordValidation.length }]">
+                      <Check v-if="passwordValidation.length" :size="12" stroke-width="3" aria-hidden="true" />
+                      <span>至少 {{ PASSWORD_MIN_LENGTH }} 个字符</span>
+                      <span class="sr-only">，{{ passwordValidation.length ? '已满足' : '未满足' }}</span>
+                    </div>
+                    <div role="listitem" :class="['requirement', { met: passwordValidation.uppercase }]">
+                      <Check v-if="passwordValidation.uppercase" :size="12" stroke-width="3" aria-hidden="true" />
+                      <span>包含大写字母</span>
+                      <span class="sr-only">，{{ passwordValidation.uppercase ? '已满足' : '未满足' }}</span>
+                    </div>
+                    <div role="listitem" :class="['requirement', { met: passwordValidation.lowercase }]">
+                      <Check v-if="passwordValidation.lowercase" :size="12" stroke-width="3" aria-hidden="true" />
+                      <span>包含小写字母</span>
+                      <span class="sr-only">，{{ passwordValidation.lowercase ? '已满足' : '未满足' }}</span>
+                    </div>
+                    <div role="listitem" :class="['requirement', { met: passwordValidation.number }]">
+                      <Check v-if="passwordValidation.number" :size="12" stroke-width="3" aria-hidden="true" />
+                      <span>包含数字</span>
+                      <span class="sr-only">，{{ passwordValidation.number ? '已满足' : '未满足' }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="tabMode === mode.value && errorMessage" :id="errorMessageId" class="error-message" role="alert">{{ errorMessage }}</div>
+                <div v-if="tabMode === mode.value && successMessage" class="success-message" role="status" aria-live="polite">{{ successMessage }}</div>
+
+                <div class="dialog-actions">
+                  <NButton attr-type="submit" class="btn-primary" type="primary" block :loading="loading">
+                    {{ loading ? '处理中...' : (mode.value === 'login' ? '登录' : '注册并登录') }}
+                  </NButton>
+                </div>
+              </form>
+            </div>
+          </NTabPane>
+
+          <NTabPane name="webdav" tab="WebDAV" :disabled="loading">
+            <div class="tab-content">
+              <div class="service-note">通过 WebDAV 连接网盘以使用云端工作区。连接需要跨域(CORS)支持。</div>
+              <form @submit.prevent="handleSubmit">
+                <div class="form-group">
+                  <label :for="webdavUrlId">服务器地址(URL)</label>
+                  <NInput
+                    v-model:value="webdavUrl"
+                    type="text"
+                    placeholder="例如: https://pan.example.com/dav"
+                    required
+                    autocomplete="off"
+                    :input-props="inputAccessibilityProps(webdavUrlId, 'webdavUrl')"
+                    @update:value="clearInvalidField('webdavUrl')"
+                  />
+                </div>
+                <div class="form-group">
+                  <label :for="webdavUserId">用户名</label>
+                  <NInput
+                    v-model:value="webdavUser"
+                    type="text"
+                    placeholder="请输入WebDAV用户名"
+                    required
+                    autocomplete="off"
+                    :input-props="inputAccessibilityProps(webdavUserId, 'webdavUser')"
+                    @update:value="clearInvalidField('webdavUser')"
+                  />
+                </div>
+                <div class="form-group">
+                  <label :for="webdavPasswordId">密码</label>
+                  <NInput
+                    v-model:value="webdavPass"
+                    type="password"
+                    show-password-on="click"
+                    placeholder="请输入WebDAV密码/Token"
+                    required
+                    autocomplete="new-password"
+                    :input-props="inputAccessibilityProps(webdavPasswordId, 'webdavPassword')"
+                    @update:value="clearInvalidField('webdavPassword')"
+                  />
+                </div>
+                <div class="form-group checkbox-group">
+                  <NCheckbox v-model:checked="rememberWebdavPassword">记住密码（加密存储到浏览器）</NCheckbox>
+                  <div class="checkbox-hint">密码将使用 AES-GCM 加密后存储在浏览器中。注意：此功能无法防止 XSS 攻击获取密钥。</div>
+                </div>
+
+                <div v-if="tabMode === 'webdav' && errorMessage" :id="errorMessageId" class="error-message" role="alert">{{ errorMessage }}</div>
+                <div v-if="tabMode === 'webdav' && successMessage" class="success-message" role="status" aria-live="polite">{{ successMessage }}</div>
+
+                <div class="dialog-actions">
+                  <NButton attr-type="submit" class="btn-primary" type="primary" block :loading="loading">
+                    {{ loading ? '处理中...' : '连接并创建文件夹' }}
+                  </NButton>
+                </div>
+              </form>
+            </div>
+          </NTabPane>
         </NTabs>
-        <div v-if="tabMode !== 'webdav'" class="service-warning">
-          本账号服务不保证可用性，请妥善备份您的数据
-        </div>
-        <div v-else class="service-note">
-          通过 WebDAV 连接网盘以使用云端工作区。连接需要跨域(CORS)支持。
-        </div>
-
-        <form @submit.prevent="handleSubmit">
-          <template v-if="tabMode === 'webdav'">
-            <div class="form-group">
-              <label>服务器地址(URL)</label>
-              <NInput
-                type="text"
-                v-model:value="webdavUrl"
-                placeholder="例如: https://pan.example.com/dav"
-                required
-                autocomplete="off"
-              />
-            </div>
-            <div class="form-group">
-              <label>用户名</label>
-              <NInput
-                type="text"
-                v-model:value="webdavUser"
-                placeholder="请输入WebDAV用户名"
-                required
-                autocomplete="off"
-              />
-            </div>
-            <div class="form-group">
-              <label>密码</label>
-              <NInput
-                type="password"
-                v-model:value="webdavPass"
-                show-password-on="click"
-                placeholder="请输入WebDAV密码/Token"
-                required
-                autocomplete="new-password"
-              />
-            </div>
-            <div class="form-group checkbox-group">
-              <NCheckbox v-model:checked="rememberWebdavPassword">记住密码（加密存储到浏览器）</NCheckbox>
-              <div class="checkbox-hint">
-                密码将使用 AES-GCM 加密后存储在浏览器中。注意：此功能无法防止 XSS 攻击获取密钥。
-              </div>
-            </div>
-          </template>
-          
-          <template v-else>
-            <div class="form-group">
-              <label>用户名</label>
-              <NInput
-                type="text"
-                v-model:value="username"
-                placeholder="请输入字母或数字"
-                required
-                maxlength="32"
-                pattern="[A-Za-z0-9_\-]{1,32}"
-                title="只能包含字母、数字、下划线和连字符"
-                autocomplete="username"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>密码</label>
-              <NInput
-                type="password"
-                v-model:value="password"
-                show-password-on="click"
-                placeholder="请输入密码"
-                required
-                :minlength="tabMode === 'register' ? 8 : 6"
-                autocomplete="current-password"
-              />
-              <div v-if="tabMode === 'register' && passwordValidation" class="password-requirements">
-                <div :class="['requirement', { met: passwordValidation.length }]">
-                  <Check v-if="passwordValidation.length" :size="12" stroke-width="3" />
-                  至少 8 个字符
-                </div>
-                <div :class="['requirement', { met: passwordValidation.uppercase }]">
-                  <Check v-if="passwordValidation.uppercase" :size="12" stroke-width="3" />
-                  包含大写字母
-                </div>
-                <div :class="['requirement', { met: passwordValidation.lowercase }]">
-                  <Check v-if="passwordValidation.lowercase" :size="12" stroke-width="3" />
-                  包含小写字母
-                </div>
-                <div :class="['requirement', { met: passwordValidation.number }]">
-                  <Check v-if="passwordValidation.number" :size="12" stroke-width="3" />
-                  包含数字
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <div v-if="errorMessage" class="error-message">
-            {{ errorMessage }}
-          </div>
-          <div v-if="successMessage" class="success-message">
-            {{ successMessage }}
-          </div>
-
-          <div class="dialog-actions">
-            <NButton attr-type="submit" class="btn-primary" type="primary" block :loading="loading">
-              {{ loading ? '处理中...' : (tabMode === 'login' ? '登录' : (tabMode === 'register' ? '注册并登录' : '连接并创建文件夹')) }}
-            </NButton>
-          </div>
-        </form>
       </div>
   </ResponsiveOverlay>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, useId } from 'vue'
 import { NButton, NCheckbox, NInput, NTabPane, NTabs } from 'naive-ui'
 import { Check } from 'lucide-vue-next'
 import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
@@ -140,7 +171,19 @@ const emit = defineEmits(['update:visible', 'success'])
 const { login, register, setWebdavLogin } = useAuth()
 const { mkcol } = useWebDav()
 
-const tabMode = ref('login') // 'login', 'register', 'webdav'
+type LoginTabMode = 'login' | 'register' | 'webdav'
+type LoginField = 'username' | 'password' | 'webdavUrl' | 'webdavUser' | 'webdavPassword'
+
+const accountTabModes = [
+  { value: 'login', label: '登录' },
+  { value: 'register', label: '注册' }
+] as const
+
+const normalizeTabMode = (value: unknown): LoginTabMode => (
+  value === 'register' || value === 'webdav' ? value : 'login'
+)
+
+const tabMode = ref<LoginTabMode>('login')
 const username = ref('')
 const password = ref('')
 const webdavUrl = ref('')
@@ -150,8 +193,46 @@ const rememberWebdavPassword = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const invalidFields = ref<Set<LoginField>>(new Set())
+const hasClientValidationError = ref(false)
+const idPrefix = useId()
+const webdavUrlId = `${idPrefix}-webdav-url`
+const webdavUserId = `${idPrefix}-webdav-user`
+const webdavPasswordId = `${idPrefix}-webdav-password`
+const passwordRequirementsId = `${idPrefix}-password-requirements`
+const errorMessageId = `${idPrefix}-error`
+const accountInputId = (mode: 'login' | 'register', field: 'username' | 'password') => `${idPrefix}-${mode}-${field}`
 
-const isLoginMode = computed(() => tabMode.value === 'login')
+const inputAccessibilityProps = (id: string, field: LoginField, descriptionId?: string) => {
+  const isInvalid = invalidFields.value.has(field)
+  const describedBy = [descriptionId, isInvalid && errorMessage.value ? errorMessageId : ''].filter(Boolean).join(' ')
+  return {
+    id,
+    'aria-describedby': describedBy || undefined,
+    'aria-invalid': isInvalid ? true : undefined
+  }
+}
+
+const clearInvalidField = (field: LoginField) => {
+  invalidFields.value.delete(field)
+  if (invalidFields.value.size === 0 && hasClientValidationError.value) {
+    errorMessage.value = ''
+    hasClientValidationError.value = false
+  }
+}
+
+const clearFeedback = () => {
+  errorMessage.value = ''
+  successMessage.value = ''
+  invalidFields.value = new Set()
+  hasClientValidationError.value = false
+}
+
+const dialogTitle = computed(() => ({
+  login: '账号登录',
+  register: '注册账号',
+  webdav: '连接 WebDAV'
+})[tabMode.value])
 
 const passwordValidation = computed(() => {
   if (tabMode.value !== 'register' || !password.value) return null
@@ -163,10 +244,13 @@ watch(() => props.visible, (newVal) => {
     // Reset form when opened
     username.value = ''
     password.value = ''
-    errorMessage.value = ''
-    successMessage.value = ''
-    tabMode.value = props.initialTab || 'login'
+    clearFeedback()
+    tabMode.value = normalizeTabMode(props.initialTab)
   }
+})
+
+watch(tabMode, () => {
+  clearFeedback()
 })
 
 const close = () => {
@@ -174,11 +258,16 @@ const close = () => {
 }
 
 const handleSubmit = async () => {
-  errorMessage.value = ''
-  successMessage.value = ''
+  clearFeedback()
   
   if (tabMode.value === 'webdav') {
-    if (!webdavUrl.value.trim() || !webdavUser.value.trim() || !webdavPass.value.trim()) {
+    const missingFields: LoginField[] = []
+    if (!webdavUrl.value.trim()) missingFields.push('webdavUrl')
+    if (!webdavUser.value.trim()) missingFields.push('webdavUser')
+    if (!webdavPass.value.trim()) missingFields.push('webdavPassword')
+    if (missingFields.length > 0) {
+      invalidFields.value = new Set(missingFields)
+      hasClientValidationError.value = true
       errorMessage.value = '请填写完整的 WebDAV 信息'
       return
     }
@@ -207,7 +296,12 @@ const handleSubmit = async () => {
     return
   }
 
-  if (!username.value.trim() || !password.value.trim()) {
+  const missingFields: LoginField[] = []
+  if (!username.value.trim()) missingFields.push('username')
+  if (!password.value.trim()) missingFields.push('password')
+  if (missingFields.length > 0) {
+    invalidFields.value = new Set(missingFields)
+    hasClientValidationError.value = true
     errorMessage.value = '用户名和密码不能为空'
     return
   }
@@ -215,6 +309,8 @@ const handleSubmit = async () => {
   if (tabMode.value === 'register') {
     const validation = validatePasswordStrength(password.value)
     if (!validation.isValid) {
+      invalidFields.value = new Set(['password'])
+      hasClientValidationError.value = true
       errorMessage.value = '密码必须至少 8 个字符，且包含大小写字母和数字'
       return
     }
@@ -246,7 +342,11 @@ const handleSubmit = async () => {
 }
 
 .tabs {
-  margin-bottom: 20px;
+  margin-bottom: 0;
+}
+
+.tab-content {
+  padding-top: 20px;
 }
 
 .service-warning,
@@ -316,6 +416,18 @@ const handleSubmit = async () => {
 
 .requirement.met {
   color: var(--color-success);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .checkbox-group {

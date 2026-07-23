@@ -231,17 +231,68 @@ export interface WorkspaceLayout {
   seats: WorkspaceSeat[]
 }
 
+export type WorkspaceIdentifier = number | string
+
+export interface WorkspaceStudent extends Omit<Student, 'id' | 'tags'> {
+  id: WorkspaceIdentifier
+  tags: WorkspaceIdentifier[]
+}
+
+export interface WorkspaceTag extends Omit<Tag, 'id'> {
+  id: WorkspaceIdentifier
+}
+
+export interface WorkspaceZone extends Omit<Zone, 'id' | 'tagIds'> {
+  id: WorkspaceIdentifier
+  tagIds: WorkspaceIdentifier[]
+}
+
+export interface WorkspaceRuleSubject extends Omit<RuleSubject, 'id'> {
+  id: WorkspaceIdentifier | null
+}
+
+export interface WorkspaceRuleParams extends Omit<RuleParams, 'zoneId'> {
+  zoneId?: WorkspaceIdentifier
+  tagId?: WorkspaceIdentifier
+}
+
+export interface WorkspaceLegacyRuleSubject extends Omit<LegacyRuleSubject, 'id' | 'id1' | 'id2' | 'tagId' | 'tagId1' | 'tagId2'> {
+  id?: WorkspaceIdentifier | null
+  id1?: WorkspaceIdentifier | null
+  id2?: WorkspaceIdentifier | null
+  tagId?: WorkspaceIdentifier | null
+  tagId1?: WorkspaceIdentifier | null
+  tagId2?: WorkspaceIdentifier | null
+}
+
+export interface WorkspaceRuleSubRule extends Omit<RuleSubRule, 'params' | 'subjects'> {
+  params: WorkspaceRuleParams
+  subjects?: WorkspaceRuleSubject[]
+}
+
+export interface WorkspaceRuleInput extends Omit<RuleInput, 'subjects' | 'subjectsA' | 'subjectsB' | 'subject' | 'params' | 'subRules'> {
+  subjects?: WorkspaceRuleSubject[]
+  subjectsA?: WorkspaceRuleSubject[]
+  subjectsB?: WorkspaceRuleSubject[]
+  subject?: WorkspaceLegacyRuleSubject
+  params?: WorkspaceRuleParams
+  subRules?: Array<Partial<WorkspaceRuleSubRule>> | null
+}
+
+export const WORKSPACE_SCHEMA_VERSION = '2.3'
+
 // 工作区数据模型
 export interface Workspace {
   meta?: WorkspaceMeta
-  students: Student[]
+  students: WorkspaceStudent[]
   studentAttributeDefinitions?: NumericAttributeDefinition[]
   studentAttributeSettings?: StudentAttributeSettings
-  tags: Tag[]
+  tags: WorkspaceTag[]
   tagSettings?: TagSettings
   layout: WorkspaceLayout
-  zones: Zone[]
-  rules: RuleInput[]
+  zones: WorkspaceZone[]
+  rotationGroups?: RotationGroup[]
+  rules: WorkspaceRuleInput[]
   exportSettings?: Partial<ExportSettings>
 }
 

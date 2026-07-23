@@ -16,23 +16,23 @@
         </div>
         <div class="action-grid">
           <NButton size="small" secondary :disabled="!hasSelectionStudent" @click="editSelectedSeats">
-            <Edit3 :size="14" stroke-width="2" />
+            <template #icon><Edit3 :size="14" stroke-width="2" /></template>
             <span>编辑学生</span>
           </NButton>
           <NButton size="small" type="error" secondary :disabled="!hasSelectionStudent" @click="clearSelectedSeats">
-            <UserMinus :size="14" stroke-width="2" />
+            <template #icon><UserMinus :size="14" stroke-width="2" /></template>
             <span>移出学生</span>
           </NButton>
           <NButton size="small" type="info" secondary :disabled="!canShuffleSelection" @click="shuffleSelectedSeats">
-            <component :is="selectedCount === 2 ? ArrowLeftRight : Shuffle" :size="14" stroke-width="2" />
+            <template #icon><component :is="selectedCount === 2 ? ArrowLeftRight : Shuffle" :size="14" stroke-width="2" /></template>
             <span>{{ selectedCount === 2 ? '交换座位' : '打乱座位' }}</span>
           </NButton>
           <NButton size="small" type="success" secondary :disabled="!canAssignSelection" @click="assignSelectedSeats">
-            <Sparkles :size="14" stroke-width="2" />
+            <template #icon><Sparkles :size="14" stroke-width="2" /></template>
             <span>排入学生</span>
           </NButton>
           <NButton size="small" secondary @click="clearSelection">
-            <X :size="14" stroke-width="2" />
+            <template #icon><X :size="14" stroke-width="2" /></template>
             <span>取消选择</span>
           </NButton>
         </div>
@@ -47,19 +47,19 @@
         </div>
         <div class="action-grid">
           <NButton size="small" secondary :disabled="!singleSelectedSeat.studentId" @click="editSelectedSeats">
-            <Edit3 :size="14" stroke-width="2" />
+            <template #icon><Edit3 :size="14" stroke-width="2" /></template>
             <span>编辑学生</span>
           </NButton>
           <NButton size="small" type="error" secondary :disabled="!singleSelectedSeat.studentId" @click="clearSingleSelectedSeat">
-            <UserMinus :size="14" stroke-width="2" />
+            <template #icon><UserMinus :size="14" stroke-width="2" /></template>
             <span>移出学生</span>
           </NButton>
           <NButton size="small" type="success" secondary :disabled="!canAssignSelection" @click="assignSelectedSeats">
-            <Sparkles :size="14" stroke-width="2" />
+            <template #icon><Sparkles :size="14" stroke-width="2" /></template>
             <span>排入学生</span>
           </NButton>
           <NButton size="small" type="warning" secondary @click="toggleSingleSelectedEmpty">
-            <LayoutGrid :size="14" stroke-width="2" />
+            <template #icon><LayoutGrid :size="14" stroke-width="2" /></template>
             <span>切换空置</span>
           </NButton>
           <NButton size="small" secondary @click="clearSelection">

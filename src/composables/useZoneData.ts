@@ -162,6 +162,15 @@ export function useZoneData(): UseZoneDataReturn {
     nextZoneId = 1
   }
 
+  const replaceZoneData = (nextZones: Zone[]): void => {
+    zones.value = nextZones.map(zone => ({
+      ...zone,
+      tagIds: [...zone.tagIds],
+      seatIds: [...zone.seatIds]
+    }))
+    syncZoneIdCounter()
+  }
+
   // 同步选区 ID 计数器（工作区加载后调用）
   const syncZoneIdCounter = (): void => {
     if (zones.value.length === 0) {
@@ -192,6 +201,7 @@ export function useZoneData(): UseZoneDataReturn {
     removeTagFromAllZones,
     cleanupInvalidSeats,
     clearAllZones,
+    replaceZoneData,
     syncZoneIdCounter
   }
 }

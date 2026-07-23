@@ -2,23 +2,25 @@
   <ResponsiveOverlay :show="visible" title="编辑学生信息" :busy="isCommitting" :desktop-width="560" @update:show="value => !value && requestClose()">
         <div class="dialog-body">
           <div class="form-group">
-            <label class="form-label">姓名</label>
+            <label class="form-label" :for="nameInputId">姓名</label>
             <NInput
               v-model:value="localName"
               type="text"
               class="form-input"
               placeholder="请输入学生姓名"
+              :input-props="{ id: nameInputId }"
               @keyup.enter="handleSave"
             />
           </div>
 
           <div class="form-group">
-            <label class="form-label">学号</label>
+            <label class="form-label" :for="numberInputId">学号</label>
             <NInput
               v-model:value="localNumber"
               type="text"
               class="form-input"
               placeholder="请输入学号（可选）"
+              :input-props="{ id: numberInputId }"
               @keyup.enter="handleSave"
             />
           </div>
@@ -30,6 +32,7 @@
                 v-for="attribute in enabledAttributeDefinitions"
                 :key="attribute.id"
                 class="numeric-field"
+                :for="numericInputId(attribute.id)"
               >
                 <span>{{ attribute.unit ? `${attribute.name}（${attribute.unit}）` : attribute.name }}</span>
                 <NInputNumber
@@ -38,6 +41,7 @@
                   :max="attribute.max ?? undefined"
                   :precision="attribute.precision ?? undefined"
                   class="form-input"
+                  :input-props="{ id: numericInputId(attribute.id) }"
                   @update:value="value => updateLocalNumericAttribute(attribute, value)"
                   @keyup.enter="handleSave"
                 />
@@ -55,7 +59,12 @@
                   class="tag-item"
                   :style="{ '--tag-color': getTagColor(tagId) }"
                   :title="getTagName(tagId)"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`移除标签 ${getTagName(tagId)}`"
                   @click="removeTag(tagId)"
+                  @keydown.enter.prevent="removeTag(tagId)"
+                  @keydown.space.prevent="removeTag(tagId)"
                 >
                   <span class="tag-name">{{ getTagName(tagId) }}</span>
                   <X :size="12" />
@@ -68,7 +77,12 @@
                   class="tag-option"
                   :style="{ '--tag-color': tag.color }"
                   :title="tag.name"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`添加标签 ${tag.name}`"
                   @click="addTag(tag.id)"
+                  @keydown.enter.prevent="addTag(tag.id)"
+                  @keydown.space.prevent="addTag(tag.id)"
                 >
                   <span class="tag-name">{{ tag.name }}</span>
                 </span>
@@ -86,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, useId } from 'vue'
 import { NButton, NInput, NInputNumber } from 'naive-ui'
 import { X } from 'lucide-vue-next'
 import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
@@ -121,6 +135,10 @@ const localTags = ref<number[]>([])
 const localNumericAttributes = ref<Record<string, number | null>>({})
 const originalSnapshot = ref('')
 const isCommitting = ref(false)
+const idPrefix = useId()
+const nameInputId = `${idPrefix}-name`
+const numberInputId = `${idPrefix}-number`
+const numericInputId = (attributeId: string) => `${idPrefix}-numeric-${attributeId.replace(/[^A-Za-z0-9_-]/g, '-')}`
 const getFormSnapshot = () => JSON.stringify({
   name: localName.value,
   number: localNumber.value,
@@ -246,7 +264,6 @@ const close = () => {
 <style scoped>
 
 .dialog-body {
-  overflow-y: auto;
   overflow-x: hidden;
   flex: 1;
   min-height: 0;
@@ -385,6 +402,12 @@ const close = () => {
   justify-content: flex-end;
   gap: 12px;
   flex: 0 0 auto;
+}
+
+.tag-item:focus-visible,
+.tag-option:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
 }
 
 .dialog-action {

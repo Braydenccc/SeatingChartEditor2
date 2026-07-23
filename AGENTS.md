@@ -164,6 +164,7 @@ EditorView.vue
 - `.agents/features/07-cloud-sync.md`
 - `.agents/features/08-export-system.md`
 - `.agents/features/09-security-enhancements.md`
+- `.agents/features/10-admin-api.md`
 - `.agents/rules/项目规范.md`
 - `.agents/rules/学生卡片外观规范.md`
 

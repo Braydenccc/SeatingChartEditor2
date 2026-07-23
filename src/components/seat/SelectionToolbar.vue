@@ -2,23 +2,23 @@
   <Transition name="sel-toolbar">
     <div v-if="visible" class="selection-toolbar" :style="positionStyle" @mousedown.stop @pointerdown.stop>
       <NButton size="tiny" quaternary type="primary" title="编辑学生" :disabled="!hasStudent" @click="handleEdit">
-        <Edit3 :size="15" stroke-width="2" />
+        <template #icon><Edit3 :size="15" stroke-width="2" /></template>
         <span class="sel-btn-label">编辑</span>
       </NButton>
       <NButton size="tiny" quaternary type="error" title="移出学生" @click="handleClear">
-        <UserMinus :size="15" stroke-width="2" />
+        <template #icon><UserMinus :size="15" stroke-width="2" /></template>
         <span class="sel-btn-label">移出</span>
       </NButton>
       <NButton v-if="isExactlyTwo" size="tiny" quaternary type="warning" title="交换座位" :disabled="!canShuffle" @click="handleShuffle">
-        <ArrowLeftRight :size="15" stroke-width="2" />
+        <template #icon><ArrowLeftRight :size="15" stroke-width="2" /></template>
         <span class="sel-btn-label">交换</span>
       </NButton>
       <NButton v-else size="tiny" quaternary type="info" title="打乱顺序" :disabled="!canShuffle" @click="handleShuffle">
-        <Shuffle :size="15" stroke-width="2" />
+        <template #icon><Shuffle :size="15" stroke-width="2" /></template>
         <span class="sel-btn-label">打乱</span>
       </NButton>
       <NButton size="tiny" quaternary type="success" title="一键排入" :disabled="isFull" @click="handleAssign">
-        <Sparkles :size="15" stroke-width="2" />
+        <template #icon><Sparkles :size="15" stroke-width="2" /></template>
         <span class="sel-btn-label">排入</span>
       </NButton>
       <div class="sel-divider"></div>

@@ -405,7 +405,7 @@ const getReadableDarkPrimary = (color: string) => {
 
 // 应用主题色到 CSS 变量
 const applyThemeColor = () => {
-  const { colorMode, themeColor, customColors } = settings.value.ui
+  const { colorMode, themeColor, customBaseScheme, customColors } = settings.value.ui
   const root = document.documentElement
 
   if (colorMode === 'simple') {
@@ -462,6 +462,16 @@ const applyThemeColor = () => {
     root.style.setProperty('--color-info', customColors.info)
     root.style.setProperty('--color-info-hover', customColors.infoHover)
   }
+
+  const usesDarkBase = colorMode === 'custom'
+    ? customBaseScheme === 'dark'
+    : isDarkSimpleScheme()
+  root.style.setProperty(
+    '--color-header-accent-bg',
+    usesDarkBase
+      ? 'color-mix(in srgb, var(--color-primary-dark) 64%, var(--color-bg-card))'
+      : 'var(--color-primary)'
+  )
 
   // 强制触发重绘，确保 CSS 变量立即生效
   void root.offsetHeight

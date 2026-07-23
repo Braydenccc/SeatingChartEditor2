@@ -19,8 +19,8 @@ related_files:
 
 - `is_enable`: 总开关，值必须严格为 `1`，否则所有 admin API 视为未验证。
 - `api_token_hash`: 管理员明文 token 的 SHA-256 hex，后端不保存明文 token。
-- `audit_logs`: 所有 admin 调用日志，后端仅追加和读取。
-- `audit_failures`: 失败、参数错误、校验未通过或未验证调用的备份日志，后端仅追加和读取。
+- `audit_logs`: 所有 admin 调用日志，最多保留最近 500 条。
+- `audit_failures`: 失败、参数错误、校验未通过或未验证调用的备份日志，最多保留最近 500 条。
 
 后端不提供修改或删除 `admin` 配置与日志的云函数；清理、关闭或更换密钥只能通过热铁盒数据库管理界面手动完成。
 
@@ -51,3 +51,7 @@ Content-Type: application/json
 日志字段包括 `id`、`time`、`timestamp`、`action`、`success`、`verified`、`status`、`ip`、`userAgent`、`reason`、`target` 和 `paramsSummary`。
 
 `paramsSummary` 会脱敏敏感字段，不记录 token、密码、新密码、工作区 content、WebDAV 凭据或用户设置详情。
+
+日志数组通过原子 `push` 追加，超过上限后删除最早条目。未认证请求的限流也使用原子尝试记录，避免并发 `get`/`set` 覆盖导致限流失效；限流存储无法确认时按失败关闭返回 503。
+
+所有外部字符串字段在写入审计日志前会先规范为有效 UTF-8 并按字节安全截断。JSON 编码启用 `JSON_INVALID_UTF8_SUBSTITUTE`；若完整记录仍无法编码，后端会写入不含原始请求字段的最小兜底记录，并通过服务器错误日志报告降级。

@@ -150,8 +150,17 @@ interface ProbabilityConfig {
 interface AssignmentMoveResult {
   accepted: boolean
   newScore: number
+  newRequiredScore: number
+  newSoftScore: number
   useEmptySeat: boolean
   emptySeatIdx: number
+}
+
+interface AssignmentScorePreview {
+  score: number
+  requiredScore: number
+  softScore: number
+  updates: Array<[number, number]> | null
 }
 
 export interface AssignmentViolationReport {
@@ -240,6 +249,22 @@ export function useAssignment() {
   }
 
   const hasGuardSeat = (...seatIds: string[]) => seatIds.some(seatId => isGuardSeatId(seatId))
+
+  const applyRuleNegation = (rule: AssignmentRule, result: ViolationResult): ViolationResult => {
+    if (!rule.not) return result
+    return { ...result, violated: !result.violated, excess: undefined }
+  }
+
+  const applyGlobalRuleNegation = (
+    rule: AssignmentRule,
+    positivePenalties: number,
+    positiveSatisfied: boolean,
+    evaluated = true
+  ) => {
+    if (!rule.not || !evaluated) return positivePenalties
+    const weight = PENALTY_WEIGHTS[rule.priority] ?? PENALTY_WEIGHTS.optional
+    return positiveSatisfied ? weight : 0
+  }
 
   // ==================== 随机工具 ====================
 
@@ -570,6 +595,11 @@ export function useAssignment() {
       return returnDetails ? { penalties: 0, details: { positionedCount: positioned.length, missingCount: expandedSubjects.length - positioned.length } } : 0
     }
 
+    const finalize = (positivePenalties: number, details: Record<string, number>) => {
+      const effectivePenalties = applyGlobalRuleNegation(rule, positivePenalties, positivePenalties <= 0)
+      return returnDetails ? { penalties: effectivePenalties, details } : effectivePenalties
+    }
+
     let penalties = 0
     const values = positioned.map(item => item.value)
     const minValue = Math.min(...values)
@@ -587,7 +617,7 @@ export function useAssignment() {
         penalties += diff * diff * weight * 1.8
       }
       const avgDiff = totalDiff / positioned.length
-      return returnDetails ? { penalties, details: { positionedCount: positioned.length, avgDiff } } : penalties
+      return finalize(penalties, { positionedCount: positioned.length, avgDiff })
     }
 
     if (predicate === 'ATTRIBUTE_GROUP_BALANCE') {
@@ -601,13 +631,13 @@ export function useAssignment() {
       const metrics = [...groupMap.values()].map(group =>
         params.aggregate === 'sum' ? group.sum : group.sum / Math.max(1, group.count)
       )
-      if (metrics.length <= 1) return returnDetails ? { penalties: 0, details: { positionedCount: positioned.length } } : 0
+      if (metrics.length <= 1) return finalize(0, { positionedCount: positioned.length, groupCount: metrics.length })
       const mean = metrics.reduce((sum, value) => sum + value, 0) / metrics.length
       for (const metric of metrics) {
         const normalizedDiff = Math.abs(metric - mean) / valueRange
         penalties += normalizedDiff * normalizedDiff * weight * 2.5
       }
-      return returnDetails ? { penalties, details: { positionedCount: positioned.length, groupCount: metrics.length } } : penalties
+      return finalize(penalties, { positionedCount: positioned.length, groupCount: metrics.length })
     }
 
     if (predicate === 'ATTRIBUTE_DISTRIBUTE_BANDS') {
@@ -633,10 +663,10 @@ export function useAssignment() {
         const min = Math.min(...counts)
         penalties += (max - min) * weight * 0.45
       }
-      return returnDetails ? { penalties, details: { positionedCount: positioned.length, bandCount } } : penalties
+      return finalize(penalties, { positionedCount: positioned.length, bandCount })
     }
 
-    return returnDetails ? { penalties: 0, details: { positionedCount: positioned.length } } : 0
+    return finalize(0, { positionedCount: positioned.length })
   }
 
   const checkAttributePairViolation = (
@@ -652,7 +682,7 @@ export function useAssignment() {
     const diff = Math.abs(value1 - value2)
     const maxDelta = Number(rule.params?.maxDelta ?? Infinity)
     const violated = diff > maxDelta
-    return { violated, excess: violated ? diff - maxDelta : 0 }
+    return applyRuleNegation(rule, { violated, excess: violated ? diff - maxDelta : 0 })
   }
 
   // ==================== 新引擎：违规检测 ====================
@@ -773,11 +803,7 @@ export function useAssignment() {
 
     // 执行检测并应用 NOT 取反
     const result = detect()
-    if (not) {
-      // 取反：violated 变为 !violated
-      return { ...result, violated: !result.violated, excess: undefined }
-    }
-    return result
+    return not ? applyRuleNegation(rule, result) : result
   }
 
   /**
@@ -794,6 +820,8 @@ export function useAssignment() {
     const { predicate, params } = rule
     let penalties = 0
     let details = null
+    let evaluated = false
+    let positiveSatisfied = true
 
     if (predicate === 'DISTRIBUTE_EVENLY') {
       // 收集已分配学生的座位信息
@@ -863,6 +891,7 @@ export function useAssignment() {
       }
 
       const avgDistance = pairCount > 0 ? totalDistance / pairCount : 0
+      evaluated = true
 
       // 优化后的惩罚策略：优先分开距离为1的对象
       // 1. 距离为1的极高优先级惩罚：最优先处理距离正好为1的情况
@@ -907,16 +936,19 @@ export function useAssignment() {
           isIdeal: minDistance >= idealMinDistance && adjacentPairs.length === 0
         }
       }
+      positiveSatisfied = (minDistance >= idealMinDistance && adjacentPairs.length === 0) || penalties <= 0
     }
 
     if (predicate === 'CLUSTER_TOGETHER') {
       // 统计不同大组/区域的数量，越多违规越重
       const keySet = new Set<number | string>()
+      let positionedCount = 0
       for (const subj of expandedSubjects) {
         if (subj.type !== 'single') continue
         const seatId = assignment.get(subj.studentId)
         if (!seatId) continue
         if (isGuardSeatId(seatId)) continue
+        positionedCount++
         const key = params.scope === 'group'
           ? parseSeatId(seatId).groupIndex
           : (getZoneForSeat(seatId)?.id ?? 'none')
@@ -926,7 +958,11 @@ export function useAssignment() {
       if (keySet.size > 1) {
         penalties = (keySet.size - 1) * PENALTY_WEIGHTS[rule.priority] * 0.2
       }
+      evaluated = positionedCount > 1
+      positiveSatisfied = keySet.size <= 1
     }
+
+    penalties = applyGlobalRuleNegation(rule, penalties, positiveSatisfied, evaluated)
 
     if (returnDetails) {
       return { penalties, details }
@@ -1217,8 +1253,7 @@ export function useAssignment() {
     }
 
     const result = detect()
-    if (not) return { ...result, violated: !result.violated, excess: undefined }
-    return result
+    return not ? applyRuleNegation(rule, result) : result
   }
 
   const isGlobalScoringRule = (rule: AssignmentRule) => {
@@ -1501,6 +1536,41 @@ export function useAssignment() {
     return score
   }
 
+  const compareLexicographicScores = (
+    requiredScoreA: number,
+    softScoreA: number,
+    requiredScoreB: number,
+    softScoreB: number
+  ) => {
+    if (requiredScoreA !== requiredScoreB) return requiredScoreA - requiredScoreB
+    return softScoreA - softScoreB
+  }
+
+  const evaluateScoreParts = (
+    assignment: AssignmentMap,
+    activeRules: AssignmentRule[],
+    studentList: Student[],
+    context: AssignmentContext | null
+  ) => {
+    if (context?.scoringUnits) {
+      let requiredScore = 0
+      let softScore = 0
+      for (const unit of context.scoringUnits) {
+        const unitScore = scoreUnit(unit, assignment, studentList, context)
+        if (unit.rule.priority === RulePriority.REQUIRED) requiredScore += unitScore
+        else softScore += unitScore
+      }
+      return { requiredScore, softScore }
+    }
+
+    const requiredRules = activeRules.filter(rule => rule.priority === RulePriority.REQUIRED)
+    const softRules = activeRules.filter(rule => rule.priority !== RulePriority.REQUIRED)
+    return {
+      requiredScore: evaluateScore(assignment, requiredRules, studentList, null),
+      softScore: evaluateScore(assignment, softRules, studentList, null)
+    }
+  }
+
   // ==================== 新引擎：智能初始解 ====================
 
   /**
@@ -1538,6 +1608,7 @@ export function useAssignment() {
     // Step 1: 处理 required 的 IN_ROW_RANGE 和 IN_GROUP_RANGE 规则
     for (const rule of shuffleArray(activeRules)) {
       if (rule.priority !== RulePriority.REQUIRED) continue
+      if (rule.not || (rule.subRules?.length ?? 0) > 1) continue
       if (!['IN_ROW_RANGE', 'IN_GROUP_RANGE'].includes(rule.predicate)) continue
 
       const subjects = shuffleArray(getCompiledSubjects(rule, studentList))
@@ -1574,6 +1645,7 @@ export function useAssignment() {
     // Step 1.5: 处理数值前后梯度，生成更合理的初始分布
     for (const rule of shuffleArray(activeRules)) {
       if (rule.priority !== RulePriority.PREFER) continue
+      if (rule.not || (rule.subRules?.length ?? 0) > 1) continue
       if (rule.predicate !== 'ATTRIBUTE_ROW_GRADIENT') continue
 
       const subjects = getCompiledSubjects(rule, studentList)
@@ -1606,6 +1678,7 @@ export function useAssignment() {
     // Step 2: 处理 required 的 MUST_BE_SEATMATES（同桌绑定）
     for (const rule of shuffleArray(activeRules)) {
       if (rule.priority !== RulePriority.REQUIRED) continue
+      if (rule.not || (rule.subRules?.length ?? 0) > 1) continue
       if (rule.predicate !== 'MUST_BE_SEATMATES') continue
 
       const subjects = shuffleArray(getCompiledSubjects(rule, studentList))
@@ -1688,6 +1761,8 @@ export function useAssignment() {
     context: AssignmentContext | null
     unitScores: number[]
     totalScore: number
+    requiredScore: number
+    softScore: number
 
     constructor(
       assignment: AssignmentMap,
@@ -1700,21 +1775,31 @@ export function useAssignment() {
       this.context = context
       this.unitScores = []
       this.totalScore = 0
+      this.requiredScore = 0
+      this.softScore = 0
       this.rebuild(assignment)
     }
 
     rebuild(assignment: AssignmentMap) {
       this.unitScores = []
       this.totalScore = 0
+      this.requiredScore = 0
+      this.softScore = 0
       if (!this.context?.scoringUnits) {
-        this.totalScore = evaluateScore(assignment, this.activeRules, this.studentList, this.context)
+        const parts = evaluateScoreParts(assignment, this.activeRules, this.studentList, this.context)
+        this.requiredScore = parts.requiredScore
+        this.softScore = parts.softScore
+        this.totalScore = parts.requiredScore + parts.softScore
         return
       }
       for (let i = 0; i < this.context.scoringUnits.length; i++) {
-        const unitScore = scoreUnit(this.context.scoringUnits[i], assignment, this.studentList, this.context)
+        const unit = this.context.scoringUnits[i]
+        const unitScore = scoreUnit(unit, assignment, this.studentList, this.context)
         this.unitScores[i] = unitScore
-        this.totalScore += unitScore
+        if (unit.rule.priority === RulePriority.REQUIRED) this.requiredScore += unitScore
+        else this.softScore += unitScore
       }
+      this.totalScore = this.requiredScore + this.softScore
     }
 
     getAffectedUnitIndexes(studentIds: number[]) {
@@ -1730,43 +1815,58 @@ export function useAssignment() {
       return affected
     }
 
-    previewScore(assignment: AssignmentMap, studentIds: number[]): {
-      score: number
-      updates: Array<[number, number]> | null
-    } {
+    previewScore(assignment: AssignmentMap, studentIds: number[]): AssignmentScorePreview {
       const affected = this.getAffectedUnitIndexes(studentIds)
       if (!affected) {
+        const parts = evaluateScoreParts(assignment, this.activeRules, this.studentList, this.context)
         return {
-          score: evaluateScore(assignment, this.activeRules, this.studentList, this.context),
+          score: parts.requiredScore + parts.softScore,
+          requiredScore: parts.requiredScore,
+          softScore: parts.softScore,
           updates: null
         }
       }
 
       const context = this.context
       if (!context) {
+        const parts = evaluateScoreParts(assignment, this.activeRules, this.studentList, null)
         return {
-          score: evaluateScore(assignment, this.activeRules, this.studentList, null),
+          score: parts.requiredScore + parts.softScore,
+          requiredScore: parts.requiredScore,
+          softScore: parts.softScore,
           updates: null
         }
       }
-      let score = this.totalScore
+      let requiredScore = this.requiredScore
+      let softScore = this.softScore
       const updates: Array<[number, number]> = []
       for (const unitIndex of affected) {
         const unit = context.scoringUnits[unitIndex]
         if (!unit) continue
         const newUnitScore = scoreUnit(unit, assignment, this.studentList, context)
         const oldUnitScore = this.unitScores[unitIndex] ?? 0
-        score += newUnitScore - oldUnitScore
+        if (unit.rule.priority === RulePriority.REQUIRED) {
+          requiredScore += newUnitScore - oldUnitScore
+        } else {
+          softScore += newUnitScore - oldUnitScore
+        }
         updates.push([unitIndex, newUnitScore])
       }
-      return { score, updates }
+      return {
+        score: requiredScore + softScore,
+        requiredScore,
+        softScore,
+        updates
+      }
     }
 
-    commitPreview(score: number, updates: Array<[number, number]> | null) {
-      this.totalScore = score
-      if (!updates) return
-      for (let i = 0; i < updates.length; i++) {
-        const [unitIndex, unitScore] = updates[i]
+    commitPreview(preview: AssignmentScorePreview) {
+      this.totalScore = preview.score
+      this.requiredScore = preview.requiredScore
+      this.softScore = preview.softScore
+      if (!preview.updates) return
+      for (let i = 0; i < preview.updates.length; i++) {
+        const [unitIndex, unitScore] = preview.updates[i]
         this.unitScores[unitIndex] = unitScore
       }
     }
@@ -1778,6 +1878,10 @@ export function useAssignment() {
     tracker: ScoreTracker
     currentScore: number
     bestScore: number
+    currentRequiredScore: number
+    currentSoftScore: number
+    bestRequiredScore: number
+    bestSoftScore: number
     currentReverse: Map<string, number>
     emptySeats: string[]
     stagnationCounter: number
@@ -1795,6 +1899,10 @@ export function useAssignment() {
       this.tracker = new ScoreTracker(this.current, activeRules, studentList, context)
       this.currentScore = this.tracker.totalScore
       this.bestScore = this.currentScore
+      this.currentRequiredScore = this.tracker.requiredScore
+      this.currentSoftScore = this.tracker.softScore
+      this.bestRequiredScore = this.currentRequiredScore
+      this.bestSoftScore = this.currentSoftScore
       this.currentReverse = this.buildReverse(this.current)
       this.emptySeats = this.buildEmptySeats(availableSeats)
       this.stagnationCounter = 0
@@ -1816,8 +1924,15 @@ export function useAssignment() {
     }
 
     updateBestIfBetter() {
-      if (this.currentScore > this.bestScore) {
+      if (compareLexicographicScores(
+        this.currentRequiredScore,
+        this.currentSoftScore,
+        this.bestRequiredScore,
+        this.bestSoftScore
+      ) > 0) {
         this.bestScore = this.currentScore
+        this.bestRequiredScore = this.currentRequiredScore
+        this.bestSoftScore = this.currentSoftScore
         this.best = new Map(this.current)
         this.stagnationCounter = 0
         this.stagnationSinceBest = 0
@@ -1834,6 +1949,8 @@ export function useAssignment() {
     rebuildScore(activeRules: AssignmentRule[], studentList: Student[], context: AssignmentContext | null) {
       this.tracker = new ScoreTracker(this.current, activeRules, studentList, context)
       this.currentScore = this.tracker.totalScore
+      this.currentRequiredScore = this.tracker.requiredScore
+      this.currentSoftScore = this.tracker.softScore
     }
   }
 
@@ -1996,16 +2113,29 @@ export function useAssignment() {
 
   const buildPartnerMap = (activeRules: AssignmentRule[], studentList: Student[]) => {
     const partnerMap = new Map<number, number>()
-    activeRules.forEach(r => {
-      if (r.priority === RulePriority.REQUIRED && r.predicate === 'MUST_BE_SEATMATES') {
-        const subjects = getCompiledSubjects(r, studentList)
-        subjects.forEach(s => {
-          if (s.type === 'pair') {
-            partnerMap.set(s.studentId1, s.studentId2)
-            partnerMap.set(s.studentId2, s.studentId1)
-          }
+
+    const addRulePairs = (rule: AssignmentRule) => {
+      const subjects = getCompiledSubjects(rule, studentList)
+      subjects.forEach(subject => {
+        if (subject.type === 'pair') {
+          partnerMap.set(subject.studentId1, subject.studentId2)
+          partnerMap.set(subject.studentId2, subject.studentId1)
+        }
+      })
+    }
+
+    activeRules.forEach(rule => {
+      if (rule.priority !== RulePriority.REQUIRED || rule.not) return
+
+      if (rule.subRules && rule.subRules.length > 1) {
+        if (rule.logicOperator !== 'AND') return
+        rule.subRules.forEach(subRule => {
+          if (subRule.predicate === 'MUST_BE_SEATMATES' && !subRule.not) addRulePairs(subRule)
         })
+        return
       }
+
+      if (rule.predicate === 'MUST_BE_SEATMATES') addRulePairs(rule)
     })
     return partnerMap
   }
@@ -2136,11 +2266,20 @@ export function useAssignment() {
       if (!moveResult || !moveResult.accepted) continue
 
       state.currentScore = moveResult.newScore
+      state.currentRequiredScore = moveResult.newRequiredScore
+      state.currentSoftScore = moveResult.newSoftScore
       if (moveResult.useEmptySeat && moveResult.emptySeatIdx >= 0) {
         state.emptySeats[moveResult.emptySeatIdx] = seatA
       }
-      if (state.currentScore >= state.bestScore) {
+      if (compareLexicographicScores(
+        state.currentRequiredScore,
+        state.currentSoftScore,
+        state.bestRequiredScore,
+        state.bestSoftScore
+      ) >= 0) {
         state.bestScore = state.currentScore
+        state.bestRequiredScore = state.currentRequiredScore
+        state.bestSoftScore = state.currentSoftScore
         state.best = new Map(state.current)
       }
     }
@@ -2194,7 +2333,7 @@ export function useAssignment() {
     const ruleAffectedStudentIds = buildRuleAffectedStudentIds(activeRules, studentList, assignedStudentIds)
     let violatingStudents = computeViolatingStudents(state.current, activeRules, studentList, context)
 
-    if (state.bestScore === 0) {
+    if (state.bestRequiredScore === 0 && state.bestSoftScore === 0) {
       randomizePlateauSolution(state, activeRules, studentList, availableSeats, context, {
         assignedStudentIds,
         partnerMap,
@@ -2254,11 +2393,13 @@ export function useAssignment() {
       if (moveResult) {
         if (moveResult.accepted) {
           state.currentScore = moveResult.newScore
+          state.currentRequiredScore = moveResult.newRequiredScore
+          state.currentSoftScore = moveResult.newSoftScore
           if (moveResult.useEmptySeat && moveResult.emptySeatIdx >= 0) {
             state.emptySeats[moveResult.emptySeatIdx] = seatA
           }
           if (state.updateBestIfBetter()) {
-            if (state.bestScore === 0) {
+            if (state.bestRequiredScore === 0 && state.bestSoftScore === 0) {
               if (onProgress) onProgress(100)
               break
             }
@@ -2353,7 +2494,10 @@ export function useAssignment() {
     const movedStudents = [studentA, partner, studentC, studentD]
     const scorePreview = state.tracker.previewScore(state.current, movedStudents)
     const newScore = scorePreview.score
-    const delta = newScore - state.currentScore
+    const requiredDelta = scorePreview.requiredScore - state.currentRequiredScore
+    const delta = requiredDelta !== 0
+      ? requiredDelta
+      : scorePreview.softScore - state.currentSoftScore
     const accepted = delta >= 0 || Math.random() < Math.exp(delta / T)
     
     if (!accepted) {
@@ -2366,10 +2510,17 @@ export function useAssignment() {
       state.currentReverse.set(seatC, studentC)
       state.currentReverse.set(seatD, studentD)
     } else {
-      state.tracker.commitPreview(newScore, scorePreview.updates)
+      state.tracker.commitPreview(scorePreview)
     }
     
-    return { accepted, newScore, useEmptySeat: false, emptySeatIdx: -1 }
+    return {
+      accepted,
+      newScore,
+      newRequiredScore: scorePreview.requiredScore,
+      newSoftScore: scorePreview.softScore,
+      useEmptySeat: false,
+      emptySeatIdx: -1
+    }
   }
 
   const trySingleMove = (
@@ -2412,7 +2563,10 @@ export function useAssignment() {
     const movedStudents = useEmptySeat || studentB === undefined ? [studentA] : [studentA, studentB]
     const scorePreview = state.tracker.previewScore(state.current, movedStudents)
     const newScore = scorePreview.score
-    const delta = newScore - state.currentScore
+    const requiredDelta = scorePreview.requiredScore - state.currentRequiredScore
+    const delta = requiredDelta !== 0
+      ? requiredDelta
+      : scorePreview.softScore - state.currentSoftScore
     const accepted = delta >= 0 || Math.random() < Math.exp(delta / T)
     
     if (!accepted) {
@@ -2428,10 +2582,17 @@ export function useAssignment() {
         state.currentReverse.set(seatB, studentB)
       }
     } else {
-      state.tracker.commitPreview(newScore, scorePreview.updates)
+      state.tracker.commitPreview(scorePreview)
     }
     
-    return { accepted, newScore, useEmptySeat, emptySeatIdx }
+    return {
+      accepted,
+      newScore,
+      newRequiredScore: scorePreview.requiredScore,
+      newSoftScore: scorePreview.softScore,
+      useEmptySeat,
+      emptySeatIdx
+    }
   }
 
   // ==================== 新引擎：穷举 + 剪枝回溯 ====================
@@ -2480,7 +2641,7 @@ export function useAssignment() {
 
             // 对于均匀分散规则：当最小距离理想且互不相邻时就返回成功
             let ruleSatisfied = false
-            if (subRule.predicate === 'DISTRIBUTE_EVENLY' && details?.isIdeal) {
+            if (!subRule.not && subRule.predicate === 'DISTRIBUTE_EVENLY' && details?.isIdeal) {
               ruleSatisfied = true
             } else if (penalty <= 0) {
               ruleSatisfied = true
@@ -2608,7 +2769,7 @@ export function useAssignment() {
         }
 
         // 对于均匀分散规则：当最小距离理想且互不相邻时就返回成功
-        if (rule.predicate === 'DISTRIBUTE_EVENLY' && details?.isIdeal) {
+        if (!rule.not && rule.predicate === 'DISTRIBUTE_EVENLY' && details?.isIdeal) {
           satisfied.push(rule)
         } else if (penalty <= 0) {
           satisfied.push(rule)
@@ -2788,6 +2949,12 @@ export function useAssignment() {
         isAssigning.value = false
         return { success: false, message: '没有可用座位' }
       }
+      if (studentList.length > availableSeats.length) {
+        return {
+          success: false,
+          message: `可用座位不足：${studentList.length} 名学生仅有 ${availableSeats.length} 个可用座位，原座位未修改`
+        }
+      }
 
       // 收集规则
       const { getActiveRules } = useSeatRules()
@@ -2838,7 +3005,24 @@ export function useAssignment() {
         solution = initial
       }
 
-      // 写入结果
+      const report = generateReport(solution, activeRules, studentList)
+      const duration = Date.now() - startTime
+      const requiredViolations = report.violated.filter(item => item.rule.priority === RulePriority.REQUIRED)
+
+      if (requiredViolations.length > 0) {
+        assignmentProgress.value = 100
+        return {
+          success: false,
+          message: `排位失败：仍有 ${requiredViolations.length} 条必须规则未满足，原座位未修改`,
+          score,
+          satRate: report.satRate,
+          report,
+          duration,
+          reheatCount: finalReheatCount
+        }
+      }
+
+      // 必须规则验收通过后再一次性写入结果
       const { recordBatch, createSnapshot } = useUndo()
       const beforeSnapshot = createSnapshot()
 
@@ -2851,10 +3035,6 @@ export function useAssignment() {
       recordBatch(beforeSnapshot, afterSnapshot)
 
       assignmentProgress.value = 100
-
-      // 生成审计报告
-      const report = generateReport(solution, activeRules, studentList)
-      const duration = Date.now() - startTime
 
       // 构建消息，包含均匀分散规则的最小距离信息
       let message = `排位完成 · 满足度 ${Math.round(report.satRate * 100)}% · 耗时 ${duration}ms${finalReheatCount > 0 ? ` · 重加热 ${finalReheatCount} 次` : ''}`

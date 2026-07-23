@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from 'vue'
+import { computed, ref, useId, type CSSProperties } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { NCard, NDrawer, NDrawerContent, NModal } from 'naive-ui'
 
@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{ 'update:show': [value: boolean] }>()
+const titleId = `${useId()}-title`
 const isMobile = useMediaQuery('(max-width: 768px)')
 const drawerHeight = computed(() => typeof props.mobileHeight === 'number' ? `${props.mobileHeight}px` : props.mobileHeight)
 const desktopCardStyle = computed<CSSProperties>(() => ({
@@ -48,8 +49,8 @@ const requestClose = async () => {
   }
 }
 
-const handleMask = () => {
-  if (props.maskClosable) void requestClose()
+const handleUpdateShow = (value: boolean) => {
+  if (!value) void requestClose()
 }
 </script>
 
@@ -61,17 +62,18 @@ const handleMask = () => {
     :height="drawerHeight"
     :mask-closable="maskClosable && !busy"
     :close-on-esc="closeOnEsc && !busy"
-    @mask-click="handleMask"
-    @esc="requestClose"
-    @update:show="value => !value && requestClose()"
+    role="dialog"
+    aria-modal="true"
+    :aria-labelledby="titleId"
+    :aria-busy="busy"
+    @update:show="handleUpdateShow"
   >
     <NDrawerContent
-      :title="title"
-      closable
+      :closable="!busy"
       :native-scrollbar="false"
       :body-content-style="overlayContentStyle"
-      @close="requestClose"
     >
+      <template #header><span :id="titleId">{{ title }}</span></template>
       <slot />
       <template v-if="$slots.footer" #footer><slot name="footer" /></template>
     </NDrawerContent>
@@ -82,19 +84,19 @@ const handleMask = () => {
     :show="show"
     :mask-closable="maskClosable && !busy"
     :close-on-esc="closeOnEsc && !busy"
-    @mask-click="handleMask"
-    @esc="requestClose"
-    @update:show="value => !value && requestClose()"
+    @update:show="handleUpdateShow"
   >
     <NCard
-      :title="title"
       :style="desktopCardStyle"
       :content-style="overlayContentStyle"
-      closable
+      :closable="!busy"
       role="dialog"
       aria-modal="true"
+      :aria-labelledby="titleId"
+      :aria-busy="busy"
       @close="requestClose"
     >
+      <template #header><span :id="titleId">{{ title }}</span></template>
       <slot />
       <template v-if="$slots.footer" #footer><slot name="footer" /></template>
     </NCard>

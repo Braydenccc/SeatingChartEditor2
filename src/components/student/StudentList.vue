@@ -36,16 +36,16 @@
         <!-- 操作按钮组 -->
         <div class="empty-actions">
           <NButton class="empty-action-btn" secondary block attr-type="button" @click="goFilesView">
-            <FolderOpen :size="16" stroke-width="2" />
+            <template #icon><FolderOpen :size="16" stroke-width="2" /></template>
             <span>到文件页导入</span>
           </NButton>
           <div class="empty-action-row">
             <NButton class="empty-action-btn" secondary @click="handleLoadWorkspace">
-              <FolderOpen :size="14" stroke-width="2" />
+              <template #icon><FolderOpen :size="14" stroke-width="2" /></template>
               <span>本地工作区</span>
             </NButton>
             <NButton class="empty-action-btn" secondary :title="cloudLoadTitle" @click="openCloudLoad">
-              <CloudDownload :size="14" stroke-width="2" />
+              <template #icon><CloudDownload :size="14" stroke-width="2" /></template>
               <span>{{ cloudLoadLabel }}</span>
             </NButton>
           </div>

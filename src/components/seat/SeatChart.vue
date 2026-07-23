@@ -157,11 +157,13 @@
     <Teleport v-if="dragPreviewState.isActive" to="body">
       <div ref="dragPreviewRef" class="drag-preview-overlay">
         <div v-for="item in previewItems" :key="item.seatId"
-          class="drag-preview-seat" :class="{ 'is-anchor': item.isAnchor }" :style="item.style">
+          class="drag-preview-seat"
+          :class="{ 'is-anchor': item.isAnchor, 'is-empty': item.isEmptySeat }"
+          :style="item.style">
           <StudentCardFace
             v-if="item.student"
             :student="item.student"
-            variant="preview"
+            variant="seat"
             density="standard"
           />
           <span v-else class="drag-preview-name">{{ item.isEmptySeat ? '空位' : '未命名' }}</span>
@@ -174,6 +176,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
+import { mobileWorkbenchMediaQuery } from '@/constants/layout'
 import SeatItem from './SeatItem.vue'
 import StudentCardFace from '@/components/student/StudentCardFace.vue'
 import StudentEditDialog from '@/components/student/StudentEditDialog.vue'
@@ -189,7 +192,7 @@ import { useDragPreview } from '@/composables/useDragPreview'
 import { useLayoutConstants } from '@/composables/useLayoutConstants'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
-import { parseSeatId, generateSeatId } from '@/utils/seatHelpers'
+import { parseSeatId } from '@/utils/seatHelpers'
 import { getRowNumber } from '@/utils/exportLayout'
 import type { RotationZone, Seat } from '@/types/models'
 
@@ -219,13 +222,13 @@ const {
   getSeat,
   isGuardSeatId,
   toGlobalCol,
-  fromGlobalCol
+  getTranslatedSeatId
 } = useSeatChart()
 
 const { firstSelectedSeat, setFirstSelectedSeat, clearFirstSelectedSeat } = useEditMode()
 const { clearSelection: clearStudentSelection, students } = useStudentData()
 const { scale, panX, panY, zoomIn, zoomOut, setScale, MIN_SCALE, MAX_SCALE, registerViewport, fitToViewport } = useZoom()
-const { recordAssign, recordBatch, createSnapshot, canUndo, canRedo, undo, redo } = useUndo()
+const { recordBatch, createSnapshot, canUndo, canRedo, undo, redo } = useUndo()
 const {
   isDraggingFromSeat: globalIsDraggingFromSeat,
   isTouchDraggingFromSeat,
@@ -271,34 +274,32 @@ const dropTargetSeatIds = computed(() => {
   if (!currentDragTargetSeatId.value || !currentDragAnchorSeatId.value || selectedCount.value <= 1) return new Set<string>()
   if (isGuardSeatId(currentDragTargetSeatId.value) || isGuardSeatId(currentDragAnchorSeatId.value)) return new Set<string>()
 
-  const anchor = parseSeatId(currentDragAnchorSeatId.value)
-  const target = parseSeatId(currentDragTargetSeatId.value)
+  const anchor = getSeat(currentDragAnchorSeatId.value)
+  const target = getSeat(currentDragTargetSeatId.value)
+  if (!anchor || !target || anchor.isEmpty || target.isEmpty) return new Set<string>()
 
   const offsetCol = toGlobalCol(target) - toGlobalCol(anchor)
   const offsetRow = target.rowIndex - anchor.rowIndex
+  if (toGlobalCol(anchor) < 0 || toGlobalCol(target) < 0) return new Set<string>()
 
   const targets = new Set<string>()
-  const gc = seatConfig.value.groupCount
-  const cpg = seatConfig.value.columnsPerGroup
-  const spc = seatConfig.value.seatsPerColumn
-
   for (const sid of selectedSeatsArray.value) {
-    const src = parseSeatId(sid)
-    const destGC = toGlobalCol(src) + offsetCol
-    const destR = src.rowIndex + offsetRow
-    const { groupIndex: destG, columnIndex: destC } = fromGlobalCol(destGC)
+    const source = getSeat(sid)
+    if (!source || source.isEmpty || isGuardSeatId(source.id)) return new Set<string>()
+    if (source.studentId === null) continue
 
-    // 检查是否在边界内
-    if (destG >= 0 && destG < gc && destC >= 0 && destC < cpg && destR >= 0 && destR < spc) {
-      targets.add(generateSeatId(destG, destC, destR))
-    }
+    const destinationId = getTranslatedSeatId(sid, offsetCol, offsetRow)
+    if (!destinationId) return new Set<string>()
+    const destination = getSeat(destinationId)
+    if (!destination || destination.isEmpty || isGuardSeatId(destination.id)) return new Set<string>()
+    targets.add(destinationId)
   }
 
   return targets
 })
 
 // 响应式断点检测
-const isMobile = useMediaQuery('(max-width: 768px)')
+const isMobileWorkbench = useMediaQuery(mobileWorkbenchMediaQuery)
 
 // 候选区是否已隐藏（所有学生均已入座）
 const candidateAreaHidden = computed(() => {
@@ -312,7 +313,7 @@ const focusSeatContext = (seatId: string) => {
   if (!seatId || isGuardSeatId(seatId)) return
   selectSingleSeat(seatId)
   setRightRailTab('selection')
-  if (isMobile.value) showMobileSheet('context')
+  if (isMobileWorkbench.value) showMobileSheet('context')
 }
 
 // ==================== 变换样式 ====================
@@ -522,7 +523,7 @@ const handleViewportClickCapture = (e: MouseEvent) => {
     clearSeatSelection()
   }
 
-  if (isMobile.value && !findSeatElement(e.target)) {
+  if (isMobileWorkbench.value && !findSeatElement(e.target)) {
     closeMobileDrawer()
   }
 }
@@ -766,6 +767,7 @@ const handleDrop = (e: DragEvent) => {
         // 选区拖拽
         if (data.seatId !== targetSeatId) {
           const beforeSnapshot = createSnapshot()
+          const movableSeatIds = data.selectedSeatIds.filter(seatId => getSeat(seatId)?.studentId !== null)
           const moved = moveSelection(data.selectedSeatIds, data.seatId, targetSeatId)
           if (moved) {
             const afterSnapshot = createSnapshot()
@@ -775,12 +777,9 @@ const handleDrop = (e: DragEvent) => {
             const offsetCol = toGlobalCol(target) - toGlobalCol(anchor)
             const offsetRow = target.rowIndex - anchor.rowIndex
 
-            const destIds = data.selectedSeatIds.map(sid => {
-              const src = parseSeatId(sid)
-              const destGC = toGlobalCol(src) + offsetCol
-              const destR = src.rowIndex + offsetRow
-              const { groupIndex: destG, columnIndex: destC } = fromGlobalCol(destGC)
-              return generateSeatId(destG, destC, destR)
+            const destIds = movableSeatIds.flatMap(sid => {
+              const destinationId = getTranslatedSeatId(sid, offsetCol, offsetRow)
+              return destinationId ? [destinationId] : []
             })
             endDragPreview(destIds)
           } else {
@@ -1019,7 +1018,7 @@ const handleGlobalDragOver = (e: DragEvent) => {
 // ==================== 键盘快捷键 ====================
 const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
-    if (isMobile.value && isSelectionMode.value) {
+    if (isMobileWorkbench.value && isSelectionMode.value) {
       toggleSelectionMode()
     } else {
       clearSeatSelection()
@@ -1040,6 +1039,7 @@ const handleContextMenu = (e: MouseEvent) => {
     addSeatToSelection(seatId)
   }
   setRightRailTab('selection')
+  if (isMobileWorkbench.value) showMobileSheet('context')
 }
 
 // 处理双击编辑学生
@@ -1145,14 +1145,9 @@ const totalSeats = computed(() => {
 
 // 处理分配学生
 const handleAssignStudent = (seatId: string, studentId: number) => {
-  const existingSeat = findSeatByStudent(studentId)
-  const previousSeatId = existingSeat ? existingSeat.id : null
-  if (existingSeat) {
-    clearSeat(existingSeat.id, false)
+  if (assignStudent(seatId, studentId)) {
+    clearStudentSelection()
   }
-  assignStudent(seatId, studentId, false)
-  clearStudentSelection()
-  recordAssign(seatId, studentId, previousSeatId)
 }
 
 // 处理切换空置状态
@@ -1406,9 +1401,9 @@ const rectSelectStyle = computed(() => {
 .drag-preview-seat {
   position: absolute;
   box-sizing: border-box;
-  border: var(--seat-card-border-width) solid var(--color-info);
+  border: var(--seat-card-border-width) solid var(--color-primary);
   border-radius: var(--seat-card-radius);
-  background: color-mix(in srgb, var(--color-info) 10%, var(--color-bg-card));
+  background: var(--color-bg-selected);
   color: var(--color-text-primary);
   display: flex;
   align-items: center;
@@ -1417,7 +1412,12 @@ const rectSelectStyle = computed(() => {
   overflow: hidden;
   padding: 0;
   box-shadow: var(--seat-card-shadow-drag);
-  opacity: 0.95;
+  opacity: 1;
+}
+
+.drag-preview-seat.is-empty {
+  border-color: var(--color-border);
+  background: var(--color-surface);
 }
 
 .drag-preview-name {
@@ -1426,14 +1426,13 @@ const rectSelectStyle = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   word-break: break-all;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: var(--seat-card-placeholder-size);
+  font-weight: 400;
   line-height: 1.2;
 }
 
 .drag-preview-seat.is-anchor {
-  border-width: 3px;
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-info) 42%, transparent);
+  box-shadow: var(--seat-card-shadow-drag), 0 0 0 2px color-mix(in srgb, var(--color-info) 42%, transparent);
   z-index: 10;
 }
 
@@ -1706,7 +1705,7 @@ const rectSelectStyle = computed(() => {
 }
 
 /* ==================== 响应式 ==================== */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .seat-chart-container {
     width: 100%;
     height: 100%;
@@ -1754,9 +1753,6 @@ const rectSelectStyle = computed(() => {
     gap: 7px;
   }
 
-  .drag-preview-seat {
-    font-size: 12px;
-  }
 }
 
 @media (max-width: 480px) {
@@ -1803,11 +1799,6 @@ const rectSelectStyle = computed(() => {
 
   .seat-column {
     gap: 6px;
-  }
-
-  .drag-preview-seat {
-    font-size: 11px;
-    border-radius: 8px;
   }
 
 }

@@ -1,7 +1,13 @@
 <template>
   <div class="candidate-item" :class="{ dragging: isStudentDragging, selected: isSelected, compact: displayMode === 'compact' }"
     ref="itemRef" :draggable="canHtmlDrag()"
+    role="button"
+    tabindex="0"
+    :aria-label="accessibleLabel"
+    :aria-pressed="isSelected"
     @click="handleClick"
+    @keydown.enter.prevent="handleClick"
+    @keydown.space.prevent="handleClick"
     @dragstart="handleDragStart" @dragend="handleDragEnd"
     @dblclick="handleDoubleClick"
     @contextmenu.prevent="handleContextMenu" @pointerdown="handlePointerDown" @touchstart.passive="handleTouchStart">
@@ -16,6 +22,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
+import { mobileWorkbenchMediaQuery } from '@/constants/layout'
 import { useStudentDragging } from '@/composables/useStudentDragging'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useStudentData } from '@/composables/useStudentData'
@@ -51,11 +58,15 @@ const {
   restoreMobileDrawerAfterDrag,
   isSeatFullscreen
 } = useEditorWorkbench()
-const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
+const isMobileWorkbench = useMediaQuery(mobileWorkbenchMediaQuery)
 const isLandscape = useMediaQuery('(orientation: landscape)')
 const isFullscreenLandscape = computed(() => isSeatFullscreen.value && isMobileWorkbench.value && isLandscape.value)
 
 const isSelected = computed(() => selectedStudentId.value === props.student.id)
+const accessibleLabel = computed(() => {
+  const number = props.student.studentNumber == null ? '' : `，学号 ${props.student.studentNumber}`
+  return `候选学生 ${props.student.name || '未命名'}${number}${isSelected.value ? '，已选中' : ''}`
+})
 
 const {
   isStudentDragging,
@@ -97,7 +108,7 @@ const handleContextMenu = () => {
 
   selectStudent(props.student.id)
   setRightRailTab('selection')
-  if (window.matchMedia('(max-width: 768px)').matches) {
+  if (isMobileWorkbench.value) {
     showMobileSheet('context')
   }
 }
@@ -204,6 +215,12 @@ const handleDoubleClick = () => {
   pointer-events: none;
 }
 
+.candidate-item:focus-visible {
+  outline: 3px solid var(--color-info);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-selection-ring), var(--shadow-selection-card);
+}
+
 .candidate-item.touch-drag-preview-card {
   border-color: var(--color-info);
   background: color-mix(in srgb, var(--color-info) 10%, var(--color-bg-card));
@@ -229,7 +246,7 @@ const handleDoubleClick = () => {
   .candidate-item { width: var(--seat-card-width); height: var(--seat-card-height); border-radius: var(--seat-card-radius); }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .candidate-item { width: var(--seat-card-width); height: var(--seat-card-height); border-radius: var(--seat-card-radius); }
 }
 

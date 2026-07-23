@@ -308,13 +308,13 @@
         <!-- ── 底部按钮 ── -->
         <div class="dialog-footer">
           <template v-if="activeTab === 'image'">
-            <NButton v-if="authType === 'webdav'" type="info" :loading="isUploading" :disabled="isGenerating || isUploading" @click="handleCloudExportImage">
+            <NButton v-if="authType === 'webdav'" type="info" :loading="isUploading" :disabled="isGenerating || isImageExporting || isUploading" @click="handleCloudExportImage">
               <CloudUpload v-if="!isUploading" :size="14" stroke-width="2" />
               {{ isUploading ? '上传中...' : '保存至云盘' }}
             </NButton>
-            <NButton type="primary" :loading="isGenerating" :disabled="isGenerating || isUploading" @click="handleDownload">
-              <Download v-if="!isGenerating" :size="14" stroke-width="2" />
-              {{ isGenerating ? '生成中...' : '下载图片' }}
+            <NButton type="primary" :loading="isImageExporting && !isUploading" :disabled="isGenerating || isImageExporting || isUploading" @click="handleDownload">
+              <Download v-if="!isImageExporting || isUploading" :size="14" stroke-width="2" />
+              {{ isImageExporting && !isUploading ? '生成中...' : '下载图片' }}
             </NButton>
           </template>
           <template v-if="activeTab === 'excel'">
@@ -346,7 +346,7 @@ import {
 } from 'naive-ui'
 import { CloudUpload, Download } from 'lucide-vue-next'
 import { useExportSettings, type ExportSettingsState } from '@/composables/useExportSettings'
-import { useImageExport } from '@/composables/useImageExport'
+import { createLatestImagePreviewRunner, useImageExport } from '@/composables/useImageExport'
 import { useTagData } from '@/composables/useTagData'
 import { useExcelData } from '@/composables/useExcelData'
 import { useSeatChart } from '@/composables/useSeatChart'
@@ -438,6 +438,7 @@ const updateExportNumber = (
 const activeTab = ref<'image' | 'excel'>(props.initialTab === 'excel' ? 'excel' : 'image')
 const previewUrl = ref('')
 const isGenerating = ref(false)
+const isImageExporting = ref(false)
 const isExcelGenerating = ref(false)
 const isExcelDownloading = ref(false)
 const tagSettingsLocal = ref<Record<number, LocalTagSetting>>({})
@@ -450,6 +451,29 @@ const excelScale = ref(1)
 let excelResizeObserver: ResizeObserver | null = null
 let removeExcelResizeListener: (() => void) | null = null
 let lastPreviewObjectUrl = ''
+let previewRefreshPending = false
+
+const revokeObjectUrl = (url: string) => {
+  if (url) URL.revokeObjectURL(url)
+}
+
+const previewRunner = createLatestImagePreviewRunner({
+  generate: () => exportToImage({ resolution: 'preview' }),
+  onLatest: (url) => {
+    revokeObjectUrl(lastPreviewObjectUrl)
+    lastPreviewObjectUrl = url
+    previewUrl.value = url
+  },
+  onDiscard: revokeObjectUrl,
+  onRunningChange: (running) => {
+    isGenerating.value = running
+  },
+  onError: () => {
+    revokeObjectUrl(lastPreviewObjectUrl)
+    lastPreviewObjectUrl = ''
+    previewUrl.value = ''
+  }
+})
 
 const updateExcelScale = () => {
   if (!excelScrollRef.value || !excelContentRef.value || activeTab.value !== 'excel') return
@@ -825,23 +849,11 @@ const generatePreviewNow = async () => {
     clearTimeout(debounceTimer)
     debounceTimer = null
   }
-
-  isGenerating.value = true
-  try {
-    const nextUrl = await exportToImage()
-    if (typeof nextUrl !== 'string') {
-      throw new Error('图片导出未返回有效的预览地址')
-    }
-    if (lastPreviewObjectUrl) {
-      URL.revokeObjectURL(lastPreviewObjectUrl)
-    }
-    lastPreviewObjectUrl = nextUrl
-    previewUrl.value = nextUrl
-  } catch {
-    previewUrl.value = ''
-  } finally {
-    isGenerating.value = false
+  if (isImageExporting.value) {
+    previewRefreshPending = true
+    return
   }
+  await previewRunner.request()
 }
 
 // ── 图片预览（防抖）──
@@ -855,14 +867,13 @@ const generatePreview = () => {
 
 // ── 下载图片 ──
 const handleDownload = async () => {
-  await generatePreviewNow()
-  const url = previewUrl.value
-  if (!url) return
-
-  const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-  const filename = `座位表_${ts}.png`
+  isImageExporting.value = true
+  let printUrl = ''
   try {
-    const exportedBlob = await fetch(url).then((res) => res.blob())
+    printUrl = await exportToImage({ resolution: 'print' })
+    const exportedBlob = await fetch(printUrl).then((res) => res.blob())
+    const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+    const filename = `座位表_${ts}.png`
     await saveBinaryFile(exportedBlob, {
       title: '保存座位表图片',
       defaultPath: filename,
@@ -874,6 +885,13 @@ const handleDownload = async () => {
   } catch (err) {
     console.warn('图片导出失败:', err)
     emit('exported', null)
+  } finally {
+    revokeObjectUrl(printUrl)
+    isImageExporting.value = false
+    if (previewRefreshPending && props.visible && activeTab.value === 'image') {
+      previewRefreshPending = false
+      generatePreview()
+    }
   }
 }
 
@@ -905,15 +923,14 @@ const getWebdavPath = (filename: string) => {
 }
 
 const handleCloudExportImage = async () => {
-  await generatePreviewNow()
-  const url = previewUrl.value
-  if (!url) return
-  
+  isImageExporting.value = true
   isUploading.value = true
+  let printUrl = ''
   try {
     const config = webdavConfig.value
     if (!config) throw new Error('请先配置 WebDAV')
-    const res = await fetch(url)
+    printUrl = await exportToImage({ resolution: 'print' })
+    const res = await fetch(printUrl)
     const blob = await res.blob()
     const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     const filename = `座位表_${ts}.png`
@@ -928,7 +945,13 @@ const handleCloudExportImage = async () => {
   } catch (err) {
     error(`保存到云盘失败：${err instanceof Error ? err.message : '未知错误，请确保存储目录存在。'}`)
   } finally {
+    revokeObjectUrl(printUrl)
+    isImageExporting.value = false
     isUploading.value = false
+    if (previewRefreshPending && props.visible && activeTab.value === 'image') {
+      previewRefreshPending = false
+      generatePreview()
+    }
   }
 }
 
@@ -1054,10 +1077,11 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
+  previewRunner.dispose()
   if (excelResizeObserver) excelResizeObserver.disconnect()
   removeExcelResizeListener?.()
   if (lastPreviewObjectUrl) {
-    URL.revokeObjectURL(lastPreviewObjectUrl)
+    revokeObjectUrl(lastPreviewObjectUrl)
     lastPreviewObjectUrl = ''
   }
 })

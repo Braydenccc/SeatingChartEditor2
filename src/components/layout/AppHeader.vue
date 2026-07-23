@@ -1,7 +1,7 @@
 <template>
   <header class="app-header">
     <div class="header-left">
-      <h1 class="header-text">BraydenSCE V2</h1>
+      <h1 class="header-text" data-route-heading tabindex="-1">BraydenSCE V2</h1>
 
       <!-- 用户菜单 -->
       <NDropdown v-if="isLoggedIn" trigger="click" :options="accountOptions" @select="handleAccountSelect">
@@ -47,18 +47,20 @@
           class="theme-btn"
           :class="{ active: currentColorScheme === mode.value }"
           size="small"
-          :type="currentColorScheme === mode.value ? 'primary' : 'default'"
-          :quaternary="currentColorScheme !== mode.value"
+          quaternary
+          :aria-pressed="currentColorScheme === mode.value"
           @click="switchTheme(mode.value)"
           :title="themeTitleFor(mode)"
         >
-          <span class="theme-icon" :class="{ auto: mode.value === 'auto' }">
-            <component :is="themeIconFor(mode)" :size="16" stroke-width="2" />
-            <span v-if="mode.value === 'auto'" class="theme-auto-mark">A</span>
+          <span class="theme-btn-content">
+            <span class="theme-icon" :class="{ auto: mode.value === 'auto' }">
+              <component :is="themeIconFor(mode)" :size="16" stroke-width="2" />
+              <span v-if="mode.value === 'auto'" class="theme-auto-mark">A</span>
+            </span>
+            <Transition name="theme-label">
+              <span v-if="currentColorScheme === mode.value" class="theme-label">{{ mode.label }}</span>
+            </Transition>
           </span>
-          <Transition name="theme-label">
-            <span v-if="currentColorScheme === mode.value" class="theme-label">{{ mode.label }}</span>
-          </Transition>
         </NButton>
       </NButtonGroup>
 
@@ -82,7 +84,7 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref, type Component } from 'vue'
 import { NButton, NButtonGroup, NDropdown, NIcon, type DropdownOption } from 'naive-ui'
-import { ChevronDown, CircleQuestionMark, Cloud, FileOutput, FileText, LogIn, Moon, Settings, Sun, User, Users } from 'lucide-vue-next'
+import { ChevronDown, CircleQuestionMark, Cloud, FileOutput, FileText, LogIn, LogOut, Moon, Settings, Sun, User, Users } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
@@ -148,12 +150,17 @@ const cycleTheme = () => {
   switchTheme(nextMode.value)
 }
 
-const renderDropdownIcon = (icon: Component) => () => h(NIcon, null, { default: () => h(icon, { size: 16 }) })
+const renderDropdownIcon = (icon: Component, color?: string) => () => h(NIcon, { color }, { default: () => h(icon, { size: 16 }) })
+const renderDangerLabel = (label: string) => () => h('span', { style: { color: 'var(--color-danger)' } }, label)
 const accountOptions = computed<DropdownOption[]>(() => [
   { label: '账号中心', key: 'user', icon: renderDropdownIcon(User) },
   ...(!hasRetiehe.value ? [{ label: '登录 SCE 账号', key: 'login', icon: renderDropdownIcon(LogIn) }] : []),
   { type: 'divider', key: 'divider' },
-  { label: hasRetiehe.value ? '退出 SCE 账号' : '退出 WebDAV', key: 'logout' }
+  {
+    label: renderDangerLabel(hasRetiehe.value ? '退出 SCE 账号' : '退出 WebDAV'),
+    key: 'logout',
+    icon: renderDropdownIcon(LogOut, 'var(--color-danger)')
+  }
 ])
 
 const handleAccountSelect = (key: string | number) => {
@@ -199,7 +206,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  background: var(--color-primary);
+  background: var(--color-header-accent-bg, var(--color-primary));
   height: var(--app-header-height, 100px);
   color: var(--color-text-inverse);
   padding: 0 calc(30px + var(--header-help-space)) 0 30px;
@@ -239,6 +246,12 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
+.header-text:focus-visible {
+  outline: 2px solid var(--color-text-inverse);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
 /* ===== 统一按钮样式 ===== */
 .header-btn {
   position: relative;
@@ -261,9 +274,8 @@ onBeforeUnmount(() => {
   transition:
     background 0.22s cubic-bezier(0.4, 0, 0.2, 1),
     border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 2px 8px var(--shadow-md);
+    color 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: none;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -275,10 +287,8 @@ onBeforeUnmount(() => {
 .header-btn:hover {
   background: color-mix(in srgb, var(--color-text-inverse) 22%, transparent);
   border-color: color-mix(in srgb, var(--color-text-inverse) 36%, transparent);
-  transform: scale(1.03);
-  box-shadow:
-    0 4px 14px var(--shadow-lg),
-    inset 0 0 0 1px color-mix(in srgb, var(--color-text-inverse) 10%, transparent);
+  color: var(--color-text-inverse);
+  box-shadow: none;
 }
 
 .header-btn:hover svg {
@@ -286,9 +296,9 @@ onBeforeUnmount(() => {
 }
 
 .header-btn:active {
-  transform: scale(0.98);
   background: color-mix(in srgb, var(--color-text-inverse) 15%, transparent);
-  box-shadow: 0 2px 8px var(--shadow-md);
+  color: var(--color-text-inverse);
+  box-shadow: none;
 }
 
 .header-btn.icon-only {
@@ -340,7 +350,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   height: 100%;
   min-height: 0;
   box-sizing: border-box;
@@ -348,17 +357,27 @@ onBeforeUnmount(() => {
   border: none;
   background: transparent;
   color: color-mix(in srgb, var(--color-text-inverse) 60%, transparent);
-  border-radius: 20px;
+  border-radius: 20px !important;
   cursor: pointer;
   transform-origin: center;
   transition:
     background 0.22s cubic-bezier(0.4, 0, 0.2, 1),
     color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
+}
+
+.theme-switcher .theme-btn {
+  margin: 0 !important;
+}
+
+.theme-btn-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .theme-btn svg {
@@ -514,7 +533,7 @@ onBeforeUnmount(() => {
 }
 
 /* ===== 响应式 - 移动设备 ===== */
-@media (max-width: 768px), (max-width: 1024px) and (orientation: landscape) and (max-height: 540px) {
+@media (max-width: 1024px) {
   .app-header {
     height: var(--app-header-height, calc(54px + env(safe-area-inset-top, 0px)));
     min-height: var(--app-header-height, calc(54px + env(safe-area-inset-top, 0px)));
@@ -552,7 +571,15 @@ onBeforeUnmount(() => {
   }
 
   .header-left .header-text {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   /* 标题层 */
@@ -563,15 +590,15 @@ onBeforeUnmount(() => {
   /* 分层工具按钮 */
   .login-btn,
   .header-btn {
-    height: 42px;
+    height: 44px;
     min-width: 0;
     flex: 1 1 0;
   }
 
   .header-btn {
     width: 100%;
-    min-height: 42px;
-    height: 42px;
+    min-height: 44px;
+    height: 44px;
     border-radius: 6px;
     background: transparent;
     border: none;

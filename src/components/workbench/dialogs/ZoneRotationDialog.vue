@@ -9,11 +9,11 @@
 
         <div class="toolbar-row">
           <NButton size="small" secondary @click="addGroup('cycle')">
-            <RefreshCcw :size="15" stroke-width="2" />
+            <template #icon><RefreshCcw :size="15" stroke-width="2" /></template>
             <span>循环组</span>
           </NButton>
           <NButton size="small" secondary @click="addGroup('swap')">
-            <ArrowLeftRight :size="15" stroke-width="2" />
+            <template #icon><ArrowLeftRight :size="15" stroke-width="2" /></template>
             <span>互换组</span>
           </NButton>
         </div>
@@ -55,7 +55,7 @@
           </div>
 
           <NButton class="add-zone-button" size="small" secondary block @click="addZone(group.id)">
-            <Plus :size="14" stroke-width="2" />
+            <template #icon><Plus :size="14" stroke-width="2" /></template>
             <span>添加选区</span>
           </NButton>
 
@@ -68,7 +68,7 @@
       <template #footer><footer class="dialog-footer">
         <NButton secondary @click="stopEditing">退出编辑</NButton>
         <NButton type="primary" @click="applyRotation">
-          <RefreshCcw :size="16" stroke-width="2" />
+          <template #icon><RefreshCcw :size="16" stroke-width="2" /></template>
           <span>应用选区轮换</span>
         </NButton>
       </footer></template>
@@ -176,7 +176,6 @@ const applyRotation = () => {
 .dialog-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
 }
 
 .toolbar-row {

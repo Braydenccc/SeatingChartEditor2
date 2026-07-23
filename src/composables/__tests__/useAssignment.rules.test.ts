@@ -523,7 +523,7 @@ describe('useAssignment - Rule Combinations', () => {
 
       seatRules.addRule({
         predicate: 'DISTRIBUTE_EVENLY',
-        priority: 'required',
+        priority: 'prefer',
         enabled: true,
         subjects: studentIds.map(id => ({ type: 'person', id })),
         params: {}

@@ -6,7 +6,7 @@
         <p>用于身高、成绩等智能排位参考</p>
       </div>
       <NButton class="add-attribute-btn" size="small" type="primary" secondary @click="handleAdd">
-        <Plus :size="14" />
+        <template #icon><Plus :size="14" /></template>
         <span>添加属性</span>
       </NButton>
     </div>

@@ -9,6 +9,11 @@
     "core:default",
     "dialog:default",
     "fs:default",
+    "fs:allow-exists",
+    "fs:allow-remove",
+    "fs:allow-rename",
+    "fs:allow-write-file",
+    "fs:allow-write-text-file",
     {
       "identifier": "fs:scope",
       "allow": [

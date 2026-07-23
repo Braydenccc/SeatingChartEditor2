@@ -9,8 +9,10 @@ const ADMIN_CORS_ALLOWED_ORIGINS_KEY = 'cors_allowed_origins';
 const ADMIN_AUDIT_LOG_KEY = 'audit_logs';
 const ADMIN_AUDIT_FAILURE_KEY = 'audit_failures';
 const ADMIN_MAX_LOG_LIMIT = 200;
+const ADMIN_MAX_STORED_LOGS = 500;
 const ADMIN_UNVERIFIED_RATE_WINDOW = 300;
 const ADMIN_UNVERIFIED_RATE_MAX = 30;
+const ADMIN_MAX_WORKSPACE_DB_VALUE_BYTES = 60000;
 
 function adminNormalizeCorsOrigin($origin) {
     if (!is_string($origin)) {
@@ -123,17 +125,17 @@ function adminGetHeaderValue($name) {
 
 function adminCreateRequestSummary($rawInput = null, $jsonError = '') {
     $summary = [
-        'method' => isset($_SERVER['REQUEST_METHOD']) ? (string)$_SERVER['REQUEST_METHOD'] : '',
-        'contentType' => isset($_SERVER['CONTENT_TYPE']) ? substr((string)$_SERVER['CONTENT_TYPE'], 0, 120) : '',
+        'method' => isset($_SERVER['REQUEST_METHOD']) ? truncateUtf8String($_SERVER['REQUEST_METHOD'], 16) : '',
+        'contentType' => isset($_SERVER['CONTENT_TYPE']) ? truncateUtf8String($_SERVER['CONTENT_TYPE'], 120, '...') : '',
         'contentLength' => isset($_SERVER['CONTENT_LENGTH']) ? (int)$_SERVER['CONTENT_LENGTH'] : null,
         'rawInputLength' => is_string($rawInput) ? strlen($rawInput) : null,
         'hasPostFields' => !empty($_POST),
-        'origin' => isset($_SERVER['HTTP_ORIGIN']) ? substr((string)$_SERVER['HTTP_ORIGIN'], 0, 160) : '',
-        'referer' => isset($_SERVER['HTTP_REFERER']) ? substr((string)$_SERVER['HTTP_REFERER'], 0, 200) : ''
+        'origin' => isset($_SERVER['HTTP_ORIGIN']) ? truncateUtf8String($_SERVER['HTTP_ORIGIN'], 160, '...') : '',
+        'referer' => isset($_SERVER['HTTP_REFERER']) ? truncateUtf8String($_SERVER['HTTP_REFERER'], 200, '...') : ''
     ];
 
     if ($jsonError !== '') {
-        $summary['jsonError'] = $jsonError;
+        $summary['jsonError'] = truncateUtf8String($jsonError, 160, '...');
     }
 
     return $summary;
@@ -273,31 +275,30 @@ function adminIsVerified($adminDb) {
 }
 
 function adminIsHttpsAllowed() {
-    return isHttpsRequest() || isLocalRequestHost() || envFlagEnabled('ADMIN_ALLOW_HTTP');
+    return isHttpsRequest() || isLocalRequest() || envFlagEnabled('ADMIN_ALLOW_HTTP');
 }
 
 function adminCheckUnverifiedRateLimit() {
     $rateDb = new Database('admin_rate_limit');
-    $key = sanitizeDbKey('admin_unverified_' . getClientIp());
-    $now = time();
-    $raw = $rateDb->get($key);
-    $timestamps = $raw ? json_decode($raw, true) : [];
-    if (!is_array($timestamps)) {
-        $timestamps = [];
+    $key = sanitizeDbKey('admin_unverified_v2_' . getClientIp());
+    $rateResult = consumeAtomicRateLimitAttempt(
+        $rateDb,
+        $key,
+        ADMIN_UNVERIFIED_RATE_WINDOW,
+        ADMIN_UNVERIFIED_RATE_MAX
+    );
+
+    if (!$rateResult['ok']) {
+        http_response_code(503);
+        echo json_encode(['success' => false, 'message' => '暂时无法确认请求频率，请稍后重试'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+        exit(1);
     }
 
-    $timestamps = array_values(array_filter($timestamps, function($timestamp) use ($now) {
-        return ($now - (int)$timestamp) < ADMIN_UNVERIFIED_RATE_WINDOW;
-    }));
-
-    if (count($timestamps) >= ADMIN_UNVERIFIED_RATE_MAX) {
+    if (!$rateResult['allowed']) {
         http_response_code(429);
         echo json_encode(['success' => false, 'message' => '请求过于频繁，请稍后重试'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
         exit(1);
     }
-
-    $timestamps[] = $now;
-    $rateDb->set($key, json_encode($timestamps));
 }
 
 function adminSanitizeForLog($value, $depth = 0) {
@@ -306,8 +307,11 @@ function adminSanitizeForLog($value, $depth = 0) {
     }
 
     if (!is_array($value)) {
-        if (is_string($value) && strlen($value) > 160) {
-            return substr($value, 0, 160) . '...';
+        if (is_string($value)) {
+            $normalizedValue = normalizeUtf8String($value);
+            return strlen($normalizedValue) > 160
+                ? truncateUtf8String($normalizedValue, 160, '...')
+                : $normalizedValue;
         }
         return $value;
     }
@@ -332,11 +336,12 @@ function adminSanitizeForLog($value, $depth = 0) {
             break;
         }
 
-        $normalizedKey = strtolower((string)$key);
+        $safeKey = is_string($key) ? truncateUtf8String($key, 80, '...') : $key;
+        $normalizedKey = strtolower((string)$safeKey);
         if (in_array($normalizedKey, $sensitiveKeys, true)) {
-            $sanitized[$key] = '[redacted]';
+            $sanitized[$safeKey] = '[redacted]';
         } else {
-            $sanitized[$key] = adminSanitizeForLog($item, $depth + 1);
+            $sanitized[$safeKey] = adminSanitizeForLog($item, $depth + 1);
         }
         $count++;
     }
@@ -349,14 +354,14 @@ function adminCreateLogEntry($action, $success, $verified, $status, $reason, $ta
         'id' => bin2hex(random_bytes(8)),
         'time' => time(),
         'timestamp' => date('c'),
-        'action' => $action,
+        'action' => truncateUtf8String($action, 120, '...'),
         'success' => $success,
         'verified' => $verified,
         'status' => $status,
-        'ip' => getClientIp(),
-        'userAgent' => isset($_SERVER['HTTP_USER_AGENT']) ? substr((string)$_SERVER['HTTP_USER_AGENT'], 0, 200) : '',
-        'reason' => $reason,
-        'target' => $target,
+        'ip' => truncateUtf8String(getClientIp(), 64, '...'),
+        'userAgent' => isset($_SERVER['HTTP_USER_AGENT']) ? truncateUtf8String($_SERVER['HTTP_USER_AGENT'], 200, '...') : '',
+        'reason' => truncateUtf8String($reason, 160, '...'),
+        'target' => adminSanitizeForLog($target),
         'paramsSummary' => adminSanitizeForLog($input)
     ];
 
@@ -369,12 +374,35 @@ function adminCreateLogEntry($action, $success, $verified, $status, $reason, $ta
 
 function adminAppendAuditLog($adminDb, $entry) {
     try {
-        $encoded = json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
-        $adminDb->push(ADMIN_AUDIT_LOG_KEY, $encoded);
-        if (!$entry['success'] || !$entry['verified']) {
-            $adminDb->push(ADMIN_AUDIT_FAILURE_KEY, $encoded);
+        $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE;
+        $encoded = json_encode($entry, $jsonFlags);
+        if (!is_string($encoded)) {
+            $encodingError = function_exists('json_last_error_msg') ? json_last_error_msg() : 'unknown JSON encoding error';
+            error_log('Admin audit log encoding fallback: ' . $encodingError);
+            $encoded = json_encode([
+                'id' => bin2hex(random_bytes(8)),
+                'time' => time(),
+                'timestamp' => date('c'),
+                'action' => 'audit_encode_failure',
+                'success' => false,
+                'verified' => isset($entry['verified']) ? (bool)$entry['verified'] : false,
+                'status' => isset($entry['status']) ? (int)$entry['status'] : 500,
+                'reason' => 'audit_entry_json_encode_failed'
+            ], $jsonFlags);
         }
-    } catch (Exception $e) {
+        if (!is_string($encoded)) {
+            $encoded = '{"action":"audit_encode_failure","success":false,"verified":false,"status":500,"reason":"audit_fallback_encode_failed"}';
+            error_log('Admin audit log used the static encoding fallback');
+        }
+        if (!databasePushBounded($adminDb, ADMIN_AUDIT_LOG_KEY, $encoded, ADMIN_MAX_STORED_LOGS)) {
+            throw new RuntimeException('admin audit log write was not confirmed');
+        }
+        if (!$entry['success'] || !$entry['verified']) {
+            if (!databasePushBounded($adminDb, ADMIN_AUDIT_FAILURE_KEY, $encoded, ADMIN_MAX_STORED_LOGS)) {
+                throw new RuntimeException('admin audit failure log write was not confirmed');
+            }
+        }
+    } catch (Throwable $e) {
         error_log('Admin audit log failed: ' . $e->getMessage());
     }
 }
@@ -707,7 +735,10 @@ try {
             unset($profile['disabledAt']);
         }
 
-        $profilesDb->set($username, json_encode($profile, JSON_UNESCAPED_UNICODE));
+        $encodedProfile = json_encode($profile, JSON_UNESCAPED_UNICODE);
+        if (!is_string($encodedProfile) || !databaseSetVerified($profilesDb, $username, $encodedProfile)) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '用户状态写入失败'], 503, false, true, 'profile_write_failed', $username);
+        }
         adminRespond($adminDb, $input, $action, ['success' => true, 'message' => '用户状态已更新', 'data' => ['username' => $username, 'status' => $status]], 200, true, true, '', $username);
     }
 
@@ -724,8 +755,12 @@ try {
             adminRespond($adminDb, $input, $action, ['success' => false, 'message' => $validation['message']], 400, false, true, 'invalid_password', $username);
         }
 
-        $usersDb->set($username, password_hash($newPassword, PASSWORD_DEFAULT));
-        $sessionDb->delete($username);
+        if (!databaseSetVerified($usersDb, $username, password_hash($newPassword, PASSWORD_DEFAULT))) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '密码写入失败'], 503, false, true, 'password_write_failed', $username);
+        }
+        if (!databaseDeleteVerified($sessionDb, $username)) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '密码已更新，但旧会话失效失败，请立即禁用该账号并重试'], 503, false, true, 'session_revoke_failed', $username);
+        }
         adminRespond($adminDb, $input, $action, ['success' => true, 'message' => '密码已重置'], 200, true, true, '', $username);
     }
 
@@ -810,7 +845,14 @@ try {
 
         $fileData['metadata']['name'] = $name;
         $fileData['metadata']['adminUpdatedAt'] = date('c');
-        $filesDb->set($sanitizedFileId, json_encode($fileData, JSON_UNESCAPED_UNICODE));
+        $encodedFileData = json_encode($fileData, JSON_UNESCAPED_UNICODE);
+        if (
+            !is_string($encodedFileData) ||
+            strlen($encodedFileData) > ADMIN_MAX_WORKSPACE_DB_VALUE_BYTES ||
+            !databaseSetVerified($filesDb, $sanitizedFileId, $encodedFileData)
+        ) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '工作区名称写入失败或数据超过安全存储上限'], 503, false, true, 'workspace_write_failed', $fileId);
+        }
 
         adminRespond($adminDb, $input, $action, ['success' => true, 'message' => '工作区名称已更新', 'data' => ['fileId' => $fileId, 'metadata' => $fileData['metadata']]], 200, true, true, '', $fileId);
     }
@@ -853,7 +895,14 @@ try {
         }
 
         $fileData['metadata']['adminUpdatedAt'] = date('c');
-        $filesDb->set($sanitizedFileId, json_encode($fileData, JSON_UNESCAPED_UNICODE));
+        $encodedFileData = json_encode($fileData, JSON_UNESCAPED_UNICODE);
+        if (
+            !is_string($encodedFileData) ||
+            strlen($encodedFileData) > ADMIN_MAX_WORKSPACE_DB_VALUE_BYTES ||
+            !databaseSetVerified($filesDb, $sanitizedFileId, $encodedFileData)
+        ) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '工作区状态写入失败或数据超过安全存储上限'], 503, false, true, 'workspace_write_failed', $fileId);
+        }
 
         adminRespond($adminDb, $input, $action, ['success' => true, 'message' => $deleted ? '工作区已标记删除' : '工作区已恢复', 'data' => ['fileId' => $fileId, 'metadata' => $fileData['metadata'], 'deleted' => adminIsWorkspaceDeleted($fileData)]], 200, true, true, '', $fileId);
     }

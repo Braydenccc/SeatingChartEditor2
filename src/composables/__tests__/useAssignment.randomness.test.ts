@@ -235,7 +235,7 @@ describe('useAssignment - Randomness Tests', () => {
 
       seatRules.addRule({
         predicate: 'DISTRIBUTE_EVENLY',
-        priority: 'required',
+        priority: 'prefer',
         enabled: true,
         subjects: studentIds.map(id => ({ type: 'person', id })),
         params: {}

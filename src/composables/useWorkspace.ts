@@ -12,6 +12,7 @@ import { useUndo } from './useUndo'
 import { useSelection } from './useSelection'
 import { useEditMode } from './useEditMode'
 import { useZoneRotation } from './useZoneRotation'
+import { useEditorWorkbench } from './useEditorWorkbench'
 import { initializeTags } from './useTagData'
 import { parseSeatId, isGuardSeatId } from '@/utils/seatHelpers'
 import { isTauriRuntime } from '@/platform/runtime'
@@ -19,16 +20,21 @@ import { openTextFile, saveTextFile, workspaceFileFilters, writeTextFilePath } f
 import {
   cloneWorkspaceInput,
   formatWorkspaceValidationErrors,
+  getWorkspaceVersionError,
   MAX_WORKSPACE_GROUPS,
   MAX_WORKSPACE_SEATS,
   validateWorkspaceDocument
 } from '@/utils/workspaceValidation'
+import { WORKSPACE_SCHEMA_VERSION } from '@/types/models'
 import type {
-  RuleInput,
   RuleSubject,
+  RuleParams,
   SeatConfig,
   Workspace,
+  WorkspaceIdentifier,
   WorkspaceMeta,
+  WorkspaceRuleInput,
+  WorkspaceRuleSubject,
   WorkspaceSeat
 } from '@/types/models'
 import type { AuthType } from '@/types/models'
@@ -63,8 +69,8 @@ interface ApplyWorkspaceOptions {
 }
 
 interface RemappableRuleParams extends Record<string, unknown> {
-  tagId?: number
-  zoneId?: number
+  tagId?: WorkspaceIdentifier | null
+  zoneId?: WorkspaceIdentifier | null
 }
 
 interface LoadedWorkspace {
@@ -88,7 +94,6 @@ interface LastWorkspaceInfo {
 const LAST_WORKSPACE_COOKIE = 'sce_last_workspace'
 
 const FILE_EXT = '.sce'
-const CURRENT_VERSION = '2.2'
 const currentLocalWorkspacePath = ref<string | null>(null)
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -96,6 +101,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const getErrorMessage = (errorValue: unknown) =>
   errorValue instanceof Error ? errorValue.message : String(errorValue)
+
+const getIdentifierKey = (value: unknown) => String(value)
 
 const createDefaultSeatConfig = (): SeatConfig => ({
   groupCount: 4,
@@ -182,12 +189,13 @@ export function useWorkspace() {
     addStudent,
     updateStudent,
     clearAllStudents,
+    replaceStudentData,
     syncStudentIdCounter
   } = useStudentData()
-  const { tags, addTag, clearAllTags, showTagsInSeatChart, tagDisplayMode, setShowTagsInSeatChart, setTagDisplayMode } = useTagData()
-  const { seatConfig, seats, updateConfig, clearAllSeats, batchUpdateSeats } = useSeatChart()
+  const { tags, addTag, clearAllTags, replaceTagData, showTagsInSeatChart, tagDisplayMode, setShowTagsInSeatChart, setTagDisplayMode } = useTagData()
+  const { seatConfig, seats, updateConfig, clearAllSeats, batchUpdateSeats, replaceSeatChartState } = useSeatChart()
   const { exportSettings, resetExportSettings, applyExportSettings } = useExportSettings()
-  const { zones, selectedZoneId, clearAllZones, addZone, updateZone, syncZoneIdCounter } = useZoneData()
+  const { zones, selectedZoneId, clearAllZones, replaceZoneData, addZone, updateZone, syncZoneIdCounter } = useZoneData()
   const { rules, clearAllRules, addRule } = useSeatRules()
   const {
     attributeDefinitions,
@@ -195,7 +203,7 @@ export function useWorkspace() {
     showNumericAttributesInEditor,
     setShowNumericAttributesInEditor
   } = useStudentAttributes()
-  const { success, warning, error } = useLogger()
+  const { success, error } = useLogger()
   const { undoStack, redoStack, highlightedSeats, clearHistory } = useUndo()
   const {
     selectedSeatIds,
@@ -205,11 +213,13 @@ export function useWorkspace() {
     clearSelection
   } = useSelection()
   const { currentMode, firstSelectedSeat, resetEditMode } = useEditMode()
+  const { resetTransientWorkbenchState } = useEditorWorkbench()
   const {
-    rotGroups,
     editingZoneId,
-    clearAllRotData,
-    syncZoneRotationIdCounter
+    getRotationData,
+    replaceRotationData,
+    resetRotationData,
+    clearEditingZone
   } = useZoneRotation()
 
   // 生成工作区 JSON 数据 (用于云端或本地保存)
@@ -217,7 +227,7 @@ export function useWorkspace() {
     try {
       const workspace = {
         meta: {
-          version: CURRENT_VERSION,
+          version: WORKSPACE_SCHEMA_VERSION,
           app: 'SeatingChartEditor',
           createdAt: new Date().toISOString()
         },
@@ -262,6 +272,7 @@ export function useWorkspace() {
           seatIds: [...z.seatIds],
           visible: z.visible
         })),
+        rotationGroups: getRotationData(),
         exportSettings: { ...exportSettings.value },
         rules: (rules.value || []).map(r => ({
           id: r.id,
@@ -299,6 +310,11 @@ export function useWorkspace() {
   const prepareWorkspaceData = (workspaceRaw: unknown) => {
     const cloned: unknown = cloneWorkspaceInput(workspaceRaw)
     if (!isRecord(cloned)) throw new Error('工作区根节点必须是对象')
+    const sourceVersion = isRecord(cloned.meta)
+      ? cloned.meta.version
+      : cloned.version ?? '1.0'
+    const versionError = getWorkspaceVersionError(sourceVersion)
+    if (versionError) throw new Error(versionError)
     const workspace = migrateWorkspace(cloned as MigratingWorkspace)
     const validation = validateWorkspaceDocument(workspace)
     if (!validation.valid) {
@@ -308,13 +324,18 @@ export function useWorkspace() {
   }
 
   const captureRuntimeSnapshot = () => {
-    const workspaceJson = getWorkspaceJson()
-    if (!workspaceJson) {
-      throw new Error('无法创建当前工作区回滚快照')
-    }
-
     return {
-      workspace: JSON.parse(workspaceJson),
+      students: cloneWorkspaceInput(students.value),
+      tags: cloneWorkspaceInput(tags.value),
+      seatConfig: cloneWorkspaceInput(seatConfig.value),
+      seats: cloneWorkspaceInput(seats.value),
+      zones: cloneWorkspaceInput(zones.value),
+      rules: cloneWorkspaceInput(rules.value),
+      attributeDefinitions: cloneWorkspaceInput(attributeDefinitions.value),
+      showNumericAttributesInEditor: showNumericAttributesInEditor.value,
+      showTagsInSeatChart: showTagsInSeatChart.value,
+      tagDisplayMode: tagDisplayMode.value,
+      exportSettings: cloneWorkspaceInput(exportSettings.value),
       undoStack: cloneWorkspaceInput(undoStack.value),
       redoStack: cloneWorkspaceInput(redoStack.value),
       highlightedSeatIds: [...highlightedSeats.value],
@@ -326,13 +347,23 @@ export function useWorkspace() {
       selectedZoneId: selectedZoneId.value,
       currentMode: currentMode.value,
       firstSelectedSeat: firstSelectedSeat.value,
-      rotGroups: cloneWorkspaceInput(rotGroups.value),
+      rotGroups: getRotationData(),
       editingZoneId: editingZoneId.value
     }
   }
 
   const restoreRuntimeSnapshot = (snapshot: ReturnType<typeof captureRuntimeSnapshot>) => {
-    applyWorkspaceState(prepareWorkspaceData(snapshot.workspace))
+    replaceTagData(snapshot.tags)
+    replaceStudentData(snapshot.students)
+    replaceSeatChartState(snapshot.seatConfig, snapshot.seats)
+    replaceZoneData(snapshot.zones)
+    replaceAttributeDefinitions(snapshot.attributeDefinitions, { useDefaultsWhenEmpty: false })
+    setShowNumericAttributesInEditor(snapshot.showNumericAttributesInEditor)
+    setShowTagsInSeatChart(snapshot.showTagsInSeatChart)
+    setTagDisplayMode(snapshot.tagDisplayMode)
+    resetExportSettings()
+    applyExportSettings(snapshot.exportSettings)
+    rules.value = cloneWorkspaceInput(snapshot.rules)
     undoStack.value = cloneWorkspaceInput(snapshot.undoStack)
     redoStack.value = cloneWorkspaceInput(snapshot.redoStack)
     highlightedSeats.value = new Set(snapshot.highlightedSeatIds)
@@ -344,9 +375,15 @@ export function useWorkspace() {
     selectedZoneId.value = snapshot.selectedZoneId
     currentMode.value = snapshot.currentMode
     firstSelectedSeat.value = snapshot.firstSelectedSeat
-    rotGroups.value = cloneWorkspaceInput(snapshot.rotGroups)
+    const rotationResult = replaceRotationData(snapshot.rotGroups)
+    if (!rotationResult.success) throw new Error(rotationResult.error)
     editingZoneId.value = snapshot.editingZoneId
-    syncZoneRotationIdCounter()
+  }
+
+  const restoreRotationGroups = (groups: Workspace['rotationGroups'] = []) => {
+    const result = replaceRotationData(groups)
+    if (!result.success) throw new Error(result.error)
+    clearEditingZone()
   }
 
   const buildDefaultWorkspaceName = () => {
@@ -470,15 +507,14 @@ export function useWorkspace() {
         }
 
         // 恢复标签并记录旧ID->新ID映射
-        const oldTagIdToNewId = new Map<number, number>()
+        const oldTagIdToNewId = new Map<string, number>()
         workspace.tags.forEach(tag => {
-          addTag({ 
+          const newTagId = addTag({
             name: tag.name, 
             color: tag.color, 
             showInSeatChart: tag.showInSeatChart !== false 
           })
-          const added = tags.value.find(t => t.name === tag.name && t.color === tag.color)
-          if (added) oldTagIdToNewId.set(tag.id, added.id)
+          oldTagIdToNewId.set(getIdentifierKey(tag.id), newTagId)
         })
 
         // 恢复标签显示设置
@@ -492,11 +528,11 @@ export function useWorkspace() {
         }
 
         // 恢复学生并记录旧ID->新ID映射
-        const oldStudentIdToNewId = new Map<number, number>()
+        const oldStudentIdToNewId = new Map<string, number>()
         workspace.students.forEach(s => {
           const newId = addStudent()
           const mappedTags = (s.tags || [])
-            .map(tagId => oldTagIdToNewId.get(tagId))
+            .map(tagId => oldTagIdToNewId.get(getIdentifierKey(tagId)))
             .filter((tagId): tagId is number => tagId !== undefined)
           updateStudent(newId, {
             name: s.name,
@@ -504,7 +540,7 @@ export function useWorkspace() {
             tags: mappedTags,
             numericAttributes: { ...(s.numericAttributes || {}) }
           })
-          oldStudentIdToNewId.set(s.id, newId)
+          oldStudentIdToNewId.set(getIdentifierKey(s.id), newId)
         })
 
         // 恢复座位配置
@@ -527,7 +563,9 @@ export function useWorkspace() {
             return {
               seatId: match.id,
               isEmpty: !!sw.empty,
-              studentId: typeof sw.studentId === 'number' ? (oldStudentIdToNewId.get(sw.studentId) ?? null) : null
+              studentId: sw.studentId === null || sw.studentId === undefined
+                ? null
+                : (oldStudentIdToNewId.get(getIdentifierKey(sw.studentId)) ?? null)
             }
           }).filter((update): update is { seatId: string; isEmpty: boolean; studentId: number | null } => update !== null)
 
@@ -541,18 +579,20 @@ export function useWorkspace() {
           applyExportSettings(workspace.exportSettings)
         }
 
+        restoreRotationGroups(workspace.rotationGroups)
+
         // 注意：旧版的 relations (人际关系) 已被废弃，我们不再从存档中恢复它们。
         // 如有需要，用户应使用最新的 SeatRules (座位规则) 机制进行配置。
 
         // 恢复选区数据
-        const oldZoneIdToNewId = new Map<number, number>()
+        const oldZoneIdToNewId = new Map<string, number>()
         if (workspace.zones && Array.isArray(workspace.zones)) {
           clearAllZones()
 
           workspace.zones.forEach(z => {
             const newZoneId = addZone()
             const mappedTagIds = (z.tagIds || [])
-              .map(tagId => oldTagIdToNewId.get(tagId))
+              .map(tagId => oldTagIdToNewId.get(getIdentifierKey(tagId)))
               .filter((tagId): tagId is number => tagId !== undefined)
             updateZone(newZoneId, {
               name: z.name,
@@ -560,11 +600,11 @@ export function useWorkspace() {
               seatIds: [...z.seatIds],
               visible: z.visible !== undefined ? z.visible : false
             })
-            oldZoneIdToNewId.set(z.id, newZoneId)
+            oldZoneIdToNewId.set(getIdentifierKey(z.id), newZoneId)
           })
         }
 
-        const normalizeRule = (rule: RuleInput): { subjects: RuleSubject[] } => {
+        const normalizeRule = (rule: WorkspaceRuleInput): { subjects: WorkspaceRuleSubject[] } => {
           if (Array.isArray(rule.subjects)) {
             return { subjects: (rule.subjects || []).map(item => ({ ...item })) }
           }
@@ -592,30 +632,28 @@ export function useWorkspace() {
         }
 
         const remapEntry = (
-          entry: RuleSubject,
-          oldStudentIdToNewIdMap: Map<number, number>,
-          oldTagIdToNewIdMap: Map<number, number>
+          entry: WorkspaceRuleSubject,
+          oldStudentIdToNewIdMap: Map<string, number>,
+          oldTagIdToNewIdMap: Map<string, number>
         ): RuleSubject | null => {
           if (!entry) return null
           if (entry.type === 'person') {
-            return { ...entry, id: entry.id === null ? null : oldStudentIdToNewIdMap.get(entry.id) ?? null }
+            return { ...entry, id: entry.id === null ? null : oldStudentIdToNewIdMap.get(getIdentifierKey(entry.id)) ?? null }
           }
           if (entry.type === 'tag') {
-            return { ...entry, id: entry.id === null ? null : oldTagIdToNewIdMap.get(entry.id) ?? null }
+            return { ...entry, id: entry.id === null ? null : oldTagIdToNewIdMap.get(getIdentifierKey(entry.id)) ?? null }
           }
           if (entry.type === 'all') {
             return { type: 'all', id: null }
           }
-          return entry
+          return null
         }
 
         // 恢复智能排位规则
         if (workspace.rules && Array.isArray(workspace.rules)) {
           clearAllRules()
-          let totalDroppedSubjects = 0
-          let totalDroppedRules = 0
 
-          workspace.rules.forEach(r => {
+          workspace.rules.forEach((r, ruleIndex) => {
             const normalized = normalizeRule(r)
 
             const remappedSubjects = normalized.subjects.map(entry => remapEntry(entry, oldStudentIdToNewId, oldTagIdToNewId))
@@ -624,17 +662,18 @@ export function useWorkspace() {
             )
             const dropped = remappedSubjects.length - subjects.length
             if (dropped > 0) {
-              totalDroppedSubjects += dropped
-              warning('Workspace rule subject remap dropped entries', {
-                rule: r,
-                dropped
-              })
+              throw new Error(`rules[${ruleIndex}] 包含无法恢复的规则对象`)
             }
 
-            const remapParams = (params: RemappableRuleParams = {}) => {
-              const newParams: RemappableRuleParams = { ...params }
-              if (newParams.tagId) newParams.tagId = oldTagIdToNewId.get(newParams.tagId)
-              if (newParams.zoneId) newParams.zoneId = oldZoneIdToNewId.get(newParams.zoneId)
+            const remapParams = (params: RemappableRuleParams = {}): RuleParams => {
+              const { tagId, zoneId, ...otherParams } = params
+              const newParams: RuleParams = { ...otherParams }
+              if (tagId !== null && tagId !== undefined) {
+                newParams.tagId = oldTagIdToNewId.get(getIdentifierKey(tagId))
+              }
+              if (zoneId !== null && zoneId !== undefined) {
+                newParams.zoneId = oldZoneIdToNewId.get(getIdentifierKey(zoneId))
+              }
               return newParams
             }
 
@@ -643,12 +682,23 @@ export function useWorkspace() {
               const subRules = Array.isArray(r.subRules)
                 ? r.subRules
                   .filter((subRule): subRule is typeof subRule & { predicate: string } => typeof subRule.predicate === 'string')
-                  .map(sr => ({
-                  predicate: sr.predicate,
-                  not: sr.not ?? false,
-                  subjects,
-                  params: remapParams(sr.params)
-                }))
+                  .map((sr, subRuleIndex) => {
+                    const sourceSubjects = Array.isArray(sr.subjects) && sr.subjects.length > 0
+                      ? sr.subjects
+                      : normalized.subjects
+                    const remappedSubRuleSubjects = sourceSubjects
+                      .map(entry => remapEntry(entry, oldStudentIdToNewId, oldTagIdToNewId))
+                      .filter((entry): entry is RuleSubject => entry !== null && (entry.type === 'all' || entry.id !== null))
+                    if (remappedSubRuleSubjects.length !== sourceSubjects.length) {
+                      throw new Error(`rules[${ruleIndex}].subRules[${subRuleIndex}] 包含无法恢复的规则对象`)
+                    }
+                    return {
+                      predicate: sr.predicate,
+                      not: sr.not ?? false,
+                      subjects: remappedSubRuleSubjects,
+                      params: remapParams(sr.params)
+                    }
+                  })
                 : null
               const result = addRule({
                 enabled: r.enabled ?? true,
@@ -662,29 +712,17 @@ export function useWorkspace() {
                 subRules
               })
               if (!result?.success) {
-                totalDroppedRules += 1
-                warning('Workspace rule skipped due to validation failure', {
-                  rule: r,
-                  warnings: result?.warnings || []
-                })
+                throw new Error(`rules[${ruleIndex}] 无法恢复: ${(result?.warnings || []).join('；')}`)
               }
             } else {
-              totalDroppedRules += 1
+              throw new Error(`rules[${ruleIndex}] 没有可恢复的规则对象`)
             }
           })
-
-          if (totalDroppedSubjects > 0 || totalDroppedRules > 0) {
-            warning(
-              `工作区规则迁移时丢失了 ${totalDroppedSubjects} 个对象条目，跳过了 ${totalDroppedRules} 条无效规则，请检查规则配置。`
-            )
-          }
         }
 
         // 3. 同步所有 ID 计数器（必须在数据恢复完成后执行）
         syncStudentIdCounter()
         syncZoneIdCounter()
-        syncZoneRotationIdCounter()
-
         return true
   }
 
@@ -710,6 +748,7 @@ export function useWorkspace() {
     try {
       applyWorkspaceState(workspace)
       currentLocalWorkspacePath.value = options.localPath ?? null
+      resetTransientWorkbenchState()
       return true
     } catch (err) {
       console.error('Apply Workspace Data failed:', err)
@@ -741,12 +780,13 @@ export function useWorkspace() {
 
       clearAllZones()
       clearAllRules()
-      clearAllRotData()
+      resetRotationData()
       updateConfig(createDefaultSeatConfig())
       clearAllSeats()
 
       currentLocalWorkspacePath.value = null
       eraseCookie(LAST_WORKSPACE_COOKIE)
+      resetTransientWorkbenchState()
       success('已新建空白工作区')
       return true
     } catch (err) {
@@ -800,7 +840,7 @@ export function useWorkspace() {
 
       // 添加 meta
       ws.meta = {
-        version: CURRENT_VERSION,
+        version: WORKSPACE_SCHEMA_VERSION,
         app: 'SeatingChartEditor',
         createdAt: ws.timestamp || new Date().toISOString()
       }
@@ -855,7 +895,7 @@ export function useWorkspace() {
     // 确保默认值
     ws.meta = {
       ...(ws.meta || {}),
-      version: CURRENT_VERSION,
+      version: WORKSPACE_SCHEMA_VERSION,
       app: ws.meta?.app || 'SeatingChartEditor',
       createdAt: ws.meta?.createdAt || new Date().toISOString()
     }
@@ -868,6 +908,7 @@ export function useWorkspace() {
       tagDisplayMode: ws.tagSettings?.tagDisplayMode || 'dot'
     }
     ws.zones = ws.zones || []
+    ws.rotationGroups = ws.rotationGroups || []
     ws.rules = ws.rules || []
     ws.exportSettings = ws.exportSettings || {}
 

@@ -14,11 +14,11 @@
             <span>请先启动不想排座位，再重新检测</span>
             <div class="fs-state-actions">
               <NButton secondary attr-type="button" @click="loadClassrooms">
-                <RefreshCcw :size="15" />
+                <template #icon><RefreshCcw :size="15" /></template>
                 <span>重新检测</span>
               </NButton>
               <NButton v-if="showExcelFallback" type="primary" attr-type="button" @click="fallbackExcel">
-                <FileInput :size="15" />
+                <template #icon><FileInput :size="15" /></template>
                 <span>导入 Excel</span>
               </NButton>
             </div>
@@ -29,7 +29,7 @@
             <strong>已连接本地服务</strong>
             <span>当前不想排座位没有可导入的班级</span>
             <NButton secondary attr-type="button" @click="loadClassrooms">
-              <RefreshCcw :size="15" />
+              <template #icon><RefreshCcw :size="15" /></template>
               <span>刷新</span>
             </NButton>
           </div>
@@ -65,7 +65,7 @@
           <footer class="fs-import-footer">
           <NButton class="fs-footer-action" secondary attr-type="button" @click="close">取消</NButton>
           <NButton class="fs-footer-action" secondary attr-type="button" :disabled="isLoading || isImporting" @click="loadClassrooms">
-            <RefreshCcw :size="15" />
+            <template #icon><RefreshCcw :size="15" /></template>
             <span>刷新</span>
           </NButton>
           <NButton
@@ -76,7 +76,7 @@
             :loading="isImporting"
             @click="handleImport"
           >
-            <Download v-if="!isImporting" :size="15" />
+            <template #icon><Download v-if="!isImporting" :size="15" /></template>
             <span>{{ importButtonText }}</span>
           </NButton>
           </footer>

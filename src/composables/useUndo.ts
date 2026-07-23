@@ -254,11 +254,21 @@ export function useUndo() {
   }
 
   const recordBatch = (beforeSnapshot: SeatSnapshotEntry[], afterSnapshot: SeatSnapshotEntry[]) => {
+    const changed = beforeSnapshot.length !== afterSnapshot.length || beforeSnapshot.some((before, index) => {
+      const after = afterSnapshot[index]
+      return !after ||
+        before.id !== after.id ||
+        before.studentId !== after.studentId ||
+        before.isEmpty !== after.isEmpty
+    })
+    if (!changed) return false
+
     pushCommand({
       type: 'batch',
-      beforeSnapshot,
-      afterSnapshot
+      beforeSnapshot: cloneSnapshot(beforeSnapshot),
+      afterSnapshot: cloneSnapshot(afterSnapshot)
     })
+    return true
   }
 
   const isHighlighted = (seatId: string) => highlightedSeats.value.has(seatId)

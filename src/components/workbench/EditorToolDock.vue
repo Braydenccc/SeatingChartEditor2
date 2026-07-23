@@ -3,33 +3,46 @@
     <div v-if="zoneEditSession" class="zone-edit-strip">
       <span>{{ zoneEditSession.title || '正在编辑选区' }}</span>
       <NButton size="tiny" type="primary" @click="finishZoneEditing">
-        <Check :size="15" stroke-width="2.4" />
+        <template #icon><Check :size="15" stroke-width="2.4" /></template>
         <span>完成</span>
       </NButton>
     </div>
 
-    <NButtonGroup class="tool-group mobile-only">
+    <div class="tool-group mobile-only">
       <NButton size="small" quaternary class="tool-button" :title="isSeatFullscreen ? '退出全屏座位表' : '全屏座位表'" @click="toggleSeatFullscreen">
-        <Minimize2 v-if="isSeatFullscreen" :size="17" stroke-width="2" />
-        <Maximize2 v-else :size="17" stroke-width="2" />
+        <template #icon>
+          <Minimize2 v-if="isSeatFullscreen" :size="17" stroke-width="2" />
+          <Maximize2 v-else :size="17" stroke-width="2" />
+        </template>
         <span>{{ isSeatFullscreen ? '退出' : '全屏' }}</span>
       </NButton>
+      <NButton
+        size="small"
+        quaternary
+        class="tool-button"
+        title="上下文"
+        :aria-pressed="mobileDrawer === 'selection'"
+        @click="openWorkbenchDrawer('selection')"
+      >
+        <template #icon><PanelRightOpen :size="17" stroke-width="2" /></template>
+        <span>上下文</span>
+      </NButton>
       <NButton size="small" quaternary class="tool-button" title="候选学生" @click="openWorkbenchDrawer('candidates')">
-        <Users :size="17" stroke-width="2" />
+        <template #icon><Users :size="17" stroke-width="2" /></template>
         <span>学生</span>
       </NButton>
       <NButton size="small" quaternary class="tool-button" title="更多工具" @click="openWorkbenchDrawer('tools')">
-        <MoreHorizontal :size="17" stroke-width="2" />
+        <template #icon><MoreHorizontal :size="17" stroke-width="2" /></template>
         <span>工具</span>
       </NButton>
-    </NButtonGroup>
+    </div>
 
     <div v-if="selectedStudent" class="placement-strip mobile-placement">
       <span>正在放置：{{ selectedStudent.name || '未命名' }}</span>
       <NButton size="tiny" secondary @click="clearStudentSelection">取消</NButton>
     </div>
 
-    <NButtonGroup class="tool-group">
+    <div class="tool-group">
       <NButton size="small" quaternary circle class="tool-button icon-only" title="撤销" :disabled="!canUndo" @click="undo">
         <Undo2 :size="17" stroke-width="2" />
       </NButton>
@@ -37,7 +50,7 @@
         <Redo2 :size="17" stroke-width="2" />
       </NButton>
       <NButton size="small" class="tool-button" :type="currentMode === EditMode.NORMAL && !isSelectionMode ? 'primary' : 'default'" :secondary="currentMode === EditMode.NORMAL && !isSelectionMode" :quaternary="currentMode !== EditMode.NORMAL || isSelectionMode" title="普通模式" @click="activateTool('normal')">
-        <MousePointer2 :size="17" stroke-width="2" />
+        <template #icon><MousePointer2 :size="17" stroke-width="2" /></template>
         <span>普通</span>
       </NButton>
       <NButton
@@ -51,54 +64,54 @@
         :aria-pressed="isSelectionMode"
         @click="toggleSelectionMode"
       >
-        <BoxSelect :size="17" stroke-width="2" />
+        <template #icon><BoxSelect :size="17" stroke-width="2" /></template>
         <span>多选</span>
         <span v-if="isSelectionMode && selectedCount > 0" class="selection-badge">{{ selectedCount }}</span>
       </NButton>
       <div v-if="isSelectionMode" class="selection-mode-hint" role="status">
         {{ selectionModeHint }}
       </div>
-    </NButtonGroup>
+    </div>
 
-    <NButtonGroup class="tool-group">
+    <div class="tool-group">
       <NButton size="small" class="tool-button" :type="currentMode === EditMode.SWAP ? 'primary' : 'default'" :secondary="currentMode === EditMode.SWAP" :quaternary="currentMode !== EditMode.SWAP" title="交换座位" @click="activateTool('swap')">
-        <ArrowLeftRight :size="17" stroke-width="2" />
+        <template #icon><ArrowLeftRight :size="17" stroke-width="2" /></template>
         <span>交换</span>
       </NButton>
       <NButton size="small" class="tool-button" :type="currentMode === EditMode.CLEAR ? 'error' : 'default'" :secondary="currentMode === EditMode.CLEAR" :quaternary="currentMode !== EditMode.CLEAR" title="清空座位" @click="activateTool('clear')">
-        <Trash2 :size="17" stroke-width="2" />
+        <template #icon><Trash2 :size="17" stroke-width="2" /></template>
         <span>清空</span>
       </NButton>
       <NButton size="small" class="tool-button" :type="currentMode === EditMode.EMPTY_EDIT ? 'warning' : 'default'" :secondary="currentMode === EditMode.EMPTY_EDIT" :quaternary="currentMode !== EditMode.EMPTY_EDIT" title="空置座位" @click="activateTool('empty')">
-        <LayoutGrid :size="17" stroke-width="2" />
+        <template #icon><LayoutGrid :size="17" stroke-width="2" /></template>
         <span>空置</span>
       </NButton>
-    </NButtonGroup>
+    </div>
 
-    <NButtonGroup class="tool-group workflows">
+    <div class="tool-group workflows">
       <NButton size="small" quaternary class="tool-button" title="座位配置" @click="openWorkbenchDialog('seatConfig')">
-        <Settings :size="17" stroke-width="2" />
+        <template #icon><Settings :size="17" stroke-width="2" /></template>
         <span>配置</span>
       </NButton>
       <NButton size="small" quaternary class="tool-button" title="位移轮换" @click="openWorkbenchDialog('shiftRotation')">
-        <MoveDiagonal2 :size="17" stroke-width="2" />
+        <template #icon><MoveDiagonal2 :size="17" stroke-width="2" /></template>
         <span>位移</span>
       </NButton>
       <NButton size="small" quaternary class="tool-button" title="选区轮换" @click="openWorkbenchDialog('zoneRotation')">
-        <RefreshCcw :size="17" stroke-width="2" />
+        <template #icon><RefreshCcw :size="17" stroke-width="2" /></template>
         <span>轮换</span>
       </NButton>
       <NButton size="small" quaternary class="tool-button" title="智能排位" @click="openWorkbenchDialog('assignment')">
-        <Shuffle :size="17" stroke-width="2" />
+        <template #icon><Shuffle :size="17" stroke-width="2" /></template>
         <span>排位</span>
       </NButton>
       <NButton size="small" quaternary class="tool-button" title="规则管理" @click="openWorkbenchDialog('rules')">
-        <Scale :size="17" stroke-width="2" />
+        <template #icon><Scale :size="17" stroke-width="2" /></template>
         <span>规则</span>
       </NButton>
-    </NButtonGroup>
+    </div>
 
-    <NButtonGroup class="tool-group zoom-tools">
+    <div class="tool-group zoom-tools">
       <NButton size="small" quaternary circle class="tool-button icon-only" title="缩小" :disabled="scale <= MIN_SCALE" @click="zoomOut">
         <Minus :size="17" stroke-width="2" />
       </NButton>
@@ -109,16 +122,16 @@
         <Plus :size="17" stroke-width="2" />
       </NButton>
       <NButton size="small" quaternary class="tool-button export-tool" title="导出" @click="router.push({ path: '/export', query: { tab: 'image' } })">
-        <FileOutput :size="17" stroke-width="2" />
+        <template #icon><FileOutput :size="17" stroke-width="2" /></template>
         <span>导出</span>
       </NButton>
-    </NButtonGroup>
+    </div>
   </footer>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { NButton, NButtonGroup } from 'naive-ui'
+import { NButton } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import {
   ArrowLeftRight,
@@ -132,6 +145,7 @@ import {
   MoreHorizontal,
   MousePointer2,
   MoveDiagonal2,
+  PanelRightOpen,
   Plus,
   Redo2,
   RefreshCcw,
@@ -143,6 +157,7 @@ import {
   Users
 } from 'lucide-vue-next'
 import { useMediaQuery } from '@vueuse/core'
+import { mobileWorkbenchMediaQuery } from '@/constants/layout'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import { useEditorCommands } from '@/composables/useEditorCommands'
 import { useEditMode } from '@/composables/useEditMode'
@@ -155,6 +170,7 @@ const router = useRouter()
 const {
   zoneEditSession,
   isSeatFullscreen,
+  mobileDrawer,
   toggleSeatFullscreen
 } = useEditorWorkbench()
 const { currentMode, EditMode } = useEditMode()
@@ -170,7 +186,7 @@ const {
 const { students, selectedStudentId, clearSelection: clearStudentSelection } = useStudentData()
 const { undo, redo, canUndo, canRedo } = useUndo()
 const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom()
-const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
+const isMobileWorkbench = useMediaQuery(mobileWorkbenchMediaQuery)
 
 const selectedStudent = computed(() => (
   students.value.find(student => student.id === selectedStudentId.value) || null

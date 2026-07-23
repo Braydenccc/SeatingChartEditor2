@@ -65,7 +65,8 @@ describe('useAssignment - Conflict Rules', () => {
       seatChart.clearAllSeats()
       const result = await assignment.runSmartAssignment({ useRules: true, iterations: 5000 })
 
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('必须规则未满足')
     })
 
     it('should handle MUST_BE_SAME_GROUP vs MUST_NOT_BE_SAME_GROUP conflict', async () => {
@@ -110,7 +111,8 @@ describe('useAssignment - Conflict Rules', () => {
       seatChart.clearAllSeats()
       const result = await assignment.runSmartAssignment({ useRules: true, iterations: 5000 })
 
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('必须规则未满足')
     })
 
     it('should handle DISTANCE_AT_LEAST vs DISTANCE_AT_MOST conflict', async () => {
@@ -151,7 +153,8 @@ describe('useAssignment - Conflict Rules', () => {
       seatChart.clearAllSeats()
       const result = await assignment.runSmartAssignment({ useRules: true, iterations: 5000 })
 
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('必须规则未满足')
     })
 
     it('should handle IN_ROW_RANGE conflict with limited seats', async () => {
@@ -182,7 +185,8 @@ describe('useAssignment - Conflict Rules', () => {
       seatChart.clearAllSeats()
       const result = await assignment.runSmartAssignment({ useRules: true, iterations: 5000 })
 
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('必须规则未满足')
     })
   })
 
@@ -292,7 +296,8 @@ describe('useAssignment - Conflict Rules', () => {
       seatChart.clearAllSeats()
       const result = await assignment.runSmartAssignment({ useRules: true, iterations: 5000 })
 
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('必须规则未满足')
     })
 
     it('should handle DISTRIBUTE_EVENLY vs CLUSTER_TOGETHER conflict', async () => {
@@ -361,7 +366,8 @@ describe('useAssignment - Conflict Rules', () => {
       seatChart.clearAllSeats()
       const result = await assignment.runSmartAssignment({ useRules: true, iterations: 5000 })
 
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('必须规则未满足')
     })
 
     it('should handle all students requiring same seat position', async () => {
@@ -431,7 +437,8 @@ describe('useAssignment - Conflict Rules', () => {
       seatChart.clearAllSeats()
       const result = await assignment.runSmartAssignment({ useRules: true, iterations: 5000 })
 
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('必须规则未满足')
     })
   })
 
@@ -557,7 +564,8 @@ describe('useAssignment - Conflict Rules', () => {
       seatChart.clearAllSeats()
       const result = await assignment.runSmartAssignment({ useRules: true, iterations: 5000 })
 
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('必须规则未满足')
     })
 
     it('should handle empty rules list', async () => {

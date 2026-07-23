@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
-import { NDrawer, NModal } from 'naive-ui'
+import { NCard, NDrawer, NModal } from 'naive-ui'
 import ResponsiveOverlay from '../ResponsiveOverlay.vue'
 
 const setMobileViewport = (mobile: boolean) => {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
+    writable: true,
     value: vi.fn((query: string) => ({
       matches: query.includes('max-width: 768px') ? mobile : false,
       media: query,
@@ -39,11 +40,37 @@ describe('ResponsiveOverlay', () => {
       props: { show: true, title: '排位规则', beforeClose }
     })
 
-    wrapper.findComponent(NModal).vm.$emit('esc')
+    wrapper.findComponent(NModal).vm.$emit('update:show', false)
     await flushPromises()
 
     expect(beforeClose).toHaveBeenCalledTimes(1)
     expect(wrapper.emitted('update:show')).toBeUndefined()
+  })
+
+  it('associates the desktop dialog with its visible title', () => {
+    const wrapper = shallowMount(ResponsiveOverlay, {
+      props: { show: true, title: '学生编辑' },
+      global: { renderStubDefaultSlot: true }
+    })
+    const card = wrapper.findComponent(NCard)
+
+    expect(card.attributes('role')).toBe('dialog')
+    expect(card.attributes('aria-modal')).toBe('true')
+    expect(card.attributes('aria-labelledby')).toMatch(/-title$/)
+    expect(card.attributes('aria-busy')).toBe('false')
+  })
+
+  it('associates the mobile drawer with its visible title', () => {
+    setMobileViewport(true)
+    const wrapper = shallowMount(ResponsiveOverlay, {
+      props: { show: true, title: '学生编辑', busy: true }
+    })
+    const drawer = wrapper.findComponent(NDrawer)
+
+    expect(drawer.attributes('role')).toBe('dialog')
+    expect(drawer.attributes('aria-modal')).toBe('true')
+    expect(drawer.attributes('aria-labelledby')).toMatch(/-title$/)
+    expect(drawer.attributes('aria-busy')).toBe('true')
   })
 
   it('deduplicates simultaneous close events while awaiting beforeClose', async () => {
@@ -54,7 +81,7 @@ describe('ResponsiveOverlay', () => {
     })
     const modal = wrapper.findComponent(NModal)
 
-    modal.vm.$emit('mask-click')
+    modal.vm.$emit('update:show', false)
     modal.vm.$emit('update:show', false)
     expect(beforeClose).toHaveBeenCalledTimes(1)
 
@@ -66,15 +93,17 @@ describe('ResponsiveOverlay', () => {
   it('blocks Escape and mask closure while busy', async () => {
     const beforeClose = vi.fn().mockResolvedValue(true)
     const wrapper = shallowMount(ResponsiveOverlay, {
-      props: { show: true, title: '导入数据', busy: true, beforeClose }
+      props: { show: true, title: '导入数据', busy: true, beforeClose },
+      global: { renderStubDefaultSlot: true }
     })
     const modal = wrapper.findComponent(NModal)
 
-    modal.vm.$emit('mask-click')
-    modal.vm.$emit('esc')
+    modal.vm.$emit('update:show', false)
     await flushPromises()
 
     expect(beforeClose).not.toHaveBeenCalled()
     expect(wrapper.emitted('update:show')).toBeUndefined()
+    expect(wrapper.findComponent(NModal).props('maskClosable')).toBe(false)
+    expect(wrapper.findComponent(NCard).attributes('aria-busy')).toBe('true')
   })
 })

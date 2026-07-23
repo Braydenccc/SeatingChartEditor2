@@ -10,6 +10,7 @@ import { appBuildInfo } from '@/constants/appBuildInfo'
 import { saveTextFile, sdesFileFilters } from '@/platform/files'
 import { generateGuardSeatId, generateSeatId, isGuardSeatId } from '@/utils/seatHelpers'
 import { convertGridToGroupedColumns, type GridToGroupedCell } from '@/utils/gridToGroupedColumns'
+import { WORKSPACE_SCHEMA_VERSION } from '@/types/models'
 import type { NumericAttributeDefinition, Seat, Tag } from '@/types'
 
 export const SDES_FORMAT = 'student-data-exchange-schema'
@@ -212,6 +213,18 @@ const asArray = <T>(value: unknown): T[] => Array.isArray(value) ? value as T[] 
 
 const toStringValue = (value: unknown): string => String(value ?? '').trim()
 
+const getDuplicateSeatIds = (chart: SdesSeatChart): string[] => {
+  const seen = new Set<string>()
+  const duplicates = new Set<string>()
+  asArray<SdesSeat>(chart.seats).forEach(seat => {
+    const id = toStringValue(seat.id)
+    if (!id) return
+    if (seen.has(id)) duplicates.add(id)
+    seen.add(id)
+  })
+  return [...duplicates]
+}
+
 const toPositiveInt = (value: unknown): number | null => {
   const numberValue = Number(value)
   return Number.isInteger(numberValue) && numberValue > 0 ? numberValue : null
@@ -355,6 +368,7 @@ export const getSdesImportTargets = (document: SdesDocument): SdesImportTarget[]
       const unsupportedGuardCount = asArray<SdesSeat>(chart.seats)
         .filter(seat => seat.kind === 'guard' && (seat.guardPos?.index !== 0 || !['left', 'right'].includes(String(seat.guardPos?.side))))
         .length
+      const duplicateSeatIds = getDuplicateSeatIds(chart)
       if (unsupportedAttributeCount > 0) {
         warnings.push(`${unsupportedAttributeCount} 个非数值属性将跳过`)
       }
@@ -363,6 +377,9 @@ export const getSdesImportTargets = (document: SdesDocument): SdesImportTarget[]
       }
       if (chart.layoutModel === 'grid') {
         warnings.push('grid 座位表会按显式分组或走廊列转换为大组列行')
+      }
+      if (duplicateSeatIds.length > 0) {
+        warnings.push(`${duplicateSeatIds.length} 个 seat.id 重复，当前座位表无法导入`)
       }
 
       targets.push({
@@ -845,6 +862,12 @@ export const buildWorkspaceFromSdes = (
   if (chart.layoutModel !== 'grid' && chart.layoutModel !== 'groupedColumns') {
     throw new Error(`不支持的 SDES 座位表模型：${chart.layoutModel || 'unknown'}`)
   }
+  const duplicateSeatIds = getDuplicateSeatIds(chart)
+  if (duplicateSeatIds.length > 0) {
+    const visibleIds = duplicateSeatIds.slice(0, 3).join('、')
+    const suffix = duplicateSeatIds.length > 3 ? ` 等 ${duplicateSeatIds.length} 个` : ''
+    throw new Error(`SDES 座位表包含重复 seat.id：${visibleIds}${suffix}，无法安全解析座位分配`)
+  }
 
   const report = createReport()
   const studentResult = buildStudents(clazz, report)
@@ -863,7 +886,7 @@ export const buildWorkspaceFromSdes = (
   return {
     workspace: {
       meta: {
-        version: '2.2',
+        version: WORKSPACE_SCHEMA_VERSION,
         app: 'SeatingChartEditor',
         createdAt: new Date().toISOString(),
         source: 'sdes',
@@ -1057,7 +1080,7 @@ export const buildSdesDocumentFromState = (state: {
     ],
     extensions: {
       [BSCE_EXTENSION_KEY]: {
-        workspaceVersion: '2.2',
+        workspaceVersion: WORKSPACE_SCHEMA_VERSION,
         note: 'SDES 是交换格式；完整备份请使用 .sce 工作区文件。',
         seatConfig: {
           shiftDistance: state.seatConfig.shiftDistance,

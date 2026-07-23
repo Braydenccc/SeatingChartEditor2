@@ -63,4 +63,25 @@ describe('useDragPreview', () => {
     expect(previewItems.value[0].isEmptySeat).toBe(false)
     expect('contentHtml' in previewItems.value[0]).toBe(false)
   })
+
+  it('positions selected seats with heterogeneous group column widths', () => {
+    const seatChart = useSeatChart()
+    seatChart.updateConfig({
+      groupCount: 3,
+      columnsPerGroup: 2,
+      seatsPerColumn: 1,
+      groups: [
+        { columns: 1, rows: 1 },
+        { columns: 3, rows: 1 },
+        { columns: 2, rows: 1 }
+      ]
+    })
+    const { startDragPreview, previewItems, L } = useDragPreview()
+
+    startDragPreview('seat-0-0-0', ['seat-0-0-0', 'seat-2-1-0'], 120, 80)
+
+    const target = previewItems.value.find(item => item.seatId === 'seat-2-1-0')
+    const expectedOffset = 5 * (L.SEAT_W + L.COL_GAP) + 2 * (L.GROUP_GAP - L.COL_GAP)
+    expect(target?.style.left).toBe(`calc(50% + ${expectedOffset}px)`)
+  })
 })

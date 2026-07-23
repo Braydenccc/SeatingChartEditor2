@@ -4,13 +4,10 @@ import { useEditorWorkbench } from '../useEditorWorkbench'
 describe('useEditorWorkbench', () => {
   let workbench: ReturnType<typeof useEditorWorkbench>
 
-  beforeEach(() => {
+  beforeEach(async () => {
     workbench = useEditorWorkbench()
-    workbench.closeDialog()
-    workbench.finishZoneEditSession()
+    await workbench.resetTransientWorkbenchState()
     workbench.setRightRailTab('candidates')
-    workbench.closeMobileDrawer()
-    workbench.exitSeatFullscreen()
   })
 
   it('opens and closes a workbench dialog', () => {
@@ -22,6 +19,72 @@ describe('useEditorWorkbench', () => {
 
     workbench.closeDialog()
     expect(workbench.activeWorkbenchDialog.value).toBeNull()
+  })
+
+  it('stores an isolated seat configuration draft for the advanced dialog', () => {
+    const initialConfig = {
+      groupCount: 2,
+      columnsPerGroup: 2,
+      seatsPerColumn: 7,
+      groups: [{ columns: 2, rows: 7 }, { columns: 3, rows: 6 }],
+      shiftDistance: 3,
+      podiumPosition: 'top' as const,
+      guardSeats: {
+        enabled: true,
+        leftEnabled: true,
+        rightEnabled: false,
+        includeInAutoAssignment: false,
+        hideEmptyOnExport: true
+      }
+    }
+
+    workbench.openDialog('seatConfig', { seatConfig: initialConfig })
+
+    expect(workbench.seatConfigDialogInitialConfig.value).toEqual(initialConfig)
+    initialConfig.groups[0].columns = 5
+    initialConfig.guardSeats.enabled = false
+    expect(workbench.seatConfigDialogInitialConfig.value?.groups?.[0].columns).toBe(2)
+    expect(workbench.seatConfigDialogInitialConfig.value?.guardSeats?.enabled).toBe(true)
+
+    workbench.closeDialog()
+    expect(workbench.seatConfigDialogInitialConfig.value).toBeNull()
+  })
+
+  it('does not reuse an earlier seat configuration draft', () => {
+    workbench.openDialog('seatConfig', { seatConfig: { groupCount: 2 } })
+    expect(workbench.seatConfigDialogInitialConfig.value?.groupCount).toBe(2)
+
+    workbench.openDialog('seatConfig')
+    expect(workbench.seatConfigDialogInitialConfig.value).toBeNull()
+  })
+
+  it('resets transient route state without changing the right rail preference', async () => {
+    workbench.enterSeatFullscreen()
+    workbench.openDialog('rules', { focusRuleId: 'rule-1' })
+    workbench.startZoneEditSession({
+      kind: 'assignment',
+      sourceDialog: 'assignment',
+      zoneId: 1,
+      title: 'A区'
+    })
+    workbench.openMobileDrawerForDrag('candidates')
+    workbench.suspendMobileDrawerForDrag('candidates')
+    workbench.setRightRailTab('activity')
+
+    await workbench.resetTransientWorkbenchState()
+
+    expect(workbench.activeWorkbenchDialog.value).toBeNull()
+    expect(workbench.assignmentWorkbenchPanel.value).toBe('run')
+    expect(workbench.focusedRuleId.value).toBe('')
+    expect(workbench.seatConfigDialogInitialConfig.value).toBeNull()
+    expect(workbench.isWorkbenchDialogHidden.value).toBe(false)
+    expect(workbench.zoneEditSession.value).toBeNull()
+    expect(workbench.mobileSheet.value).toBeNull()
+    expect(workbench.mobileDrawer.value).toBeNull()
+    expect(workbench.suspendedMobileDrawer.value).toBeNull()
+    expect(workbench.dragOpenedMobileDrawer.value).toBeNull()
+    expect(workbench.mobileViewMode.value).toBe('normal')
+    expect(workbench.rightRailTab.value).toBe('activity')
   })
 
   it('opens rules inside the assignment workbench', () => {
@@ -211,6 +274,209 @@ describe('useEditorWorkbench', () => {
     await vi.waitFor(() => {
       expect(unlock).toHaveBeenCalled()
       expect(document.exitFullscreen).toHaveBeenCalled()
+    })
+
+    document.documentElement.requestFullscreen = originalRequestFullscreen
+    document.exitFullscreen = originalExitFullscreen
+    if (fullscreenDescriptor) {
+      Object.defineProperty(document, 'fullscreenElement', fullscreenDescriptor)
+    }
+    if (orientationDescriptor) {
+      Object.defineProperty(window.screen, 'orientation', orientationDescriptor)
+    }
+  })
+
+  it('leaves css fullscreen when native fullscreen exits externally', async () => {
+    let fullscreenElement: Element | null = null
+    const originalRequestFullscreen = document.documentElement.requestFullscreen
+    const fullscreenDescriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenElement')
+    const orientationDescriptor = Object.getOwnPropertyDescriptor(window.screen, 'orientation')
+    const unlock = vi.fn()
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement
+    })
+    document.documentElement.requestFullscreen = vi.fn(async () => {
+      fullscreenElement = document.documentElement
+    })
+    Object.defineProperty(window.screen, 'orientation', {
+      configurable: true,
+      value: { lock: vi.fn().mockResolvedValue(undefined), unlock }
+    })
+
+    workbench.enterSeatFullscreen()
+    await vi.waitFor(() => {
+      expect(document.documentElement.requestFullscreen).toHaveBeenCalled()
+      expect(workbench.isSeatFullscreen.value).toBe(true)
+    })
+
+    fullscreenElement = null
+    document.dispatchEvent(new Event('fullscreenchange'))
+
+    expect(workbench.isSeatFullscreen.value).toBe(false)
+    expect(workbench.mobileViewMode.value).toBe('normal')
+    expect(unlock).toHaveBeenCalled()
+
+    document.documentElement.requestFullscreen = originalRequestFullscreen
+    if (fullscreenDescriptor) {
+      Object.defineProperty(document, 'fullscreenElement', fullscreenDescriptor)
+    }
+    if (orientationDescriptor) {
+      Object.defineProperty(window.screen, 'orientation', orientationDescriptor)
+    }
+  })
+
+  it('exits native fullscreen if route cleanup wins a pending fullscreen request', async () => {
+    let fullscreenElement: Element | null = null
+    let finishRequest: () => void = () => undefined
+    const originalRequestFullscreen = document.documentElement.requestFullscreen
+    const originalExitFullscreen = document.exitFullscreen
+    const fullscreenDescriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenElement')
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement
+    })
+    document.documentElement.requestFullscreen = vi.fn(() => new Promise<void>((resolve) => {
+      finishRequest = () => {
+        fullscreenElement = document.documentElement
+        resolve()
+      }
+    }))
+    document.exitFullscreen = vi.fn(async () => {
+      fullscreenElement = null
+    })
+
+    workbench.enterSeatFullscreen()
+    await vi.waitFor(() => {
+      expect(document.documentElement.requestFullscreen).toHaveBeenCalled()
+    })
+
+    await workbench.resetTransientWorkbenchState()
+    expect(workbench.isSeatFullscreen.value).toBe(false)
+
+    finishRequest()
+    await vi.waitFor(() => {
+      expect(document.exitFullscreen).toHaveBeenCalled()
+    })
+
+    document.documentElement.requestFullscreen = originalRequestFullscreen
+    document.exitFullscreen = originalExitFullscreen
+    if (fullscreenDescriptor) {
+      Object.defineProperty(document, 'fullscreenElement', fullscreenDescriptor)
+    }
+  })
+
+  it('keeps a newer fullscreen request owned when an older request rejects', async () => {
+    let fullscreenElement: Element | null = null
+    let rejectFirstRequest: (reason?: unknown) => void = () => undefined
+    let finishSecondRequest: () => void = () => undefined
+    const originalRequestFullscreen = document.documentElement.requestFullscreen
+    const fullscreenDescriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenElement')
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement
+    })
+    document.documentElement.requestFullscreen = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>((_resolve, reject) => {
+        rejectFirstRequest = reject
+      }))
+      .mockImplementationOnce(() => new Promise<void>((resolve) => {
+        finishSecondRequest = () => {
+          fullscreenElement = document.documentElement
+          resolve()
+        }
+      }))
+
+    workbench.enterSeatFullscreen()
+    await vi.waitFor(() => {
+      expect(document.documentElement.requestFullscreen).toHaveBeenCalledTimes(1)
+    })
+
+    workbench.exitSeatFullscreen()
+    workbench.enterSeatFullscreen()
+    await vi.waitFor(() => {
+      expect(document.documentElement.requestFullscreen).toHaveBeenCalledTimes(2)
+    })
+
+    rejectFirstRequest(new Error('older request rejected'))
+    finishSecondRequest()
+    await vi.waitFor(() => {
+      expect(workbench.isSeatFullscreen.value).toBe(true)
+      expect(document.fullscreenElement).toBe(document.documentElement)
+    })
+
+    fullscreenElement = null
+    document.dispatchEvent(new Event('fullscreenchange'))
+
+    expect(workbench.isSeatFullscreen.value).toBe(false)
+    expect(workbench.mobileViewMode.value).toBe('normal')
+
+    document.documentElement.requestFullscreen = originalRequestFullscreen
+    if (fullscreenDescriptor) {
+      Object.defineProperty(document, 'fullscreenElement', fullscreenDescriptor)
+    }
+  })
+
+  it('keeps fullscreen ownership when an older request succeeds before a newer request rejects', async () => {
+    let fullscreenElement: Element | null = null
+    let finishFirstRequest: () => void = () => undefined
+    let rejectSecondRequest: (reason?: unknown) => void = () => undefined
+    const originalRequestFullscreen = document.documentElement.requestFullscreen
+    const originalExitFullscreen = document.exitFullscreen
+    const fullscreenDescriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenElement')
+    const orientationDescriptor = Object.getOwnPropertyDescriptor(window.screen, 'orientation')
+    const lock = vi.fn().mockResolvedValue(undefined)
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement
+    })
+    document.documentElement.requestFullscreen = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>((resolve) => {
+        finishFirstRequest = () => {
+          fullscreenElement = document.documentElement
+          resolve()
+        }
+      }))
+      .mockImplementationOnce(() => new Promise<void>((_resolve, reject) => {
+        rejectSecondRequest = reject
+      }))
+    document.exitFullscreen = vi.fn(async () => {
+      fullscreenElement = null
+    })
+    Object.defineProperty(window.screen, 'orientation', {
+      configurable: true,
+      value: { lock, unlock: vi.fn() }
+    })
+
+    workbench.enterSeatFullscreen()
+    await vi.waitFor(() => {
+      expect(document.documentElement.requestFullscreen).toHaveBeenCalledTimes(1)
+    })
+
+    workbench.exitSeatFullscreen()
+    workbench.enterSeatFullscreen()
+    await vi.waitFor(() => {
+      expect(document.documentElement.requestFullscreen).toHaveBeenCalledTimes(2)
+    })
+
+    finishFirstRequest()
+    await vi.waitFor(() => {
+      expect(document.fullscreenElement).toBe(document.documentElement)
+    })
+
+    rejectSecondRequest(new Error('newer request rejected'))
+    await vi.waitFor(() => {
+      expect(lock).toHaveBeenCalledWith('landscape')
+    })
+
+    workbench.exitSeatFullscreen()
+    await vi.waitFor(() => {
+      expect(document.exitFullscreen).toHaveBeenCalledTimes(1)
+      expect(document.fullscreenElement).toBeNull()
     })
 
     document.documentElement.requestFullscreen = originalRequestFullscreen

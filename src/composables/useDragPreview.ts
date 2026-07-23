@@ -1,9 +1,9 @@
-import { ref, computed, reactive } from 'vue'
+import { computed, reactive } from 'vue'
 import { useSeatChart } from './useSeatChart'
 import { useZoom } from './useZoom'
 import { useStudentData } from './useStudentData'
 import { useLayoutConstants } from './useLayoutConstants'
-import { parseSeatId, generateSeatId, isGuardSeatId } from '@/utils/seatHelpers'
+import { parseSeatId, isGuardSeatId } from '@/utils/seatHelpers'
 
 const { LAYOUT: L } = useLayoutConstants()
 
@@ -50,7 +50,7 @@ const positionPreviewElement = () => {
 }
 
 export function useDragPreview() {
-  const { seatConfig, getSeat } = useSeatChart()
+  const { seatConfig, getSeat, getGroupConfig, toGlobalCol } = useSeatChart()
   const { scale } = useZoom()
   const { students } = useStudentData()
 
@@ -72,28 +72,28 @@ export function useDragPreview() {
   }
 
   function chartLocalToGrid(x: number, y: number): DragPreviewGrid | null {
-    const cpg = seatConfig.value.columnsPerGroup
-    const spc = seatConfig.value.seatsPerColumn
     const gc = seatConfig.value.groupCount
-    const groupW = cpg * L.SEAT_W + (cpg - 1) * L.COL_GAP
-    const groupStride = groupW + L.GROUP_GAP
-
-    const gFloat = (x - L.PAD_L) / groupStride
-    const g = Math.round(gFloat)
-    if (g < 0 || g >= gc) return null
-
-    const groupLeft = L.PAD_L + g * groupStride
     const colStride = L.SEAT_W + L.COL_GAP
-    const cFloat = (x - groupLeft) / colStride
-    const c = Math.round(cFloat)
-    if (c < 0 || c >= cpg) return null
+    let groupLeft = L.PAD_L
 
-    const rowStride = L.SEAT_H + L.ROW_GAP
-    const rFloat = (y - L.PAD_T - L.LABEL_H) / rowStride
-    const r = Math.round(rFloat)
-    if (r < 0 || r >= spc) return null
+    for (let g = 0; g < gc; g++) {
+      const groupConfig = getGroupConfig(g)
+      const groupW = groupConfig.columns * L.SEAT_W + Math.max(0, groupConfig.columns - 1) * L.COL_GAP
+      const c = Math.round((x - groupLeft) / colStride)
+      const firstColumnLeft = groupLeft - L.SEAT_W / 2
+      const lastColumnRight = groupLeft + Math.max(0, groupConfig.columns - 1) * colStride + L.SEAT_W / 2
 
-    return { g, c, r }
+      if (x >= firstColumnLeft && x <= lastColumnRight && c >= 0 && c < groupConfig.columns) {
+        const rowStride = L.SEAT_H + L.ROW_GAP
+        const r = Math.round((y - L.PAD_T - L.LABEL_H) / rowStride)
+        if (r < 0 || r >= groupConfig.rows) return null
+        return { g, c, r }
+      }
+
+      groupLeft += groupW + L.GROUP_GAP
+    }
+
+    return null
   }
 
   const startDragPreview = (
@@ -209,7 +209,6 @@ export function useDragPreview() {
     }
 
     const anchor = parseSeatId(state.anchorSeatId)
-    const cpg = seatConfig.value.columnsPerGroup
 
     let seatW = L.SEAT_W
     let seatH = L.SEAT_H
@@ -247,13 +246,16 @@ export function useDragPreview() {
       }
     }
 
-    const groupW = cpg * seatW + (cpg - 1) * colGap
+    const toLayoutX = (position: ReturnType<typeof parseSeatId>) => {
+      const globalColumn = toGlobalCol(position)
+      return globalColumn * (seatW + colGap) + position.groupIndex * (groupGap - colGap)
+    }
+    const anchorX = toLayoutX(anchor)
 
     return state.selectedSeatIds.map(sid => {
       const parsed = parseSeatId(sid)
 
-      const dx = (parsed.groupIndex * (groupW + groupGap) + parsed.columnIndex * (seatW + colGap)) -
-                 (anchor.groupIndex * (groupW + groupGap) + anchor.columnIndex * (seatW + colGap))
+      const dx = toLayoutX(parsed) - anchorX
       const dy = (parsed.rowIndex * (seatH + rowGap)) - (anchor.rowIndex * (seatH + rowGap))
 
       const seat = getSeat(sid)

@@ -144,6 +144,34 @@ describe('useCloudWorkspace', () => {
     expect(mockPutFile).not.toHaveBeenCalled()
   })
 
+  it('generates one stable legal file id before a new SCE workspace request', async () => {
+    const workspace = useCloudWorkspace()
+    vi.mocked(apiFetch).mockImplementationOnce(async (_url, options) => {
+      if (typeof options?.body !== 'string') throw new Error('Expected a JSON request body')
+      const requestBody = JSON.parse(options.body) as { fileId: string }
+      return jsonResponse({
+        success: true,
+        data: {
+          fileId: requestBody.fileId,
+          metadata: { name: '测试工作区' }
+        }
+      })
+    })
+
+    await workspace.saveWorkspaceToCloud('测试工作区', {
+      students: [],
+      tags: [],
+      layout: { seats: [], config: {} }
+    })
+
+    const [, options] = vi.mocked(apiFetch).mock.calls[0]
+    if (typeof options?.body !== 'string') throw new Error('Expected a JSON request body')
+    const requestBody = JSON.parse(options.body) as { fileId: string }
+    expect(requestBody.fileId).toMatch(/^[a-f0-9]{32}$/)
+    expect(new Headers(options.headers).get('Idempotency-Key')).toBeNull()
+    expect(vi.mocked(apiFetch).mock.calls[0][2]).toBe(0)
+  })
+
   it('sends trimmed workspace name when renaming Retiehe workspace', async () => {
     const workspace = useCloudWorkspace()
 

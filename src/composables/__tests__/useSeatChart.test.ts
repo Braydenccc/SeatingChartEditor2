@@ -50,6 +50,19 @@ describe('useSeatChart', () => {
     })
   })
 
+  const configureHeterogeneousColumns = () => {
+    seatChart.updateConfig({
+      groupCount: 3,
+      columnsPerGroup: 2,
+      seatsPerColumn: 2,
+      groups: [
+        { columns: 1, rows: 2 },
+        { columns: 3, rows: 2 },
+        { columns: 2, rows: 2 }
+      ]
+    })
+  }
+
   describe('initialization', () => {
     it('should initialize with default configuration', () => {
       expect(seatChart.seatConfig.value.groupCount).toBe(4)
@@ -101,6 +114,88 @@ describe('useSeatChart', () => {
 
       expect(seatChart.getStudentAtSeat(seat1)).toBe(null)
       expect(seatChart.getStudentAtSeat(seat2)).toBe(1)
+    })
+  })
+
+  describe('studentSeatMap', () => {
+    it('reuses the reverse index until seat assignments change', () => {
+      seatChart.assignStudent('seat-0-0-0', 1, false)
+
+      const firstIndex = seatChart.studentSeatMap.value
+      expect(seatChart.findSeatByStudent(1)?.id).toBe('seat-0-0-0')
+      expect(seatChart.studentSeatMap.value).toBe(firstIndex)
+      expect(useSeatChart().studentSeatMap).toBe(seatChart.studentSeatMap)
+
+      seatChart.assignStudent('seat-0-0-1', 1, false)
+
+      expect(seatChart.studentSeatMap.value).not.toBe(firstIndex)
+      expect(seatChart.studentSeatMap.value.get(1)?.id).toBe('seat-0-0-1')
+      expect(seatChart.findSeatByStudent(1)?.id).toBe('seat-0-0-1')
+    })
+  })
+
+  describe('heterogeneous group coordinates', () => {
+    it('maps global columns using groups[] prefix sums', () => {
+      configureHeterogeneousColumns()
+
+      expect(seatChart.toGlobalCol(requireDefined(seatChart.getSeat('seat-0-0-0')))).toBe(0)
+      expect(seatChart.toGlobalCol(requireDefined(seatChart.getSeat('seat-1-0-0')))).toBe(1)
+      expect(seatChart.toGlobalCol(requireDefined(seatChart.getSeat('seat-1-2-0')))).toBe(3)
+      expect(seatChart.toGlobalCol(requireDefined(seatChart.getSeat('seat-2-0-0')))).toBe(4)
+      expect(seatChart.fromGlobalCol(5)).toEqual({ groupIndex: 2, columnIndex: 1 })
+      expect(seatChart.fromGlobalCol(6)).toBeNull()
+      expect(seatChart.getTranslatedSeatId('seat-0-0-0', 2, 0)).toBe('seat-1-1-0')
+    })
+
+    it('moves a selection across 1/3/2-column groups without losing displaced students', () => {
+      configureHeterogeneousColumns()
+      seatChart.assignStudent('seat-0-0-0', 1, false)
+      seatChart.assignStudent('seat-1-0-0', 2, false)
+      seatChart.assignStudent('seat-1-1-0', 3, false)
+      seatChart.assignStudent('seat-1-2-0', 4, false)
+
+      const moved = seatChart.moveSelection(
+        ['seat-0-0-0', 'seat-1-0-0'],
+        'seat-0-0-0',
+        'seat-1-1-0'
+      )
+
+      expect(moved).toBe(true)
+      expect(seatChart.getStudentAtSeat('seat-0-0-0')).toBe(3)
+      expect(seatChart.getStudentAtSeat('seat-1-0-0')).toBe(4)
+      expect(seatChart.getStudentAtSeat('seat-1-1-0')).toBe(1)
+      expect(seatChart.getStudentAtSeat('seat-1-2-0')).toBe(2)
+      expect(seatChart.seats.value.flatMap(seat => seat.studentId === null ? [] : [seat.studentId]).sort()).toEqual([1, 2, 3, 4])
+    })
+
+    it('leaves every source unchanged when any translated target is invalid', () => {
+      configureHeterogeneousColumns()
+      seatChart.assignStudent('seat-0-0-0', 1, false)
+      seatChart.assignStudent('seat-1-0-0', 2, false)
+      const before = seatChart.seats.value.map(seat => ({ ...seat }))
+
+      const moved = seatChart.moveSelection(
+        ['seat-0-0-0', 'seat-1-0-0'],
+        'seat-0-0-0',
+        'seat-2-1-0'
+      )
+
+      expect(moved).toBe(false)
+      expect(seatChart.seats.value).toEqual(before)
+      expect(seatChart.seats.value.flatMap(seat => seat.studentId === null ? [] : [seat.studentId]).sort()).toEqual([1, 2])
+    })
+
+    it('shifts heterogeneous columns atomically while conserving every student', () => {
+      configureHeterogeneousColumns()
+      const regularSeats = seatChart.seats.value.filter(seat => seat.kind !== 'guard')
+      regularSeats.forEach((seat, index) => {
+        seat.studentId = index + 1
+      })
+      const beforeStudentIds = regularSeats.map(seat => seat.studentId).sort((a, b) => Number(a) - Number(b))
+
+      expect(seatChart.shiftSeats(1, 1, 1)).toBe(true)
+
+      expect(regularSeats.map(seat => seat.studentId).sort((a, b) => Number(a) - Number(b))).toEqual(beforeStudentIds)
     })
   })
 

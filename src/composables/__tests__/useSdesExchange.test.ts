@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { WORKSPACE_SCHEMA_VERSION } from '@/types/models'
 import {
+  BSCE_EXTENSION_KEY,
   buildSdesDocumentFromState,
   buildWorkspaceFromSdes,
   getSdesImportTargets,
@@ -153,6 +155,7 @@ describe('useSdesExchange', () => {
     })
     const workspace = rawWorkspace as any
 
+    expect(workspace.meta.version).toBe(WORKSPACE_SCHEMA_VERSION)
     expect(workspace.students).toEqual([
       {
         id: 1,
@@ -377,6 +380,25 @@ describe('useSdesExchange', () => {
     expect(workspace.layout.seats.find((seat: any) => seat.id === 'seat-0-0-0').studentId).toBeNull()
   })
 
+  it.each([
+    { seatChartIndex: 0, label: 'grid' },
+    { seatChartIndex: 1, label: 'groupedColumns' }
+  ])('rejects $label charts with duplicate seat IDs before resolving assignments', ({ seatChartIndex }) => {
+    const document = createOfficialLikeSdes()
+    const chart = document.classes[0].seatCharts![seatChartIndex]
+    const firstSeat = chart.seats![0]
+    chart.seats!.push({
+      ...firstSeat,
+      x: firstSeat.x === undefined ? undefined : firstSeat.x + 1,
+      row: firstSeat.row === undefined ? undefined : firstSeat.row + 1
+    })
+
+    const targets = getSdesImportTargets(document)
+    expect(targets[seatChartIndex].warnings).toContain('1 个 seat.id 重复，当前座位表无法导入')
+    expect(() => buildWorkspaceFromSdes(document, { classIndex: 0, seatChartIndex }))
+      .toThrow(/包含重复 seat\.id.*无法安全解析座位分配/)
+  })
+
   it('exports the current workspace shape with resolvable seat and student references', () => {
     const document = buildSdesDocumentFromState({
       students: [
@@ -467,5 +489,7 @@ describe('useSdesExchange', () => {
     expect(chart.assignments!.every(assignment => seatIds.has(assignment.seatId))).toBe(true)
     expect(chart.assignments!.every(assignment => studentIds.has(assignment.studentId))).toBe(true)
     expect(document.extensions?.['app.bsce']).toBeTruthy()
+    expect((document.extensions?.[BSCE_EXTENSION_KEY] as { workspaceVersion?: string }).workspaceVersion)
+      .toBe(WORKSPACE_SCHEMA_VERSION)
   })
 })

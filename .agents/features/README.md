@@ -54,6 +54,7 @@ graph TD
   - [07-云端同步与认证 (07-cloud-sync.md)](./07-cloud-sync.md)
   - [08-导出系统 (08-export-system.md)](./08-export-system.md)
   - [09-安全增强 (09-security-enhancements.md)](./09-security-enhancements.md)
+  - [10-管理端 API (10-admin-api.md)](./10-admin-api.md)
 
 ## Vibe Coding 注意事项
 

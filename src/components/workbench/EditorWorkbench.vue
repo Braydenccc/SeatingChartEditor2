@@ -50,6 +50,9 @@
       display-directive="show"
       :native-scrollbar="false"
       :z-index="999"
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="mobileDrawerTitleId"
       @mask-click="closeMobileSheet"
       @esc="closeMobileSheet"
       @update:show="value => !value && mobileDrawerVisible && closeMobileSheet()"
@@ -63,6 +66,7 @@
       >
         <template #header>
           <strong
+          :id="mobileDrawerTitleId"
           class="mobile-drawer-title"
           @pointerdown="handleDrawerPointerDown"
           @pointermove="handleDrawerPointerMove"
@@ -86,8 +90,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
+import { mobileWorkbenchMediaQuery } from '@/constants/layout'
 import { NDrawer, NDrawerContent, NTabPane, NTabs } from 'naive-ui'
 import { LogOut } from 'lucide-vue-next'
 import SeatChart from '@/components/seat/SeatChart.vue'
@@ -102,7 +107,8 @@ import { useDragState } from '@/composables/useDragState'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
 const isWideDesktop = useMediaQuery('(min-width: 1440px)')
-const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
+const mobileDrawerTitleId = `${useId()}-mobile-drawer-title`
+const isMobileWorkbench = useMediaQuery(mobileWorkbenchMediaQuery)
 const isLandscape = useMediaQuery('(orientation: landscape)')
 const {
   rightRailTab,

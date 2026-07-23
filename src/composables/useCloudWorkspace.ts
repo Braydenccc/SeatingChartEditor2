@@ -69,6 +69,19 @@ const getErrorMessage = (errorValue: unknown, fallback: string) =>
 
 const workspaceFormatErrorMessage = '工作区数据格式错误'
 
+const createRandomHexId = (byteLength: number) => {
+    const cryptoApi = globalThis.crypto
+    if (!cryptoApi?.getRandomValues) {
+        throw new Error('当前环境无法安全生成云工作区标识')
+    }
+
+    return Array.from(cryptoApi.getRandomValues(new Uint8Array(byteLength)))
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('')
+}
+
+const createWorkspaceFileId = () => createRandomHexId(16)
+
 export function useCloudWorkspace() {
     const { currentUser, token, authType, webdavConfig, backupMode } = useAuth()
     const { listFiles, putFile, getFileText, deleteFile } = useWebDav()
@@ -133,7 +146,7 @@ export function useCloudWorkspace() {
                     _csrf: csrfToken,
                     ...payload
                 })
-            }, 3)
+            }, 0)
 
             if (!response.ok) {
                 let errorMsg = `HTTP Error: ${response.status}`
@@ -252,10 +265,20 @@ export function useCloudWorkspace() {
             }
         }
 
+        let stableFileId = fileId
+        if (!stableFileId) {
+            try {
+                stableFileId = createWorkspaceFileId()
+            } catch (err) {
+                const message = getErrorMessage(err, '无法生成云工作区标识')
+                return { success: false, message, error: message }
+            }
+        }
+
         const primaryResult = await callWorkspaceApi('save', {
             name,
             content: parsedContent,
-            fileId
+            fileId: stableFileId
         })
 
         if (primaryResult.success && backupMode.value && webdavConfig.value) {

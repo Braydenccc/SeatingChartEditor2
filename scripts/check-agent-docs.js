@@ -73,6 +73,22 @@ for (const doc of activeDocs) {
 }
 
 const sharedGuide = read('.agents/project/shared-agent-guide.md')
+const featureIndex = read('.agents/features/README.md')
+const featureDocs = fs.readdirSync(path.join(root, '.agents/features'), { withFileTypes: true })
+  .filter(entry => entry.isFile() && entry.name.endsWith('.md') && entry.name !== 'README.md')
+  .map(entry => entry.name)
+  .sort()
+
+for (const featureDoc of featureDocs) {
+  if (!featureIndex.includes(`(./${featureDoc})`)) {
+    errors.push(`.agents/features/README.md 未索引 ${featureDoc}`)
+  }
+
+  if (/^\d{2}-/.test(featureDoc) && !sharedGuide.includes(`.agents/features/${featureDoc}`)) {
+    errors.push(`.agents/project/shared-agent-guide.md 未索引 ${featureDoc}`)
+  }
+}
+
 const agentTemplate = read('.agents/templates/agent-entry.md.tpl')
 const traeTemplate = read('.agents/templates/trae-project-architecture.md.tpl')
 const expectedGenerated = {
@@ -118,14 +134,6 @@ for (const [target, expected] of Object.entries(expectedGenerated)) {
   if (normalize(read(target)) !== normalize(expected)) {
     errors.push(`${target} 与统一模板不同步，请运行 npm run docs:sync`)
   }
-}
-
-if (!read('.agents/features/README.md').includes('09-security-enhancements.md')) {
-  errors.push('.agents/features/README.md 未索引 09-security-enhancements.md')
-}
-
-if (!read('AGENTS.md').includes('09-security-enhancements.md')) {
-  errors.push('AGENTS.md 未索引 09-security-enhancements.md')
 }
 
 const temporaryDocNames = fs.existsSync(path.join(root, 'docs'))

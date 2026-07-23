@@ -13,6 +13,92 @@ import {
 } from '@/utils/exportLayout'
 import type { Seat } from '@/types/models'
 
+export interface ImageExportOptions {
+  resolution?: 'preview' | 'print'
+}
+
+export interface ImageSeatTableGeometry {
+  groupWidths: number[]
+  seatTableWidth: number
+  maxRowCount: number
+}
+
+export const calculateImageSeatTableGeometry = (
+  groupColumnRowCounts: number[][],
+  seatWidth: number,
+  columnGap: number,
+  groupGap: number,
+  rowNumberWidth: number
+): ImageSeatTableGeometry => {
+  const groupWidths = groupColumnRowCounts.map(columns => (
+    columns.length * seatWidth + Math.max(0, columns.length - 1) * columnGap
+  ))
+  const seatContentWidth = groupWidths.reduce((sum, width) => sum + width, 0) +
+    Math.max(0, groupWidths.length - 1) * groupGap
+  const maxRowCount = groupColumnRowCounts.reduce((maxRows, columns) => (
+    Math.max(maxRows, ...columns, 0)
+  ), 0)
+
+  return {
+    groupWidths,
+    seatTableWidth: rowNumberWidth * 2 + seatContentWidth,
+    maxRowCount
+  }
+}
+
+interface LatestImagePreviewRunnerOptions {
+  generate: () => Promise<string>
+  onLatest: (url: string) => void
+  onDiscard: (url: string) => void
+  onRunningChange: (running: boolean) => void
+  onError: (error: unknown) => void
+}
+
+export const createLatestImagePreviewRunner = (options: LatestImagePreviewRunnerOptions) => {
+  let requestedVersion = 0
+  let completedVersion = 0
+  let runningPromise: Promise<void> | null = null
+  let disposed = false
+
+  const run = async () => {
+    options.onRunningChange(true)
+    try {
+      while (!disposed && completedVersion < requestedVersion) {
+        const generationVersion = requestedVersion
+        try {
+          const url = await options.generate()
+          if (disposed || generationVersion !== requestedVersion) {
+            options.onDiscard(url)
+          } else {
+            options.onLatest(url)
+          }
+        } catch (error) {
+          if (!disposed && generationVersion === requestedVersion) {
+            options.onError(error)
+          }
+        }
+        completedVersion = generationVersion
+      }
+    } finally {
+      options.onRunningChange(false)
+      runningPromise = null
+    }
+  }
+
+  return {
+    request: () => {
+      if (disposed) return Promise.resolve()
+      requestedVersion += 1
+      if (!runningPromise) runningPromise = run()
+      return runningPromise
+    },
+    dispose: () => {
+      disposed = true
+      requestedVersion += 1
+    }
+  }
+}
+
 export function useImageExport() {
   const { seatConfig, organizedSeats, visibleGuardSeats } = useSeatChart()
   const { students } = useStudentData()
@@ -80,7 +166,7 @@ export function useImageExport() {
   }
 
   // 导出为图片，返回 Promise<string> (blob object URL)
-  const exportToImage = () => {
+  const exportToImage = (options: ImageExportOptions = {}) => {
     return new Promise<string>((resolve, reject) => {
       try {
         const isBW = exportSettings.value.colorMode === 'bw' || exportSettings.value.colorMode === 'pureBw'
@@ -121,12 +207,16 @@ export function useImageExport() {
         const hasGuardSeatInExport = !!guardSeatLeft || !!guardSeatRight
         const PODIUM_HEIGHT = exportSettings.value.showPodium ? (hasGuardSeatInExport ? SEAT_HEIGHT : 60) : 0
 
-        // 计算内容尺寸
-        const groupWidth = seatConfig.value.columnsPerGroup * SEAT_WIDTH +
-          (seatConfig.value.columnsPerGroup - 1) * COL_GAP
-        const seatTableWidth = ROW_NUMBER_WIDTH * 2 +
-          seatConfig.value.groupCount * groupWidth +
-          (seatConfig.value.groupCount - 1) * GROUP_GAP
+        // 计算内容尺寸。使用 organizedSeats 的真实列数和行数，兼容每组异构配置。
+        const renderedGroups = createOrderedSeatGroups(organizedSeats.value, flips)
+        const tableGeometry = calculateImageSeatTableGeometry(
+          renderedGroups.map(group => group.columns.map(column => column.seats.length)),
+          SEAT_WIDTH,
+          COL_GAP,
+          GROUP_GAP,
+          ROW_NUMBER_WIDTH
+        )
+        const { groupWidths, seatTableWidth, maxRowCount } = tableGeometry
         const podiumWidth = SEAT_WIDTH * 4 + COL_GAP * 3
         const podiumLayout = getCenteredPodiumLayout({
           seatTableWidth,
@@ -140,7 +230,7 @@ export function useImageExport() {
         const contentWidth = innerContentWidth + 2 * PADDING
         const verticalLayout = getImageExportVerticalLayout({
           titleHeight: TITLE_HEIGHT,
-          seatRowCount: seatConfig.value.seatsPerColumn,
+          seatRowCount: maxRowCount,
           seatHeight: SEAT_HEIGHT,
           rowGap: ROW_GAP,
           groupLabelHeight: GROUP_LABEL_HEIGHT,
@@ -153,13 +243,14 @@ export function useImageExport() {
         })
         const contentHeight = verticalLayout.contentHeight
 
-        // A4 尺寸 (300 DPI): 2480 × 3508
+        // 下载保持 A4 300 DPI；预览使用 150 DPI，显著降低 Canvas 与编码内存。
+        const resolutionScale = options.resolution === 'preview' ? 0.5 : 1
         const A4_SHORT = 2480
         const A4_LONG = 3508
         // 根据内容比例自动选择横/纵向
         const isLandscape = contentWidth / contentHeight > 1
-        const canvasWidth = isLandscape ? A4_LONG : A4_SHORT
-        const canvasHeight = isLandscape ? A4_SHORT : A4_LONG
+        const canvasWidth = Math.round((isLandscape ? A4_LONG : A4_SHORT) * resolutionScale)
+        const canvasHeight = Math.round((isLandscape ? A4_SHORT : A4_LONG) * resolutionScale)
 
         // 内存安全：最大 64MB（每像素 4 字节），需在分配 canvas 前检查
         const MAX_CANVAS_PIXELS = 64 * 1024 * 1024 / 4
@@ -215,11 +306,11 @@ export function useImageExport() {
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
 
-          for (let i = 0; i < seatConfig.value.seatsPerColumn; i++) {
+          for (let i = 0; i < maxRowCount; i++) {
             const rowY = seatStartY + i * (SEAT_HEIGHT + ROW_GAP) + SEAT_HEIGHT / 2
             const rowNumber = getVisualRowNumber(
               i,
-              seatConfig.value.seatsPerColumn,
+              maxRowCount,
               seatConfig.value.podiumPosition,
               flips.flipVertical
             )
@@ -234,8 +325,7 @@ export function useImageExport() {
 
         // 绘制座位
         let currentX = seatStartX
-        const renderedGroups = createOrderedSeatGroups(organizedSeats.value, flips)
-        renderedGroups.forEach((group) => {
+        renderedGroups.forEach((group, groupIndex) => {
           let columnX = currentX
 
           group.columns.forEach((column) => {
@@ -249,21 +339,22 @@ export function useImageExport() {
             columnX += SEAT_WIDTH + COL_GAP
           })
 
-          currentX += groupWidth + GROUP_GAP
+          currentX += (groupWidths[groupIndex] || 0) + GROUP_GAP
         })
 
         // 绘制组号（翻转时组号在顶部座位上方，正序时在底部下方）
         if (exportSettings.value.showGroupLabels) {
           const groupLabelY = flips.flipVertical
             ? seatStartY - 20  // 翻转：组号在座位最上方
-            : seatStartY + seatConfig.value.seatsPerColumn * SEAT_HEIGHT + (seatConfig.value.seatsPerColumn - 1) * ROW_GAP + 30
+            : seatStartY + maxRowCount * SEAT_HEIGHT + Math.max(0, maxRowCount - 1) * ROW_GAP + 30
 
           ctx.fillStyle = primaryColor
           ctx.font = `bold ${exportSettings.value.fontSizeGroupLabel}px Microsoft YaHei, Arial, sans-serif`
           ctx.textAlign = 'center'
 
           let groupLabelX = seatStartX
-          renderedGroups.forEach((group) => {
+          renderedGroups.forEach((group, groupIndex) => {
+            const groupWidth = groupWidths[groupIndex] || 0
             ctx.fillText(`第${group.groupIndex + 1}组`, groupLabelX + groupWidth / 2, groupLabelY)
             groupLabelX += groupWidth + GROUP_GAP
           })

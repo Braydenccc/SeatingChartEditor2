@@ -1,5 +1,5 @@
 <template>
-  <AppPageShell title="设置" eyebrow="全局与工作区">
+  <AppPageShell title="设置" eyebrow="全局与工作区" contained>
     <template #actions>
       <NPopconfirm
         :disabled="activeTab !== 'global'"
@@ -8,14 +8,20 @@
         @positive-click="handleReset"
       >
         <template #trigger>
-          <NButton size="small" secondary :disabled="activeTab !== 'global'">重置当前项</NButton>
+          <NButton size="small" secondary :disabled="activeTab !== 'global'">重置当前分类</NButton>
         </template>
         确认将当前分类恢复为默认设置？修改会立即保存。
       </NPopconfirm>
     </template>
 
     <div class="settings-page">
-      <NTabs v-model:value="activeTab" class="settings-tabs" type="segment" size="small">
+      <NTabs
+        v-model:value="activeTab"
+        class="settings-tabs"
+        type="card"
+        size="small"
+        :theme-overrides="settingsTabsThemeOverrides"
+      >
         <NTabPane name="global" tab="全局设置" />
         <NTabPane name="workspace" tab="工作区设置" />
         <NTabPane name="about" tab="关于" />
@@ -28,6 +34,7 @@
             :mode="isMobile ? 'horizontal' : 'vertical'"
             :options="menuOptions"
             :collapsed-width="0"
+            :theme-overrides="settingsMenuThemeOverrides"
             @update:value="value => activeCategory = String(value)"
           />
         </nav>
@@ -126,6 +133,31 @@ const menuOptions = computed<MenuOption[]>(() => currentCategories.value.map(cat
   icon: () => h(NIcon, null, { default: () => h(category.icon, { size: 17 }) })
 })))
 
+const settingsTabsThemeOverrides = {
+  tabColor: 'var(--color-surface)',
+  tabBorderColor: 'var(--color-border)',
+  tabTextColorCard: 'var(--color-text-secondary)',
+  tabTextColorHoverCard: 'var(--color-primary)',
+  tabTextColorActiveCard: 'var(--color-primary)',
+  tabBorderRadius: '8px'
+}
+
+const settingsMenuThemeOverrides = {
+  borderRadius: '8px',
+  itemHeight: '40px',
+  itemColorHover: 'var(--color-surface)',
+  itemColorActive: 'var(--color-surface)',
+  itemColorActiveHover: 'var(--color-surface)',
+  itemTextColor: 'var(--color-text-secondary)',
+  itemTextColorHover: 'var(--color-primary)',
+  itemTextColorActive: 'var(--color-primary)',
+  itemTextColorActiveHover: 'var(--color-primary)',
+  itemIconColor: 'var(--color-text-secondary)',
+  itemIconColorHover: 'var(--color-primary)',
+  itemIconColorActive: 'var(--color-primary)',
+  itemIconColorActiveHover: 'var(--color-primary)'
+}
+
 const currentSettings = computed(() => {
   if (activeTab.value !== 'global') return {}
   if (activeCategory.value === 'sync') return settings.value.sync
@@ -192,7 +224,7 @@ onBeforeUnmount(flushPendingSave)
 }
 
 .settings-tabs {
-  padding: 10px 12px;
+  padding: 10px 12px 0;
   background: var(--color-bg-subtle);
   border-bottom: 1px solid var(--color-border);
 }
@@ -205,7 +237,7 @@ onBeforeUnmount(flushPendingSave)
 }
 
 .settings-nav {
-  padding: 10px;
+  padding: 14px;
   border-right: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
 }

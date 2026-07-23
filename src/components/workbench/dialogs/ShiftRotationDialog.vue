@@ -4,11 +4,11 @@
       <div class="dialog-body">
         <div class="direction-pad">
           <NButton size="small" :type="form.shiftDistance < 0 ? 'primary' : 'default'" :secondary="form.shiftDistance >= 0" @click="setForward">
-            <ArrowUp :size="18" stroke-width="2" />
+            <template #icon><ArrowUp :size="18" stroke-width="2" /></template>
             <span>向前</span>
           </NButton>
           <NButton size="small" :type="form.shiftColShift < 0 ? 'primary' : 'default'" :secondary="form.shiftColShift >= 0" @click="setLeft">
-            <ArrowLeft :size="18" stroke-width="2" />
+            <template #icon><ArrowLeft :size="18" stroke-width="2" /></template>
             <span>向左</span>
           </NButton>
           <div class="shift-summary">
@@ -16,11 +16,11 @@
             <span>支持同时设置行偏移和列偏移</span>
           </div>
           <NButton size="small" :type="form.shiftColShift > 0 ? 'primary' : 'default'" :secondary="form.shiftColShift <= 0" @click="setRight">
-            <ArrowRight :size="18" stroke-width="2" />
+            <template #icon><ArrowRight :size="18" stroke-width="2" /></template>
             <span>向右</span>
           </NButton>
           <NButton size="small" :type="form.shiftDistance > 0 ? 'primary' : 'default'" :secondary="form.shiftDistance <= 0" @click="setBackward">
-            <ArrowDown :size="18" stroke-width="2" />
+            <template #icon><ArrowDown :size="18" stroke-width="2" /></template>
             <span>向后</span>
           </NButton>
         </div>
@@ -44,7 +44,7 @@
       <template #footer><footer class="dialog-footer">
         <NButton secondary @click="resetForm">重置</NButton>
         <NButton type="primary" @click="applySeatShift">
-          <RefreshCcw :size="16" stroke-width="2" />
+          <template #icon><RefreshCcw :size="16" stroke-width="2" /></template>
           <span>应用位移</span>
         </NButton>
       </footer></template>
@@ -131,7 +131,6 @@ const applySeatShift = () => {
 .dialog-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
 }
 
 .direction-pad {

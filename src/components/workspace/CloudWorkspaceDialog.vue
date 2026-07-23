@@ -416,8 +416,7 @@ const formatSize = (bytes?: number) => {
 }
 
 .dialog-body {
-  max-height: min(680px, calc(100dvh - 180px));
-  overflow-y: auto;
+  min-height: 0;
 }
 
 .loading-state {

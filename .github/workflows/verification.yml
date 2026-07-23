@@ -1,0 +1,96 @@
+name: Reusable Verification
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Docs, version, types and Vitest
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check agent documentation
+        run: npm run docs:check
+
+      - name: Check synchronized release version
+        run: npm run version:check
+
+      - name: Run type check
+        run: npm run type-check
+
+      - name: Run full Vitest suite
+        run: npm run test:run
+
+      - name: Test safe test-environment build wrapper
+        run: npm run test:build-test
+
+  e2e:
+    name: Playwright browser workflows
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser workflow tests
+        run: npm run test:e2e
+
+      - name: Archive browser test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            playwright-report/
+            test-results/e2e/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  tauri-check:
+    name: Tauri cargo check
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Check Tauri crate
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked

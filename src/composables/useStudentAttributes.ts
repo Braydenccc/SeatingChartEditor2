@@ -1,43 +1,12 @@
 import { computed, ref } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import type { NumericAttributeDefinition } from '@/types'
+import { hasRepresentableNumberInputRange } from '@/utils/inputNormalization'
 import { useStudentData } from './useStudentData'
+import { attributeDefinitions, createDefaultAttributeDefinitions } from './studentAttributeState'
 
-const defaultAttributeDefinitions: NumericAttributeDefinition[] = [
-  {
-    id: 'height',
-    name: '身高',
-    unit: 'cm',
-    min: 80,
-    max: 220,
-    precision: 0,
-    enabled: true,
-    showInEditor: true,
-    builtInKey: 'height',
-    createdFrom: 'default'
-  },
-  {
-    id: 'score',
-    name: '成绩',
-    unit: '分',
-    min: 0,
-    max: 150,
-    precision: 1,
-    enabled: true,
-    showInEditor: true,
-    builtInKey: 'score',
-    createdFrom: 'default'
-  }
-]
-
-const attributeDefinitions = ref<NumericAttributeDefinition[]>(
-  defaultAttributeDefinitions.map(def => ({ ...def }))
-)
 const showNumericAttributesInEditor = ref(true)
 let nextAttributeId = 1
-
-const createDefaultDefinitions = (): NumericAttributeDefinition[] =>
-  defaultAttributeDefinitions.map(def => ({ ...def }))
 
 const enabledAttributeDefinitions = computed(() =>
   attributeDefinitions.value.filter(def => def.enabled !== false)
@@ -57,14 +26,23 @@ const normalizeDefinition = (
   const name = String(definition.name || '').trim()
   if (!id || !name) return null
 
+  const min = parseOptionalNumber(definition.min)
+  const max = parseOptionalNumber(definition.max)
+  if (min !== null && max !== null && min > max) return null
   const precision = Number(definition.precision ?? 0)
+  const normalizedPrecision = Number.isFinite(precision) ? Math.min(10, Math.max(0, Math.floor(precision))) : 0
+  if (!hasRepresentableNumberInputRange({
+    min: min ?? undefined,
+    max: max ?? undefined,
+    precision: normalizedPrecision
+  })) return null
   return {
     id,
     name,
     unit: String(definition.unit || '').trim(),
-    min: parseOptionalNumber(definition.min),
-    max: parseOptionalNumber(definition.max),
-    precision: Number.isFinite(precision) ? Math.max(0, Math.floor(precision)) : 0,
+    min,
+    max,
+    precision: normalizedPrecision,
     enabled: definition.enabled !== false,
     showInEditor: definition.showInEditor !== false,
     builtInKey: definition.builtInKey,
@@ -204,13 +182,24 @@ export function useStudentAttributes(): {
   const updateAttribute = (attributeId: string, updates: Partial<NumericAttributeDefinition>) => {
     const index = attributeDefinitions.value.findIndex(def => def.id === attributeId)
     if (index === -1) return false
+    const currentDefinition = attributeDefinitions.value[index]
     const normalized = normalizeDefinition({
-      ...attributeDefinitions.value[index],
+      ...currentDefinition,
       ...updates,
       id: attributeId
     }, attributeId)
     if (!normalized) return false
     attributeDefinitions.value[index] = normalized
+    const constraintsChanged =
+      currentDefinition.min !== normalized.min ||
+      currentDefinition.max !== normalized.max ||
+      currentDefinition.precision !== normalized.precision
+    if (constraintsChanged) {
+      students.value.forEach(student => {
+        if (!student.numericAttributes) return
+        updateStudent(student.id, { numericAttributes: student.numericAttributes })
+      })
+    }
     return true
   }
 
@@ -245,7 +234,7 @@ export function useStudentAttributes(): {
       })
     attributeDefinitions.value = normalized.length > 0
       ? normalized
-      : (options.useDefaultsWhenEmpty === false ? [] : createDefaultDefinitions())
+      : (options.useDefaultsWhenEmpty === false ? [] : createDefaultAttributeDefinitions())
   }
 
   const setShowNumericAttributesInEditor = (show: boolean) => {

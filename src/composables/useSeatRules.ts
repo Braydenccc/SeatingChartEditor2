@@ -598,7 +598,34 @@ export function useSeatRules() {
 
   const detectConflicts = (zoneHelper: RuleZoneHelper | null = null, seatChartHelper: RuleSeatChartHelper | null = null) => {
     const conflicts: RuleConflict[] = []
-    const activeRules = rules.value.filter(r => r.enabled)
+    const negatedPredicateMap: Record<string, string> = {
+      IN_ZONE: 'NOT_IN_ZONE',
+      NOT_IN_ZONE: 'IN_ZONE',
+      MUST_BE_SEATMATES: 'MUST_NOT_BE_SEATMATES',
+      MUST_NOT_BE_SEATMATES: 'MUST_BE_SEATMATES',
+      MUST_BE_SAME_GROUP: 'MUST_NOT_BE_SAME_GROUP',
+      MUST_NOT_BE_SAME_GROUP: 'MUST_BE_SAME_GROUP'
+    }
+    const canonicalizeRule = (rule: Rule) => {
+      if (!rule.not) return [rule]
+      const effectivePredicate = negatedPredicateMap[rule.predicate]
+      if (!effectivePredicate) return []
+      return [{ ...rule, predicate: effectivePredicate, not: false }]
+    }
+    const activeRules = rules.value.flatMap(rule => {
+      if (!rule.enabled) return []
+      if ((rule.subRules?.length ?? 0) <= 1) return canonicalizeRule(rule)
+      if (rule.not || rule.logicOperator !== 'AND') return []
+
+      return (rule.subRules || []).flatMap(subRule => canonicalizeRule({
+        ...rule,
+        predicate: subRule.predicate,
+        params: { ...(subRule.params || {}) },
+        not: subRule.not,
+        logicOperator: null,
+        subRules: null
+      }))
+    })
     const expandedSubjectCache = new WeakMap<Rule, ExpandedRuleSubjects>()
     const pairKeyCache = new WeakMap<Rule, Partial<Record<'ordered' | 'unordered', Set<string>>>>()
 

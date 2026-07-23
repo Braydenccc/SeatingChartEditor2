@@ -12,6 +12,8 @@ const RATE_LIMIT_WINDOW = 300;
 const MAX_ATTEMPTS = 5;
 const TOKEN_EXPIRY_DAYS = 30;
 const TOKEN_EXPIRY_REMEMBER_ME = 90;
+const SECURITY_LOG_MAX_ENTRIES = 500;
+const SECURITY_LOG_MAX_ENTRY_BYTES = 4096;
 
 // 生产环境强制 HTTPS，开发环境可通过环境变量禁用
 // 默认要求 HTTPS，只有明确设置 REQUIRE_HTTPS=false 才禁用
@@ -33,20 +35,58 @@ function shouldRequireHttps() {
 }
 
 function logSecurityEvent($event, $username, $details = []) {
+    $safeEvent = truncateUtf8String($event, 80, '...');
+    $safeUsername = truncateUtf8String($username, 80, '...');
     try {
         $logDb = new Database('security_logs');
-        $logEntry = json_encode([
-            'event' => $event,
-            'username' => $username,
-            'ip' => getClientIp(),
-            'time' => time(),
-            'timestamp' => date('c'),
-            'details' => $details
-        ], JSON_UNESCAPED_UNICODE);
-        $logDb->push('events', $logEntry);
-    } catch (Exception $e) {
-        error_log("Security log failed: {$event} for {$username} - " . $e->getMessage());
+        $logEntry = encodeBoundedSecurityLogEntry(
+            $safeEvent,
+            $safeUsername,
+            getClientIp(),
+            $details,
+            SECURITY_LOG_MAX_ENTRY_BYTES
+        );
+        if (!databasePushBounded($logDb, 'events', $logEntry, SECURITY_LOG_MAX_ENTRIES)) {
+            throw new RuntimeException('security log write was not confirmed');
+        }
+    } catch (Throwable $e) {
+        $logEvent = sanitizeSingleLineLogText($safeEvent, 80);
+        $logUsername = sanitizeSingleLineLogText($safeUsername, 80);
+        $safeError = sanitizeSingleLineLogText($e->getMessage(), 512);
+        error_log("Security log failed: {$logEvent} for {$logUsername} - {$safeError}");
     }
+}
+
+function failRegistrationWithRollback(
+    $usersDb,
+    $profileDb,
+    $sessionDb,
+    $registrationLockDb,
+    $lease,
+    $username,
+    $expectedValues,
+    $reason,
+    $message
+) {
+    $rollback = rollbackRegistrationSaga($usersDb, $profileDb, $sessionDb, $username, $expectedValues);
+    try {
+        $leaseReleased = releaseRegistrationLease($registrationLockDb, $lease);
+    } catch (Throwable $error) {
+        $leaseReleased = false;
+        error_log("Registration lease release failed for {$username}: " . $error->getMessage());
+    }
+    logSecurityEvent('register_failed', $username, [
+        'reason' => $reason,
+        'rollback_success' => $rollback['success'],
+        'rollback_steps' => $rollback['steps'],
+        'rollback_outcomes' => $rollback['outcomes'],
+        'lease_released' => $leaseReleased
+    ]);
+
+    if (!$rollback['success']) {
+        $message .= '，且未能确认注册数据已完整清理，请联系管理员';
+    }
+    respond(['success' => false, 'message' => $message], 503);
 }
 
 function ensureHttps() {
@@ -61,32 +101,24 @@ function ensureHttps() {
 
 function checkRateLimitGeneric($key, $maxAttempts, $errorMessage, $logEvent = null, $logUsername = null) {
     $rateLimitDb = new Database('users_rate_limit');
-    $data = $rateLimitDb->get($key);
-    $now = time();
+    $rateResult = consumeAtomicRateLimitAttempt(
+        $rateLimitDb,
+        sanitizeDbKey('v2_' . $key),
+        RATE_LIMIT_WINDOW,
+        $maxAttempts
+    );
 
-    $attempts = [];
-    if ($data) {
-        $attempts = json_decode($data, true);
-        if (!is_array($attempts)) {
-            $attempts = [];
-        }
-
-        $attempts = array_filter($attempts, function($timestamp) use ($now) {
-            return ($now - $timestamp) < RATE_LIMIT_WINDOW;
-        });
-
-        if (count($attempts) >= $maxAttempts) {
-            $oldestAttempt = min($attempts);
-            $waitTime = RATE_LIMIT_WINDOW - ($now - $oldestAttempt);
-            if ($logEvent && $logUsername) {
-                logSecurityEvent($logEvent, $logUsername, ['wait_time' => $waitTime]);
-            }
-            respond(['success' => false, 'message' => $errorMessage . "，请在 {$waitTime} 秒后重试"], 429);
-        }
+    if (!$rateResult['ok']) {
+        respond(['success' => false, 'message' => '暂时无法确认请求频率，请稍后重试'], 503);
     }
 
-    $attempts[] = $now;
-    $rateLimitDb->set($key, json_encode($attempts));
+    if (!$rateResult['allowed']) {
+        $waitTime = $rateResult['retryAfter'];
+        if ($logEvent && $logUsername) {
+            logSecurityEvent($logEvent, $logUsername, ['wait_time' => $waitTime]);
+        }
+        respond(['success' => false, 'message' => $errorMessage . "，请在 {$waitTime} 秒后重试"], 429);
+    }
 }
 
 function checkRateLimit($username) {
@@ -139,17 +171,32 @@ function readPasswordField($input, $plainKey, $encryptedKey, $username) {
     return isset($input[$plainKey]) && is_string($input[$plainKey]) ? $input[$plainKey] : '';
 }
 
-function issueSessionToken($sessionDb, $username, $rememberMe = false) {
+function createSessionTokenData($rememberMe = false) {
     $token = bin2hex(random_bytes(32));
     $expiryDays = $rememberMe ? TOKEN_EXPIRY_REMEMBER_ME : TOKEN_EXPIRY_DAYS;
     $expiry = time() + ($expiryDays * 86400);
 
-    // 存储 Token 的 SHA-256 哈希而非明文
     $tokenHash = hash('sha256', $token);
     $sessionData = json_encode(['tokenHash' => $tokenHash, 'expiry' => $expiry]);
-    $sessionDb->set($username, $sessionData);
+    if (!is_string($sessionData)) {
+        throw new RuntimeException('session token encoding failed');
+    }
+    return [
+        'token' => $token,
+        'expiryDays' => $expiryDays,
+        'storedValue' => $sessionData
+    ];
+}
 
-    return ['token' => $token, 'expiryDays' => $expiryDays];
+function persistSessionToken($sessionDb, $username, $tokenData) {
+    if (!isset($tokenData['storedValue']) || !databaseSetVerified($sessionDb, $username, $tokenData['storedValue'])) {
+        throw new RuntimeException('session token write was not confirmed');
+    }
+    return $tokenData;
+}
+
+function issueSessionToken($sessionDb, $username, $rememberMe = false) {
+    return persistSessionToken($sessionDb, $username, createSessionTokenData($rememberMe));
 }
 
 function setAuthCookies($username, $tokenData) {
@@ -179,7 +226,7 @@ try {
     $input = parseRequestInput();
 
     $action = $input['action'];
-    $username = isset($input['username']) ? trim($input['username']) : '';
+    $username = isset($input['username']) && is_string($input['username']) ? trim($input['username']) : '';
     $password = readPasswordField($input, 'password', 'encryptedPassword', $username);
     $currentPassword = isset($input['currentPassword']) && is_string($input['currentPassword']) ? $input['currentPassword'] : '';
     $newPassword = isset($input['newPassword']) && is_string($input['newPassword']) ? $input['newPassword'] : '';
@@ -213,17 +260,191 @@ try {
             respond(['success' => false, 'message' => '注册失败，请检查输入或稍后重试']);
         }
 
-        $hash = password_hash($password, PASSWORD_DEFAULT);
-        $db->set($username, $hash);
-        $profileDb->set($username, json_encode([
-            'status' => 'active',
-            'createdAt' => date('c'),
-            'updatedAt' => date('c')
-        ], JSON_UNESCAPED_UNICODE));
+        $registrationId = bin2hex(random_bytes(16));
+        $registrationLockDb = new Database("registration_locks");
+        $lease = acquireRegistrationLease($registrationLockDb, $username, $registrationId);
+        if ($lease === null) {
+            logSecurityEvent('register_failed', $username, ['reason' => 'registration_in_progress']);
+            respond(['success' => false, 'message' => '同一用户名正在注册，请稍后重试'], 409);
+        }
 
-        $issuedToken = issueSessionToken($sessionDb, $username);
+        $expectedValues = [];
+
+        // 租约建立后重新检查，避免两个并发请求都通过首次存在性检查。
+        try {
+            $existingHash = $db->get($username);
+        } catch (Throwable $error) {
+            failRegistrationWithRollback(
+                $db,
+                $profileDb,
+                $sessionDb,
+                $registrationLockDb,
+                $lease,
+                $username,
+                $expectedValues,
+                'registration_recheck_failed',
+                '注册状态确认失败，请稍后重试'
+            );
+        }
+        if ($existingHash !== null) {
+            $leaseReleased = releaseRegistrationLease($registrationLockDb, $lease);
+            if (!$leaseReleased) {
+                error_log("Registration lease release failed after username conflict for {$username}");
+            }
+            logSecurityEvent('register_failed', $username, [
+                'reason' => 'username_exists',
+                'lease_released' => $leaseReleased
+            ]);
+            respond(['success' => false, 'message' => '注册失败，请检查输入或稍后重试']);
+        }
+
+        try {
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+            if (!is_string($hash)) {
+                throw new RuntimeException('password hash generation failed');
+            }
+
+            $createdAt = date('c');
+            $pendingProfileData = json_encode([
+                'status' => 'active',
+                'createdAt' => $createdAt,
+                'updatedAt' => $createdAt,
+                'registrationMarker' => $registrationId
+            ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            $finalProfileData = json_encode([
+                'status' => 'active',
+                'createdAt' => $createdAt,
+                'updatedAt' => $createdAt
+            ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            if (!is_string($pendingProfileData) || !is_string($finalProfileData)) {
+                throw new RuntimeException('registration profile encoding failed');
+            }
+
+            $issuedToken = createSessionTokenData();
+            $expectedValues = [
+                'account' => $hash,
+                'profile' => [$pendingProfileData, $finalProfileData],
+                'session' => $issuedToken['storedValue']
+            ];
+        } catch (Throwable $error) {
+            failRegistrationWithRollback(
+                $db,
+                $profileDb,
+                $sessionDb,
+                $registrationLockDb,
+                $lease,
+                $username,
+                $expectedValues,
+                'registration_prepare_failed',
+                '注册信息准备失败，请稍后重试'
+            );
+        }
+
+        if (!databaseSetVerified($db, $username, $hash)) {
+            failRegistrationWithRollback(
+                $db,
+                $profileDb,
+                $sessionDb,
+                $registrationLockDb,
+                $lease,
+                $username,
+                $expectedValues,
+                'account_write_failed',
+                '注册信息写入失败，请稍后重试'
+            );
+        }
+        if (!databaseSetVerified($profileDb, $username, $pendingProfileData)) {
+            failRegistrationWithRollback(
+                $db,
+                $profileDb,
+                $sessionDb,
+                $registrationLockDb,
+                $lease,
+                $username,
+                $expectedValues,
+                'profile_write_failed',
+                '用户资料写入失败，请稍后重试'
+            );
+        }
+
+        try {
+            persistSessionToken($sessionDb, $username, $issuedToken);
+        } catch (Throwable $error) {
+            failRegistrationWithRollback(
+                $db,
+                $profileDb,
+                $sessionDb,
+                $registrationLockDb,
+                $lease,
+                $username,
+                $expectedValues,
+                'session_write_failed',
+                '登录会话写入失败，请稍后重试'
+            );
+        }
+
+        $pendingState = registrationStateMatchesExpected($db, $profileDb, $sessionDb, $username, [
+            'account' => $hash,
+            'profile' => $pendingProfileData,
+            'session' => $issuedToken['storedValue']
+        ]);
+        if (!$pendingState['success']) {
+            failRegistrationWithRollback(
+                $db,
+                $profileDb,
+                $sessionDb,
+                $registrationLockDb,
+                $lease,
+                $username,
+                $expectedValues,
+                'registration_ownership_lost',
+                '注册状态发生并发变化，请稍后重试'
+            );
+        }
+
+        if (!databaseSetVerified($profileDb, $username, $finalProfileData)) {
+            failRegistrationWithRollback(
+                $db,
+                $profileDb,
+                $sessionDb,
+                $registrationLockDb,
+                $lease,
+                $username,
+                $expectedValues,
+                'profile_commit_failed',
+                '用户资料提交失败，请稍后重试'
+            );
+        }
+
+        $committedState = registrationStateMatchesExpected($db, $profileDb, $sessionDb, $username, [
+            'account' => $hash,
+            'profile' => $finalProfileData,
+            'session' => $issuedToken['storedValue']
+        ]);
+        if (!$committedState['success']) {
+            failRegistrationWithRollback(
+                $db,
+                $profileDb,
+                $sessionDb,
+                $registrationLockDb,
+                $lease,
+                $username,
+                $expectedValues,
+                'registration_commit_unconfirmed',
+                '注册状态确认失败，请稍后重试'
+            );
+        }
+
+        try {
+            $leaseReleased = releaseRegistrationLease($registrationLockDb, $lease);
+        } catch (Throwable $error) {
+            $leaseReleased = false;
+        }
+        if (!$leaseReleased) {
+            error_log("Registration lease release failed after successful commit for {$username}");
+        }
         setAuthCookies($username, $issuedToken);
-        logSecurityEvent('register_success', $username);
+        logSecurityEvent('register_success', $username, ['lease_released' => $leaseReleased]);
         respond([
             'success' => true,
             'message' => '注册成功',
@@ -286,7 +507,9 @@ try {
             clearAuthCookies();
             respond(['success' => false, 'message' => 'Token过期或无效'], 401);
         }
-        $sessionDb->delete($authUsername);
+        if (!databaseDeleteVerified($sessionDb, $authUsername)) {
+            respond(['success' => false, 'message' => '会话失效失败，请稍后重试'], 503);
+        }
         clearAuthCookies();
         logSecurityEvent('logout_success', $authUsername);
         respond(['success' => true, 'message' => '登出成功']);
@@ -309,7 +532,9 @@ try {
             respond(['success' => false, 'message' => '当前密码不正确']);
         }
 
-        $db->set($authUsername, password_hash($newPassword, PASSWORD_DEFAULT));
+        if (!databaseSetVerified($db, $authUsername, password_hash($newPassword, PASSWORD_DEFAULT))) {
+            respond(['success' => false, 'message' => '密码写入失败，请稍后重试'], 503);
+        }
         $issuedToken = issueSessionToken($sessionDb, $authUsername);
         setAuthCookies($authUsername, $issuedToken);
         logSecurityEvent('change_password_success', $authUsername);
@@ -319,7 +544,9 @@ try {
         $settingsDb = new Database("users_settings");
         $settings = isset($input['settings']) ? sanitizeUserSettings($input['settings']) : [];
         $settingsStr = json_encode($settings, JSON_UNESCAPED_UNICODE);
-        $settingsDb->set($authUsername, $settingsStr);
+        if (!is_string($settingsStr) || !databaseSetVerified($settingsDb, $authUsername, $settingsStr)) {
+            respond(['success' => false, 'message' => '设置写入失败，请稍后重试'], 503);
+        }
         respond(['success' => true, 'message' => '设置已保存']);
     } elseif ($action === 'get_settings') {
         $authUsername = requireAuthenticatedUsername($sessionDb);

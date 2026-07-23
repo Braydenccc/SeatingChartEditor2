@@ -61,7 +61,7 @@
                   <Minus :size="14" />
                 </NButton>
                 <span class="group-count-display">{{ localConfig.groupCount }}</span>
-                <NButton class="control-btn" size="tiny" quaternary circle @click="addGroup" :disabled="localConfig.groupCount >= 10">
+                <NButton class="control-btn" size="tiny" quaternary circle @click="addGroup" :disabled="localConfig.groupCount >= maxSeatGroupCount">
                   <Plus :size="14" />
                 </NButton>
               </div>
@@ -117,18 +117,23 @@ import { NButton } from 'naive-ui'
 import { Plus, Minus } from 'lucide-vue-next'
 import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 import { useSeatChart } from '@/composables/useSeatChart'
+import { maxSeatGroupCount } from '@/constants/seatConfig'
 import type { GroupConfig, SeatConfig } from '@/types/models'
 
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false
-  }
+const props = withDefaults(defineProps<{
+  visible?: boolean
+  initialConfig?: Partial<SeatConfig> | null
+}>(), {
+  visible: false,
+  initialConfig: null
 })
 
-const emit = defineEmits(['update:visible', 'confirm'])
+const emit = defineEmits<{
+  'update:visible': [value: boolean]
+  confirm: [config: Partial<SeatConfig>]
+}>()
 
-const { seatConfig, updateConfig } = useSeatChart()
+const { seatConfig } = useSeatChart()
 
 const localConfig = ref<{
   groupCount: number
@@ -155,7 +160,12 @@ watch(() => props.visible, (newVal) => {
 initLocalConfig()
 
 function initLocalConfig() {
-  const config = seatConfig.value
+  const config: SeatConfig = {
+    ...seatConfig.value,
+    ...props.initialConfig,
+    groups: props.initialConfig?.groups ?? seatConfig.value.groups,
+    guardSeats: props.initialConfig?.guardSeats ?? seatConfig.value.guardSeats
+  }
   localConfig.value.groupCount = config.groupCount
   localConfig.value.podiumPosition = config.podiumPosition || 'bottom'
 
@@ -194,7 +204,7 @@ const totalSeats = computed(() => {
 })
 
 function addGroup() {
-  if (localConfig.value.groupCount >= 10) return
+  if (localConfig.value.groupCount >= maxSeatGroupCount) return
   localConfig.value.groupCount++
 
   // 确保 groups 数组长度与 groupCount 匹配
@@ -283,7 +293,6 @@ function handleConfirm() {
 .dialog-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
