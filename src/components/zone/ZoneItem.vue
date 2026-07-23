@@ -2,6 +2,8 @@
   <div
     class="zone-item"
     :class="{ selected: isSelected }"
+    role="listitem"
+    :aria-label="`选区 ${zone.name}`"
     @click="handleSelect"
   >
     <div class="zone-header">
@@ -11,6 +13,7 @@
         v-model:value="editedName"
         class="zone-name-input"
         size="small"
+        :input-props="{ 'aria-label': `修改选区 ${zone.name} 的名称` }"
         @blur="saveName"
         @keyup.enter="saveName"
         @click.stop
@@ -26,6 +29,7 @@
       <NCheckbox
         class="zone-visible-checkbox"
         :checked="zone.visible"
+        :aria-label="`${zone.name} 显示状态`"
         @click.stop
         @update:checked="toggleVisible"
       >显示</NCheckbox>
@@ -40,7 +44,14 @@
           :style="{ background: getTagColor(tagId) }"
         >
           {{ getTagName(tagId) }}
-          <NButton class="remove-tag-btn" size="tiny" text circle @click.stop="removeTag(tagId)">
+          <NButton
+            class="remove-tag-btn"
+            size="tiny"
+            text
+            circle
+            :aria-label="`从 ${zone.name} 移除标签 ${getTagName(tagId)}`"
+            @click.stop="removeTag(tagId)"
+          >
             <X :size="10" stroke-width="2.5" />
           </NButton>
         </span>
@@ -52,7 +63,7 @@
           :width="200"
         >
           <template #trigger>
-            <NButton size="tiny" quaternary circle type="primary" title="添加标签" @click.stop>
+            <NButton size="tiny" quaternary circle type="primary" title="添加标签" :aria-label="`为 ${zone.name} 添加标签`" @click.stop>
               <Plus :size="12" stroke-width="2.5" />
             </NButton>
           </template>
@@ -64,7 +75,7 @@
                 class="tag-option"
                 text
                 block
-                @click="addTagToZone(tag.id)"
+                @click.stop="addTagToZone(tag.id)"
               >
                 <span class="tag-option-content">
                   <span class="tag-dot" :style="{ background: tag.color }"></span>
@@ -82,10 +93,23 @@
       </div>
     </div>
 
-    <NPopconfirm positive-text="删除" negative-text="取消" @positive-click="handleDelete">
-      <template #trigger><NButton size="small" type="error" secondary block @click.stop>删除</NButton></template>
-      确认删除选区“{{ zone.name }}”？
-    </NPopconfirm>
+    <div class="zone-actions">
+      <NButton
+        size="small"
+        secondary
+        block
+        :type="isSelected ? 'primary' : 'default'"
+        :aria-pressed="isSelected"
+        :aria-label="isSelected ? `退出编辑选区 ${zone.name}` : `编辑选区 ${zone.name} 的座位`"
+        @click.stop="handleSelect"
+      >
+        {{ isSelected ? '退出编辑' : '编辑座位' }}
+      </NButton>
+      <NPopconfirm positive-text="删除" negative-text="取消" @positive-click="handleDelete">
+        <template #trigger><NButton size="small" type="error" secondary block @click.stop>删除</NButton></template>
+        确认删除选区“{{ zone.name }}”？
+      </NPopconfirm>
+    </div>
   </div>
 </template>
 
@@ -278,6 +302,12 @@ const handleDelete = () => {
 .zone-info {
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+
+.zone-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .tag-picker-scroll {

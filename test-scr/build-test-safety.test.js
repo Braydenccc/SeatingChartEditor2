@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { EventEmitter } from 'node:events'
 import { afterEach, test } from 'node:test'
 import {
@@ -13,27 +14,16 @@ import {
 import { patchTestEnvironment, testEnvironmentFiles } from '../scripts/patch-test-env.js'
 
 const fixtureRoots = []
-
-const fixtureContents = {
-  'index.html': Buffer.from('<!doctype html>\r\n<title>测试座位表</title>\r\n', 'utf8'),
-  'src/components/auth/LoginDialog.vue': Buffer.from(
-    '<template>本账号服务不保证可用性，请妥善备份您的数据</template>\r\n',
-    'utf8'
-  ),
-  'src/components/layout/AppHeader.vue': Buffer.from(
-    '<template><h1 class="header-text">BraydenSCE V2</h1></template>\r\n<style scoped>\r\n</style>\r\n',
-    'utf8'
-  )
-}
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const createFixture = () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'scev2-build-test-'))
   fixtureRoots.push(root)
 
-  for (const [relativePath, content] of Object.entries(fixtureContents)) {
+  for (const relativePath of testEnvironmentFiles) {
     const target = path.join(root, relativePath)
     fs.mkdirSync(path.dirname(target), { recursive: true })
-    fs.writeFileSync(target, content)
+    fs.copyFileSync(path.join(repositoryRoot, relativePath), target)
   }
 
   return root
@@ -65,7 +55,7 @@ test('成功构建后逐字节恢复三个临时 patch 文件', async () => {
   await runTestBuild({
     repositoryRoot: root,
     startBuild: () => {
-      assert.match(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), /\[test\] 测试座位表/)
+      assert.match(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), /<title(?:\s[^>]*)?>\[test\]\s/)
       assert.match(fs.readFileSync(path.join(root, 'src/components/layout/AppHeader.vue'), 'utf8'), /test-badge/)
       return {
         child: { kill: () => true },

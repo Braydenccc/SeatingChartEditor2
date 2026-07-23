@@ -73,7 +73,7 @@
         <div class="section-title">选中学生</div>
         <div class="student-card">
           <strong>{{ selectedStudent.name || '未命名' }}</strong>
-          <span>{{ selectedStudent.studentNumber || '无学号' }}</span>
+          <span>{{ selectedStudent.studentNumber ?? '无学号' }}</span>
         </div>
         <div class="detail-list">
           <div><span>状态</span><strong>{{ selectedStudentSeat ? '已入座' : '未入座' }}</strong></div>
@@ -203,6 +203,7 @@ import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useTagData } from '@/composables/useTagData'
 import { useUndo } from '@/composables/useUndo'
 import { normalizeNumberInput } from '@/utils/inputNormalization'
+import { shuffleArray } from '@/utils/shuffleArray'
 import type { NumericAttributeDefinition } from '@/types/models'
 
 const { currentMode, EditMode } = useEditMode()
@@ -419,15 +420,12 @@ const shuffleSelectedSeats = () => {
       }
     }
   } else {
-    for (let i = studentIds.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [studentIds[i], studentIds[j]] = [studentIds[j], studentIds[i]]
-    }
+    const shuffledStudentIds = shuffleArray(studentIds)
     const occupiedIds = ids.filter(id => getStudentAtSeat(id))
     for (const seatId of occupiedIds) clearSeat(seatId, false)
     for (let i = 0; i < occupiedIds.length; i++) {
       const seatId = occupiedIds[i]
-      const studentId = studentIds[i]
+      const studentId = shuffledStudentIds[i]
       if (seatId && studentId !== undefined) assignStudent(seatId, studentId, false)
     }
   }
@@ -441,7 +439,7 @@ const assignSelectedSeats = () => {
   const unassigned = students.value.filter(student => !findSeatByStudent(student.id))
   if (emptyIds.length === 0 || unassigned.length === 0) return
 
-  const shuffled = [...unassigned].sort(() => Math.random() - 0.5)
+  const shuffled = shuffleArray(unassigned)
   const count = Math.min(emptyIds.length, shuffled.length)
   const before = createSnapshot()
   for (let i = 0; i < count; i++) {

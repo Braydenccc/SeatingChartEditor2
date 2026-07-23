@@ -7,6 +7,7 @@ vi.mock('../useAuth')
 import { fetchWithRetry } from '@/utils/fetchHelpers'
 import { useAuth, getOrCreateCsrfToken } from '../useAuth'
 import { useWebDav } from '../useWebDav'
+import { buildWebDavWorkspacePath } from '@/utils/webdavPath'
 
 type AuthApi = ReturnType<typeof useAuth>
 
@@ -115,4 +116,18 @@ describe('useWebDav', () => {
       })
     }))
   })
+
+  it('preserves the same encoded workspace path for direct and proxy requests', async () => {
+    vi.mocked(useAuth).mockReturnValue(createAuthMock('cookie-session'))
+    mockedFetchWithRetry
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response('workspace', { status: 200 }))
+    const encodedPath = buildWebDavWorkspacePath('班级 #1%.sce')
+
+    await expect(useWebDav().getFileText(config, encodedPath)).resolves.toBe('workspace')
+
+    expect(mockedFetchWithRetry.mock.calls[0][0]).toBe(`https://dav.example.com/root${encodedPath}`)
+    expect(new Headers(mockedFetchWithRetry.mock.calls[1][1]?.headers).get('x-dav-path')).toBe(encodedPath)
+  })
+
 })

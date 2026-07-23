@@ -144,6 +144,36 @@ describe('useCloudWorkspace', () => {
     expect(mockPutFile).not.toHaveBeenCalled()
   })
 
+  it('encodes WebDAV workspace names as one path segment for save, load and delete', async () => {
+    const workspace = useCloudWorkspace()
+    const fileId = '班级 #1%.sce'
+    const encodedPath = '/sce_data/%E7%8F%AD%E7%BA%A7%20%231%25.sce'
+    mockGetFileText.mockResolvedValueOnce('{}')
+
+    await expect(workspace.saveWorkspaceToCloud('班级 #1%', {}, null, 'webdav'))
+      .resolves.toEqual({ success: true })
+    await expect(workspace.loadWorkspaceFromCloud(fileId, 'webdav'))
+      .resolves.toMatchObject({ success: true })
+    await expect(workspace.deleteWorkspaceFromCloud(fileId, 'webdav'))
+      .resolves.toEqual({ success: true })
+
+    expect(mockPutFile).toHaveBeenCalledWith(expect.anything(), encodedPath, expect.any(String), 'application/json')
+    expect(mockGetFileText).toHaveBeenCalledWith(expect.anything(), encodedPath)
+    expect(mockDeleteFile).toHaveBeenCalledWith(expect.anything(), encodedPath)
+  })
+
+  it('rejects WebDAV file IDs that would escape the workspace directory', async () => {
+    const workspace = useCloudWorkspace()
+
+    await expect(workspace.loadWorkspaceFromCloud('../escape.sce', 'webdav'))
+      .resolves.toMatchObject({ success: false, message: expect.stringMatching(/单个有效路径段/) })
+    await expect(workspace.deleteWorkspaceFromCloud('folder\\escape.sce', 'webdav'))
+      .resolves.toMatchObject({ success: false, message: expect.stringMatching(/单个有效路径段/) })
+
+    expect(mockGetFileText).not.toHaveBeenCalled()
+    expect(mockDeleteFile).not.toHaveBeenCalled()
+  })
+
   it('lets the server assign the file id for a new SCE workspace', async () => {
     const workspace = useCloudWorkspace()
     vi.mocked(apiFetch).mockImplementationOnce(async (_url, options) => {

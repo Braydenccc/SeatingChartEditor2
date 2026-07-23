@@ -121,7 +121,7 @@ const largeNameMode = computed(() => showStudentName.value && hasHiddenElement.v
 const largeNumberMode = computed(() => showStudentNumber.value && hasHiddenElement.value && settings.value.ui.largeNumberMode)
 
 const displayName = computed(() => props.student?.name || props.fallbackName)
-const displayNumber = computed(() => props.student?.studentNumber || '-')
+const displayNumber = computed(() => props.student?.studentNumber ?? '-')
 
 const allVisibleTags = computed(() => {
   if (!showTagsInSeatChart.value || !props.student) return []

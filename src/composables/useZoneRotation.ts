@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { useSeatChart } from './useSeatChart'
+import { pruneRotationSeatIds, rotGroups } from './zoneRotationState'
 import { isGuardSeatId, parseSeatId } from '@/utils/seatHelpers'
 import type { RotationGroup, RotationZone, Seat } from '@/types/models'
 
@@ -11,7 +12,6 @@ import type { RotationGroup, RotationZone, Seat } from '@/types/models'
  * - applyZoneRotation 按座位坐标排序，消除点击顺序影响
  */
 
-const rotGroups = ref<RotationGroup[]>([])
 let nextGroupId = 1
 let nextZoneId = 1   // 全局递增，避免选区名重复
 
@@ -342,14 +342,7 @@ export function useZoneRotation() {
     return { moved: updates.length, errors }
   }
 
-  const cleanupInvalidRotSeats = (validSeatIds: string[]) => {
-    const validSet = new Set(validSeatIds)
-    for (const g of rotGroups.value) {
-      for (const z of g.zones) {
-        z.seatIds = z.seatIds.filter(sid => validSet.has(sid))
-      }
-    }
-  }
+  const cleanupInvalidRotSeats = (validSeatIds: string[]) => pruneRotationSeatIds(validSeatIds)
 
   const clearAllRotData = () => {
     rotGroups.value = []

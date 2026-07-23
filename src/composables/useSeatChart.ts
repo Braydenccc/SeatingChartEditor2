@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { useZoneData } from './useZoneData'
 import { useUndo } from './useUndo'
+import { pruneRotationSeatIds } from './zoneRotationState'
 import { parseSeatId, generateSeatId, generateGuardSeatId, isGuardSeatId } from '@/utils/seatHelpers'
 import type { GroupConfig, GuardSeatsConfig, Seat, SeatConfig, SeatPosition } from '@/types/models'
 
@@ -147,6 +148,16 @@ function rebuildSeatMap() {
   seatMap = newMap
 }
 
+const applySeatState = (seat: Seat, updates: SeatStateUpdate) => {
+  Object.assign(seat, updates)
+  if (seat.isEmpty) seat.studentId = null
+}
+
+const cloneSeatWithValidState = (seat: Seat): Seat => ({
+  ...seat,
+  studentId: seat.isEmpty ? null : seat.studentId
+})
+
 const replaceSeatChartState = (nextConfig: SeatConfig, nextSeats: Seat[]) => {
   seatConfig.value = {
     ...nextConfig,
@@ -155,7 +166,7 @@ const replaceSeatChartState = (nextConfig: SeatConfig, nextSeats: Seat[]) => {
       ? { ...nextConfig.guardSeats }
       : { ...DEFAULT_GUARD_SEATS_CONFIG }
   }
-  seats.value = nextSeats.map(seat => ({ ...seat }))
+  seats.value = nextSeats.map(cloneSeatWithValidState)
   rebuildSeatMap()
 }
 
@@ -169,14 +180,15 @@ const updateSeatState = (seatId: string, updates: SeatStateUpdate, recordUndo = 
 
   const undo = recordUndo ? useUndo() : null
   const beforeSnapshot = undo?.createSnapshot()
+  const willBeEmpty = updates.isEmpty ?? seat.isEmpty
 
   // 如果要分配新学生，先找到该学生之前所在的座位
-  if (updates.studentId !== undefined && updates.studentId !== null && updates.studentId !== seat.studentId) {
+  if (!willBeEmpty && updates.studentId !== undefined && updates.studentId !== null && updates.studentId !== seat.studentId) {
     const previousSeat = seats.value.find(s => s.studentId === updates.studentId && s.id !== seatId)
     if (previousSeat) previousSeat.studentId = null
   }
 
-  Object.assign(seat, updates)
+  applySeatState(seat, updates)
   if (undo && beforeSnapshot) {
     undo.recordBatch(beforeSnapshot, undo.createSnapshot())
   }
@@ -193,7 +205,7 @@ const batchUpdateSeats = (updates: BatchSeatUpdate[], recordUndo = true) => {
 
     for (const { seatId, ...changes } of updates) {
       const seat = seatMap.get(seatId)
-      if (seat) Object.assign(seat, changes)
+      if (seat) applySeatState(seat, changes)
     }
 
     const afterSnapshot = createSnapshot()
@@ -201,7 +213,7 @@ const batchUpdateSeats = (updates: BatchSeatUpdate[], recordUndo = true) => {
   } else {
     for (const { seatId, ...changes } of updates) {
       const seat = seatMap.get(seatId)
-      if (seat) Object.assign(seat, changes)
+      if (seat) applySeatState(seat, changes)
     }
   }
 }
@@ -250,13 +262,14 @@ function reconcileSeatsWithConfig() {
       for (let r = 0; r < groupConfig.rows; r++) {
         const id = generateSeatId(g, c, r)
         const previousSeat = previousSeats.get(id)
+        const isEmpty = previousSeat?.isEmpty ?? false
         newSeats.push({
           id,
           groupIndex: g,
           columnIndex: c,
           rowIndex: r,
-          studentId: previousSeat?.studentId ?? null,
-          isEmpty: previousSeat?.isEmpty ?? false,
+          studentId: isEmpty ? null : (previousSeat?.studentId ?? null),
+          isEmpty,
           kind: 'regular'
         })
       }
@@ -328,7 +341,7 @@ const visibleGuardSeats = computed(() => {
 const studentSeatMap = computed(() => {
   const index = new Map<number, Seat>()
   for (const seat of seats.value) {
-    if (seat.studentId !== null && !index.has(seat.studentId)) {
+    if (!seat.isEmpty && seat.studentId !== null && !index.has(seat.studentId)) {
       index.set(seat.studentId, seat)
     }
   }
@@ -440,15 +453,17 @@ export function useSeatChart() {
   const swapSeats = (seatId1: string, seatId2: string, recordUndo = true) => {
     const seat1 = seatMap.get(seatId1)
     const seat2 = seatMap.get(seatId2)
-    if (seat1 && seat2) {
-      if (recordUndo) {
-        const { recordSwap } = useUndo()
-        recordSwap(seatId1, seatId2)
-      }
-      const temp = seat1.studentId
-      seat1.studentId = seat2.studentId
-      seat2.studentId = temp
+    if (!seat1 || !seat2 || seat1.isEmpty || seat2.isEmpty || seatId1 === seatId2) {
+      return false
     }
+    if (recordUndo) {
+      const { recordSwap } = useUndo()
+      recordSwap(seatId1, seatId2)
+    }
+    const temp = seat1.studentId
+    seat1.studentId = seat2.studentId
+    seat2.studentId = temp
+    return true
   }
 
   // 批量移动选区学生（以拖拽起始座位为锚点，整体平移）
@@ -624,8 +639,10 @@ export function useSeatChart() {
     ensureGroupsArray()
     ensureGuardSeatsConfig()
     reconcileSeatsWithConfig()
-    // 清理选区中已失效的座位引用
-    cleanupInvalidSeats(seats.value.filter(s => s.kind !== 'guard').map(s => s.id))
+    // 清理普通选区和轮换选区中已失效的座位引用
+    const validSeatIds = seats.value.filter(s => s.kind !== 'guard').map(s => s.id)
+    cleanupInvalidSeats(validSeatIds)
+    pruneRotationSeatIds(validSeatIds)
   }
 
   // 获取座位上的学生ID

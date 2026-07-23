@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NButton } from 'naive-ui'
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterView } from 'vue-router'
 import { History, RotateCcw } from 'lucide-vue-next'
 import GlobalDropZone from './components/ui/GlobalDropZone.vue'
@@ -38,6 +38,12 @@ const {
   restoreAutoSaveBackup
 } = useAutoSave()
 const { isWelcomeIntroVisible, showWelcomeIntroIfNeeded } = useWelcomeOnboarding()
+
+watch(
+  () => settings.value.editor.undoHistorySize,
+  size => setMaxHistory(size),
+  { immediate: true }
+)
 
 const loginDialogInitialTab = ref<'login' | 'register'>('login')
 const showAutoSavePrompt = ref(false)
@@ -195,10 +201,6 @@ onMounted(async () => {
   initializeTags()
   applyColorScheme()
   applyThemeColor()
-
-  if (settings.value.editor.undoHistorySize) {
-    setMaxHistory(settings.value.editor.undoHistorySize)
-  }
 
   if (settings.value.ui.enableAnimations !== undefined) {
     document.documentElement.classList.toggle('disable-animations', !settings.value.ui.enableAnimations)

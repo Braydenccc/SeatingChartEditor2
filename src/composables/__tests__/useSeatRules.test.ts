@@ -260,6 +260,86 @@ describe('useSeatRules', () => {
   })
 
   describe('detectConflicts', () => {
+    it.each([
+      ['top', 0],
+      ['bottom', 6]
+    ] as const)('uses %s podium direction and heterogeneous group rows for zone/range checks', (podiumPosition, rowIndex) => {
+      seatRules.addRule({
+        priority: 'required',
+        predicate: 'IN_ZONE',
+        subjects: [{ type: 'person', id: 1 }],
+        params: { zoneId: 1 }
+      })
+      seatRules.addRule({
+        priority: 'required',
+        predicate: 'IN_ROW_RANGE',
+        subjects: [{ type: 'person', id: 1 }],
+        params: { minRow: 1, maxRow: 1 }
+      })
+
+      const seatId = `seat-1-0-${rowIndex}`
+      const conflicts = seatRules.detectConflicts({
+        zones: [{ id: 1, name: '前排', tagIds: [], seatIds: [seatId], visible: true }]
+      }, {
+        seats: [{
+          id: seatId,
+          groupIndex: 1,
+          columnIndex: 0,
+          rowIndex,
+          studentId: null,
+          isEmpty: false
+        }],
+        seatConfig: {
+          groupCount: 2,
+          columnsPerGroup: 2,
+          seatsPerColumn: 3,
+          groups: [{ columns: 2, rows: 3 }, { columns: 2, rows: 7 }],
+          shiftDistance: 4,
+          podiumPosition
+        }
+      })
+
+      expect(conflicts).toEqual([])
+    })
+
+    it.each([
+      [1, false],
+      [2, false],
+      [3, true]
+    ])('treats deskmates plus minimum distance %i as conflicting=%s', (distance, conflicting) => {
+      seatRules.addRule({
+        priority: 'required',
+        predicate: 'MUST_BE_SEATMATES',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: {}
+      })
+      seatRules.addRule({
+        priority: 'required',
+        predicate: 'DISTANCE_AT_LEAST',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: { distance }
+      })
+
+      expect(seatRules.detectConflicts().some(conflict => conflict.type === 'infeasible')).toBe(conflicting)
+    })
+
+    it('does not report a deskmate/distance conflict for different student pairs', () => {
+      seatRules.addRule({
+        priority: 'required',
+        predicate: 'MUST_BE_SEATMATES',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: {}
+      })
+      seatRules.addRule({
+        priority: 'required',
+        predicate: 'DISTANCE_AT_LEAST',
+        subjects: [{ type: 'person', id: 2 }, { type: 'person', id: 3 }],
+        params: { distance: 3 }
+      })
+
+      expect(seatRules.detectConflicts()).toEqual([])
+    })
+
     it('canonicalizes supported negation before checking opposite pair rules', () => {
       seatRules.addRule({
         priority: 'required',

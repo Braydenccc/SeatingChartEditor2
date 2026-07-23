@@ -1,5 +1,6 @@
 <?php
 require_once "api/common.php";
+require_once "api/dav-proxy-security.php";
 
 const DAV_PROXY_MAX_REQUEST_BYTES = 10 * 1024 * 1024;
 const DAV_PROXY_MAX_RESPONSE_BYTES = 20 * 1024 * 1024;
@@ -31,15 +32,7 @@ function isSameOriginRequest() {
     return strtolower($origin) === strtolower($scheme . '://' . $host);
 }
 
-function isPublicIpAddress($ip) {
-    return filter_var(
-        $ip,
-        FILTER_VALIDATE_IP,
-        FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
-    ) !== false;
-}
-
-function assertPublicHost($host) {
+function resolvePublicHostAddresses($host) {
     $host = trim($host, "[] \t\n\r\0\x0B");
     $lowerHost = strtolower($host);
 
@@ -51,7 +44,7 @@ function assertPublicHost($host) {
         if (!isPublicIpAddress($host)) {
             jsonProxyError('WebDAV 中转不允许访问内网或保留地址', 403);
         }
-        return;
+        return [$host];
     }
 
     $addresses = [];
@@ -75,19 +68,28 @@ function assertPublicHost($host) {
         jsonProxyError('无法解析 WebDAV 服务器地址', 400);
     }
 
+    $normalizedAddresses = [];
     foreach ($addresses as $address) {
-        if (!isPublicIpAddress($address)) {
+        $normalizedAddress = normalizeIpAddress($address);
+        if ($normalizedAddress === null || !isPublicIpAddress($normalizedAddress)) {
             jsonProxyError('WebDAV 中转不允许访问内网或保留地址', 403);
         }
+        $normalizedAddresses[$normalizedAddress] = true;
     }
+
+    return array_keys($normalizedAddresses);
 }
 
-function buildDavUrl($baseUrl, $path) {
+function buildDavTarget($baseUrl, $path) {
+    if (!supportsGlobalIpRangeValidation()) {
+        jsonProxyError('当前运行环境不支持安全的 WebDAV 地址校验', 503);
+    }
+
     if ($baseUrl === '' || $path === '') {
         jsonProxyError('缺少 WebDAV 地址或路径', 400);
     }
 
-    if (preg_match('/[\r\n]/', $baseUrl . $path)) {
+    if (preg_match('/[\x00-\x20\x7F\\\\]/', $baseUrl . $path)) {
         jsonProxyError('WebDAV 地址格式无效', 400);
     }
 
@@ -106,9 +108,21 @@ function buildDavUrl($baseUrl, $path) {
         jsonProxyError('WebDAV 根地址不能包含查询参数或片段', 400);
     }
 
-    assertPublicHost($parts['host']);
+    $host = trim($parts['host'], '[]');
+    $port = isset($parts['port']) ? (int)$parts['port'] : 443;
+    if ($port < 1 || $port > 65535) {
+        jsonProxyError('WebDAV 端口无效', 400);
+    }
 
-    $normalizedBase = rtrim($baseUrl, '/');
+    $resolvedAddresses = resolvePublicHostAddresses($host);
+    if (count($resolvedAddresses) === 0) {
+        jsonProxyError('无法解析 WebDAV 服务器地址', 400);
+    }
+
+    $urlHost = filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? '[' . $host . ']' : $host;
+    $urlPort = $port === 443 ? '' : ':' . $port;
+    $basePath = isset($parts['path']) ? rtrim($parts['path'], '/') : '';
+    $normalizedBase = 'https://' . $urlHost . $urlPort . $basePath;
     $normalizedPath = '/' . ltrim($path, '/');
     $url = $normalizedBase . $normalizedPath;
 
@@ -117,7 +131,13 @@ function buildDavUrl($baseUrl, $path) {
         jsonProxyError('WebDAV 地址格式无效', 400);
     }
 
-    return $url;
+    return [
+        'url' => $url,
+        'host' => strtolower($host),
+        'port' => $port,
+        'pinnedIp' => $resolvedAddresses[0],
+        'requiresResolve' => filter_var($host, FILTER_VALIDATE_IP) === false
+    ];
 }
 
 function checkProxyRateLimit($username) {
@@ -165,7 +185,7 @@ if ($contentLength > DAV_PROXY_MAX_REQUEST_BYTES) {
     jsonProxyError('WebDAV 上传内容超过限制', 413);
 }
 
-$davUrl = buildDavUrl(getRequestHeaderValue('x-dav-base-url'), getRequestHeaderValue('x-dav-path'));
+$davTarget = buildDavTarget(getRequestHeaderValue('x-dav-base-url'), getRequestHeaderValue('x-dav-path'));
 $headers = [];
 
 $authorization = getRequestHeaderValue('Authorization');
@@ -182,13 +202,43 @@ if (isset($_SERVER['CONTENT_TYPE']) && !preg_match('/[\r\n]/', $_SERVER['CONTENT
     $headers[] = 'Content-Type: ' . $_SERVER['CONTENT_TYPE'];
 }
 
-$body = file_get_contents('php://input');
+$inputStream = @fopen('php://input', 'rb');
+if ($inputStream === false) {
+    jsonProxyError('无法读取 WebDAV 请求内容', 400);
+}
+$bodyResult = readLimitedRequestBody($inputStream, DAV_PROXY_MAX_REQUEST_BYTES);
+fclose($inputStream);
+if ($bodyResult['tooLarge']) {
+    jsonProxyError('WebDAV 上传内容超过限制', 413);
+}
+if (!$bodyResult['success']) {
+    jsonProxyError('无法读取 WebDAV 请求内容', 400);
+}
+$body = $bodyResult['body'];
 
 $ch = curl_init();
+if ($ch === false) {
+    jsonProxyError('WebDAV 中转初始化失败', 502);
+}
+if (!defined('CURLINFO_PRIMARY_IP')) {
+    curl_close($ch);
+    jsonProxyError('当前运行环境不支持安全的 WebDAV 中转', 503);
+}
+if ($davTarget['requiresResolve']) {
+    if (!defined('CURLOPT_RESOLVE')) {
+        curl_close($ch);
+        jsonProxyError('当前运行环境不支持安全的 WebDAV 中转', 503);
+    }
+    $resolveEntry = buildCurlResolveEntry($davTarget['host'], $davTarget['port'], $davTarget['pinnedIp']);
+    if (!curl_setopt($ch, CURLOPT_RESOLVE, [$resolveEntry])) {
+        curl_close($ch);
+        jsonProxyError('无法锁定 WebDAV 服务器地址', 502);
+    }
+}
 $responseHeaders = '';
 $responseBody = '';
 $responseTooLarge = false;
-curl_setopt($ch, CURLOPT_URL, $davUrl);
+curl_setopt($ch, CURLOPT_URL, $davTarget['url']);
 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
 curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
@@ -197,6 +247,14 @@ curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+if (!curl_setopt($ch, CURLOPT_PROXY, '')) {
+    curl_close($ch);
+    jsonProxyError('无法禁用 WebDAV 中转代理', 502);
+}
+if (defined('CURLOPT_NOPROXY') && !curl_setopt($ch, CURLOPT_NOPROXY, '*')) {
+    curl_close($ch);
+    jsonProxyError('无法禁用 WebDAV 中转代理', 502);
+}
 curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($ch, $header) use (&$responseHeaders) {
     $responseHeaders .= $header;
     return strlen($header);
@@ -216,6 +274,7 @@ if ($body !== '') {
 
 $curlResult = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$primaryIp = curl_getinfo($ch, CURLINFO_PRIMARY_IP);
 $error = curl_error($ch);
 curl_close($ch);
 
@@ -225,6 +284,10 @@ if ($responseTooLarge) {
 
 if ($curlResult === false || $error) {
     jsonProxyError('WebDAV 中转请求失败', 502);
+}
+
+if (!is_string($primaryIp) || !isPublicIpAddress($primaryIp) || !ipAddressesMatch($primaryIp, $davTarget['pinnedIp'])) {
+    jsonProxyError('WebDAV 中转连接地址校验失败', 502);
 }
 
 $headerLines = explode("\r\n", $responseHeaders);

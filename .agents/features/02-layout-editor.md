@@ -48,6 +48,7 @@ export const EditMode = {
 - **选区拖拽 (`useDragPreview`)**: 支持多选座位后整体拖拽移动。通过 `clientToChartLocal` 将鼠标坐标转换为画布本地坐标，再通过 `chartLocalToGrid` 计算目标网格位置。拖拽预览返回 `student`、`isEmptySeat`、`isAnchor` 等结构化数据，由 `SeatChart` 复用 `StudentCardFace` 渲染，不再克隆座位 DOM 的 `innerHTML`。触摸端长按拖拽也按起点判断：起点在当前多选内则带动选区，起点不在多选内则只移动单个座位。
 - **右侧固定上下文面板**: 桌面端普通模式下左键点击座位会将选区收敛为单个座位；多选模式下按住左键拖过座位可涂抹加入多选，右键座位仍可加入当前多选并切换到右侧上下文面板。移动端普通模式点击座位不创建选区，必须通过底部「多选」工具进入涂抹选择；退出多选工具不会清空已有选区。面板复用选区操作能力，提供编辑、移出、交换/打乱、排入、切换空置与取消选择。点击空白处会清空选区。
 - **座位配置草稿交接**: 基础与高级配置统一使用 `maxSeatGroupCount` 的 50 组上限。`SeatConfigPanel` 进入编辑器前把完整草稿快照交给 `useEditorWorkbench`，`WorkbenchDialogs` 在用户确认后将高级布局结果覆盖到该草稿再应用，避免尚未应用的护法位、错位距离等设置在跳转时丢失。
+- **位移失败反馈**: `shiftSeats()` 返回 `false` 时，位移轮换弹层保留当前参数并提示调整，不记录 Undo、不显示成功消息，也不关闭窗口；只有原子位移成功后才提交历史。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **DOM重排开销**: 绝对不要在 `SeatChart.vue` 内去循环写 `margin/width` 的 `style` 计算（除了全局控制的Gap）。

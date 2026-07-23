@@ -11,7 +11,7 @@ export const testEnvironmentFiles = [
 ]
 
 const loginWarning = '本账号服务不保证可用性，请妥善备份您的数据'
-const headerTitle = '<h1 class="header-text">BraydenSCE V2</h1>'
+const headerTitle = '<h1 class="header-text" data-route-heading tabindex="-1">BraydenSCE V2</h1>'
 
 const countOccurrences = (content, anchor) => content.split(anchor).length - 1
 
@@ -57,7 +57,7 @@ const createPatchPlan = ({ repositoryRoot, testHost, fileSystem }) => {
   let patchedHeader = replaceSingleAnchor(
     contents.get(headerPath),
     headerTitle,
-    '<h1 class="header-text">BraydenSCE V2<span class="test-badge">测试版</span></h1>',
+    '<h1 class="header-text" data-route-heading tabindex="-1">BraydenSCE V2<span class="test-badge">测试版</span></h1>',
     `${headerPath} 的标题锚点`
   )
 

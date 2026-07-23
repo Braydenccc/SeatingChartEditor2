@@ -39,6 +39,7 @@ interface RotationGroup {
 - **原子无缝替换 (Atomic Snapshot)**: `applyZoneRotation` 函数执行前，会用 `map` 对所有人“拍快照”。即使 ZoneA 的人要移到 ZoneB，且 ZoneB 的人移到 ZoneC，由于快照存在，也不会出现“ZoneB 先被覆盖而丢失数据”的时序问题。
 - **工作区持久化**: `.sce` schema `2.3` 会保存完整 `rotationGroups`。`getRotationData()` 返回深拷贝，`replaceRotationData()` 先校验再整体替换并保留组/选区 ID，`resetRotationData()` 用于新建工作区；加载缺少该字段的旧工作区时必须恢复为空数组，不能沿用上一个工作区的轮换状态。
 - **引用校验**: 工作区写入共享状态前会检查轮换组和局部选区 ID 唯一性、类型及全部 `seatIds`。引用不存在座位的轮换数据会拒绝加载并保留当前工作区。
+- **布局缩减清理**: `zoneRotationState.ts` 保存无 `useSeatChart` 依赖的轮换状态与纯清理函数。布局删除行、列或大组后，普通选区和轮换局部选区会一起裁剪已不存在的座位 ID，避免保存出无法再次加载的工作区。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **选区名复用风险**: 轮换组内部的局部选区使用的是全局 `nextZoneId`。如果要做 UI 展示，记得一定要拿 `getZoneColor` 方法来匹配，而不是死编码。

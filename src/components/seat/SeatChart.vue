@@ -790,9 +790,13 @@ const handleDrop = (e: DragEvent) => {
         }
         clearSeatSelection()
       } else if (data.seatId !== targetSeatId) {
-        swapSeats(data.seatId, targetSeatId)
-        focusSeatContext(targetSeatId)
-        endDragPreview([targetSeatId])
+        const swapped = swapSeats(data.seatId, targetSeatId)
+        if (swapped) {
+          focusSeatContext(targetSeatId)
+          endDragPreview([targetSeatId])
+        } else {
+          endDragPreview()
+        }
         clearSeatSelection()
       } else {
         endDragPreview()
@@ -955,8 +959,9 @@ const handleTouchSeatDrop = (e: Event) => {
     }
     clearSeatSelection()
   } else if (sourceSeatId !== targetSeatId) {
-    swapSeats(sourceSeatId, targetSeatId)
-    focusSeatContext(targetSeatId)
+    if (swapSeats(sourceSeatId, targetSeatId)) {
+      focusSeatContext(targetSeatId)
+    }
   }
 }
 
@@ -1163,15 +1168,16 @@ const handleClearSeat = (seatId: string) => {
 // 处理交换座位
 const handleSwapSeat = (seatId: string, sourceSeatId: string | null = null) => {
   if (sourceSeatId) {
-    swapSeats(sourceSeatId, seatId)
+    return swapSeats(sourceSeatId, seatId)
   } else {
     if (!firstSelectedSeat.value) {
       setFirstSelectedSeat(seatId)
     } else if (firstSelectedSeat.value === seatId) {
       clearFirstSelectedSeat()
     } else {
-      swapSeats(firstSelectedSeat.value, seatId)
-      clearFirstSelectedSeat()
+      if (swapSeats(firstSelectedSeat.value, seatId)) {
+        clearFirstSelectedSeat()
+      }
     }
   }
 }

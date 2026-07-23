@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useStudentData } from '../useStudentData'
+import { useSeatChart } from '../useSeatChart'
+import { useUndo } from '../useUndo'
 import { requireDefined } from '@/test-utils/testHelpers'
 
 describe('useStudentData', () => {
@@ -8,6 +10,8 @@ describe('useStudentData', () => {
   beforeEach(() => {
     studentData = useStudentData()
     studentData.clearAllStudents()
+    useSeatChart().clearAllSeats()
+    useUndo().clearHistory()
   })
 
   describe('addStudent', () => {
@@ -115,6 +119,24 @@ describe('useStudentData', () => {
       studentData.deleteStudent(id2)
       expect(studentData.selectedStudentId.value).toBe(id1)
     })
+
+    it('should clear undo and redo history only after an existing student is deleted', () => {
+      const undo = useUndo()
+      const seatChart = useSeatChart()
+      const id = studentData.addStudent()
+      seatChart.assignStudent('seat-0-0-0', id)
+      undo.undo()
+      expect(undo.canRedo.value).toBe(true)
+
+      studentData.deleteStudent(id)
+
+      expect(undo.canUndo.value).toBe(false)
+      expect(undo.canRedo.value).toBe(false)
+
+      undo.recordClear('seat-0-0-0', 99)
+      studentData.deleteStudent(999)
+      expect(undo.canUndo.value).toBe(true)
+    })
   })
 
   describe('setStudentCount', () => {
@@ -152,6 +174,19 @@ describe('useStudentData', () => {
       expect(result).toBe(true)
       expect(studentData.students.value).toHaveLength(5)
     })
+
+    it('should preserve a student numbered zero and clear history when empty students are removed', () => {
+      const zeroId = studentData.addStudent()
+      studentData.updateStudent(zeroId, { studentNumber: 0 })
+      studentData.addStudent()
+      useUndo().recordClear('seat-0-0-0', zeroId)
+
+      expect(studentData.setStudentCount(1)).toBe(true)
+
+      expect(studentData.students.value).toHaveLength(1)
+      expect(studentData.students.value[0]).toMatchObject({ id: zeroId, studentNumber: 0 })
+      expect(useUndo().canUndo.value).toBe(false)
+    })
   })
 
   describe('sortedStudents', () => {
@@ -185,6 +220,18 @@ describe('useStudentData', () => {
       expect(sorted[0].studentNumber).toBe(5)
       expect(sorted[1].studentNumber).toBe(10)
       expect(sorted[2].studentNumber).toBe(15)
+    })
+
+    it('should sort student number zero as a real number after unnumbered students', () => {
+      const id1 = studentData.addStudent()
+      const id2 = studentData.addStudent()
+      const id3 = studentData.addStudent()
+
+      studentData.updateStudent(id1, { studentNumber: 2 })
+      studentData.updateStudent(id2, { studentNumber: 0 })
+      studentData.updateStudent(id3, { studentNumber: null })
+
+      expect(studentData.students.value.map(student => student.studentNumber)).toEqual([null, 0, 2])
     })
   })
 

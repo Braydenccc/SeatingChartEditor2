@@ -3,6 +3,7 @@ import type { Ref, ComputedRef } from 'vue'
 import type { Student, UseStudentDataReturn } from '@/types'
 import { normalizeNumberInput } from '@/utils/inputNormalization'
 import { useSeatChart } from './useSeatChart'
+import { useUndo } from './useUndo'
 import { attributeDefinitions } from './studentAttributeState'
 
 // 学生数据管理
@@ -58,9 +59,9 @@ export function useStudentData(): UseStudentDataReturn {
   const sortedStudents: ComputedRef<Student[]> = computed(() => {
     return [...students.value].sort((a, b) => {
       // 空白学号排在前面
-      if (!a.studentNumber && !b.studentNumber) return 0
-      if (!a.studentNumber) return -1
-      if (!b.studentNumber) return 1
+      if (a.studentNumber == null && b.studentNumber == null) return 0
+      if (a.studentNumber == null) return -1
+      if (b.studentNumber == null) return 1
       // 都有学号则按学号排序
       return a.studentNumber - b.studentNumber
     })
@@ -100,7 +101,7 @@ export function useStudentData(): UseStudentDataReturn {
       // 删除空白学生
       const emptyStudents = students.value.filter(s =>
         !s.name &&
-        !s.studentNumber &&
+        s.studentNumber == null &&
         s.tags.length === 0 &&
         !hasMeaningfulNumericAttributes(s.numericAttributes)
       )
@@ -111,12 +112,14 @@ export function useStudentData(): UseStudentDataReturn {
         const idsToDelete = emptyStudents.slice(0, toDelete).map(s => s.id)
         clearSeatAssignmentsForStudents(idsToDelete)
         students.value = students.value.filter(s => !idsToDelete.includes(s.id))
+        useUndo().clearHistory()
         return true
       } else {
         // 删除所有空白学生但仍不够
         const idsToDelete = emptyStudents.map(s => s.id)
         clearSeatAssignmentsForStudents(idsToDelete)
         students.value = students.value.filter(s => !idsToDelete.includes(s.id))
+        if (idsToDelete.length > 0) useUndo().clearHistory()
         return false // 返回false表示无法完全满足
       }
     }
@@ -166,8 +169,10 @@ export function useStudentData(): UseStudentDataReturn {
 
   // 删除学生
   const deleteStudent = (studentId: number): void => {
+    if (!students.value.some(student => student.id === studentId)) return
     clearSeatAssignmentsForStudents([studentId])
     students.value = students.value.filter(s => s.id !== studentId)
+    useUndo().clearHistory()
     // 健壮性：如果被删除的学生正处于选中状态，则清空焦点
     if (selectedStudentId.value === studentId) {
       selectedStudentId.value = null

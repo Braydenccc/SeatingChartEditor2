@@ -55,6 +55,8 @@ const PREDICATE_META = {
 - **全体主体 (`type: 'all'`)**: 用于数值参考等班级级规则，展开时表示当前学生列表中的全部学生，不需要额外 `id`。
 - **数值参考谓词**: `ATTRIBUTE_ROW_GRADIENT`、`ATTRIBUTE_GROUP_BALANCE`、`ATTRIBUTE_PAIR_DELTA`、`ATTRIBUTE_DISTRIBUTE_BANDS` 通过 `params.attributeId` 绑定学生数值属性。`PREDICATE_META` 支持 `attribute` 参数类型，由规则 UI 渲染为属性选择器。
 - **高级拓扑冲突 (`detectConflicts`)**: 利用笛卡尔组合判断所有激活的规则是否存在矛盾。这是整个系统的最强亮点。比如判定：“规则A要求张三离李四超过 3 步”，同时“规则B要求张三离李四不得超过 2 步”，就会抛出异常。
+- **统一座位拓扑**: 行号、讲台方向、异构大组行数、同桌关系和座位深度由纯函数 `src/utils/seatTopology.ts` 统一计算。冲突预检不再使用全局默认行数；当前同桌关系允许同排列差 1～2，因此“必须同桌”和最小距离 2 可以同时成立，距离大于 2 才是结构性冲突。
+- **同桌图可行性**: 排位前检查会把 REQUIRED 学生关系图嵌入真实可用座位同桌图，同时考虑禁止同桌边和单人座位域。搜索达到预算上限时只给警告，不把“尚未证明不可行”误判为阻断错误。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **前后兼容坑**: 由于该项目持续演进到 v2，存在历史存档的解析版本差异。`useSeatRules.ts` 首部的 `normalizeRuleShape` 用来兼容旧版本到最新规则结构。如果修改 `Rule` 结构，务必同步更新并测试此 Normalize 方法。

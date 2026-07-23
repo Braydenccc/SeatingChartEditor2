@@ -5,7 +5,7 @@
 
       <!-- 用户菜单 -->
       <NDropdown v-if="isLoggedIn" trigger="click" :options="accountOptions" @select="handleAccountSelect">
-        <NButton class="header-btn user-btn" quaternary :title="currentUser?.username || '账户'">
+        <NButton class="header-btn user-btn" quaternary :title="currentUser?.username || '账户'" :aria-label="`账户菜单：${currentUser?.username || '当前账户'}`" aria-haspopup="menu">
           <template #icon><NIcon><Cloud v-if="authType === 'webdav'" :size="18" /><User v-else :size="18" /></NIcon></template>
           <span class="btn-text">{{ currentUser?.username }}</span>
           <ChevronDown class="dropdown-icon" :size="14" />
@@ -13,28 +13,28 @@
       </NDropdown>
 
       <!-- 登录按钮 -->
-      <NButton v-else class="header-btn login-btn" quaternary title="登录" @click="emit('open-login')">
+      <NButton v-else class="header-btn login-btn" quaternary title="登录" aria-label="登录" @click="emit('open-login')">
         <template #icon><NIcon><Cloud :size="18" /></NIcon></template>
         <span class="btn-text">登录</span>
       </NButton>
 
       <!-- 设置按钮 -->
-      <NButton class="header-btn" quaternary @click="openFiles" title="文件">
+      <NButton class="header-btn" quaternary aria-label="文件" @click="openFiles" title="文件">
         <template #icon><NIcon><FileText :size="18" /></NIcon></template>
         <span class="btn-text">文件</span>
       </NButton>
 
-      <NButton class="header-btn" quaternary @click="openStudents" title="学生">
+      <NButton class="header-btn" quaternary aria-label="学生" @click="openStudents" title="学生">
         <template #icon><NIcon><Users :size="18" /></NIcon></template>
         <span class="btn-text">学生</span>
       </NButton>
 
-      <NButton class="header-btn" quaternary @click="openExport" title="导出">
+      <NButton class="header-btn" quaternary aria-label="导出" @click="openExport" title="导出">
         <template #icon><NIcon><FileOutput :size="18" /></NIcon></template>
         <span class="btn-text">导出</span>
       </NButton>
 
-      <NButton class="header-btn" quaternary @click="openUnifiedSettings" title="统一设置">
+      <NButton class="header-btn" quaternary aria-label="统一设置" @click="openUnifiedSettings" title="统一设置">
         <template #icon><NIcon><Settings :size="18" /></NIcon></template>
         <span class="btn-text">设置</span>
       </NButton>
@@ -49,6 +49,7 @@
           size="small"
           quaternary
           :aria-pressed="currentColorScheme === mode.value"
+          :aria-label="themeTitleFor(mode)"
           @click="switchTheme(mode.value)"
           :title="themeTitleFor(mode)"
         >
@@ -64,7 +65,7 @@
         </NButton>
       </NButtonGroup>
 
-      <NButton class="header-btn mobile-theme-btn" quaternary :title="mobileThemeTitle" @click="cycleTheme">
+      <NButton class="header-btn mobile-theme-btn" quaternary :title="mobileThemeTitle" :aria-label="mobileThemeTitle" @click="cycleTheme">
         <span class="mobile-theme-icon" :class="{ auto: currentColorScheme === 'auto' }">
           <component :is="mobileThemeIcon" :size="18" stroke-width="2" />
           <span v-if="currentColorScheme === 'auto'" class="mobile-theme-auto-mark">A</span>
@@ -74,7 +75,7 @@
     </div>
 
     <div class="header-right">
-      <NButton class="header-btn icon-only" quaternary circle @click="openHelp" title="帮助">
+      <NButton class="header-btn icon-only" quaternary circle aria-label="帮助" @click="openHelp" title="帮助">
         <template #icon><NIcon><CircleQuestionMark :size="18" /></NIcon></template>
       </NButton>
     </div>
@@ -250,6 +251,12 @@ onBeforeUnmount(() => {
   outline: 2px solid var(--color-text-inverse);
   outline-offset: 4px;
   border-radius: 2px;
+}
+
+.header-btn:focus-visible,
+.theme-btn:focus-visible {
+  outline: 2px solid var(--color-text-inverse);
+  outline-offset: 2px;
 }
 
 /* ===== 统一按钮样式 ===== */

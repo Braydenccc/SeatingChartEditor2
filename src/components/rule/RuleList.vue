@@ -4,7 +4,7 @@
     <!-- 搜索与筛选工具栏 -->
     <div class="rule-toolbar">
       <div class="search-box">
-        <NInput v-model:value="searchQuery" size="small" placeholder="搜索规则、学生、备注..." clearable>
+        <NInput v-model:value="searchQuery" size="small" placeholder="搜索规则、学生、备注..." aria-label="搜索规则" clearable>
           <template #prefix><Search :size="15" stroke-width="2.5" /></template>
         </NInput>
       </div>
@@ -25,10 +25,10 @@
           </NButton>
         </div>
         <div class="toolbar-actions">
-          <NButton size="small" quaternary circle @click="emit('export')" title="导出规则">
+          <NButton size="small" quaternary circle aria-label="导出规则" @click="emit('export')" title="导出规则">
             <FileOutput :size="14" />
           </NButton>
-          <NButton size="small" quaternary circle @click="emit('import')" title="导入规则">
+          <NButton size="small" quaternary circle aria-label="导入规则" @click="emit('import')" title="导入规则">
             <FileInput :size="14" />
           </NButton>
           <NButton
@@ -37,6 +37,7 @@
             quaternary
             circle
             type="error"
+            aria-label="清空全部规则"
             @click="handleClearAll"
             title="清空全部"
           >
@@ -78,11 +79,19 @@
       <template v-if="hasScannedConflicts && conflicts.length > 0">发现 {{ conflicts.length }} 条逻辑冲突规则</template>
       <template v-else-if="hasScannedConflicts">未发现逻辑冲突</template>
       <template v-else>正在检查逻辑冲突...</template>
-      <NButton v-if="conflicts.length > 0" class="conflict-detail-action" size="tiny" text @click="showConflicts = !showConflicts">
+      <NButton
+        v-if="conflicts.length > 0"
+        class="conflict-detail-action"
+        size="tiny"
+        text
+        :aria-expanded="showConflicts"
+        aria-controls="rule-conflict-details"
+        @click="showConflicts = !showConflicts"
+      >
         {{ showConflicts ? '收起' : '详情' }}
       </NButton>
     </div>
-    <div v-if="showConflicts && conflicts.length > 0" class="conflict-list">
+    <div id="rule-conflict-details" v-if="showConflicts && conflicts.length > 0" class="conflict-list">
       <div v-for="(c, i) in conflicts" :key="i" class="conflict-item">
         <span class="conflict-type-badge" :class="c.type">{{ c.type === 'infeasible' ? '无法满足' : '逻辑矛盾' }}</span>
         {{ c.message }}
@@ -109,18 +118,24 @@
         }"
         >
           <!-- 主行 -->
-          <div class="rule-main" @click="toggleExpand(rule.id)">
+          <div class="rule-main">
             <div class="rule-priority-bar" :style="{ background: PRIORITY_COLORS[rule.priority] }"></div>
 
             <div class="rule-select" @click.stop>
               <NCheckbox
                 :checked="isSelected(rule.id)"
+                :aria-label="`选择规则：${getRuleText(rule)}`"
                 @update:checked="toggleSelectRule(rule.id)"
               />
             </div>
 
             <div class="rule-toggle">
-            <NSwitch size="small" :value="rule.enabled" @update:value="handleToggle(rule.id)" @click.stop />
+            <NSwitch
+              size="small"
+              :value="rule.enabled"
+              :aria-label="`${rule.enabled ? '停用' : '启用'}规则：${getRuleText(rule)}`"
+              @update:value="handleToggle(rule.id)"
+            />
           </div>
 
           <div class="rule-text">
@@ -132,15 +147,24 @@
               <template #icon><Pencil :size="14" stroke-width="2" /></template>
               <span>编辑</span>
             </NButton>
-            <span class="rule-chevron" :class="{ open: expandedId === rule.id }">
-              <ChevronDown :size="14" />
-            </span>
+            <NButton
+              class="rule-expand-button"
+              size="tiny"
+              quaternary
+              circle
+              :aria-label="`${expandedId === rule.id ? '收起' : '展开'}规则详情：${getRuleText(rule)}`"
+              :aria-expanded="expandedId === rule.id"
+              :aria-controls="getRuleDetailId(rule.id)"
+              @click="toggleExpand(rule.id)"
+            >
+              <ChevronDown class="rule-chevron" :class="{ open: expandedId === rule.id }" :size="14" />
+            </NButton>
           </div>
         </div>
 
         <!-- 展开区：参数详情 + 删除 -->
         <transition name="expand">
-          <div v-if="expandedId === rule.id" class="rule-detail">
+          <div v-if="expandedId === rule.id" :id="getRuleDetailId(rule.id)" class="rule-detail">
             <div class="rule-detail-grid">
               <div v-if="rule.description" class="detail-item full-width">
                 <span class="detail-key">使用指南</span>
@@ -272,6 +296,7 @@ const isAllFilteredSelected = computed(() => {
   return filteredRuleIds.value.every(id => selectedRuleIdSet.value.has(id))
 })
 const hasSelectedRules = computed(() => selectedRuleIds.value.length > 0)
+const getRuleDetailId = (ruleId: string) => `rule-detail-${ruleId.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 
 const studentNameMap = computed(() => {
   const map = new Map<number, string>()
@@ -718,7 +743,6 @@ defineExpose({ focusRule })
   display: flex;
   align-items: center;
   padding: 10px 12px 10px 0;
-  cursor: pointer;
   gap: 8px;
   user-select: none;
 }
@@ -761,6 +785,11 @@ defineExpose({ focusRule })
 }
 
 .rule-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.rule-expand-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
 
 .rule-chevron {
   color: var(--color-text-disabled);

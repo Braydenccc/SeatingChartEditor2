@@ -1,8 +1,30 @@
+import { readFile } from 'node:fs/promises'
+import { pathToFileURL } from 'node:url'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { loadXlsx, useExcelData } from '../useExcelData'
 import { useStudentAttributes } from '../useStudentAttributes'
 import { useStudentData } from '../useStudentData'
 import { requireDefined } from '@/test-utils/testHelpers'
+
+const normalRosterFixtureUrl = new URL(
+  '../../../test-scr/excel-fixtures/学生名单-测试样例-正常导入.xlsx',
+  import.meta.url
+)
+const duplicateNumberFixtureUrl = new URL(
+  '../../../test-scr/excel-fixtures/学生名单-测试样例-重复学号.xlsx',
+  import.meta.url
+)
+const roster101FixtureUrl = new URL(
+  '../../../test-scr/excel-fixtures/学生名单-测试样例-101人超限.xlsx',
+  import.meta.url
+)
+
+const readFixtureBytes = async (url: URL) => {
+  const fileUrl = url.protocol === 'file:'
+    ? url
+    : new URL(url.pathname.replace(/^\/+/, ''), pathToFileURL(`${process.cwd()}/`))
+  return Uint8Array.from(await readFile(fileUrl))
+}
 
 const createWorkbookFile = async (rows: Array<Array<string | number | null | undefined>>) => {
   const XLSX = await loadXlsx()
@@ -24,6 +46,32 @@ describe('useExcelData import', () => {
     studentData = useStudentData()
     studentData.clearAllStudents()
     attributes.replaceAttributeDefinitions()
+  })
+
+  it('imports the real normal roster fixture', async () => {
+    const { importFromExcel } = useExcelData()
+    const result = await importFromExcel(await readFixtureBytes(normalRosterFixtureUrl))
+
+    expect(result.students).toHaveLength(10)
+    expect(result.students[0]).toMatchObject({ studentNumber: 1, name: '张晓雨' })
+    expect(result.students[9]).toMatchObject({ studentNumber: 10 })
+  })
+
+  it('rejects duplicate student numbers in the real conflict fixture', async () => {
+    const { importFromExcel } = useExcelData()
+    const fixture = await readFixtureBytes(duplicateNumberFixtureUrl)
+
+    await expect(importFromExcel(fixture)).rejects.toThrow('重复学号')
+  })
+
+  it('imports the real 101-student fixture under the current 150-student limit', async () => {
+    const { importFromExcel } = useExcelData()
+    const result = await importFromExcel(await readFixtureBytes(roster101FixtureUrl))
+
+    expect(result.students).toHaveLength(101)
+    expect(result.students[0]).toMatchObject({ studentNumber: 1, name: '学生1' })
+    expect(result.students[100]).toMatchObject({ studentNumber: 101, name: '学生101' })
+    expect(result.warning).toBeUndefined()
   })
 
   it('imports numeric tag values while keeping flag and category columns as tags', async () => {

@@ -25,11 +25,11 @@
                   <div class="control-item">
                     <span class="control-label">列数</span>
                     <div class="button-group">
-                      <NButton class="control-btn" size="tiny" quaternary circle @click="removeColumn(gIndex)" :disabled="group.columns <= 1">
+                      <NButton class="control-btn" size="tiny" quaternary circle :aria-label="`减少第 ${gIndex + 1} 组列数`" @click="removeColumn(gIndex)" :disabled="group.columns <= 1">
                         <Minus :size="14" />
                       </NButton>
                       <span class="control-value">{{ group.columns }}</span>
-                      <NButton class="control-btn" size="tiny" quaternary circle @click="addColumn(gIndex)" :disabled="group.columns >= 5">
+                      <NButton class="control-btn" size="tiny" quaternary circle :aria-label="`增加第 ${gIndex + 1} 组列数`" @click="addColumn(gIndex)" :disabled="group.columns >= 5">
                         <Plus :size="14" />
                       </NButton>
                     </div>
@@ -37,11 +37,11 @@
                   <div class="control-item">
                     <span class="control-label">行数</span>
                     <div class="button-group">
-                      <NButton class="control-btn" size="tiny" quaternary circle @click="removeRow(gIndex)" :disabled="group.rows <= 1">
+                      <NButton class="control-btn" size="tiny" quaternary circle :aria-label="`减少第 ${gIndex + 1} 组行数`" @click="removeRow(gIndex)" :disabled="group.rows <= 1">
                         <Minus :size="14" />
                       </NButton>
                       <span class="control-value">{{ group.rows }}</span>
-                      <NButton class="control-btn" size="tiny" quaternary circle @click="addRow(gIndex)" :disabled="group.rows >= 10">
+                      <NButton class="control-btn" size="tiny" quaternary circle :aria-label="`增加第 ${gIndex + 1} 组行数`" @click="addRow(gIndex)" :disabled="group.rows >= 10">
                         <Plus :size="14" />
                       </NButton>
                     </div>
@@ -55,25 +55,26 @@
         <div class="global-actions">
           <div class="global-controls">
             <div class="input-group">
-              <label>大组数量</label>
-              <div class="input-with-buttons">
-                <NButton class="control-btn" size="tiny" quaternary circle @click="removeGroup" :disabled="localConfig.groupCount <= 1">
+              <span id="seat-group-count-label">大组数量</span>
+              <div class="input-with-buttons" role="group" aria-labelledby="seat-group-count-label">
+                <NButton class="control-btn" size="tiny" quaternary circle aria-label="减少大组数量" @click="removeGroup" :disabled="localConfig.groupCount <= 1">
                   <Minus :size="14" />
                 </NButton>
                 <span class="group-count-display">{{ localConfig.groupCount }}</span>
-                <NButton class="control-btn" size="tiny" quaternary circle @click="addGroup" :disabled="localConfig.groupCount >= maxSeatGroupCount">
+                <NButton class="control-btn" size="tiny" quaternary circle aria-label="增加大组数量" @click="addGroup" :disabled="localConfig.groupCount >= maxSeatGroupCount">
                   <Plus :size="14" />
                 </NButton>
               </div>
             </div>
             <div class="input-group">
-              <label>讲台位置</label>
-              <div class="alignment-buttons">
+              <span id="podium-position-label">讲台位置</span>
+              <div class="alignment-buttons" role="group" aria-labelledby="podium-position-label">
                 <NButton
                   class="alignment-btn" 
                   size="small"
                   :type="localConfig.podiumPosition === 'bottom' ? 'primary' : 'default'"
                   :secondary="localConfig.podiumPosition !== 'bottom'"
+                  :aria-pressed="localConfig.podiumPosition === 'bottom'"
                   @click="localConfig.podiumPosition = 'bottom'"
                 >
                   底部
@@ -83,6 +84,7 @@
                   size="small"
                   :type="localConfig.podiumPosition === 'top' ? 'primary' : 'default'"
                   :secondary="localConfig.podiumPosition !== 'top'"
+                  :aria-pressed="localConfig.podiumPosition === 'top'"
                   @click="localConfig.podiumPosition = 'top'"
                 >
                   顶部
@@ -411,6 +413,12 @@ function handleConfirm() {
   flex: 0 0 auto;
 }
 
+.control-btn:focus-visible,
+.alignment-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .control-value {
   min-width: 20px;
   text-align: center;
@@ -444,7 +452,7 @@ function handleConfirm() {
   gap: 6px;
 }
 
-.input-group label {
+.input-group > span {
   font-size: 12px;
   color: var(--color-text-secondary);
   font-weight: 500;

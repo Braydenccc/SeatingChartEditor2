@@ -15,6 +15,7 @@ import { useZoneRotation } from './useZoneRotation'
 import { useEditorWorkbench } from './useEditorWorkbench'
 import { initializeTags } from './useTagData'
 import { parseSeatId, isGuardSeatId } from '@/utils/seatHelpers'
+import { getNextColor, normalizeTagColor } from '@/constants/tagColors'
 import { isTauriRuntime } from '@/platform/runtime'
 import { openTextFile, saveTextFile, workspaceFileFilters, writeTextFilePath } from '@/platform/files'
 import {
@@ -98,6 +99,14 @@ const currentLocalWorkspacePath = ref<string | null>(null)
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+const normalizeLegacyTagColors = (workspace: MigratingWorkspace) => {
+  if (!Array.isArray(workspace.tags)) return
+  workspace.tags.forEach((tag, index) => {
+    if (!isRecord(tag) || typeof tag.color !== 'string') return
+    tag.color = normalizeTagColor(tag.color, getNextColor(index))
+  })
+}
 
 const getErrorMessage = (errorValue: unknown) =>
   errorValue instanceof Error ? errorValue.message : String(errorValue)
@@ -968,6 +977,7 @@ export function useWorkspace() {
 
     // 分支前允许保存定义范围外的有限数值；迁移时扩展定义，避免重载时截断旧数据。
     normalizeLegacyStudentData(ws)
+    normalizeLegacyTagColors(ws)
 
     // 确保默认值
     ws.meta = {

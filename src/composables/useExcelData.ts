@@ -1295,7 +1295,7 @@ export function useExcelData() {
 
     students.forEach(student => {
       const row: Array<string | number> = [
-        student.studentNumber || '',
+        student.studentNumber ?? '',
         student.name || ''
       ]
 
@@ -1394,7 +1394,7 @@ export function useExcelData() {
         if (stu) {
           const cellContent = formatCellContent(content.cellFormat, {
             name: stu.name || '未命名',
-            studentId: layout.showStudentId ? (stu.studentNumber || '') : '',
+            studentId: layout.showStudentId ? (stu.studentNumber ?? '') : '',
             rowLabel: context.rowLabel,
             groupLabel: context.groupLabel,
             serialLabel: context.serialLabel

@@ -194,7 +194,7 @@ const visibleStudents = computed(() => {
     if (activeTags.length > 0 && !activeTags.every(tagId => (student.tags || []).includes(tagId))) return false
     if (!search) return true
     const name = String(student.name || '').toLowerCase()
-    const number = String(student.studentNumber || '').toLowerCase()
+    const number = String(student.studentNumber ?? '').toLowerCase()
     return name.includes(search) || number.includes(search)
   })
 })

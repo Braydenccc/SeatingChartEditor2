@@ -118,7 +118,11 @@ const applySeatShift = () => {
   }
 
   const before = createSnapshot()
-  shiftSeats(shiftDistance, shiftDirection, shiftColShift)
+  const shifted = shiftSeats(shiftDistance, shiftDirection, shiftColShift)
+  if (!shifted) {
+    warning('当前座位布局无法完成该位移，请调整参数后重试')
+    return
+  }
   const after = createSnapshot()
   recordBatch(before, after)
   success(`座位轮换完成：${statusText.value}`)

@@ -35,6 +35,7 @@ export function useImageExport() {
 - **导出翻转陷阱**: 导出菜单的 `flipVertical`/`excelFlipVertical` 与 `flipHorizontal`/`excelFlipHorizontal` 只改变导出视图，不修改编辑器座位数据。上下翻转会反转行显示顺序，并通过 `getEffectivePodiumPosition()` 将讲台视觉方向在 top/bottom 间切换；左右翻转会镜像大组和组内列，但组号仍保留真实编号。旧字段 `reverseOrder`/`excelReverseOrder` 仅作为加载兼容映射到上下翻转。
 - **左右护法导出**: 护法位来自 `visibleGuardSeats`，图片导出直接绘制在讲台左右，Excel 导出通过 `guardSeats` 临时选项判断可见护法位。护法左右槽位根据导出后的讲台视觉位置决定：讲台在顶部时显示为 `右护法 / 讲台 / 左护法`，讲台在底部时显示为 `左护法 / 讲台 / 右护法`；上下翻转导出会先计算有效讲台位置再套用该顺序。图片导出的讲台行和座位区之间始终保留 `rowGap`，避免顶部讲台时护法位贴住或遮挡第一行座位。`seatConfig.guardSeats.hideEmptyOnExport` 默认为 true，空护法位在图片和 Excel 中都完全不占位；有学生时始终显示。Excel 中只要左护法或右护法任一可见，讲台行会预留左右护法位置并缩短讲台合并范围，优先复用座位表已有左右边缘列，只有总列数不足以放下“左护法 / 讲台 / 右护法”三段时才补最少的列。导出讲台行仍受 `showPodium`/`excelShowPodium` 控制。
 - **保存方式**: 图片、Excel、规则 JSON 和工作区文件保存都通过 `src/platform/files.ts`。Web 版使用 Blob 下载；Tauri 版使用原生保存对话框和 `@tauri-apps/plugin-fs` 写入文件。`useExcelData` 不直接调用 `XLSX.writeFile`，而是生成 workbook buffer 后交给平台层保存。
+- **浏览器选择取消**: Web 文件选择器统一处理 `change`、标准 `cancel` 和窗口回焦兜底。取消、成功或异常都只结算一次 Promise，并移除临时 input 与事件监听，避免导入窗口永久停留在加载状态。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **内存溢出防御**: 导出 Canvas 很容易发生 iPhone 崩溃问题。务必注意文件里的一行核心防御代码：`MAX_CANVAS_PIXELS = 64 * 1024 * 1024 / 4` (约 64MB 上限)。如果拓展画布尺寸，千万不能拿 `seatCount` 无限延伸。

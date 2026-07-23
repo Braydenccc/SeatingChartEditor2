@@ -294,6 +294,86 @@ describe('assignmentPrecheck', () => {
     expect(result.blockingReasons).toEqual([])
   })
 
+  it('rejects distance two plus deskmates when only adjacent-column pairs exist', () => {
+    const topologySeats = [
+      { id: 'seat-0-0-0', groupIndex: 0, columnIndex: 0, rowIndex: 0 },
+      { id: 'seat-0-1-0', groupIndex: 0, columnIndex: 1, rowIndex: 0 }
+    ]
+    const subjects = [{ type: 'person', id: 's1' }, { type: 'person', id: 's2' }]
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 2,
+        seatsPerColumn: 1,
+        groups: [{ columns: 2, rows: 1 }]
+      },
+      students: [{ id: 's1', name: '甲' }, { id: 's2', name: '乙' }],
+      activeRules: [
+        {
+          id: 'required-deskmates',
+          predicate: 'MUST_BE_SEATMATES',
+          priority: 'required',
+          subjects,
+          params: {}
+        },
+        {
+          id: 'required-distance',
+          predicate: 'DISTANCE_AT_LEAST',
+          priority: 'required',
+          subjects,
+          params: { distance: 2 }
+        }
+      ]
+    })
+
+    expect(result.pass).toBe(false)
+    expect(result.blockingReasons.join('\n')).toContain('无法嵌入当前可用座位拓扑')
+  })
+
+  it('accepts distance two plus deskmates when a two-column-gap pair exists', () => {
+    const topologySeats = Array.from({ length: 3 }, (_, columnIndex) => ({
+      id: `seat-0-${columnIndex}-0`,
+      groupIndex: 0,
+      columnIndex,
+      rowIndex: 0
+    }))
+    const subjects = [{ type: 'person', id: 's1' }, { type: 'person', id: 's2' }]
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 3,
+        seatsPerColumn: 1,
+        groups: [{ columns: 3, rows: 1 }]
+      },
+      students: [{ id: 's1', name: '甲' }, { id: 's2', name: '乙' }],
+      activeRules: [
+        {
+          id: 'required-deskmates',
+          predicate: 'MUST_BE_SEATMATES',
+          priority: 'required',
+          subjects,
+          params: {}
+        },
+        {
+          id: 'required-distance',
+          predicate: 'DISTANCE_AT_LEAST',
+          priority: 'required',
+          subjects,
+          params: { distance: 2 }
+        }
+      ]
+    })
+
+    expect(result.pass).toBe(true)
+    expect(result.blockingReasons).toEqual([])
+  })
+
   it('rejects deskmate bindings when actual available seats have no deskmate edge', () => {
     const topologySeats = [
       { id: 'seat-0-0-0', groupIndex: 0, columnIndex: 0, rowIndex: 0 },
@@ -321,6 +401,115 @@ describe('assignmentPrecheck', () => {
 
     expect(result.pass).toBe(false)
     expect(result.blockingReasons.join('\n')).toContain('当前可用座位拓扑')
+  })
+
+  it('rejects a K4 deskmate graph that cannot embed into a five-seat row', () => {
+    const topologySeats = Array.from({ length: 5 }, (_, columnIndex) => ({
+      id: `seat-0-${columnIndex}-0`,
+      groupIndex: 0,
+      columnIndex,
+      rowIndex: 0
+    }))
+    const students = Array.from({ length: 4 }, (_, index) => ({
+      id: `s${index + 1}`,
+      name: `学生${index + 1}`
+    }))
+
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 5,
+        seatsPerColumn: 1,
+        groups: [{ columns: 5, rows: 1 }]
+      },
+      students,
+      activeRules: [{
+        id: 'required-k4',
+        predicate: 'MUST_BE_SEATMATES',
+        priority: 'required',
+        subjects: students.map(student => ({ type: 'person', id: student.id })),
+        params: {}
+      }]
+    })
+
+    expect(result.pass).toBe(false)
+    expect(result.blockingReasons.join('\n')).toContain('无法嵌入当前可用座位拓扑')
+  })
+
+  it('accepts a three-student deskmate triangle on three consecutive seats', () => {
+    const topologySeats = Array.from({ length: 3 }, (_, columnIndex) => ({
+      id: `seat-0-${columnIndex}-0`,
+      groupIndex: 0,
+      columnIndex,
+      rowIndex: 0
+    }))
+    const students = Array.from({ length: 3 }, (_, index) => ({
+      id: `s${index + 1}`,
+      name: `学生${index + 1}`
+    }))
+
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 3,
+        seatsPerColumn: 1,
+        groups: [{ columns: 3, rows: 1 }]
+      },
+      students,
+      activeRules: [{
+        id: 'required-triangle',
+        predicate: 'MUST_BE_SEATMATES',
+        priority: 'required',
+        subjects: students.map(student => ({ type: 'person', id: student.id })),
+        params: {}
+      }]
+    })
+
+    expect(result.pass).toBe(true)
+    expect(result.blockingReasons).toEqual([])
+  })
+
+  it('warns instead of blocking when deskmate embedding reaches its search budget', () => {
+    const topologySeats = Array.from({ length: 5 }, (_, columnIndex) => ({
+      id: `seat-0-${columnIndex}-0`,
+      groupIndex: 0,
+      columnIndex,
+      rowIndex: 0
+    }))
+    const students = Array.from({ length: 4 }, (_, index) => ({
+      id: `s${index + 1}`,
+      name: `学生${index + 1}`
+    }))
+
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 5,
+        seatsPerColumn: 1,
+        groups: [{ columns: 5, rows: 1 }]
+      },
+      students,
+      deskmateEmbeddingNodeLimit: 1,
+      activeRules: [{
+        id: 'required-k4',
+        predicate: 'MUST_BE_SEATMATES',
+        priority: 'required',
+        subjects: students.map(student => ({ type: 'person', id: student.id })),
+        params: {}
+      }]
+    })
+
+    expect(result.pass).toBe(true)
+    expect(result.warnings.join('\n')).toContain('搜索达到预算上限')
   })
 
   it('maps expanded AND subrule conflict IDs back to the parent priority', () => {

@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20.19.0'
           cache: npm
 
       - name: Install dependencies
@@ -41,6 +41,12 @@ jobs:
       - name: Test safe test-environment build wrapper
         run: npm run test:build-test
 
+      - name: Test safe deployment ordering
+        run: node --test test-scr/deploy-staging.test.js
+
+      - name: Test PHP security source contracts
+        run: node --test test-scr/php-security-source-contract.test.js
+
   e2e:
     name: Playwright browser workflows
     runs-on: ubuntu-latest
@@ -54,7 +60,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20.19.0'
           cache: npm
 
       - name: Install dependencies
@@ -76,6 +82,38 @@ jobs:
             test-results/e2e/
           if-no-files-found: ignore
           retention-days: 30
+
+  php-contract:
+    name: Retinbox PHP lint and contract fixture
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Lint Retinbox PHP functions
+        shell: bash
+        run: find public/api -type f -name '*.php' -print0 | sort -z | xargs -0 -r -n 1 php -l
+
+      - name: Run offline PHP security contract fixture
+        working-directory: public
+        run: php ../test-scr/security-contract-fixture.php
+
+      - name: Run DAV proxy PHP contract fixture
+        working-directory: public
+        run: php ../test-scr/dav-proxy-security-contract-fixture.php
+
+      - name: Run debug guard PHP contract fixture
+        working-directory: public
+        run: php ../test-scr/debug-guard-contract-fixture.php
 
   tauri-check:
     name: Tauri cargo check

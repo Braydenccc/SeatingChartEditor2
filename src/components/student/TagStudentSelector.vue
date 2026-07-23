@@ -1,12 +1,13 @@
 <template>
   <div class="tag-student-selector">
-    <label class="selector-label">分配学生:</label>
+    <label class="selector-label" for="tag-student-search">分配学生</label>
     <div class="search-box">
       <NInput
         v-model:value="searchQuery"
         size="small"
         placeholder="搜索姓名或学号..."
         class="search-input"
+        :input-props="{ id: 'tag-student-search' }"
       >
         <template #prefix><Search :size="14" /></template>
       </NInput>
@@ -17,17 +18,17 @@
         :key="student.id"
         class="student-row"
         :class="{ selected: isSelected(student.id) }"
-        @click="toggleStudent(student.id)"
+        @click="updateStudentSelection(student.id, !isSelected(student.id))"
       >
         <NCheckbox
           class="checkbox-wrapper"
           :checked="isSelected(student.id)"
-          :aria-label="`选择${student.name || '未命名学生'}`"
+          :aria-labelledby="getStudentLabelId(student.id)"
           @click.stop
-          @update:checked="toggleStudent(student.id)"
+          @update:checked="checked => updateStudentSelection(student.id, checked)"
         />
-        <span class="student-name">{{ student.name || '未命名' }}</span>
-        <span class="student-number" v-if="student.studentNumber">#{{ student.studentNumber }}</span>
+        <span :id="getStudentLabelId(student.id)" class="student-name">{{ student.name || '未命名' }}</span>
+        <span class="student-number" v-if="hasStudentNumber(student.studentNumber)">#{{ student.studentNumber }}</span>
       </div>
     </div>
     <div v-else class="empty-hint">
@@ -72,13 +73,15 @@ const filteredStudents = computed(() => {
 })
 
 const isSelected = (studentId: number) => selectedIds.value.includes(studentId)
+const hasStudentNumber = (value: unknown) => value !== null && value !== undefined && value !== ''
+const getStudentLabelId = (studentId: number) => `tag-student-label-${studentId}`
 
-const toggleStudent = (studentId: number) => {
+const updateStudentSelection = (studentId: number, checked: boolean) => {
   const current = [...selectedIds.value]
   const index = current.indexOf(studentId)
-  if (index >= 0) {
+  if (!checked && index >= 0) {
     current.splice(index, 1)
-  } else {
+  } else if (checked && index < 0) {
     current.push(studentId)
   }
   selectedIds.value = current
@@ -148,6 +151,11 @@ const toggleStudent = (studentId: number) => {
 
 .student-row:hover {
   background: var(--color-bg-subtle);
+}
+
+.student-row:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .student-row.selected {

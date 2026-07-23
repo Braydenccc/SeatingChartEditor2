@@ -5,7 +5,7 @@
       <NButton size="small" type="primary" secondary @click="handleAddZone"><Plus :size="11" stroke-width="2" /> 添加选区</NButton>
     </div>
 
-    <div class="zone-list-content">
+    <div class="zone-list-content" role="list">
       <ZoneItem
         v-for="zone in zones"
         :key="zone.id"
@@ -31,6 +31,7 @@
 <script setup lang="ts">
 import { NButton } from 'naive-ui'
 import { Plus } from 'lucide-vue-next'
+import ZoneItem from './ZoneItem.vue'
 import { useZoneData } from '@/composables/useZoneData'
 import { useTagData } from '@/composables/useTagData'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'

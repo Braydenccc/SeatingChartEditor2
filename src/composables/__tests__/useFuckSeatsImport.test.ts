@@ -217,6 +217,26 @@ describe('useFuckSeatsImport', () => {
     expect(workspace.layout.seats.filter(seat => seat.empty)).toHaveLength(3)
   })
 
+  it('rejects sparse coordinates that would expand beyond the workspace seat budget', () => {
+    const classroom: FuckSeatsClassroomSummary = {
+      id: 9,
+      name: '异常大网格',
+      baseUrl: 'http://127.0.0.1:23948',
+      href: '/classroom/9/',
+      gridLabel: '1 × 20001',
+      studentCount: 0,
+      seatCount: 1
+    }
+
+    expect(() => buildWorkspaceFromFuckSeatsState(classroom, {
+      seats: [{ row: 1, col: 20_001, cell_type: 'seat', student: null }]
+    })).toThrow('不想排座位普通座位数不能超过 20000')
+
+    expect(() => buildWorkspaceFromFuckSeatsState(classroom, {
+      seats: [{ row: Number.MAX_SAFE_INTEGER + 1, col: 1, cell_type: 'seat', student: null }]
+    })).toThrow('不想排座位座位坐标无效')
+  })
+
   it('preserves fuckseats explicit seat groups as grouped columns', () => {
     const classroom: FuckSeatsClassroomSummary = {
       id: 11,

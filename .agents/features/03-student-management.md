@@ -75,6 +75,8 @@ export const loadXlsx = async () => {
 - **SDES 交换格式**: `src/composables/useSdesExchange.ts` 支持 SDES v1 JSON 导入导出，入口在文件页。`.sce` 仍是完整工作区备份格式，SDES 只作为跨软件交换格式。导入弹窗会列出文件内所有可导入的 `class/seatChart`，第一版一次只能选择一个并覆盖当前工作区；导入 `groupedColumns` 时按大组、列、行映射，导入 `grid` 时通过 `src/utils/gridToGroupedColumns.ts` 尽量转换为大组列行：优先使用座位 `group`，否则按整列走廊/空列推断分组；组间分隔列会折叠，组内 `aisle`、`empty`、`platform`、`door` 和缺失格会作为空置座位。当前只支持数值属性，字符串/布尔/颜色属性会跳过；当前学号模型是数字，SDES 字符串学号的前导零会在导入报告中提示；左右护法仅支持每侧 `guardPos.index = 0`。导出标准字段包含学生、标签、数值属性、`groupedColumns` 座位表、座位分配、讲台位置和护法位，规则、选区、导出设置等私有数据写入 `extensions.app.bsce`。
 - **删除学生清理座位**: `deleteStudent()`、`setStudentCount()` 删除空白学生和 `clearAllStudents()` 会同步清理这些学生在座位表上的 `studentId`，避免座位显示为已删除学生或“未知”。
 - **标签去重与防腐**: 导进来的所有标签均会被推入全局 `useTagData` 进行统一管理，并通过生成颜色给前端赋能。在存入时依赖 `new Set()` 和 `.filter(Boolean)` 清洗空值。
+- **导入容量前置校验**: SDES、FuckSeats 和共享网格转换在创建二维数组或展开座位前校验安全整数、最多 50 个大组和 20,000 个普通座位；恰好 20,000 个座位仍可导入，超限输入会在分配大对象前拒绝。
+- **标签颜色真源**: Excel 新建标签复用 `src/constants/tagColors.ts` 的十六进制领域色。旧工作区中的 `var(--tag-color-N)` 会在迁移时转换为同一调色板颜色，图片 Canvas 与 SDES 导出边界仍会防御性规范化。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **Lazy Load 依赖**: `useExcelData.ts` 由于引入了 `xlsx-js-style` 这个非常巨大的包，绝不能使用顶层 `import`，必须通过封装好的 `loadXlsx()` 来异步获取它。如果你在这个文件里写了顶层导入，会导致首屏构建体积爆炸。

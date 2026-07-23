@@ -399,6 +399,45 @@ describe('useSdesExchange', () => {
       .toThrow(/包含重复 seat\.id.*无法安全解析座位分配/)
   })
 
+  it('rejects oversized groupedColumns layouts before expanding seats', () => {
+    const document = createOfficialLikeSdes()
+    const chart = document.classes[0].seatCharts![1]
+
+    chart.groupedColumns = {
+      groups: Array.from({ length: 51 }, (_, index) => ({
+        id: `group:${index}`,
+        columns: 1,
+        rows: 1
+      }))
+    }
+    chart.seats = []
+    expect(() => buildWorkspaceFromSdes(document, { classIndex: 0, seatChartIndex: 1 }))
+      .toThrow('groupedColumns 大组数不能超过 50')
+
+    chart.groupedColumns = {
+      groups: [
+        { id: 'group:0', columns: 1, rows: 10_000 },
+        { id: 'group:1', columns: 1, rows: 10_001 }
+      ]
+    }
+    expect(() => buildWorkspaceFromSdes(document, { classIndex: 0, seatChartIndex: 1 }))
+      .toThrow('groupedColumns 普通座位数不能超过 20000')
+  })
+
+  it('rejects oversized or unsafe grid dimensions before expanding seats', () => {
+    const document = createOfficialLikeSdes()
+    const chart = document.classes[0].seatCharts![0]
+    chart.seats = []
+
+    chart.grid = { rows: 1, columns: 20_001 }
+    expect(() => buildWorkspaceFromSdes(document, { classIndex: 0, seatChartIndex: 0 }))
+      .toThrow('grid 普通座位数不能超过 20000')
+
+    chart.grid = { rows: Number.MAX_SAFE_INTEGER + 1, columns: 1 }
+    expect(() => buildWorkspaceFromSdes(document, { classIndex: 0, seatChartIndex: 0 }))
+      .toThrow('grid 座位表缺少有效 rows/columns')
+  })
+
   it('exports the current workspace shape with resolvable seat and student references', () => {
     const document = buildSdesDocumentFromState({
       students: [
@@ -411,7 +450,7 @@ describe('useSdesExchange', () => {
         }
       ],
       tags: [
-        { id: 3, name: '近视', color: '#336699', showInSeatChart: true }
+        { id: 3, name: '近视', color: 'var(--tag-color-2)', showInSeatChart: true }
       ],
       attributeDefinitions: [
         {
@@ -488,6 +527,7 @@ describe('useSdesExchange', () => {
     ])
     expect(chart.assignments!.every(assignment => seatIds.has(assignment.seatId))).toBe(true)
     expect(chart.assignments!.every(assignment => studentIds.has(assignment.studentId))).toBe(true)
+    expect(document.classes[0].tags?.[0]?.color).toBe('#2196F3')
     expect(document.extensions?.['app.bsce']).toBeTruthy()
     expect((document.extensions?.[BSCE_EXTENSION_KEY] as { workspaceVersion?: string }).workspaceVersion)
       .toBe(WORKSPACE_SCHEMA_VERSION)

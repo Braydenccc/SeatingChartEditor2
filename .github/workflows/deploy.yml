@@ -11,6 +11,10 @@ on:
         description: Source branch that selects the deployment target
         required: true
         type: string
+      release_timestamp:
+        description: UTC timestamp shared by every delivery from the caller workflow run
+        required: true
+        type: string
     secrets:
       RTH_API_KEY:
         required: true
@@ -36,7 +40,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20.19.0'
           cache: npm
 
       - name: Install dependencies
@@ -67,7 +71,9 @@ jobs:
           esac
 
       - name: Prepare timestamp release version
-        run: node scripts/set-release-version.js --timestamp "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" --github-env
+        env:
+          RELEASE_TIMESTAMP_INPUT: ${{ inputs.release_timestamp }}
+        run: node scripts/set-release-version.js --timestamp "$RELEASE_TIMESTAMP_INPUT" --github-env
 
       - name: Build
         run: npm run "$BUILD_SCRIPT"

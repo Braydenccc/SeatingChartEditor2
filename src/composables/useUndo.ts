@@ -59,8 +59,8 @@ export function useUndo() {
     snapshot.forEach(data => {
       const seat = seats.value.find(s => s.id === data.id)
       if (seat) {
-        seat.studentId = data.studentId
         seat.isEmpty = data.isEmpty
+        seat.studentId = data.isEmpty ? null : data.studentId
       }
     })
   }
@@ -291,6 +291,9 @@ export function useUndo() {
       // 如果当前历史超过新限制，裁剪
       while (undoStack.value.length > MAX_HISTORY) {
         undoStack.value.shift()
+      }
+      while (redoStack.value.length > MAX_HISTORY) {
+        redoStack.value.shift()
       }
     }
   }

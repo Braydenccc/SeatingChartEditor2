@@ -18,24 +18,40 @@ jobs:
     name: Verify exact commit
     uses: ./.github/workflows/verification.yml
 
+  release_metadata:
+    name: Prepare release timestamp
+    if: github.event_name == 'push'
+    needs: verification
+    runs-on: ubuntu-latest
+    outputs:
+      release_timestamp: ${{ steps.release_timestamp.outputs.value }}
+
+    steps:
+      - name: Generate one UTC release timestamp
+        id: release_timestamp
+        shell: bash
+        run: echo "value=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
   deploy:
     name: Deploy verified commit
     if: github.event_name == 'push'
-    needs: verification
+    needs: [verification, release_metadata]
     uses: ./.github/workflows/deploy.yml
     with:
       commit_sha: ${{ github.sha }}
       ref_name: ${{ github.ref_name }}
+      release_timestamp: ${{ needs.release_metadata.outputs.release_timestamp }}
     secrets: inherit
 
   release:
     name: Release verified main commit
     if: github.event_name == 'push' && github.ref_name == 'main'
-    needs: verification
+    needs: [verification, release_metadata]
     permissions:
       contents: write
     uses: ./.github/workflows/build-release.yml
     with:
       commit_sha: ${{ github.sha }}
       verification_passed: true
+      release_timestamp: ${{ needs.release_metadata.outputs.release_timestamp }}
     secrets: inherit

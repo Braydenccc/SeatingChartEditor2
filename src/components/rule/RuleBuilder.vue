@@ -411,7 +411,7 @@ const predicateOptions = computed(() => filteredPredicateGroups.value.map(group 
 })))
 
 const studentOptions = computed(() =>
-  students.value.map(s => ({ id: s.id, label: `${s.studentNumber || '-'} ${s.name || '未命名'}` }))
+  students.value.map(s => ({ id: s.id, label: `${s.studentNumber ?? '-'} ${s.name || '未命名'}` }))
 )
 
 const tagOptions = computed(() =>

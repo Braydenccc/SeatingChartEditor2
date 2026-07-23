@@ -77,6 +77,25 @@ const getCellValue = (worksheet: Record<string, unknown>, address: string) => {
 }
 
 describe('useExcelData guard seats', () => {
+  it('should preserve student number zero in seat chart cells', async () => {
+    const { generateSeatChartWorkbook } = useExcelData()
+    const seats = createSeats()
+    seats[0][0][0].studentId = 1
+    const result = await generateSeatChartWorkbook(
+      seats,
+      [{ id: 1, name: 'Ada', studentNumber: 0, tags: [] }],
+      [],
+      createSeatConfig(),
+      {
+        ...baseOptions,
+        layout: { ...baseOptions.layout, showStudentId: true, showPodium: false },
+        content: { title: '座位表', cellFormat: '%n|%i' }
+      }
+    )
+
+    expect(Object.keys(result.ws).some(address => getCellValue(result.ws, address) === 'Ada|0')).toBe(true)
+  })
+
   it('should hide empty guard seats by default', async () => {
     const { generateSeatChartWorkbook } = useExcelData()
     const result = await generateSeatChartWorkbook(

@@ -92,7 +92,7 @@ export interface UseSeatChartReturn {
   initializeSeats: () => void
   assignStudent: (seatId: string, studentId: number, recordUndo?: boolean) => void
   clearSeat: (seatId: string, recordUndo?: boolean) => void
-  swapSeats: (seatId1: string, seatId2: string, recordUndo?: boolean) => void
+  swapSeats: (seatId1: string, seatId2: string, recordUndo?: boolean) => boolean
   toggleEmpty: (seatId: string, recordUndo?: boolean) => void
   updateConfig: (newConfig: Partial<SeatConfig>) => void
   replaceSeatChartState: (config: SeatConfig, seats: Seat[]) => void

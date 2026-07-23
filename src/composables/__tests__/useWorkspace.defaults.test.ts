@@ -189,6 +189,24 @@ describe('workspace defaults', () => {
     ])
   })
 
+  it('migrates legacy CSS variable tag colors before strict workspace validation', async () => {
+    const source = {
+      ...createExistingWorkspace(),
+      tags: [{
+        id: 1,
+        name: '旧版标签',
+        color: 'var(--tag-color-2)',
+        showInSeatChart: true
+      }]
+    }
+
+    expect(await workspace.applyWorkspaceData(source)).toBe(true)
+    expect(tagData.tags.value).toEqual([
+      expect.objectContaining({ name: '旧版标签', color: '#2196F3' })
+    ])
+    expect(source.tags[0].color).toBe('var(--tag-color-2)')
+  })
+
   it('rejects malformed workspace data before changing the current workspace', async () => {
     const studentId = studentData.addStudent()
     studentData.updateStudent(studentId, { name: '保留学生', studentNumber: 12 })

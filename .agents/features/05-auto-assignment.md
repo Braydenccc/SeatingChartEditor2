@@ -43,6 +43,8 @@ let currentReverse = new Map<SeatId, StudentId>() // 用于以 O(1) 交换两人
 - **数值初始解**: 对 `prefer` 级 `ATTRIBUTE_ROW_GRADIENT` 会先按属性排序分配前后排座位，再交给退火继续优化；同值学生和同排候选座位会随机打破平局，避免数组顺序固定化；`required` 规则仍主要靠评分保证，避免抢占同桌绑定等硬约束的初始位置。
 - **偏向变异 (`violatingStudents` list + ruleAffectedStudentIds)**: 正常退火是随机抽 2 人换位置，但在 `useAssignment.ts` 中，每次循环都会预先整理出一批**“正在犯规的人的名单”**。变异时优先移动违规学生；若暂无明确违规学生，则优先从被规则覆盖的学生池中抽取；最后才回落到全体已分配学生。这样无规则学生更多承担随机填空角色，但仍可参与交换，避免局部子问题封死。
 - **线程脱离避卡 (`setTimeout(0)`)**: JavaScript 是单线程的，死循环 5w 次计算会锁死标签页。本项目规定每隔 1000 次执行一次 `await new Promise(r => setTimeout(r, 0))`，向主 UI 框架注入呼吸孔，使画面进度条 `assignmentProgress.value` 可以持续滚动更新。
+- **运行所有权与迟到结果保护**: 智能排位使用模块级 run token。关闭弹层、卸载或主动取消会让当前任务失效；提交前还会核对学生、座位配置、座位状态、选区和规则输入签名。旧任务、被取消任务或输入已变化的任务不会清空或覆盖当前座位，也不会写入 Undo 或成功报告。
+- **拓扑与随机一致性**: 梯度按学生所在大组的实际行数归一化；未分区座位在区域聚集规则中各自成为独立 bucket；属性均衡会纳入有可用座位但目标数为 0 的大组。所有随机排列统一使用 Fisher–Yates；需要主键排序时先洗牌再依赖稳定排序打破同值顺序。
 - **护法位参与排位**: `getAvailableSeats()` 默认不返回左右护法位；只有 `seatConfig.guardSeats.includeInAutoAssignment === true` 时，智能排位才会把 `guard-left` / `guard-right` 纳入基础候选座位。护法位没有普通行列坐标：单人行/组/区域正向规则会视为不满足，负向规则视为不违规；同桌、同组、相邻排、最大距离等需要普通坐标才能满足的正向关系会视为不满足；分散/聚集这类整体坐标统计会跳过护法位，避免 `parseSeatId()` 读取出 `NaN`。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useSeatChart } from '../useSeatChart'
+import { rotGroups } from '../zoneRotationState'
 import { requireDefined } from '@/test-utils/testHelpers'
 
 vi.mock('../useZoneData', () => ({
@@ -23,6 +24,7 @@ describe('useSeatChart', () => {
   let seatChart: ReturnType<typeof useSeatChart>
 
   beforeEach(() => {
+    rotGroups.value = []
     seatChart = useSeatChart()
     seatChart.updateConfig({
       groupCount: 4,
@@ -308,6 +310,28 @@ describe('useSeatChart', () => {
       expect(seatChart.getStudentAtSeat('guard-right')).toBe(null)
       expect(seatChart.findSeatByStudent(5)).toBeUndefined()
     })
+
+    it('should prune removed seat IDs from rotation zones', () => {
+      rotGroups.value = [{
+        id: 1,
+        name: '轮换组 1',
+        type: 'swap',
+        zones: [
+          { id: 1, name: '选区 1', seatIds: ['seat-0-0-0', 'seat-3-1-6'] },
+          { id: 2, name: '选区 2', seatIds: ['seat-0-0-1', 'seat-2-1-6'] }
+        ]
+      }]
+
+      seatChart.updateConfig({
+        groupCount: 1,
+        columnsPerGroup: 1,
+        seatsPerColumn: 2,
+        groups: [{ columns: 1, rows: 2 }]
+      })
+
+      expect(rotGroups.value[0].zones[0].seatIds).toEqual(['seat-0-0-0'])
+      expect(rotGroups.value[0].zones[1].seatIds).toEqual(['seat-0-0-1'])
+    })
   })
 
   describe('clearSeat', () => {
@@ -346,6 +370,19 @@ describe('useSeatChart', () => {
       expect(seatChart.getStudentAtSeat(seat1)).toBe(null)
       expect(seatChart.getStudentAtSeat(seat2)).toBe(1)
     })
+
+    it('should reject swapping with a physically empty seat', () => {
+      const seat1 = 'seat-0-0-0'
+      const seat2 = 'seat-0-0-1'
+      seatChart.assignStudent(seat1, 1, false)
+      seatChart.toggleEmpty(seat2, false)
+
+      const result = seatChart.swapSeats(seat1, seat2, false)
+
+      expect(result).toBe(false)
+      expect(seatChart.getStudentAtSeat(seat1)).toBe(1)
+      expect(seatChart.getStudentAtSeat(seat2)).toBe(null)
+    })
   })
 
   describe('toggleEmpty', () => {
@@ -369,6 +406,32 @@ describe('useSeatChart', () => {
       const seat = requireDefined(seatChart.seats.value.find(s => s.id === seatId))
       expect(seat.isEmpty).toBe(true)
       expect(seat.studentId).toBe(null)
+    })
+
+    it('should normalize conflicting state from batch and restored seat data', () => {
+      const seatId = 'seat-0-0-0'
+
+      seatChart.batchUpdateSeats([{ seatId, isEmpty: true, studentId: 1 }], false)
+      expect(seatChart.getSeat(seatId)).toMatchObject({ isEmpty: true, studentId: null })
+
+      const restoredSeats = seatChart.seats.value.map(seat => (
+        seat.id === seatId ? { ...seat, isEmpty: true, studentId: 2 } : { ...seat }
+      ))
+      seatChart.replaceSeatChartState(seatChart.seatConfig.value, restoredSeats)
+
+      expect(seatChart.getSeat(seatId)).toMatchObject({ isEmpty: true, studentId: null })
+    })
+
+    it('should not remove a student from another seat when updating an empty seat', () => {
+      const sourceSeatId = 'seat-0-0-0'
+      const emptySeatId = 'seat-0-0-1'
+      seatChart.assignStudent(sourceSeatId, 1, false)
+      seatChart.toggleEmpty(emptySeatId, false)
+
+      seatChart.updateSeatState(emptySeatId, { studentId: 1 }, false)
+
+      expect(seatChart.getStudentAtSeat(sourceSeatId)).toBe(1)
+      expect(seatChart.getStudentAtSeat(emptySeatId)).toBe(null)
     })
   })
 

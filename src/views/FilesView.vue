@@ -103,6 +103,7 @@
                   type="primary"
                   attr-type="button"
                   title="恢复自动保存"
+                  aria-label="恢复自动保存"
                   :disabled="isRestoringAutoSave"
                   @click="handleRestoreAutoSave"
                 >
@@ -127,6 +128,7 @@
                         size="small"
                         type="text"
                         maxlength="50"
+                        :input-props="{ 'aria-label': `修改工作区 ${getWorkspaceName(ws)} 的名称` }"
                         @keyup.enter="handleRenameWorkspace(ws)"
                         @keyup.esc="handleCancelRename"
                       />
@@ -144,6 +146,7 @@
                       circle
                       attr-type="button"
                       title="加载工作区"
+                      aria-label="加载工作区"
                       :disabled="isCloudActionBusy"
                       @click="handleLoadCloudWorkspace(ws)"
                     >
@@ -157,12 +160,13 @@
                         type="success"
                         attr-type="button"
                         title="保存名称"
+                        aria-label="保存名称"
                         :disabled="isCloudActionBusy || !editingWorkspaceName.trim()"
                         @click="handleRenameWorkspace(ws)"
                       >
                         <Check :size="15" stroke-width="2" />
                       </NButton>
-                      <NButton size="small" quaternary circle attr-type="button" title="取消改名" :disabled="isCloudActionBusy" @click="handleCancelRename">
+                      <NButton size="small" quaternary circle attr-type="button" title="取消改名" aria-label="取消改名" :disabled="isCloudActionBusy" @click="handleCancelRename">
                         <X :size="15" stroke-width="2" />
                       </NButton>
                     </template>
@@ -173,6 +177,7 @@
                         circle
                         attr-type="button"
                         title="修改名称"
+                        aria-label="修改名称"
                         :disabled="isCloudActionBusy"
                         @click="handleStartRename(ws)"
                       >
@@ -185,6 +190,7 @@
                         type="error"
                         attr-type="button"
                         title="删除工作区"
+                        aria-label="删除工作区"
                         :disabled="isCloudActionBusy"
                         @click="handleRemoveCloudWorkspace(ws)"
                       >
@@ -255,7 +261,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { NButton, NCard, NInput } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import {
@@ -365,6 +371,10 @@ const cloudLoadShortLabel = computed(() => isLoggedIn.value ? '加载' : '登录
 const cloudSaveShortLabel = computed(() => isLoggedIn.value ? '保存' : '登录后保存')
 const cloudLoadTitle = computed(() => isLoggedIn.value ? '从云端加载工作区' : '需要先登录或配置 WebDAV')
 const cloudSaveTitle = computed(() => isLoggedIn.value ? '保存当前工作区至云端' : '需要先登录或配置 WebDAV')
+
+watch(token, (value) => {
+  if (value) void refresh()
+}, { immediate: true })
 
 const getWorkspaceName = (workspace: CloudWorkspaceFile) => workspace.metadata.name || '未命名工作区'
 
@@ -694,7 +704,6 @@ onMounted(() => {
   void getAutoSaveBackup().catch((autoSaveError) => {
     error(`读取自动保存备份失败：${getErrorMessage(autoSaveError)}`)
   })
-  if (token.value) refresh()
 })
 </script>
 

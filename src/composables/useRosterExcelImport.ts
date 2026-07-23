@@ -29,19 +29,6 @@ type ImportIssue = {
 
 type RosterImportPreview = ExcelRosterPreview
 
-const rosterTagColors = [
-  'var(--tag-color-1)',
-  'var(--tag-color-2)',
-  'var(--tag-color-3)',
-  'var(--tag-color-4)',
-  'var(--tag-color-5)',
-  'var(--tag-color-6)',
-  'var(--tag-color-7)',
-  'var(--tag-color-8)',
-  'var(--tag-color-9)',
-  'var(--tag-color-10)'
-]
-
 export const isExcelRosterFile = (file?: { name?: string } | null): boolean => {
   const name = String(file?.name || '').toLowerCase()
   return name.endsWith('.xlsx') || name.endsWith('.xls')
@@ -286,11 +273,10 @@ export function useRosterExcelImport() {
         tagNameToId[tag.name] = tag.id
       })
 
-      preview.tagNames.forEach((tagName: string, index: number) => {
+      preview.tagNames.forEach((tagName: string) => {
         if (tagNameToId[tagName] != null) return
         tagNameToId[tagName] = addTag({
-          name: tagName,
-          color: rosterTagColors[(tags.value.length + index) % rosterTagColors.length]
+          name: tagName
         })
       })
 

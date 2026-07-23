@@ -39,11 +39,18 @@
     </div>
     
     <div class="in-report-body" v-if="satisfiedRules.length > 0">
-        <div class="in-group-header toggle-btn" @click="showSatisfied = !showSatisfied">
+        <NButton
+          class="in-group-header toggle-btn"
+          text
+          block
+          :aria-expanded="showSatisfied"
+          aria-controls="assignment-satisfied-rules"
+          @click="showSatisfied = !showSatisfied"
+        >
           已满足的规则 ({{ satisfiedRules.length }})
           <ChevronDown :size="14" stroke-width="2" :style="{ transform: showSatisfied ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }" />
-        </div>
-      <div class="in-rule-rows" v-show="showSatisfied">
+        </NButton>
+      <div id="assignment-satisfied-rules" class="in-rule-rows" v-show="showSatisfied">
         <div v-for="rule in satisfiedRules" :key="rule.id" class="in-rule-row ok">
           <Check :size="14" stroke-width="2" />
           <div class="in-row-content">
@@ -194,13 +201,19 @@ const gradeIconComponent = computed(() => {
 .in-group-header.toggle-btn {
   cursor: pointer;
   display: flex;
+  width: 100%;
   justify-content: space-between;
   align-items: center;
+  border-radius: 0;
   user-select: none;
   transition: background 0.15s;
 }
 .in-group-header.toggle-btn:hover {
   background: var(--color-bg-subtle);
+}
+.in-group-header.toggle-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 /* .toggle-icon: replaced by ChevronDown component */
 

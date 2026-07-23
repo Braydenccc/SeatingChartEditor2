@@ -7,6 +7,7 @@ import { useStudentData } from './useStudentData'
 import { useTagData } from './useTagData'
 import { useZoneData } from './useZoneData'
 import { useStudentAttributes } from './useStudentAttributes'
+import { isPositionInRowRange, maxDeskmateColumnDistance } from '@/utils/seatTopology'
 import {
   RulePriority,
   RULE_TYPE_LABELS,
@@ -770,11 +771,11 @@ export function useSeatRules() {
         ) {
           if (!hasCachedPairScopeOverlap(r1, r2)) continue
           const distRule = r1.predicate === 'DISTANCE_AT_LEAST' ? r1 : r2
-          if ((distRule.params?.distance ?? 0) > 1) {
+          if ((distRule.params?.distance ?? 0) > maxDeskmateColumnDistance) {
             conflicts.push({
               type: 'infeasible',
               ruleIds: [r1.id, r2.id],
-              message: `不可行冲突：「必须同桌」要求距离≤1，与「${renderRuleText(distRule)}」矛盾`
+              message: `不可行冲突：「必须同桌」要求距离≤${maxDeskmateColumnDistance}，与「${renderRuleText(distRule)}」矛盾`
             })
           }
         }
@@ -820,11 +821,9 @@ export function useSeatRules() {
     if (rangeRule.predicate === 'IN_ROW_RANGE') {
       const { minRow, maxRow } = rangeRule.params
       if (minRow === undefined || maxRow === undefined) return
-      const seatsInRange = zoneSeats.filter(seat => {
-        const totalRows = seatChartHelper.seatConfig.seatsPerColumn
-        const rowFromPodium = totalRows - seat.rowIndex
-        return rowFromPodium >= minRow && rowFromPodium <= maxRow
-      })
+      const seatsInRange = zoneSeats.filter(seat =>
+        isPositionInRowRange(seat, seatChartHelper.seatConfig, minRow, maxRow)
+      )
       if (zoneRule.predicate === 'IN_ZONE' && seatsInRange.length === 0) {
         conflicts.push({
           type: 'infeasible',

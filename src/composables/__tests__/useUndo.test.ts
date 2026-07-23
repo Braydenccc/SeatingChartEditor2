@@ -60,6 +60,7 @@ describe('useUndo', () => {
     mockSeatChart.toggleEmpty.mockClear()
     undo = useUndo()
     undo.clear()
+    undo.setMaxHistory(50)
   })
 
   describe('recordAssign', () => {
@@ -177,6 +178,39 @@ describe('useUndo', () => {
       undo.undo()
 
       expect(undo.canUndo.value).toBe(false)
+    })
+
+    it('should keep the empty-seat invariant when restoring a snapshot', () => {
+      mockSeatChart.seats.value[0] = { id: 'seat-0-0-0', studentId: 2, isEmpty: false }
+      undo.recordBatch(
+        [{ id: 'seat-0-0-0', studentId: 1, isEmpty: true }],
+        [{ id: 'seat-0-0-0', studentId: 2, isEmpty: false }]
+      )
+
+      undo.undo()
+
+      expect(mockSeatChart.seats.value[0]).toEqual({
+        id: 'seat-0-0-0',
+        studentId: null,
+        isEmpty: true
+      })
+    })
+  })
+
+  describe('setMaxHistory', () => {
+    it('should immediately trim both undo and redo stacks', () => {
+      for (let index = 0; index < 25; index++) {
+        undo.recordClear('seat-0-0-0', index)
+      }
+      for (let index = 0; index < 12; index++) undo.undo()
+
+      expect(undo.undoStack.value).toHaveLength(13)
+      expect(undo.redoStack.value).toHaveLength(12)
+
+      undo.setMaxHistory(10)
+
+      expect(undo.undoStack.value).toHaveLength(10)
+      expect(undo.redoStack.value).toHaveLength(10)
     })
   })
 })

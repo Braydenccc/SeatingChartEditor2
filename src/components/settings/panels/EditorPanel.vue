@@ -6,12 +6,13 @@
 
       <div class="setting-item">
         <div class="setting-row">
-          <label class="setting-label">撤销历史大小</label>
+          <span id="editor-undo-history-label" class="setting-label">撤销历史大小</span>
           <NButton
             class="reset-btn"
             size="small"
             quaternary
             circle
+            aria-label="恢复默认撤销历史大小"
             @click="resetUndoHistorySize"
             :disabled="isDefaultUndoHistorySize"
             title="恢复默认撤销历史大小"
@@ -22,6 +23,7 @@
         <NInputNumber
           :value="localSettings.undoHistorySize"
           class="setting-input"
+          :input-props="{ id: 'editor-undo-history-size', 'aria-labelledby': 'editor-undo-history-label' }"
           :min="10"
           :max="100"
           :step="5"
@@ -31,12 +33,13 @@
 
       <div class="setting-item">
         <div class="setting-row">
-          <label class="setting-label">拖拽灵敏度</label>
+          <span id="editor-drag-sensitivity-label" class="setting-label">拖拽灵敏度</span>
           <NButton
             class="reset-btn"
             size="small"
             quaternary
             circle
+            aria-label="恢复默认拖拽灵敏度"
             @click="resetDragSensitivity"
             :disabled="isDefaultDragSensitivity"
             title="恢复默认拖拽灵敏度"
@@ -47,22 +50,26 @@
         <NSlider
           :value="localSettings.dragSensitivity"
           class="setting-range"
+          role="group"
+          aria-labelledby="editor-drag-sensitivity-label"
+          aria-describedby="editor-drag-sensitivity-value"
           :min="0.5"
           :max="2"
           :step="0.1"
           @update:value="value => updateSetting('editor.dragSensitivity', value)"
         />
-        <span class="range-value">{{ localSettings.dragSensitivity.toFixed(1) }}x</span>
+        <span id="editor-drag-sensitivity-value" class="range-value">{{ localSettings.dragSensitivity.toFixed(1) }}x</span>
       </div>
 
       <div class="setting-item">
         <div class="setting-row">
-          <label class="setting-label">双击学生行为</label>
+          <span id="editor-double-click-label" class="setting-label">双击学生行为</span>
           <NButton
             class="reset-btn"
             size="small"
             quaternary
             circle
+            aria-label="恢复默认双击学生行为"
             @click="resetDoubleClickAction"
             :disabled="isDefaultDoubleClickAction"
             title="恢复默认双击行为"
@@ -70,8 +77,16 @@
             <RotateCcw :size="16" />
           </NButton>
         </div>
-        <NSelect :value="localSettings.doubleClickAction" class="setting-select" :options="doubleClickOptions" @update:value="updateDoubleClickAction" />
-        <span class="hint-text">对座位表和学生候选区均有效</span>
+        <NSelect
+          :value="localSettings.doubleClickAction"
+          class="setting-select"
+          :options="doubleClickOptions"
+          role="group"
+          aria-labelledby="editor-double-click-label"
+          aria-describedby="editor-double-click-hint"
+          @update:value="updateDoubleClickAction"
+        />
+        <span id="editor-double-click-hint" class="hint-text">对座位表和学生候选区均有效</span>
       </div>
     </div>
   </div>
@@ -178,6 +193,11 @@ const updateDoubleClickAction = (value: string | number | null) => {
 
 .reset-btn {
   flex: 0 0 auto;
+}
+
+.reset-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .setting-input,

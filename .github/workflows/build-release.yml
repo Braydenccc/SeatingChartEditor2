@@ -11,7 +11,16 @@ on:
         description: Caller already verified commit_sha in the same workflow run
         required: true
         type: boolean
+      release_timestamp:
+        description: UTC timestamp shared by every delivery from the caller workflow run
+        required: true
+        type: string
   workflow_dispatch:
+    inputs:
+      release_timestamp:
+        description: Optional UTC timestamp; leave empty to generate one for this manual run
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -37,7 +46,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20.19.0'
           cache: npm
 
       - name: Install dependencies
@@ -50,8 +59,13 @@ jobs:
 
       - name: Prepare timestamp release version
         shell: pwsh
+        env:
+          RELEASE_TIMESTAMP_INPUT: ${{ inputs.release_timestamp }}
         run: |
-          $buildTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          $buildTime = $env:RELEASE_TIMESTAMP_INPUT
+          if ([string]::IsNullOrWhiteSpace($buildTime)) {
+            $buildTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          }
           node scripts/set-release-version.js --timestamp $buildTime --github-env
 
       - name: Build Desktop (Tauri)

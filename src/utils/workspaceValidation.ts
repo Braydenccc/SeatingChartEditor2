@@ -1,5 +1,5 @@
 import { WORKSPACE_SCHEMA_VERSION, type Workspace } from '@/types/models'
-import { maxSeatGroupCount } from '@/constants/seatConfig'
+import { MAX_WORKSPACE_GROUPS, MAX_WORKSPACE_SEATS } from '@/constants/workspaceLimits'
 import { PREDICATE_META } from '@/constants/ruleTypes'
 import { generateGuardSeatId, generateSeatId } from '@/utils/seatHelpers'
 import { hasRepresentableNumberInputRange, normalizeNumberInput } from '@/utils/inputNormalization'
@@ -7,8 +7,7 @@ import { hasRepresentableNumberInputRange, normalizeNumberInput } from '@/utils/
 const MAX_STUDENTS = 5000
 const MAX_TAGS = 500
 const MAX_STUDENT_ATTRIBUTES = 500
-export const MAX_WORKSPACE_GROUPS = maxSeatGroupCount
-export const MAX_WORKSPACE_SEATS = 20000
+export { MAX_WORKSPACE_GROUPS, MAX_WORKSPACE_SEATS } from '@/constants/workspaceLimits'
 const MAX_ZONES = 1000
 const MAX_ROTATION_GROUPS = 1000
 const MAX_ROTATION_ZONES = 5000

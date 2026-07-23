@@ -62,9 +62,22 @@ test('renders the main route pages', async ({ page }) => {
 })
 
 test('enters, assigns, undoes, saves, reopens and reaches export', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop-chromium', '完整编辑流程使用桌面工作台的稳定候选区选择器')
-
   const studentName = '端到端流程学生'
+  const isMobile = testInfo.project.name === 'mobile-chromium'
+  const mobileStudentDrawer = page.getByRole('dialog', { name: '学生', exact: true })
+  const findCandidate = async () => {
+    if (isMobile) {
+      await page.getByRole('button', { name: '候选学生', exact: true }).click()
+      await expect(mobileStudentDrawer).toBeVisible()
+      return mobileStudentDrawer.locator('.candidate-item').filter({ hasText: studentName })
+    }
+    return page.locator('.candidate-item').filter({ hasText: studentName })
+  }
+  const closeMobileStudentDrawer = async () => {
+    if (!isMobile) return
+    await page.keyboard.press('Escape')
+    await expect(mobileStudentDrawer).toBeHidden()
+  }
 
   await page.goto('/#/students')
   await page.getByRole('button', { name: '添加学生' }).click()
@@ -75,9 +88,10 @@ test('enters, assigns, undoes, saves, reopens and reaches export', async ({ page
   await page.getByRole('button', { name: '返回编辑器' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'BraydenSCE V2' })).toBeVisible()
 
-  const candidate = page.locator('.candidate-item').filter({ hasText: studentName })
+  const candidate = await findCandidate()
   await expect(candidate).toBeVisible()
   await candidate.click()
+  if (isMobile) await expect(mobileStudentDrawer).toBeHidden()
 
   const targetSeat = page.locator('[data-seat-id]').filter({ hasText: '空位' }).first()
   await targetSeat.click()
@@ -88,7 +102,8 @@ test('enters, assigns, undoes, saves, reopens and reaches export', async ({ page
   await expect(undoButton).toBeEnabled()
   await undoButton.click()
   await expect(targetSeat).not.toContainText(studentName)
-  await expect(page.locator('.candidate-item').filter({ hasText: studentName })).toBeVisible()
+  await expect(await findCandidate()).toBeVisible()
+  await closeMobileStudentDrawer()
 
   await page.getByRole('button', { name: '文件' }).click()
   await expect(page.getByRole('heading', { level: 1, name: '文件' })).toBeVisible()
@@ -112,7 +127,8 @@ test('enters, assigns, undoes, saves, reopens and reaches export', async ({ page
   await chooser.setFiles(downloadedWorkspacePath as string)
 
   await expect(page.getByRole('heading', { level: 1, name: 'BraydenSCE V2' })).toBeVisible()
-  await expect(page.locator('.candidate-item').filter({ hasText: studentName })).toBeVisible()
+  await expect(await findCandidate()).toBeVisible()
+  await closeMobileStudentDrawer()
 
   await page.locator('button[title="导出"]').last().click()
   await expect(page.getByRole('heading', { level: 1, name: '导出' })).toBeVisible()

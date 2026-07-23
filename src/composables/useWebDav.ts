@@ -2,6 +2,7 @@ import { fetchWithRetry } from '@/utils/fetchHelpers'
 import { getOrCreateCsrfToken, useAuth } from './useAuth'
 import { isTauriRuntime } from '@/platform/runtime'
 import { webdavFetch } from '@/platform/webdavTransport'
+import { decodeWebDavHrefFilename } from '@/utils/webdavPath'
 import type { WebDavConfig } from '@/types/models'
 
 export type { WebDavConfig } from '@/types/models'
@@ -219,7 +220,8 @@ export function useWebDav() {
         const hrefEl = responses[i].getElementsByTagNameNS('*', 'href')[0]
         if (!hrefEl) continue
 
-        let href = decodeURIComponent(hrefEl.textContent)
+        const href = String(hrefEl.textContent || '').trim()
+        if (!href) continue
         // 去除尾部斜杠比较
         const baseHref = href.endsWith('/') ? href.slice(0, -1) : href
         const targetPath = collPath.endsWith('/') ? collPath.slice(0, -1) : collPath
@@ -227,8 +229,7 @@ export function useWebDav() {
         // 排除当前目录本身
         if (!baseHref.endsWith(targetPath)) {
             // 只提取最后的文件名
-            const parts = baseHref.split('/')
-            let filename = parts[parts.length - 1]
+            const filename = decodeWebDavHrefFilename(baseHref)
             if (filename) {
                 const propstat = responses[i].getElementsByTagNameNS('*', 'propstat')[0]
                 const isCollection = propstat && propstat.textContent.includes('collection')

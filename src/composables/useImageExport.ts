@@ -2,6 +2,7 @@ import { useSeatChart } from './useSeatChart'
 import { useStudentData } from './useStudentData'
 import { useTagData } from './useTagData'
 import { useExportSettings } from './useExportSettings'
+import { normalizeTagColor } from '@/constants/tagColors'
 import {
   createOrderedSeatGroups,
   getGuardSideForVisualSlot,
@@ -479,7 +480,7 @@ export function useImageExport() {
         const cx = x + width / 2
         const cy = y + height / 2
 
-        if (studentNumber) {
+        if (studentNumber != null) {
           // 两行文本：上方姓名，下方学号，以座位中心为基准均匀分布
           const gap = Math.round((nameFontSize + idFontSize) / 2) + 4
           const nameY = cy - gap / 2 + offsetYName
@@ -541,7 +542,7 @@ export function useImageExport() {
           return {
             id: tag.id,
             text: setting.displayText,
-            color: tag.color
+            color: normalizeTagColor(tag.color)
           }
         }
         return null

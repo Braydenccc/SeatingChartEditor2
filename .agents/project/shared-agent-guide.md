@@ -25,7 +25,7 @@
 | `npm run version:timestamp` | 按当前 UTC 时间同步发布、SemVer 与 MSI 版本 |
 | `npm run version:check` | 检查各版本文件是否来自同一时间戳 |
 
-Node.js >= 20.0.0。项目没有统一 linter/formatter；单元与组件测试使用 Vitest + happy-dom，浏览器流程测试使用 Playwright。
+Node.js `^20.19.0 || >=22.12.0`。项目没有统一 linter/formatter；单元与组件测试使用 Vitest + happy-dom，浏览器流程测试使用 Playwright。
 
 ## 版本规则
 
@@ -47,6 +47,7 @@ src/main.ts
 src/router/index.ts
 ├── /editor   -> src/views/EditorView.vue
 ├── /files    -> src/views/FilesView.vue
+├── /user     -> src/views/UserView.vue
 ├── /students -> src/views/StudentsView.vue
 ├── /export   -> src/views/ExportView.vue
 └── /settings -> src/views/SettingsView.vue

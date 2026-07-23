@@ -7,6 +7,8 @@ import { useTagData } from './useTagData'
 import { useWorkspace } from './useWorkspace'
 import { useZoneData } from './useZoneData'
 import { appBuildInfo } from '@/constants/appBuildInfo'
+import { MAX_WORKSPACE_GROUPS, MAX_WORKSPACE_SEATS } from '@/constants/workspaceLimits'
+import { normalizeTagColor } from '@/constants/tagColors'
 import { saveTextFile, sdesFileFilters } from '@/platform/files'
 import { generateGuardSeatId, generateSeatId, isGuardSeatId } from '@/utils/seatHelpers'
 import { convertGridToGroupedColumns, type GridToGroupedCell } from '@/utils/gridToGroupedColumns'
@@ -227,22 +229,17 @@ const getDuplicateSeatIds = (chart: SdesSeatChart): string[] => {
 
 const toPositiveInt = (value: unknown): number | null => {
   const numberValue = Number(value)
-  return Number.isInteger(numberValue) && numberValue > 0 ? numberValue : null
+  return Number.isSafeInteger(numberValue) && numberValue > 0 ? numberValue : null
 }
 
 const toNonNegativeInt = (value: unknown): number | null => {
   const numberValue = Number(value)
-  return Number.isInteger(numberValue) && numberValue >= 0 ? numberValue : null
+  return Number.isSafeInteger(numberValue) && numberValue >= 0 ? numberValue : null
 }
 
 const normalizePodiumPosition = (value: unknown): PodiumPosition => (
   value === 'top' ? 'top' : 'bottom'
 )
-
-const normalizeColor = (value: unknown, fallback = '#4CAF50'): string => {
-  const raw = toStringValue(value)
-  return /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(raw) ? raw : fallback
-}
 
 const normalizeStudentNumber = (
   value: unknown,
@@ -432,7 +429,7 @@ const buildStudents = (
     return {
       id,
       name,
-      color: normalizeColor(tag.color),
+      color: normalizeTagColor(tag.color),
       showInSeatChart: true
     }
   }).filter((tag): tag is Tag => !!tag)
@@ -556,16 +553,29 @@ const buildGroupedSeats = (
 ) => {
   const podiumPosition = normalizePodiumPosition(chart.platformPosition)
   const rawGroups = asArray<SdesGroupedColumnGroup>(chart.groupedColumns?.groups)
+  const sourceSeats = asArray<SdesSeat>(chart.seats)
   if (rawGroups.length === 0) {
     throw new Error('groupedColumns 座位表缺少 groups[]')
   }
+  if (rawGroups.length > MAX_WORKSPACE_GROUPS) {
+    throw new Error(`groupedColumns 大组数不能超过 ${MAX_WORKSPACE_GROUPS}`)
+  }
+  if (sourceSeats.length > MAX_WORKSPACE_SEATS + 2) {
+    throw new Error(`groupedColumns 座位项数量不能超过 ${MAX_WORKSPACE_SEATS + 2}`)
+  }
 
+  let configuredSeatCount = 0
   const groups = rawGroups.map((group, index) => {
     const columns = toPositiveInt(group.columns)
     const rows = toPositiveInt(group.rows)
     if (!columns || !rows) {
       throw new Error(`第 ${index + 1} 个大组的 columns/rows 必须是正整数`)
     }
+    const remainingSeatBudget = MAX_WORKSPACE_SEATS - configuredSeatCount
+    if (columns > Math.floor(remainingSeatBudget / rows)) {
+      throw new Error(`groupedColumns 普通座位数不能超过 ${MAX_WORKSPACE_SEATS}`)
+    }
+    configuredSeatCount += columns * rows
     return {
       id: toStringValue(group.id),
       columns,
@@ -597,7 +607,7 @@ const buildGroupedSeats = (
     return Number.isInteger(index) && index >= 0 && index < groups.length ? index : null
   }
 
-  asArray<SdesSeat>(chart.seats).forEach(seat => {
+  sourceSeats.forEach(seat => {
     const sourceSeatId = toStringValue(seat.id)
     if (!sourceSeatId) {
       report.skippedSeats += 1
@@ -687,8 +697,15 @@ const buildGridSeats = (
   const podiumPosition = normalizePodiumPosition(chart.platformPosition)
   const rows = toPositiveInt(chart.grid?.rows)
   const columns = toPositiveInt(chart.grid?.columns)
+  const sourceSeats = asArray<SdesSeat>(chart.seats)
   if (!rows || !columns) {
     throw new Error('grid 座位表缺少有效 rows/columns')
+  }
+  if (rows > Math.floor(MAX_WORKSPACE_SEATS / columns)) {
+    throw new Error(`grid 普通座位数不能超过 ${MAX_WORKSPACE_SEATS}`)
+  }
+  if (sourceSeats.length > MAX_WORKSPACE_SEATS + 2) {
+    throw new Error(`grid 座位项数量不能超过 ${MAX_WORKSPACE_SEATS + 2}`)
   }
 
   const guardSeats: WorkspaceSeat[] = []
@@ -697,7 +714,7 @@ const buildGridSeats = (
   const seenPositions = new Set<string>()
   const gridCells: GridToGroupedCell[] = []
 
-  asArray<SdesSeat>(chart.seats).forEach(seat => {
+  sourceSeats.forEach(seat => {
     const sourceSeatId = toStringValue(seat.id)
     if (!sourceSeatId) {
       report.skippedSeats += 1
@@ -1044,7 +1061,7 @@ export const buildSdesDocumentFromState = (state: {
         tags: state.tags.map(tag => ({
           id: `tag:${tag.id}`,
           name: tag.name,
-          color: normalizeColor(tag.color, '#4CAF50')
+          color: normalizeTagColor(tag.color)
         })),
         attributeDefinitions: state.attributeDefinitions.map(def => ({
           id: def.id,

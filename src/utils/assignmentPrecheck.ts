@@ -1,3 +1,5 @@
+import { buildDeskmateAdjacency } from '@/utils/seatTopology'
+
 const REQUIRED_PRIORITY = 'required'
 
 const POSITION_RULES = new Set([
@@ -146,16 +148,19 @@ const detectDeskmateBindingConflicts = (
   ctx: any,
   ruleFilter: (rule: any) => boolean = () => true
 ) => {
-  const activeRules = ctx.activeRules.filter((rule: any) => (
-    ruleFilter(rule) && !rule.not && rule.predicate === 'MUST_BE_SEATMATES'
+  const requiredRules = ctx.activeRules.filter((rule: any) => (
+    ruleFilter(rule) && (
+      (!rule.not && rule.predicate === 'MUST_BE_SEATMATES') ||
+      (rule.not && rule.predicate === 'MUST_NOT_BE_SEATMATES')
+    )
   ))
-  if (activeRules.length === 0) return { count: 0, details: [] }
+  if (requiredRules.length === 0) return { count: 0, details: [], budgetExhausted: false }
 
-  const adjacency = new Map()
+  const requiredAdjacency = new Map<any, Set<any>>()
   const pairKeys = new Set()
-  const expandedPairs = []
+  const expandedPairs: Array<[any, any]> = []
 
-  for (const rule of activeRules) {
+  for (const rule of requiredRules) {
     const ids = ctx.expandEntriesToStudentIds(getRuleSubjects(rule))
     for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
@@ -165,73 +170,151 @@ const detectDeskmateBindingConflicts = (
         if (pairKeys.has(key)) continue
         pairKeys.add(key)
         expandedPairs.push([a, b])
-        if (!adjacency.has(a)) adjacency.set(a, new Set())
-        if (!adjacency.has(b)) adjacency.set(b, new Set())
-        adjacency.get(a).add(b)
-        adjacency.get(b).add(a)
+        if (!requiredAdjacency.has(a)) requiredAdjacency.set(a, new Set())
+        if (!requiredAdjacency.has(b)) requiredAdjacency.set(b, new Set())
+        requiredAdjacency.get(a)?.add(b)
+        requiredAdjacency.get(b)?.add(a)
       }
     }
   }
 
-  const details = []
+  const pairKey = (first: any, second: any) => first < second
+    ? `${first}:${second}`
+    : `${second}:${first}`
+
+  const details: string[] = []
   const availableRegularSeats = ctx.availableSeats.filter((seat: any) => !isGuardSeatLike(seat))
-  const topologyDegreeBySeatId = new Map<any, number>()
-  let maxFeasiblePairs = 0
-  for (let i = 0; i < availableRegularSeats.length; i++) {
-    const seatA = availableRegularSeats[i]
-    const configuredColumns = Number(
-      ctx.config?.groups?.[seatA.groupIndex]?.columns ?? ctx.config?.columnsPerGroup ?? 0
+  const seatAdjacency = buildDeskmateAdjacency(availableRegularSeats, ctx.config)
+  const forbiddenRules = ctx.activeRules.filter((rule: any) => (
+    ruleFilter(rule) && (
+      (!rule.not && rule.predicate === 'MUST_NOT_BE_SEATMATES') ||
+      (rule.not && rule.predicate === 'MUST_BE_SEATMATES')
     )
-    if (configuredColumns <= 1) continue
-
-    for (let j = i + 1; j < availableRegularSeats.length; j++) {
-      const seatB = availableRegularSeats[j]
-      if (seatA.groupIndex !== seatB.groupIndex || seatA.rowIndex !== seatB.rowIndex) continue
-      const columnDistance = Math.abs(Number(seatA.columnIndex) - Number(seatB.columnIndex))
-      if (!Number.isFinite(columnDistance) || columnDistance < 1 || columnDistance > 2) continue
-
-      maxFeasiblePairs++
-      topologyDegreeBySeatId.set(seatA.id, (topologyDegreeBySeatId.get(seatA.id) || 0) + 1)
-      topologyDegreeBySeatId.set(seatB.id, (topologyDegreeBySeatId.get(seatB.id) || 0) + 1)
-    }
-  }
-  if (expandedPairs.length > maxFeasiblePairs) {
-    details.push(`同桌容量不足：按当前可用座位拓扑最多存在 ${maxFeasiblePairs} 对同桌位，但规则展开后需要 ${expandedPairs.length} 对`)
-  }
-
-  const maxDeskmatesPerStudent = Math.max(0, ...topologyDegreeBySeatId.values())
-  for (const [studentId, mates] of adjacency.entries()) {
-    if (mates.size <= maxDeskmatesPerStudent) continue
-    const selfName = ctx.studentNameMap.get(studentId) || `学生#${studentId}`
-    const mateNames = [...mates].map((id: any) => ctx.studentNameMap.get(id) || `学生#${id}`)
-    details.push(`同桌绑定冲突：${selfName} 绑定了 ${mateNames.join('、')}，超过当前可用座位拓扑上限（${maxDeskmatesPerStudent}）`)
-  }
-
-  const forbidRules = ctx.activeRules.filter((rule: any) => (
-    ruleFilter(rule) && !rule.not && rule.predicate === 'MUST_NOT_BE_SEATMATES'
   ))
-  if (forbidRules.length > 0 && expandedPairs.length > 0) {
-    const forbidPairKeys = new Set()
-    for (const rule of forbidRules) {
-      const ids = ctx.expandEntriesToStudentIds(getRuleSubjects(rule))
-      for (let i = 0; i < ids.length; i++) {
-        for (let j = i + 1; j < ids.length; j++) {
-          const a = ids[i]
-          const b = ids[j]
-          forbidPairKeys.add(a < b ? `${a}:${b}` : `${b}:${a}`)
-        }
+  const forbiddenPairKeys = new Set<string>()
+  for (const rule of forbiddenRules) {
+    const ids = ctx.expandEntriesToStudentIds(getRuleSubjects(rule))
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = ids[i]
+        const b = ids[j]
+        forbiddenPairKeys.add(a < b ? `${a}:${b}` : `${b}:${a}`)
       }
     }
-    for (const [a, b] of expandedPairs) {
-      const key = a < b ? `${a}:${b}` : `${b}:${a}`
-      if (!forbidPairKeys.has(key)) continue
-      const aName = ctx.studentNameMap.get(a) || `学生#${a}`
-      const bName = ctx.studentNameMap.get(b) || `学生#${b}`
-      details.push(`规则冲突：${aName} 与 ${bName} 同时存在“必须同桌”和“禁止同桌”`)
+  }
+
+  const minimumDistanceByPair = new Map<string, number>()
+  for (const rule of ctx.activeRules.filter((candidate: any) => (
+    ruleFilter(candidate) && !candidate.not && candidate.predicate === 'DISTANCE_AT_LEAST'
+  ))) {
+    const ids = ctx.expandEntriesToStudentIds(getRuleSubjects(rule))
+    const minimumDistance = Number(rule.params?.distance ?? 0)
+    if (!Number.isFinite(minimumDistance)) continue
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const key = pairKey(ids[i], ids[j])
+        minimumDistanceByPair.set(key, Math.max(minimumDistanceByPair.get(key) || 0, minimumDistance))
+      }
     }
   }
 
-  return { count: details.length, details }
+  for (const [a, b] of expandedPairs) {
+    const key = a < b ? `${a}:${b}` : `${b}:${a}`
+    if (!forbiddenPairKeys.has(key)) continue
+    const aName = ctx.studentNameMap.get(a) || `学生#${a}`
+    const bName = ctx.studentNameMap.get(b) || `学生#${b}`
+    details.push(`规则冲突：${aName} 与 ${bName} 同时存在“必须同桌”和“禁止同桌”`)
+  }
+  if (details.length > 0) return { count: details.length, details, budgetExhausted: false }
+
+  const regularSeatIds = new Set(seatAdjacency.keys())
+  const domains = new Map<any, string[]>()
+  for (const studentId of requiredAdjacency.keys()) {
+    const studentRules = (ctx.rulesByStudentId.get(studentId) || []).filter(ruleFilter)
+    const eligibleSeatIds = getEligibleSeatIdsForStudent(ctx, studentId, studentRules)
+    domains.set(studentId, [...eligibleSeatIds].filter(seatId => regularSeatIds.has(seatId as string)) as string[])
+  }
+
+  const assignment = new Map<any, string>()
+  const usedSeatIds = new Set<string>()
+  const requestedNodeLimit = Number(ctx.deskmateEmbeddingNodeLimit)
+  const nodeLimit = Number.isFinite(requestedNodeLimit) && requestedNodeLimit > 0
+    ? Math.floor(requestedNodeLimit)
+    : 50000
+  let visitedNodes = 0
+
+  const isCompatible = (studentId: any, seatId: string) => {
+    const adjacentSeats = seatAdjacency.get(seatId) || new Set<string>()
+    for (const [otherStudentId, otherSeatId] of assignment.entries()) {
+      if (requiredAdjacency.get(studentId)?.has(otherStudentId) && !adjacentSeats.has(otherSeatId)) {
+        return false
+      }
+      if (forbiddenPairKeys.has(pairKey(studentId, otherStudentId)) && adjacentSeats.has(otherSeatId)) {
+        return false
+      }
+      const minimumDistance = minimumDistanceByPair.get(pairKey(studentId, otherStudentId))
+      if (minimumDistance !== undefined) {
+        const seat = ctx.seatById.get(seatId)
+        const otherSeat = ctx.seatById.get(otherSeatId)
+        if (!seat || !otherSeat) return false
+        const distance = seat.groupIndex === otherSeat.groupIndex
+          ? Math.hypot(
+            Number(seat.columnIndex) - Number(otherSeat.columnIndex),
+            Number(seat.rowIndex) - Number(otherSeat.rowIndex)
+          )
+          : Infinity
+        if (distance < minimumDistance) return false
+      }
+    }
+    return true
+  }
+
+  const search = (): boolean | null => {
+    if (assignment.size === requiredAdjacency.size) return true
+
+    let selectedStudentId: any = null
+    let selectedCandidates: string[] | null = null
+    for (const studentId of requiredAdjacency.keys()) {
+      if (assignment.has(studentId)) continue
+      const candidates = (domains.get(studentId) || []).filter(seatId =>
+        !usedSeatIds.has(seatId) && isCompatible(studentId, seatId)
+      )
+      if (candidates.length === 0) return false
+      if (
+        selectedCandidates === null ||
+        candidates.length < selectedCandidates.length ||
+        (candidates.length === selectedCandidates.length &&
+          (requiredAdjacency.get(studentId)?.size || 0) > (requiredAdjacency.get(selectedStudentId)?.size || 0))
+      ) {
+        selectedStudentId = studentId
+        selectedCandidates = candidates
+      }
+    }
+
+    if (selectedStudentId === null || selectedCandidates === null) return false
+    for (const seatId of selectedCandidates) {
+      visitedNodes++
+      if (visitedNodes > nodeLimit) return null
+      assignment.set(selectedStudentId, seatId)
+      usedSeatIds.add(seatId)
+      const result = search()
+      if (result !== false) return result
+      usedSeatIds.delete(seatId)
+      assignment.delete(selectedStudentId)
+    }
+    return false
+  }
+
+  const embeddingResult = search()
+  if (embeddingResult === false) {
+    details.push(`同桌绑定不可行：${requiredAdjacency.size} 名学生的绑定关系无法嵌入当前可用座位拓扑`)
+  }
+
+  return {
+    count: details.length,
+    details,
+    budgetExhausted: embeddingResult === null
+  }
 }
 
 const detectSeatCapacityConflicts = (
@@ -558,11 +641,16 @@ export const createAssignmentPrecheck = (input: any) => {
     }
   }
 
+  const allDeskmateConflicts = detectDeskmateBindingConflicts(ctx)
+  const requiredDeskmateConflicts = detectDeskmateBindingConflicts(ctx, requiredRuleFilter)
   appendDetectorResults(
     '同桌绑定冲突',
-    detectDeskmateBindingConflicts(ctx),
-    detectDeskmateBindingConflicts(ctx, requiredRuleFilter)
+    allDeskmateConflicts,
+    requiredDeskmateConflicts
   )
+  if (allDeskmateConflicts.budgetExhausted || requiredDeskmateConflicts.budgetExhausted) {
+    warnings.push('同桌拓扑可行性搜索达到预算上限，本次不据此阻断排位')
+  }
   appendDetectorResults(
     '座位容量冲突',
     detectSeatCapacityConflicts(ctx),

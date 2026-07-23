@@ -15,8 +15,13 @@
           <div v-else-if="isSaveMode" class="save-section">
             <!-- 双云时显示目标选择器 -->
             <div class="form-group" v-if="hasWebdav && hasRetiehe">
-              <label>保存到</label>
-              <NRadioGroup v-model:value="targetService" class="save-target-selection" size="small">
+              <label id="cloud-save-provider-label">保存到</label>
+              <NRadioGroup
+                v-model:value="targetService"
+                class="save-target-selection"
+                size="small"
+                aria-labelledby="cloud-save-provider-label"
+              >
                 <NRadioButton v-if="hasRetiehe" value="retiehe">SCE 云服务</NRadioButton>
                 <NRadioButton v-if="hasWebdav" value="webdav">WebDAV 网盘</NRadioButton>
               </NRadioGroup>
@@ -34,10 +39,11 @@
             </div>
 
             <div class="form-group">
-              <label>工作区名称</label>
+              <label for="cloud-workspace-name">工作区名称</label>
               <NInput
                 type="text"
                 v-model:value="workspaceName"
+                :input-props="{ id: 'cloud-workspace-name' }"
                 placeholder="例如：2026级二班座位表"
                 maxlength="50"
                 @keyup.enter="handleSave"
@@ -53,7 +59,13 @@
                   :key="ws.fileId"
                   class="workspace-item"
                   @click="selectForOverwrite(ws)"
+                  @keydown.enter.prevent="selectForOverwrite(ws)"
+                  @keydown.space.prevent="selectForOverwrite(ws)"
                   :class="{ selected: selectedOverwriteId === ws.fileId }"
+                  role="button"
+                  tabindex="0"
+                  :aria-pressed="selectedOverwriteId === ws.fileId"
+                  :aria-label="`覆盖工作区 ${ws.metadata.name}`"
                 >
                   <div class="ws-info">
                     <span class="ws-name">{{ ws.metadata.name }}</span>
@@ -102,7 +114,15 @@
                 :key="ws.fileId"
                 class="workspace-card"
               >
-                <div class="card-content" @click="handleLoad(ws.fileId, ws.source)">
+                <div
+                  class="card-content"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`加载工作区 ${ws.metadata.name}`"
+                  @click="handleLoad(ws.fileId, ws.source)"
+                  @keydown.enter.prevent="handleLoad(ws.fileId, ws.source)"
+                  @keydown.space.prevent="handleLoad(ws.fileId, ws.source)"
+                >
                   <Folder :size="28" stroke-width="2" class="workspace-icon" />
                   <div class="card-details">
                     <h4 class="ws-name">{{ ws.metadata.name }}</h4>
@@ -113,7 +133,14 @@
                   </div>
                 </div>
                 <div class="card-actions">
-                  <NButton quaternary circle type="error" title="删除此工作区" @click.stop="confirmDelete(ws)">
+                  <NButton
+                    quaternary
+                    circle
+                    type="error"
+                    title="删除此工作区"
+                    :aria-label="`删除工作区 ${ws.metadata.name}`"
+                    @click.stop="confirmDelete(ws)"
+                  >
                     <Trash2 :size="15" stroke-width="2" />
                   </NButton>
                 </div>
@@ -200,6 +227,11 @@ watch(() => props.mode, (newMode) => {
   isSaveMode.value = newMode === 'save'
 })
 
+watch(targetService, () => {
+  selectedOverwriteId.value = null
+  errorMessage.value = ''
+})
+
 const fetchWorkspaces = async () => {
   const result = await listWorkspaces()
   if (result.success || (result.data?.length ?? 0) > 0) {
@@ -228,19 +260,24 @@ const selectForOverwrite = (ws: CloudWorkspaceFile) => {
 const handleSave = async () => {
   const trimmedName = workspaceName.value.trim()
   if (!trimmedName) return
-  
+
   errorMessage.value = ''
+
+  if (selectedOverwriteId.value && !targetWorkspaces.value.some(ws => ws.fileId === selectedOverwriteId.value)) {
+    selectedOverwriteId.value = null
+    errorMessage.value = '已选择的工作区不属于当前存储服务，请重新选择'
+    return
+  }
+
+  if (!selectedOverwriteId.value && targetWorkspaces.value.some(ws => ws.metadata.name === trimmedName)) {
+    errorMessage.value = '已存在同名工作区，请从列表选择后覆盖，或更换名称'
+    return
+  }
+
   isSaving.value = true
-  
+
   try {
-    // 检查是否重名，如果重名强制转为覆盖
-    let targetFileId = selectedOverwriteId.value
-    if (!targetFileId) {
-       const existingWs = targetWorkspaces.value.find(ws => ws.metadata.name === trimmedName)
-       if (existingWs) {
-         targetFileId = existingWs.fileId
-       }
-    }
+    const targetFileId = selectedOverwriteId.value
 
     const jsonContent = getWorkspaceJson()
     
@@ -467,6 +504,12 @@ const formatSize = (bytes?: number) => {
 
 .workspace-item:hover {
   background: var(--color-bg-subtle);
+}
+
+.workspace-item:focus-visible,
+.card-content:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
 }
 
 .workspace-item.selected {

@@ -2,7 +2,10 @@
   <ResponsiveOverlay :show="visible" title="智能排位与规则" :desktop-width="1280" mobile-height="92dvh" @update:show="value => !value && emit('close')">
     <div
       class="workbench-dialog"
-      :class="{ 'rule-mobile-editor-active': activePanel === 'rules' && mobileRulePage === 'editor' }"
+      :class="{
+        'compact-layout': isCompactLayout,
+        'rule-mobile-editor-active': activePanel === 'rules' && mobileRulePage === 'editor'
+      }"
     >
       <p class="dialog-description">先配置规则和选区，再检查容量并执行自动排位</p>
 
@@ -151,7 +154,7 @@
       </div>
 
     </div>
-      <template #footer><footer class="dialog-footer">
+      <template #footer><footer class="dialog-footer" :class="{ 'compact-layout': isCompactLayout }">
         <span class="footer-stats">{{ ruleCount }} 条规则</span>
         <div class="footer-actions">
           <NButton v-if="activePanel !== 'run'" @click="activePanel = 'run'">返回排位</NButton>
@@ -176,6 +179,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import { NButton, NProgress, NSlider } from 'naive-ui'
 import { ArrowLeft, BookOpen, CircleAlert, CircleX, Play, Plus, Scale, Sliders, X } from 'lucide-vue-next'
 import ZoneList from '@/components/zone/ZoneList.vue'
@@ -184,6 +188,7 @@ import RuleBuilder from '@/components/rule/RuleBuilder.vue'
 import RuleList from '@/components/rule/RuleList.vue'
 import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 import RuleUsageGuide from '@/components/docs/RuleUsageGuide.vue'
+import { assignmentWorkbenchCompactMediaQuery } from '@/constants/layout'
 import { useAssignment } from '@/composables/useAssignment'
 import type { AssignmentReport, AssignmentRule } from '@/composables/useAssignment'
 import { useLogger } from '@/composables/useLogger'
@@ -239,6 +244,7 @@ const mobileRulePage = ref<MobileRulePage>('list')
 const lastAssignmentReport = ref<AssignmentReport | null>(null)
 const lastAssignmentDuration = ref(0)
 const precheckResult = ref<ReturnType<typeof createAssignmentPrecheck> | null>(null)
+const isCompactLayout = useMediaQuery(assignmentWorkbenchCompactMediaQuery)
 
 const activeRules = computed(() => getActiveRules())
 const activeRuleCount = computed(() => activeRules.value.length)
@@ -411,6 +417,7 @@ watch(() => props.visible, (visible) => {
     activePanel.value = props.initialPanel || 'run'
     if ((props.initialPanel || 'run') === 'rules') mobileRulePage.value = 'list'
   } else {
+    if (isAssigning.value) cancelSmartAssignment()
     closeRuleEditor()
   }
 }, { immediate: true })
@@ -446,6 +453,7 @@ watch(
 
 onBeforeUnmount(() => {
   if (autoPrecheckTimer) window.clearTimeout(autoPrecheckTimer)
+  if (isAssigning.value) cancelSmartAssignment()
 })
 </script>
 
@@ -683,84 +691,82 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 
-@media (max-width: 720px) {
-  .workbench-dialog {
-    width: 100%;
-    height: 100%;
-    max-height: 100%;
-  }
+.workbench-dialog.compact-layout {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
 
-  .summary-strip {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.workbench-dialog.compact-layout .summary-strip {
+  grid-template-columns: repeat(2, 1fr);
+}
 
-  .workbench-tabs {
-    overflow-x: auto;
-  }
+.workbench-dialog.compact-layout .workbench-tabs {
+  overflow-x: auto;
+}
 
-  .workbench-tab {
-    min-height: 44px;
-  }
+.workbench-dialog.compact-layout .workbench-tab {
+  min-height: 44px;
+}
 
-  .rule-workbench {
-    grid-template-columns: 1fr;
-    height: 100%;
-    min-height: 0;
-  }
+.workbench-dialog.compact-layout .rule-workbench {
+  grid-template-columns: 1fr;
+  height: 100%;
+  min-height: 0;
+}
 
-  .dialog-body.rules-body {
-    overflow: hidden;
-  }
+.workbench-dialog.compact-layout .dialog-body.rules-body {
+  overflow: hidden;
+}
 
-  .rule-left-pane,
-  .editor-pane,
-  .empty-editor-pane {
-    height: 100%;
-    max-height: none;
-    overflow-y: auto;
-  }
+.workbench-dialog.compact-layout .rule-left-pane,
+.workbench-dialog.compact-layout .editor-pane,
+.workbench-dialog.compact-layout .empty-editor-pane {
+  height: 100%;
+  max-height: none;
+  overflow-y: auto;
+}
 
-  .rule-workbench.show-mobile-editor .rule-left-pane,
-  .rule-workbench:not(.show-mobile-editor) .editor-pane,
-  .rule-workbench:not(.show-mobile-editor) .empty-editor-pane {
-    display: none;
-  }
+.workbench-dialog.compact-layout .rule-workbench.show-mobile-editor .rule-left-pane,
+.workbench-dialog.compact-layout .rule-workbench:not(.show-mobile-editor) .editor-pane,
+.workbench-dialog.compact-layout .rule-workbench:not(.show-mobile-editor) .empty-editor-pane {
+  display: none;
+}
 
-  .mobile-rule-editor-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--color-border);
-    margin-bottom: 12px;
-    flex-shrink: 0;
-  }
+.workbench-dialog.compact-layout .mobile-rule-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
 
-  .mobile-rule-editor-header h3 {
-    margin: 0;
-    color: var(--color-text-primary);
-    font-size: 16px;
-  }
+.workbench-dialog.compact-layout .mobile-rule-editor-header h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 16px;
+}
 
-  .rule-mobile-editor-active .workbench-tabs {
-    display: none;
-  }
+.workbench-dialog.compact-layout.rule-mobile-editor-active .workbench-tabs {
+  display: none;
+}
 
-  .workbench-dialog.rule-mobile-editor-active {
-    height: 100%;
-  }
+.workbench-dialog.compact-layout.rule-mobile-editor-active {
+  height: 100%;
+}
 
-  .rule-mobile-editor-active .dialog-body {
-    padding: 14px;
-  }
+.workbench-dialog.compact-layout.rule-mobile-editor-active .dialog-body {
+  padding: 14px;
+}
 
-  .dialog-footer {
-    align-items: flex-start;
-    flex-direction: column;
-  }
+.dialog-footer.compact-layout {
+  align-items: flex-start;
+  flex-direction: column;
+}
 
-  .footer-actions {
-    width: 100%;
-  }
+.dialog-footer.compact-layout .footer-actions {
+  width: 100%;
 }
 </style>

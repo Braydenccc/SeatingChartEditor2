@@ -214,6 +214,55 @@ const createInput = (accept?: string) => {
   return input
 }
 
+const browserFileDialogFocusGraceMs = 300
+
+const selectBrowserFile = (accept?: string): Promise<File | null> => new Promise((resolve, reject) => {
+  const input = createInput(accept)
+  let settled = false
+  let focusTimer: ReturnType<typeof setTimeout> | null = null
+
+  const cleanup = () => {
+    input.removeEventListener('change', handleChange)
+    input.removeEventListener('cancel', handleCancel)
+    window.removeEventListener('focus', handleWindowFocus)
+    if (focusTimer !== null) clearTimeout(focusTimer)
+    input.remove()
+  }
+
+  const settle = (file: File | null) => {
+    if (settled) return
+    settled = true
+    cleanup()
+    resolve(file)
+  }
+
+  const handleChange = () => settle(input.files?.[0] ?? null)
+  const handleCancel = () => settle(null)
+  const handleWindowFocus = () => {
+    if (focusTimer !== null) clearTimeout(focusTimer)
+    // 部分浏览器会先恢复 window focus，再在后续任务派发 input change。
+    // 保留短暂宽限期，避免把已选择的文件抢先判定为取消。
+    focusTimer = setTimeout(() => {
+      focusTimer = null
+      settle(input.files?.[0] ?? null)
+    }, browserFileDialogFocusGraceMs)
+  }
+
+  input.addEventListener('change', handleChange)
+  input.addEventListener('cancel', handleCancel)
+  window.addEventListener('focus', handleWindowFocus)
+
+  try {
+    input.click()
+  } catch (error) {
+    if (!settled) {
+      settled = true
+      cleanup()
+      reject(error)
+    }
+  }
+})
+
 const readFileAsText = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader()
   reader.onload = (event) => resolve(String(event.target?.result || ''))
@@ -249,27 +298,13 @@ export const openTextFile = async (options: OpenTextOptions = {}): Promise<OpenT
     }
   }
 
-  return new Promise((resolve, reject) => {
-    const input = createInput(options.accept)
-    input.onchange = async () => {
-      const file = input.files?.[0]
-      document.body.removeChild(input)
-      if (!file) {
-        resolve(null)
-        return
-      }
-      try {
-        resolve({
-          name: file.name,
-          path: null,
-          text: await readFileAsText(file)
-        })
-      } catch (error) {
-        reject(error)
-      }
-    }
-    input.click()
-  })
+  const file = await selectBrowserFile(options.accept)
+  if (!file) return null
+  return {
+    name: file.name,
+    path: null,
+    text: await readFileAsText(file)
+  }
 }
 
 export const openBinaryFile = async (options: OpenTextOptions = {}): Promise<OpenBinaryResult | null> => {
@@ -293,27 +328,13 @@ export const openBinaryFile = async (options: OpenTextOptions = {}): Promise<Ope
     }
   }
 
-  return new Promise((resolve, reject) => {
-    const input = createInput(options.accept)
-    input.onchange = async () => {
-      const file = input.files?.[0]
-      document.body.removeChild(input)
-      if (!file) {
-        resolve(null)
-        return
-      }
-      try {
-        resolve({
-          name: file.name,
-          path: null,
-          bytes: await readFileAsBytes(file)
-        })
-      } catch (error) {
-        reject(error)
-      }
-    }
-    input.click()
-  })
+  const file = await selectBrowserFile(options.accept)
+  if (!file) return null
+  return {
+    name: file.name,
+    path: null,
+    bytes: await readFileAsBytes(file)
+  }
 }
 
 export const saveTextFile = async (content: string, options: SaveOptions): Promise<SaveResult> => {

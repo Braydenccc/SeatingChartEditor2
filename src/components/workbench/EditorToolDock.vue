@@ -9,7 +9,15 @@
     </div>
 
     <div class="tool-group mobile-only">
-      <NButton size="small" quaternary class="tool-button" :title="isSeatFullscreen ? '退出全屏座位表' : '全屏座位表'" @click="toggleSeatFullscreen">
+      <NButton
+        size="small"
+        quaternary
+        class="tool-button"
+        :title="isSeatFullscreen ? '退出全屏座位表' : '全屏座位表'"
+        :aria-label="isSeatFullscreen ? '退出全屏座位表' : '全屏座位表'"
+        :aria-pressed="isSeatFullscreen"
+        @click="toggleSeatFullscreen"
+      >
         <template #icon>
           <Minimize2 v-if="isSeatFullscreen" :size="17" stroke-width="2" />
           <Maximize2 v-else :size="17" stroke-width="2" />
@@ -21,17 +29,18 @@
         quaternary
         class="tool-button"
         title="上下文"
+        aria-label="上下文"
         :aria-pressed="mobileDrawer === 'selection'"
         @click="openWorkbenchDrawer('selection')"
       >
         <template #icon><PanelRightOpen :size="17" stroke-width="2" /></template>
         <span>上下文</span>
       </NButton>
-      <NButton size="small" quaternary class="tool-button" title="候选学生" @click="openWorkbenchDrawer('candidates')">
+      <NButton size="small" quaternary class="tool-button" title="候选学生" aria-label="候选学生" :aria-pressed="mobileDrawer === 'candidates'" @click="openWorkbenchDrawer('candidates')">
         <template #icon><Users :size="17" stroke-width="2" /></template>
         <span>学生</span>
       </NButton>
-      <NButton size="small" quaternary class="tool-button" title="更多工具" @click="openWorkbenchDrawer('tools')">
+      <NButton size="small" quaternary class="tool-button" title="更多工具" aria-label="更多工具" :aria-pressed="mobileDrawer === 'tools'" @click="openWorkbenchDrawer('tools')">
         <template #icon><MoreHorizontal :size="17" stroke-width="2" /></template>
         <span>工具</span>
       </NButton>
@@ -43,13 +52,13 @@
     </div>
 
     <div class="tool-group">
-      <NButton size="small" quaternary circle class="tool-button icon-only" title="撤销" :disabled="!canUndo" @click="undo">
+      <NButton size="small" quaternary circle class="tool-button icon-only" title="撤销" aria-label="撤销" :disabled="!canUndo" @click="undo">
         <Undo2 :size="17" stroke-width="2" />
       </NButton>
-      <NButton size="small" quaternary circle class="tool-button icon-only" title="重做" :disabled="!canRedo" @click="redo">
+      <NButton size="small" quaternary circle class="tool-button icon-only" title="重做" aria-label="重做" :disabled="!canRedo" @click="redo">
         <Redo2 :size="17" stroke-width="2" />
       </NButton>
-      <NButton size="small" class="tool-button" :type="currentMode === EditMode.NORMAL && !isSelectionMode ? 'primary' : 'default'" :secondary="currentMode === EditMode.NORMAL && !isSelectionMode" :quaternary="currentMode !== EditMode.NORMAL || isSelectionMode" title="普通模式" @click="activateTool('normal')">
+      <NButton size="small" class="tool-button" :type="currentMode === EditMode.NORMAL && !isSelectionMode ? 'primary' : 'default'" :secondary="currentMode === EditMode.NORMAL && !isSelectionMode" :quaternary="currentMode !== EditMode.NORMAL || isSelectionMode" title="普通模式" aria-label="普通模式" :aria-pressed="currentMode === EditMode.NORMAL && !isSelectionMode" @click="activateTool('normal')">
         <template #icon><MousePointer2 :size="17" stroke-width="2" /></template>
         <span>普通</span>
       </NButton>
@@ -74,54 +83,54 @@
     </div>
 
     <div class="tool-group">
-      <NButton size="small" class="tool-button" :type="currentMode === EditMode.SWAP ? 'primary' : 'default'" :secondary="currentMode === EditMode.SWAP" :quaternary="currentMode !== EditMode.SWAP" title="交换座位" @click="activateTool('swap')">
+      <NButton size="small" class="tool-button" :type="currentMode === EditMode.SWAP ? 'primary' : 'default'" :secondary="currentMode === EditMode.SWAP" :quaternary="currentMode !== EditMode.SWAP" title="交换座位" aria-label="交换座位" :aria-pressed="currentMode === EditMode.SWAP" @click="activateTool('swap')">
         <template #icon><ArrowLeftRight :size="17" stroke-width="2" /></template>
         <span>交换</span>
       </NButton>
-      <NButton size="small" class="tool-button" :type="currentMode === EditMode.CLEAR ? 'error' : 'default'" :secondary="currentMode === EditMode.CLEAR" :quaternary="currentMode !== EditMode.CLEAR" title="清空座位" @click="activateTool('clear')">
+      <NButton size="small" class="tool-button" :type="currentMode === EditMode.CLEAR ? 'error' : 'default'" :secondary="currentMode === EditMode.CLEAR" :quaternary="currentMode !== EditMode.CLEAR" title="清空座位" aria-label="清空座位" :aria-pressed="currentMode === EditMode.CLEAR" @click="activateTool('clear')">
         <template #icon><Trash2 :size="17" stroke-width="2" /></template>
         <span>清空</span>
       </NButton>
-      <NButton size="small" class="tool-button" :type="currentMode === EditMode.EMPTY_EDIT ? 'warning' : 'default'" :secondary="currentMode === EditMode.EMPTY_EDIT" :quaternary="currentMode !== EditMode.EMPTY_EDIT" title="空置座位" @click="activateTool('empty')">
+      <NButton size="small" class="tool-button" :type="currentMode === EditMode.EMPTY_EDIT ? 'warning' : 'default'" :secondary="currentMode === EditMode.EMPTY_EDIT" :quaternary="currentMode !== EditMode.EMPTY_EDIT" title="空置座位" aria-label="空置座位" :aria-pressed="currentMode === EditMode.EMPTY_EDIT" @click="activateTool('empty')">
         <template #icon><LayoutGrid :size="17" stroke-width="2" /></template>
         <span>空置</span>
       </NButton>
     </div>
 
     <div class="tool-group workflows">
-      <NButton size="small" quaternary class="tool-button" title="座位配置" @click="openWorkbenchDialog('seatConfig')">
+      <NButton size="small" quaternary class="tool-button" title="座位配置" aria-label="座位配置" @click="openWorkbenchDialog('seatConfig')">
         <template #icon><Settings :size="17" stroke-width="2" /></template>
         <span>配置</span>
       </NButton>
-      <NButton size="small" quaternary class="tool-button" title="位移轮换" @click="openWorkbenchDialog('shiftRotation')">
+      <NButton size="small" quaternary class="tool-button" title="位移轮换" aria-label="位移轮换" @click="openWorkbenchDialog('shiftRotation')">
         <template #icon><MoveDiagonal2 :size="17" stroke-width="2" /></template>
         <span>位移</span>
       </NButton>
-      <NButton size="small" quaternary class="tool-button" title="选区轮换" @click="openWorkbenchDialog('zoneRotation')">
+      <NButton size="small" quaternary class="tool-button" title="选区轮换" aria-label="选区轮换" @click="openWorkbenchDialog('zoneRotation')">
         <template #icon><RefreshCcw :size="17" stroke-width="2" /></template>
         <span>轮换</span>
       </NButton>
-      <NButton size="small" quaternary class="tool-button" title="智能排位" @click="openWorkbenchDialog('assignment')">
+      <NButton size="small" quaternary class="tool-button" title="智能排位" aria-label="智能排位" @click="openWorkbenchDialog('assignment')">
         <template #icon><Shuffle :size="17" stroke-width="2" /></template>
         <span>排位</span>
       </NButton>
-      <NButton size="small" quaternary class="tool-button" title="规则管理" @click="openWorkbenchDialog('rules')">
+      <NButton size="small" quaternary class="tool-button" title="规则管理" aria-label="规则管理" @click="openWorkbenchDialog('rules')">
         <template #icon><Scale :size="17" stroke-width="2" /></template>
         <span>规则</span>
       </NButton>
     </div>
 
     <div class="tool-group zoom-tools">
-      <NButton size="small" quaternary circle class="tool-button icon-only" title="缩小" :disabled="scale <= MIN_SCALE" @click="zoomOut">
+      <NButton size="small" quaternary circle class="tool-button icon-only" title="缩小" aria-label="缩小座位表" :disabled="scale <= MIN_SCALE" @click="zoomOut">
         <Minus :size="17" stroke-width="2" />
       </NButton>
-      <NButton size="small" quaternary class="tool-button zoom-label" title="自适应大小" @click="fitToViewport">
+      <NButton size="small" quaternary class="tool-button zoom-label" title="自适应大小" :aria-label="`自适应座位表大小，当前 ${Math.round(scale * 100)}%`" @click="fitToViewport">
         {{ Math.round(scale * 100) }}%
       </NButton>
-      <NButton size="small" quaternary circle class="tool-button icon-only" title="放大" :disabled="scale >= MAX_SCALE" @click="zoomIn">
+      <NButton size="small" quaternary circle class="tool-button icon-only" title="放大" aria-label="放大座位表" :disabled="scale >= MAX_SCALE" @click="zoomIn">
         <Plus :size="17" stroke-width="2" />
       </NButton>
-      <NButton size="small" quaternary class="tool-button export-tool" title="导出" @click="router.push({ path: '/export', query: { tab: 'image' } })">
+      <NButton size="small" quaternary class="tool-button export-tool" title="导出" aria-label="导出" @click="router.push({ path: '/export', query: { tab: 'image' } })">
         <template #icon><FileOutput :size="17" stroke-width="2" /></template>
         <span>导出</span>
       </NButton>
@@ -270,6 +279,11 @@ const selectionToolTitle = computed(() => {
 .tool-button {
   position: relative;
   white-space: nowrap;
+}
+
+.tool-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .selection-badge {

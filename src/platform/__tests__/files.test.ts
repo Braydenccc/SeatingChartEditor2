@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BaseDirectory } from '@tauri-apps/plugin-fs'
 
 const mocks = vi.hoisted(() => ({
@@ -18,7 +18,19 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
   writeTextFile: mocks.writeTextFile
 }))
 
-import { writeBinaryFileAtomicPath, writeTextFileAtomicPath } from '../files'
+import { openBinaryFile, openTextFile, writeBinaryFileAtomicPath, writeTextFileAtomicPath } from '../files'
+
+const getFileInput = () => {
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]')
+  if (!input) throw new Error('Expected a browser file input')
+  return input
+}
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+  document.querySelectorAll('input[type="file"]').forEach(input => input.remove())
+})
 
 describe('atomic Tauri file writes', () => {
   beforeEach(() => {
@@ -135,5 +147,104 @@ describe('atomic Tauri file writes', () => {
     const backupPath = mocks.rename.mock.calls[1]?.[1] as string
     expect(mocks.rename.mock.calls[3]).toEqual([backupPath, 'workspace.sce', undefined])
     expect(mocks.remove).toHaveBeenCalledWith(temporaryPath, undefined)
+  })
+})
+
+describe('browser file selection', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined)
+  })
+
+  it('resolves text selection with null and removes the input on cancel', async () => {
+    const result = openTextFile({ accept: '.sce' })
+    const input = getFileInput()
+
+    input.dispatchEvent(new Event('cancel'))
+
+    await expect(result).resolves.toBeNull()
+    expect(document.body.contains(input)).toBe(false)
+  })
+
+  it('uses the window-focus fallback when the browser does not emit cancel', async () => {
+    vi.useFakeTimers()
+    const result = openBinaryFile({ accept: '.xlsx' })
+    const input = getFileInput()
+
+    window.dispatchEvent(new Event('focus'))
+    await vi.runAllTimersAsync()
+
+    await expect(result).resolves.toBeNull()
+    expect(document.body.contains(input)).toBe(false)
+  })
+
+  it('lets a delayed change event win during the window-focus grace period', async () => {
+    vi.useFakeTimers()
+    const result = openTextFile({ accept: '.sce' })
+    const input = getFileInput()
+    const settled = vi.fn()
+    void result.then(settled)
+
+    window.dispatchEvent(new Event('focus'))
+    await vi.advanceTimersByTimeAsync(100)
+    expect(settled).not.toHaveBeenCalled()
+
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [new File(['selected'], 'selected.sce')]
+    })
+    input.dispatchEvent(new Event('change'))
+    await vi.runAllTimersAsync()
+
+    await expect(result).resolves.toEqual({
+      name: 'selected.sce',
+      path: null,
+      text: 'selected'
+    })
+    expect(document.body.contains(input)).toBe(false)
+  })
+
+  it('reads selected text and binary files through the shared picker', async () => {
+    const textResult = openTextFile()
+    const textInput = getFileInput()
+    Object.defineProperty(textInput, 'files', {
+      configurable: true,
+      value: [new File(['workspace'], 'class.sce', { type: 'application/json' })]
+    })
+    textInput.dispatchEvent(new Event('change'))
+
+    await expect(textResult).resolves.toEqual({
+      name: 'class.sce',
+      path: null,
+      text: 'workspace'
+    })
+
+    const binaryResult = openBinaryFile()
+    const binaryInput = getFileInput()
+    Object.defineProperty(binaryInput, 'files', {
+      configurable: true,
+      value: [new File([new Uint8Array([1, 2, 3])], 'roster.xlsx')]
+    })
+    binaryInput.dispatchEvent(new Event('change'))
+
+    await expect(binaryResult).resolves.toMatchObject({
+      name: 'roster.xlsx',
+      path: null,
+      bytes: new Uint8Array([1, 2, 3])
+    })
+  })
+
+  it('settles only once when cancel and change race', async () => {
+    const result = openTextFile()
+    const input = getFileInput()
+
+    input.dispatchEvent(new Event('cancel'))
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [new File(['late'], 'late.sce')]
+    })
+    input.dispatchEvent(new Event('change'))
+
+    await expect(result).resolves.toBeNull()
+    expect(document.body.contains(input)).toBe(false)
   })
 })

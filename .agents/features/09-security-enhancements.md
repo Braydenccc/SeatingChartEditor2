@@ -159,6 +159,8 @@
 
 ## 3. 测试
 
+后端安全回归同时由 CI 覆盖：所有 `public/api/*.php` 会运行 PHP lint，离线契约夹具验证账号/session、DAV 公网地址与请求体限制、调试端点默认关闭。Vite mock 与浏览器 E2E 不能替代这组 PHP 检查。
+
 ### 测试脚本
 
 测试脚本位于 [test-scr/test-security-enhancements.html](../../test-scr/test-security-enhancements.html)。
@@ -227,6 +229,9 @@
 
 - 已解决：密码明文传输（客户端抓包可见）
 - 已解决：文件上传缺少格式验证（可被滥用为通用 API）
+- 已解决：WebDAV DNS 预检与 cURL 连接二次解析之间的重绑定窗口；已固定预检 IP，并在连接前拒绝 mapped/compatible/NAT64/6to4/Teredo/ISATAP 等转换地址。
+- 已解决：DAV 请求体只依赖 `Content-Length` 的 10 MiB 限制；现按实际读取字节强制执行。
+- 已解决：调试端点信任 `Host` 或代理回环地址；现在生产环境始终关闭，只允许 development/test 显式开关加独立高熵请求头令牌。
 
 ### 仍需注意的安全事项
 
