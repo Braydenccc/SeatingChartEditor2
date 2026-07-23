@@ -42,7 +42,7 @@ Content-Type: application/json
 - 工作区管理：`list_workspaces`、`get_workspace_detail`、`rename_workspace`、`set_workspace_deleted`
 - 审计查询：`list_audit_logs`、`list_audit_failures`
 
-`set_user_status` 使用 `user_profiles` 数据库存储普通用户状态。老用户没有 profile 时默认为 `active`；状态为 `disabled` 时，普通登录和已有会话校验都会被拒绝。
+`set_user_status` 使用 `user_profiles` 数据库存储普通用户状态。老用户没有 profile 时默认为 `active`；切换为 `disabled` 时先轮换 `sessionEpoch`，再确认删除当前服务端会话。鉴权会核对该世代和签发时的密码哈希指纹；重新启用前也会再次确认会话已删除，避免禁用前的 30/90 天 token、删除失败残留或并发登录补写的 token 恢复有效。`set_user_status`、`reset_user_password` 与用户自助改密共用 `registration_locks` 中的同用户安全租约，避免陈旧请求覆盖禁用或密码重置；`reset_user_password` 在写入新密码前同样轮换世代。
 
 `set_workspace_deleted` 只做软删除和恢复：删除时写入 `metadata.deleted`、`metadata.deletedAt` 和 `metadata.tags[] = deleted`；恢复时移除删除标签并清除删除时间。admin API 不提供物理删除工作区。
 

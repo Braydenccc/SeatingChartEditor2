@@ -109,6 +109,86 @@ describe('workspace defaults', () => {
     expect(source.layout.config).not.toHaveProperty('groups')
   })
 
+  it('migrates legacy numeric student fields before strict workspace validation', async () => {
+    const source = {
+      ...createExistingWorkspace(),
+      students: [{
+        id: 8,
+        name: '旧版学生',
+        studentNumber: '01',
+        tags: [],
+        numericAttributes: {
+          height: 60,
+          score: '95.55'
+        }
+      }, {
+        id: 9,
+        name: '旧版学生二',
+        studentNumber: 2,
+        tags: [],
+        numericAttributes: {
+          height: 240.5,
+          score: null
+        }
+      }],
+      studentAttributeDefinitions: [
+        {
+          id: 'height',
+          name: '身高',
+          unit: 'cm',
+          min: 80,
+          max: 220,
+          precision: 0,
+          enabled: true,
+          builtInKey: 'height'
+        },
+        {
+          id: 'score',
+          name: '成绩',
+          unit: '分',
+          min: 0,
+          max: 150,
+          precision: 1,
+          enabled: true,
+          builtInKey: 'score'
+        }
+      ]
+    }
+
+    expect(await workspace.applyWorkspaceData(source)).toBe(true)
+    expect(studentData.students.value[0]).toMatchObject({
+      name: '旧版学生',
+      studentNumber: 1,
+      numericAttributes: {
+        height: 60,
+        score: 95.55
+      }
+    })
+    expect(studentData.students.value[1]).toMatchObject({
+      name: '旧版学生二',
+      studentNumber: 2,
+      numericAttributes: {
+        height: 240.5,
+        score: null
+      }
+    })
+    expect(attributes.attributeDefinitions.value).toEqual([
+      expect.objectContaining({ id: 'height', min: 60, max: 240.5, precision: 1 }),
+      expect.objectContaining({ id: 'score', min: 0, max: 150, precision: 2 })
+    ])
+    expect(source.students[0]).toMatchObject({
+      studentNumber: '01',
+      numericAttributes: {
+        height: 60,
+        score: '95.55'
+      }
+    })
+    expect(source.studentAttributeDefinitions).toEqual([
+      expect.objectContaining({ id: 'height', min: 80, max: 220, precision: 0 }),
+      expect.objectContaining({ id: 'score', min: 0, max: 150, precision: 1 })
+    ])
+  })
+
   it('rejects malformed workspace data before changing the current workspace', async () => {
     const studentId = studentData.addStudent()
     studentData.updateStudent(studentId, { name: '保留学生', studentNumber: 12 })

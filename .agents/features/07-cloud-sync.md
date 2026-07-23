@@ -35,7 +35,7 @@ const backupMode = ref<boolean>(false) // 若开启，存入 retiehe 时会静�
 - **请求超时与重试**: `apiFetch` 默认使用有限超时，并与调用方 `AbortSignal` 组合，超时覆盖响应正文的完整读取。只重试网络错误、408、425、429 和 5xx；POST 只有在后端已实现对应幂等协议时才可携带 `Idempotency-Key` 并启用重试。当前 `workspace.php` 不消费幂等键，因此工作区 POST 显式禁用自动重试。
 - **不依赖第三方库**: WebDAV 解析直接手写使用了原生的 `new DOMParser().parseFromString(text, 'text/xml')`，零 npm 依赖，避免了包体积膨胀。
 - **工作区列表管理**: SCE 云端工作区列表以 `users` 库中的 `{username}_files` 数组为准；删除工作区会在 `scefiles` 对应记录的 `metadata` 上写入 `deleted` 标记和 `deletedAt` 时间，不删除数据库值。`list`、`load`、`rename` 和覆盖保存都会忽略已标记删除的工作区。
-- **云工作区写入契约**: 新建 SCE 云工作区会在第一次请求前生成稳定的 128 位十六进制 `fileId`。单条 `scefiles` KV 在外层 JSON 编码后必须同时不超过 60000 字节和字符；写入会回读校验，失败不得返回成功。保存或重命名已确认写入后，兼容 `{username}_files` 索引追加失败不会把主操作改判为失败：后端记录告警，并以 `success: true`、原 `fileId` 和 `indexWarning` 返回；列表读取同时以权限表补齐索引。
+- **云工作区写入契约**: 新建 SCE 云工作区的 128 位十六进制 `fileId` 由服务端生成；客户端 `fileId` 只在对应工作区已存在时用于覆盖保存，不存在的自定义 ID 会被忽略并替换为服务端 ID。客户端始终以保存响应中的 canonical `fileId` 为准，并拒绝缺少有效 ID 的成功响应。单条 `scefiles` KV 在外层 JSON 编码后必须同时不超过 60000 字节和字符；写入会回读校验，失败不得返回成功。保存或重命名已确认写入后，兼容 `{username}_files` 索引读取、追加或回读失败（包括数据库抛异常）不会把主操作改判为失败：后端记录告警，并以 `success: true`、实际 `fileId` 和 `indexWarning` 返回；列表读取同时以权限表补齐索引。
 - **文件权限键**: 权限记录使用 `fileId + NUL + username` 的 SHA-256 键，并核对记录内的主体字段。读取旧拼接键时仅接受主体完全匹配的记录，并自动迁移到 v2 键。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)

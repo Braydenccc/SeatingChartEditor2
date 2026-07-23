@@ -171,13 +171,26 @@ function readPasswordField($input, $plainKey, $encryptedKey, $username) {
     return isset($input[$plainKey]) && is_string($input[$plainKey]) ? $input[$plainKey] : '';
 }
 
-function createSessionTokenData($rememberMe = false) {
+function createSessionTokenData($rememberMe = false, $sessionEpoch = '', $passwordHash = null) {
+    if (!is_string($sessionEpoch) || ($sessionEpoch !== '' && !preg_match('/^[a-f0-9]{32}$/', $sessionEpoch))) {
+        throw new RuntimeException('invalid session epoch');
+    }
+
     $token = bin2hex(random_bytes(32));
     $expiryDays = $rememberMe ? TOKEN_EXPIRY_REMEMBER_ME : TOKEN_EXPIRY_DAYS;
     $expiry = time() + ($expiryDays * 86400);
 
     $tokenHash = hash('sha256', $token);
-    $sessionData = json_encode(['tokenHash' => $tokenHash, 'expiry' => $expiry]);
+    $sessionPayload = [
+        'tokenHash' => $tokenHash,
+        'expiry' => $expiry,
+        'sessionEpoch' => $sessionEpoch
+    ];
+    $credentialFingerprint = getPasswordHashFingerprint($passwordHash);
+    if ($credentialFingerprint !== null) {
+        $sessionPayload['credentialFingerprint'] = $credentialFingerprint;
+    }
+    $sessionData = json_encode($sessionPayload);
     if (!is_string($sessionData)) {
         throw new RuntimeException('session token encoding failed');
     }
@@ -195,8 +208,12 @@ function persistSessionToken($sessionDb, $username, $tokenData) {
     return $tokenData;
 }
 
-function issueSessionToken($sessionDb, $username, $rememberMe = false) {
-    return persistSessionToken($sessionDb, $username, createSessionTokenData($rememberMe));
+function issueSessionToken($sessionDb, $username, $rememberMe = false, $sessionEpoch = '', $passwordHash = null) {
+    return persistSessionToken(
+        $sessionDb,
+        $username,
+        createSessionTokenData($rememberMe, $sessionEpoch, $passwordHash)
+    );
 }
 
 function setAuthCookies($username, $tokenData) {
@@ -305,22 +322,25 @@ try {
             }
 
             $createdAt = date('c');
+            $sessionEpoch = createUserSessionEpoch();
             $pendingProfileData = json_encode([
                 'status' => 'active',
                 'createdAt' => $createdAt,
                 'updatedAt' => $createdAt,
+                'sessionEpoch' => $sessionEpoch,
                 'registrationMarker' => $registrationId
             ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
             $finalProfileData = json_encode([
                 'status' => 'active',
                 'createdAt' => $createdAt,
-                'updatedAt' => $createdAt
+                'updatedAt' => $createdAt,
+                'sessionEpoch' => $sessionEpoch
             ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
             if (!is_string($pendingProfileData) || !is_string($finalProfileData)) {
                 throw new RuntimeException('registration profile encoding failed');
             }
 
-            $issuedToken = createSessionTokenData();
+            $issuedToken = createSessionTokenData(false, $sessionEpoch, $hash);
             $expectedValues = [
                 'account' => $hash,
                 'profile' => [$pendingProfileData, $finalProfileData],
@@ -470,12 +490,19 @@ try {
         }
 
         if (password_verify($password, $existingHash)) {
-            if (isUserDisabled($profileDb, $username)) {
+            $profile = getUserProfile($profileDb, $username);
+            if (isset($profile['status']) && $profile['status'] === 'disabled') {
                 logSecurityEvent('login_failed', $username, ['reason' => 'user_disabled']);
                 respond(['success' => false, 'message' => '账号已被禁用'], 403);
             }
 
-            $issuedToken = issueSessionToken($sessionDb, $username);
+            $sessionEpoch = getUserSessionEpoch($profile);
+            if ($sessionEpoch === null) {
+                logSecurityEvent('login_failed', $username, ['reason' => 'invalid_session_epoch']);
+                respond(['success' => false, 'message' => '账号安全状态异常，请联系管理员'], 503);
+            }
+
+            $issuedToken = issueSessionToken($sessionDb, $username, false, $sessionEpoch, $existingHash);
             setAuthCookies($username, $issuedToken);
             logSecurityEvent('login_success', $username);
             respond([
@@ -526,16 +553,57 @@ try {
 
         validatePassword($newPassword);
 
-        $existingHash = $db->get($authUsername);
-        if ($existingHash === null || !password_verify($currentPassword, $existingHash)) {
-            logSecurityEvent('change_password_failed', $authUsername, ['reason' => 'invalid_current_password']);
-            respond(['success' => false, 'message' => '当前密码不正确']);
+        $securityLockDb = new Database('registration_locks');
+        $securityLease = acquireUserSecurityLease($securityLockDb, $authUsername);
+        if ($securityLease === null) {
+            respond(['success' => false, 'message' => '账号安全设置正在更新，请稍后重试'], 409);
         }
 
-        if (!databaseSetVerified($db, $authUsername, password_hash($newPassword, PASSWORD_DEFAULT))) {
-            respond(['success' => false, 'message' => '密码写入失败，请稍后重试'], 503);
+        try {
+            $existingHash = $db->get($authUsername);
+            if ($existingHash === null || !password_verify($currentPassword, $existingHash)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_invalid_current');
+                logSecurityEvent('change_password_failed', $authUsername, ['reason' => 'invalid_current_password']);
+                respond(['success' => false, 'message' => '当前密码不正确']);
+            }
+
+            $profile = getUserProfile($profileDb, $authUsername);
+            if (isset($profile['status']) && $profile['status'] === 'disabled') {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_disabled');
+                respond(['success' => false, 'message' => '账号已被禁用'], 403);
+            }
+            $sessionEpoch = getUserSessionEpoch($profile);
+            if ($sessionEpoch === null) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_invalid_epoch');
+                respond(['success' => false, 'message' => '账号安全状态异常，请联系管理员'], 503);
+            }
+
+            $newPasswordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+            if (!is_string($newPasswordHash)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_hash_failed');
+                respond(['success' => false, 'message' => '密码处理失败，请稍后重试'], 503);
+            }
+
+            if (!revokeUserSessionVerified($sessionDb, $authUsername)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_revoke_failed');
+                respond(['success' => false, 'message' => '旧会话吊销失败，请稍后重试'], 503);
+            }
+            if (!databaseSetVerified($db, $authUsername, $newPasswordHash)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_write_failed');
+                respond(['success' => false, 'message' => '密码写入失败，请稍后重试'], 503);
+            }
+            $issuedToken = issueSessionToken(
+                $sessionDb,
+                $authUsername,
+                false,
+                $sessionEpoch,
+                $newPasswordHash
+            );
+            releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_complete');
+        } catch (Throwable $error) {
+            releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_exception');
+            throw $error;
         }
-        $issuedToken = issueSessionToken($sessionDb, $authUsername);
         setAuthCookies($authUsername, $issuedToken);
         logSecurityEvent('change_password_success', $authUsername);
         respond(['success' => true, 'message' => '密码已修改']);

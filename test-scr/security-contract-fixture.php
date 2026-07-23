@@ -86,6 +86,56 @@ fixtureAssert($firstRate['ok'] && $firstRate['allowed'], 'first rate attempt all
 fixtureAssert($secondRate['ok'] && $secondRate['allowed'], 'second rate attempt allowed');
 fixtureAssert($thirdRate['ok'] && !$thirdRate['allowed'], 'third rate attempt denied');
 
+$sessionRevocationDb = new Database('fixture_session_revocation');
+$sessionRevocationDb->set('disabled_user', '{"tokenHash":"active"}');
+fixtureAssert(revokeUserSessionVerified($sessionRevocationDb, 'disabled_user'), 'session revocation is confirmed');
+fixtureAssert($sessionRevocationDb->get('disabled_user') === null, 'session revocation removes the stored token');
+fixtureAssert(revokeUserSessionVerified($sessionRevocationDb, 'disabled_user'), 'session revocation is idempotent when already absent');
+$sessionRevocationDb->set('disabled_user', '{"tokenHash":"stale"}');
+Database::throwOnNextGet('fixture_session_revocation', 'disabled_user');
+fixtureAssert(!revokeUserSessionVerified($sessionRevocationDb, 'disabled_user'), 'session revocation fails closed on database read errors');
+fixtureAssert($sessionRevocationDb->get('disabled_user') !== null, 'failed session revocation preserves the token for a safe retry');
+
+$sessionStateDb = new Database('fixture_session_state');
+$sessionProfileDb = new Database('fixture_session_profiles');
+$sessionUsersDb = new Database('fixture_session_users');
+$sessionUsername = 'epoch_user';
+$sessionToken = str_repeat('a', 64);
+$sessionPasswordHash = 'password-hash-v1';
+$sessionEpoch = createUserSessionEpoch();
+$sessionUsersDb->set($sessionUsername, $sessionPasswordHash);
+$sessionProfileDb->set($sessionUsername, json_encode([
+    'status' => 'active',
+    'sessionEpoch' => $sessionEpoch
+]));
+$sessionStateDb->set($sessionUsername, json_encode([
+    'tokenHash' => hash('sha256', $sessionToken),
+    'expiry' => time() + 3600,
+    'sessionEpoch' => $sessionEpoch,
+    'credentialFingerprint' => getPasswordHashFingerprint($sessionPasswordHash)
+]));
+fixtureAssert(
+    isAuthorized($sessionStateDb, $sessionProfileDb, $sessionUsersDb, $sessionUsername, $sessionToken),
+    'session matching the current epoch and password hash is authorized'
+);
+$sessionProfileDb->set($sessionUsername, json_encode([
+    'status' => 'active',
+    'sessionEpoch' => createUserSessionEpoch()
+]));
+fixtureAssert(
+    !isAuthorized($sessionStateDb, $sessionProfileDb, $sessionUsersDb, $sessionUsername, $sessionToken),
+    'rotating the session epoch permanently invalidates the old token'
+);
+$sessionProfileDb->set($sessionUsername, json_encode([
+    'status' => 'active',
+    'sessionEpoch' => $sessionEpoch
+]));
+$sessionUsersDb->set($sessionUsername, 'password-hash-v2');
+fixtureAssert(
+    !isAuthorized($sessionStateDb, $sessionProfileDb, $sessionUsersDb, $sessionUsername, $sessionToken),
+    'changing the password hash invalidates an in-flight token issued from old credentials'
+);
+
 $usersDb = new Database('fixture_users');
 $profilesDb = new Database('fixture_profiles');
 $sessionsDb = new Database('fixture_sessions');
@@ -184,6 +234,8 @@ $ownerALease = acquireRegistrationLease(
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 );
 fixtureAssert($ownerALease !== null, 'first registration owner acquires the username lease');
+$securityLease = acquireUserSecurityLease($registrationLockDb, 'lease_user');
+fixtureAssert($securityLease === null, 'account security mutation shares the registration username lease');
 $ownerBLease = acquireRegistrationLease(
     $registrationLockDb,
     'lease_user',
@@ -198,6 +250,12 @@ $ownerBLease = acquireRegistrationLease(
 );
 fixtureAssert($ownerBLease !== null, 'second registration owner can acquire the released username lease');
 fixtureAssert(releaseRegistrationLease($registrationLockDb, $ownerBLease), 'second registration owner releases its lease');
+$securityLease = acquireUserSecurityLease($registrationLockDb, 'lease_user');
+fixtureAssert($securityLease !== null, 'account security mutation acquires the released username lease');
+fixtureAssert(
+    releaseUserSecurityLease($registrationLockDb, $securityLease, 'lease_user', 'fixture'),
+    'account security mutation releases the shared username lease'
+);
 
 $invalidUtf8 = "valid\xFFtail";
 fixtureAssert(preg_match('//u', normalizeUtf8String($invalidUtf8)) === 1, 'invalid UTF-8 is normalized');

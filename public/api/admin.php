@@ -639,6 +639,7 @@ try {
     $permissionsDb = new Database('file_permissions');
     $settingsDb = new Database('users_settings');
     $sessionDb = new Database('users_sessions');
+    $securityLockDb = new Database('registration_locks');
 
     if ($action === 'list_users') {
         $keys = $usersDb->list_keys();
@@ -725,21 +726,54 @@ try {
             adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '用户状态无效'], 400, false, true, 'invalid_status', $username);
         }
 
-        $profile = getUserProfile($profilesDb, $username);
-        $profile['status'] = $status;
-        $profile['updatedAt'] = date('c');
-        if ($status === 'disabled') {
-            $profile['disabledAt'] = date('c');
-        }
-        if ($status === 'active' && isset($profile['disabledAt'])) {
-            unset($profile['disabledAt']);
+        $securityLease = acquireUserSecurityLease($securityLockDb, $username);
+        if ($securityLease === null) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '账号安全设置正在更新，请稍后重试'], 409, false, true, 'security_update_in_progress', $username);
         }
 
-        $encodedProfile = json_encode($profile, JSON_UNESCAPED_UNICODE);
-        if (!is_string($encodedProfile) || !databaseSetVerified($profilesDb, $username, $encodedProfile)) {
-            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '用户状态写入失败'], 503, false, true, 'profile_write_failed', $username);
+        try {
+            if (adminGetExistingUserHash($usersDb, $username) === null) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'set_user_status_missing_user');
+                adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '用户不存在'], 404, false, true, 'user_not_found', $username);
+            }
+
+            $profile = getUserProfile($profilesDb, $username);
+            $wasDisabled = isset($profile['status']) && $profile['status'] === 'disabled';
+            if ($status === 'active' && $wasDisabled && !revokeUserSessionVerified($sessionDb, $username)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'set_user_status_enable_revoke_failed');
+                adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '旧会话吊销失败，账号仍保持禁用，请重试'], 503, false, true, 'session_revoke_failed', $username);
+            }
+
+            $profile['status'] = $status;
+            $profile['updatedAt'] = date('c');
+            if ($status === 'disabled') {
+                $sessionEpoch = getUserSessionEpoch($profile);
+                if (!$wasDisabled || $sessionEpoch === null || $sessionEpoch === '') {
+                    $profile['sessionEpoch'] = createUserSessionEpoch();
+                }
+                if (!$wasDisabled || !isset($profile['disabledAt'])) {
+                    $profile['disabledAt'] = date('c');
+                }
+            }
+            if ($status === 'active' && isset($profile['disabledAt'])) {
+                unset($profile['disabledAt']);
+            }
+
+            $encodedProfile = json_encode($profile, JSON_UNESCAPED_UNICODE);
+            if (!is_string($encodedProfile) || !databaseSetVerified($profilesDb, $username, $encodedProfile)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'set_user_status_profile_write_failed');
+                adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '用户状态写入失败'], 503, false, true, 'profile_write_failed', $username);
+            }
+            if ($status === 'disabled' && !revokeUserSessionVerified($sessionDb, $username)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'set_user_status_disable_revoke_failed');
+                adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '账号已禁用，但旧会话吊销未确认；账号会保持禁用，请重试'], 503, false, true, 'session_revoke_failed', $username);
+            }
+            releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'set_user_status_complete');
+        } catch (Throwable $error) {
+            releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'set_user_status_exception');
+            throw $error;
         }
-        adminRespond($adminDb, $input, $action, ['success' => true, 'message' => '用户状态已更新', 'data' => ['username' => $username, 'status' => $status]], 200, true, true, '', $username);
+        adminRespond($adminDb, $input, $action, ['success' => true, 'message' => '用户状态已更新', 'data' => ['username' => $username, 'status' => $status, 'sessionsRevoked' => $status === 'disabled' || $wasDisabled]], 200, true, true, '', $username);
     }
 
     if ($action === 'reset_user_password') {
@@ -755,11 +789,44 @@ try {
             adminRespond($adminDb, $input, $action, ['success' => false, 'message' => $validation['message']], 400, false, true, 'invalid_password', $username);
         }
 
-        if (!databaseSetVerified($usersDb, $username, password_hash($newPassword, PASSWORD_DEFAULT))) {
-            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '密码写入失败'], 503, false, true, 'password_write_failed', $username);
+        $securityLease = acquireUserSecurityLease($securityLockDb, $username);
+        if ($securityLease === null) {
+            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '账号安全设置正在更新，请稍后重试'], 409, false, true, 'security_update_in_progress', $username);
         }
-        if (!databaseDeleteVerified($sessionDb, $username)) {
-            adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '密码已更新，但旧会话失效失败，请立即禁用该账号并重试'], 503, false, true, 'session_revoke_failed', $username);
+
+        try {
+            if (adminGetExistingUserHash($usersDb, $username) === null) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'reset_password_missing_user');
+                adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '用户不存在'], 404, false, true, 'user_not_found', $username);
+            }
+
+            $newPasswordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+            if (!is_string($newPasswordHash)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'reset_password_hash_failed');
+                adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '密码处理失败'], 503, false, true, 'password_hash_failed', $username);
+            }
+
+            $profile = getUserProfile($profilesDb, $username);
+            $profile['sessionEpoch'] = createUserSessionEpoch();
+            $profile['updatedAt'] = date('c');
+            $encodedProfile = json_encode($profile, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            if (!is_string($encodedProfile) || !databaseSetVerified($profilesDb, $username, $encodedProfile)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'reset_password_profile_write_failed');
+                adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '账号安全状态写入失败'], 503, false, true, 'profile_write_failed', $username);
+            }
+
+            if (!databaseSetVerified($usersDb, $username, $newPasswordHash)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'reset_password_write_failed');
+                adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '密码写入失败'], 503, false, true, 'password_write_failed', $username);
+            }
+            if (!revokeUserSessionVerified($sessionDb, $username)) {
+                releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'reset_password_revoke_failed');
+                adminRespond($adminDb, $input, $action, ['success' => false, 'message' => '密码已更新，旧会话已失效，但会话记录删除未确认，请重试'], 503, false, true, 'session_revoke_failed', $username);
+            }
+            releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'reset_password_complete');
+        } catch (Throwable $error) {
+            releaseUserSecurityLease($securityLockDb, $securityLease, $username, 'reset_password_exception');
+            throw $error;
         }
         adminRespond($adminDb, $input, $action, ['success' => true, 'message' => '密码已重置'], 200, true, true, '', $username);
     }

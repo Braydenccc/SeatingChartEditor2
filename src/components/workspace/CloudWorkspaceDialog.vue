@@ -258,7 +258,7 @@ const handleSave = async () => {
     if (result.success) {
       success('工作区已保存至云端！')
 
-      const savedFileId = targetFileId || result.data?.fileId
+      const savedFileId = result.data?.fileId || targetFileId
       if (savedFileId) {
         saveLastWorkspace({
           type: 'cloud',

@@ -182,6 +182,80 @@ const normalizeWorkspaceSeat = (seat: WorkspaceSeatInput = {}) => {
   }
 }
 
+const getRequiredDecimalPrecision = (value: number) => {
+  const [coefficient, exponentText] = value.toString().toLowerCase().split('e')
+  const fractionDigits = coefficient.split('.')[1]?.length ?? 0
+  const exponent = Number(exponentText ?? 0)
+  return Math.max(0, fractionDigits - exponent)
+}
+
+const normalizeLegacyStudentData = (workspace: MigratingWorkspace) => {
+  if (!Array.isArray(workspace.students)) return
+
+  const attributeDefinitionsById = new Map<string, Record<string, unknown>>()
+  if (Array.isArray(workspace.studentAttributeDefinitions)) {
+    workspace.studentAttributeDefinitions.forEach(definition => {
+      if (!isRecord(definition) || typeof definition.id !== 'string' || !definition.id) return
+      attributeDefinitionsById.set(definition.id, definition)
+    })
+  }
+
+  workspace.students.forEach(studentValue => {
+    if (!isRecord(studentValue)) return
+    const studentRecord = studentValue as Record<string, unknown>
+
+    const studentNumber = studentRecord.studentNumber
+    if (
+      studentNumber === undefined ||
+      (typeof studentNumber === 'string' && studentNumber.trim() === '')
+    ) {
+      studentRecord.studentNumber = null
+    } else if (typeof studentNumber === 'string') {
+      const normalizedStudentNumber = Number(studentNumber)
+      if (Number.isFinite(normalizedStudentNumber)) {
+        studentRecord.studentNumber = normalizedStudentNumber
+      }
+    }
+
+    const numericAttributes = studentRecord.numericAttributes
+    if (!isRecord(numericAttributes)) return
+    Object.entries(numericAttributes).forEach(([attributeId, attributeValue]) => {
+      let normalizedValue = attributeValue
+      if (typeof attributeValue === 'string') {
+        const text = attributeValue.trim()
+        if (text === '') {
+          normalizedValue = null
+        } else {
+          const numberValue = Number(text)
+          if (Number.isFinite(numberValue)) normalizedValue = numberValue
+        }
+      }
+
+      const definition = attributeDefinitionsById.get(attributeId)
+      if (definition && typeof normalizedValue === 'number' && Number.isFinite(normalizedValue)) {
+        if (typeof definition.min === 'number' && normalizedValue < definition.min) {
+          definition.min = normalizedValue
+        }
+        if (typeof definition.max === 'number' && normalizedValue > definition.max) {
+          definition.max = normalizedValue
+        }
+
+        const requiredPrecision = getRequiredDecimalPrecision(normalizedValue)
+        if (
+          requiredPrecision <= 10 &&
+          typeof definition.precision === 'number' &&
+          Number.isInteger(definition.precision) &&
+          requiredPrecision > definition.precision
+        ) {
+          definition.precision = requiredPrecision
+        }
+      }
+
+      numericAttributes[attributeId] = normalizedValue
+    })
+  })
+}
+
 export function useWorkspace() {
   const {
     students,
@@ -891,6 +965,9 @@ export function useWorkspace() {
         hideEmptyOnExport: ws.layout.config.guardSeats?.hideEmptyOnExport !== false
       }
     }
+
+    // 分支前允许保存定义范围外的有限数值；迁移时扩展定义，避免重载时截断旧数据。
+    normalizeLegacyStudentData(ws)
 
     // 确保默认值
     ws.meta = {

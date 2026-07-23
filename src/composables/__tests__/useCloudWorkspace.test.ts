@@ -144,32 +144,93 @@ describe('useCloudWorkspace', () => {
     expect(mockPutFile).not.toHaveBeenCalled()
   })
 
-  it('generates one stable legal file id before a new SCE workspace request', async () => {
+  it('lets the server assign the file id for a new SCE workspace', async () => {
     const workspace = useCloudWorkspace()
     vi.mocked(apiFetch).mockImplementationOnce(async (_url, options) => {
       if (typeof options?.body !== 'string') throw new Error('Expected a JSON request body')
-      const requestBody = JSON.parse(options.body) as { fileId: string }
+      const requestBody = JSON.parse(options.body) as Record<string, unknown>
+      expect(requestBody).not.toHaveProperty('fileId')
       return jsonResponse({
         success: true,
         data: {
-          fileId: requestBody.fileId,
+          fileId: 'server-generated-id',
           metadata: { name: '测试工作区' }
         }
       })
     })
 
-    await workspace.saveWorkspaceToCloud('测试工作区', {
+    await expect(workspace.saveWorkspaceToCloud('测试工作区', {
       students: [],
       tags: [],
       layout: { seats: [], config: {} }
+    })).resolves.toMatchObject({
+      success: true,
+      data: { fileId: 'server-generated-id' }
     })
 
     const [, options] = vi.mocked(apiFetch).mock.calls[0]
     if (typeof options?.body !== 'string') throw new Error('Expected a JSON request body')
-    const requestBody = JSON.parse(options.body) as { fileId: string }
-    expect(requestBody.fileId).toMatch(/^[a-f0-9]{32}$/)
+    expect(JSON.parse(options.body)).not.toHaveProperty('fileId')
     expect(new Headers(options.headers).get('Idempotency-Key')).toBeNull()
     expect(vi.mocked(apiFetch).mock.calls[0][2]).toBe(0)
+  })
+
+  it('keeps sending the server file id when overwriting an existing workspace', async () => {
+    const workspace = useCloudWorkspace()
+    vi.mocked(apiFetch).mockResolvedValueOnce(jsonResponse({
+      success: true,
+      data: { fileId: 'existing-id', metadata: { name: '测试工作区' } }
+    }))
+
+    await workspace.saveWorkspaceToCloud('测试工作区', {
+      students: [],
+      tags: [],
+      layout: { seats: [], config: {} }
+    }, 'existing-id')
+
+    const [, options] = vi.mocked(apiFetch).mock.calls[0]
+    if (typeof options?.body !== 'string') throw new Error('Expected a JSON request body')
+    expect(JSON.parse(options.body)).toMatchObject({ fileId: 'existing-id' })
+  })
+
+  it('returns the canonical server id when a requested workspace no longer exists', async () => {
+    const workspace = useCloudWorkspace()
+    vi.mocked(apiFetch).mockResolvedValueOnce(jsonResponse({
+      success: true,
+      data: { fileId: 'replacement-id', metadata: { name: '测试工作区' } }
+    }))
+
+    await expect(workspace.saveWorkspaceToCloud('测试工作区', {
+      students: [],
+      tags: [],
+      layout: { seats: [], config: {} }
+    }, 'stale-id')).resolves.toMatchObject({
+      success: true,
+      data: { fileId: 'replacement-id' }
+    })
+
+    const [, options] = vi.mocked(apiFetch).mock.calls[0]
+    if (typeof options?.body !== 'string') throw new Error('Expected a JSON request body')
+    expect(JSON.parse(options.body)).toMatchObject({ fileId: 'stale-id' })
+  })
+
+  it('rejects a successful SCE save response without a valid file id', async () => {
+    const workspace = useCloudWorkspace()
+    vi.mocked(apiFetch).mockResolvedValueOnce(jsonResponse({
+      success: true,
+      data: { metadata: { name: '测试工作区' } }
+    }))
+
+    await expect(workspace.saveWorkspaceToCloud('测试工作区', {
+      students: [],
+      tags: [],
+      layout: { seats: [], config: {} }
+    })).resolves.toEqual({
+      success: false,
+      message: '云端响应缺少有效的工作区文件ID',
+      error: '云端响应格式错误',
+      source: undefined
+    })
   })
 
   it('sends trimmed workspace name when renaming Retiehe workspace', async () => {

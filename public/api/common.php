@@ -215,6 +215,27 @@ function isUserDisabled($profileDb, $username) {
     return isset($profile['status']) && $profile['status'] === 'disabled';
 }
 
+function createUserSessionEpoch() {
+    return bin2hex(random_bytes(16));
+}
+
+function getUserSessionEpoch($profile) {
+    if (!is_array($profile) || !array_key_exists('sessionEpoch', $profile)) {
+        return '';
+    }
+
+    $sessionEpoch = $profile['sessionEpoch'];
+    return is_string($sessionEpoch) && preg_match('/^[a-f0-9]{32}$/', $sessionEpoch)
+        ? $sessionEpoch
+        : null;
+}
+
+function getPasswordHashFingerprint($passwordHash) {
+    return is_string($passwordHash) && $passwordHash !== ''
+        ? hash('sha256', $passwordHash)
+        : null;
+}
+
 function ensureCsrfMatched($input = null) {
     if ($input === null) {
         global $input;
@@ -244,7 +265,7 @@ function ensureCsrfHeaderCookieMatched() {
     return $csrfHeader !== '' && $cookieCsrf !== '' && hash_equals($csrfHeader, $cookieCsrf);
 }
 
-function isAuthorized($sessionDb, $username, $token) {
+function isAuthorized($sessionDb, $profileDb, $usersDb, $username, $token) {
     if (!is_string($username) || !is_string($token) || strlen($token) < MIN_TOKEN_LENGTH) {
         return false;
     }
@@ -267,23 +288,50 @@ function isAuthorized($sessionDb, $username, $token) {
     // 新格式：比对 Token 的 SHA-256 哈希
     if (isset($data['tokenHash'])) {
         $tokenHash = hash('sha256', $token);
-        return hash_equals($data['tokenHash'], $tokenHash);
+        $tokenMatches = is_string($data['tokenHash']) && hash_equals($data['tokenHash'], $tokenHash);
+    } else {
+        // 旧格式：比对明文 Token（向后兼容）
+        $tokenMatches = is_string($data['token']) && hash_equals($data['token'], $token);
     }
 
-    // 旧格式：比对明文 Token（向后兼容）
-    return hash_equals($data['token'], $token);
+    if (!$tokenMatches) {
+        return false;
+    }
+
+    $profile = getUserProfile($profileDb, $username);
+    if (isset($profile['status']) && $profile['status'] === 'disabled') {
+        return false;
+    }
+
+    $profileEpoch = getUserSessionEpoch($profile);
+    $sessionEpoch = array_key_exists('sessionEpoch', $data) ? $data['sessionEpoch'] : '';
+    if ($profileEpoch === null || !is_string($sessionEpoch) || !hash_equals($profileEpoch, $sessionEpoch)) {
+        return false;
+    }
+
+    if (array_key_exists('credentialFingerprint', $data)) {
+        $storedFingerprint = $data['credentialFingerprint'];
+        $currentFingerprint = getPasswordHashFingerprint($usersDb->get($username));
+        if (
+            !is_string($storedFingerprint) ||
+            $currentFingerprint === null ||
+            !hash_equals($storedFingerprint, $currentFingerprint)
+        ) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 function getAuthenticatedUsername($sessionDb) {
     $username = isset($_COOKIE['sce_username']) && is_string($_COOKIE['sce_username']) ? trim($_COOKIE['sce_username']) : '';
     $token = isset($_COOKIE['sce_token']) && is_string($_COOKIE['sce_token']) ? trim($_COOKIE['sce_token']) : '';
 
-    if (!isValidUsername($username) || !isAuthorized($sessionDb, $username, $token)) {
-        return null;
-    }
-
     $profileDb = new Database('user_profiles');
-    if (isUserDisabled($profileDb, $username)) {
+    $usersDb = new Database('users');
+
+    if (!isValidUsername($username) || !isAuthorized($sessionDb, $profileDb, $usersDb, $username, $token)) {
         return null;
     }
 
@@ -420,6 +468,20 @@ function databaseDeleteVerified($db, $key) {
     }
 
     return $db->get($key) === null;
+}
+
+function revokeUserSessionVerified($sessionDb, $username) {
+    try {
+        if ($sessionDb->get($username) === null) {
+            return true;
+        }
+        return databaseDeleteVerified($sessionDb, $username);
+    } catch (Throwable $error) {
+        $safeUsername = sanitizeSingleLineLogText($username, 80);
+        $safeError = sanitizeSingleLineLogText($error->getMessage(), 512);
+        error_log("Session revocation failed for {$safeUsername}: {$safeError}");
+        return false;
+    }
 }
 
 function databaseValueMatchesExpected($value, $expectedValues) {
@@ -611,6 +673,27 @@ function releaseRegistrationLease($lockDb, $lease) {
     }
     $remaining = $lockDb->get_array($lease['key']);
     return !is_array($remaining) || !in_array($lease['entry'], $remaining, true);
+}
+
+function acquireUserSecurityLease($lockDb, $username, $ttlSeconds = 300) {
+    return acquireRegistrationLease($lockDb, $username, bin2hex(random_bytes(16)), $ttlSeconds);
+}
+
+function releaseUserSecurityLease($lockDb, $lease, $username, $context) {
+    $safeUsername = sanitizeSingleLineLogText($username, 80);
+    $safeContext = sanitizeSingleLineLogText($context, 80);
+    try {
+        $released = releaseRegistrationLease($lockDb, $lease);
+    } catch (Throwable $error) {
+        $released = false;
+        $safeError = sanitizeSingleLineLogText($error->getMessage(), 512);
+        error_log("User security lease release failed for {$safeUsername} during {$safeContext}: {$safeError}");
+    }
+
+    if (!$released) {
+        error_log("User security lease remained for {$safeUsername} during {$safeContext}");
+    }
+    return $released;
 }
 
 function consumeAtomicRateLimitAttempt($db, $key, $windowSeconds, $maxAttempts) {

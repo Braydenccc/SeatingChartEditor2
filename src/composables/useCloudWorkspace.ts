@@ -37,6 +37,9 @@ export interface CloudWorkspaceContentData {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
+const isValidWorkspaceFileId = (value: unknown): value is string =>
+    typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value)
+
 const parseWorkspaceFile = (value: unknown, source: AuthType): CloudWorkspaceFile | null => {
     if (!isRecord(value) || typeof value.fileId !== 'string' || !isRecord(value.metadata)) return null
     return {
@@ -68,19 +71,6 @@ const getErrorMessage = (errorValue: unknown, fallback: string) =>
     errorValue instanceof Error ? errorValue.message : fallback
 
 const workspaceFormatErrorMessage = '工作区数据格式错误'
-
-const createRandomHexId = (byteLength: number) => {
-    const cryptoApi = globalThis.crypto
-    if (!cryptoApi?.getRandomValues) {
-        throw new Error('当前环境无法安全生成云工作区标识')
-    }
-
-    return Array.from(cryptoApi.getRandomValues(new Uint8Array(byteLength)))
-        .map(byte => byte.toString(16).padStart(2, '0'))
-        .join('')
-}
-
-const createWorkspaceFileId = () => createRandomHexId(16)
 
 export function useCloudWorkspace() {
     const { currentUser, token, authType, webdavConfig, backupMode } = useAuth()
@@ -265,26 +255,26 @@ export function useCloudWorkspace() {
             }
         }
 
-        let stableFileId = fileId
-        if (!stableFileId) {
-            try {
-                stableFileId = createWorkspaceFileId()
-            } catch (err) {
-                const message = getErrorMessage(err, '无法生成云工作区标识')
-                return { success: false, message, error: message }
-            }
-        }
-
         const primaryResult = await callWorkspaceApi('save', {
             name,
             content: parsedContent,
-            fileId: stableFileId
+            ...(fileId ? { fileId } : {})
         })
 
+        const primaryFileId = !Array.isArray(primaryResult.data) && isValidWorkspaceFileId(primaryResult.data?.fileId)
+            ? primaryResult.data.fileId
+            : null
+        if (primaryResult.success && primaryFileId === null) {
+            return {
+                success: false,
+                message: '云端响应缺少有效的工作区文件ID',
+                error: '云端响应格式错误',
+                source: primaryResult.source
+            }
+        }
+
         if (primaryResult.success && backupMode.value && webdavConfig.value) {
-            const targetFileId = !Array.isArray(primaryResult.data) && typeof primaryResult.data?.fileId === 'string'
-                ? primaryResult.data.fileId
-                : fileId || `${name}.sce`
+            const targetFileId = primaryFileId ?? fileId ?? `${name}.sce`
             putFile(webdavConfig.value, `/sce_data/${targetFileId}`, jsonStr, 'application/json').catch(e => {
                 console.error('静默备份到WebDAV失败:', e)
             })
@@ -293,7 +283,7 @@ export function useCloudWorkspace() {
         const primaryData = !Array.isArray(primaryResult.data) && isRecord(primaryResult.data)
             ? {
                 ...primaryResult.data,
-                fileId: typeof primaryResult.data.fileId === 'string' ? primaryResult.data.fileId : undefined
+                fileId: primaryFileId ?? undefined
             }
             : undefined
         return {

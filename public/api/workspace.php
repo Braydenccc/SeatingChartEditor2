@@ -21,6 +21,16 @@ function workspaceDbValueFitsStorage($encodedValue) {
     return $encodedBytes <= MAX_WORKSPACE_DB_VALUE_BYTES && $encodedCharacters <= MAX_WORKSPACE_DB_VALUE_CHARS;
 }
 
+function generateWorkspaceFileId($dbFiles) {
+    for ($attempt = 0; $attempt < 16; $attempt++) {
+        $candidate = bin2hex(random_bytes(FILE_ID_BYTES));
+        if ($dbFiles->get(sanitizeDbKey($candidate)) === null) {
+            return $candidate;
+        }
+    }
+    return null;
+}
+
 /**
  * 验证工作区内容格式
  * 支持新旧两种数据结构：
@@ -202,15 +212,24 @@ try {
             respond(['success' => false, 'message' => '工作区格式无效: ' . $validation['message']]);
         }
 
-        $fileId = isset($input['fileId']) && !empty($input['fileId']) ? $input['fileId'] : bin2hex(random_bytes(FILE_ID_BYTES));
-
-        if (!isValidFileId($fileId)) {
+        $hasRequestedFileId = array_key_exists('fileId', $input) && $input['fileId'] !== null && $input['fileId'] !== '';
+        $requestedFileId = $hasRequestedFileId && is_string($input['fileId']) ? trim($input['fileId']) : null;
+        if ($hasRequestedFileId && !isValidFileId($requestedFileId)) {
             respond(['success' => false, 'message' => '文件ID格式无效']);
         }
 
-        // 消毒文件 ID 用作数据库键名
+        $existingFileRaw = $requestedFileId !== null
+            ? $dbFiles->get(sanitizeDbKey($requestedFileId))
+            : null;
+        $fileId = $existingFileRaw !== null
+            ? $requestedFileId
+            : generateWorkspaceFileId($dbFiles);
+        if ($fileId === null) {
+            respond(['success' => false, 'message' => '无法生成工作区文件ID，请重试'], 503);
+        }
+
+        // 只有实际存在的工作区允许沿用客户端提供的 ID；新建 ID 始终由服务端生成。
         $sanitizedFileId = sanitizeDbKey($fileId);
-        $existingFileRaw = $dbFiles->get($sanitizedFileId);
         $existingFileData = null;
         if ($existingFileRaw !== null) {
             $existingFileData = json_decode($existingFileRaw, true);
@@ -283,17 +302,21 @@ try {
 
         // 消毒用户文件列表键名
         $userFilesKey = sanitizeDbKey($username . '_files');
-        $existingFiles = $dbUsers->get_array($userFilesKey);
-        if ($existingFiles === null) {
-             $existingFiles = [];
-        }
-
         $indexWarning = null;
-        if (!in_array($fileId, $existingFiles)) {
-            if (!databasePushVerified($dbUsers, $userFilesKey, $fileId)) {
+        try {
+            $existingFiles = $dbUsers->get_array($userFilesKey);
+            if (!is_array($existingFiles)) {
+                $existingFiles = [];
+            }
+
+            if (!in_array($fileId, $existingFiles, true) && !databasePushVerified($dbUsers, $userFilesKey, $fileId)) {
                 $indexWarning = '工作区已保存，但兼容文件列表索引暂未更新';
                 error_log("Workspace user_files index update failed for {$username}/{$fileId}");
             }
+        } catch (Throwable $error) {
+            $indexWarning = '工作区已保存，但兼容文件列表索引暂未更新';
+            $safeError = sanitizeSingleLineLogText($error->getMessage(), 512);
+            error_log("Workspace user_files index update failed for {$username}/{$fileId}: {$safeError}");
         }
 
         respond([
@@ -407,17 +430,21 @@ try {
         }
 
         $userFilesKey = sanitizeDbKey($username . '_files');
-        $existingFiles = $dbUsers->get_array($userFilesKey);
-        if (!$existingFiles || !is_array($existingFiles)) {
-            $existingFiles = [];
-        }
-
         $indexWarning = null;
-        if (!in_array($fileId, $existingFiles)) {
-            if (!databasePushVerified($dbUsers, $userFilesKey, $fileId)) {
+        try {
+            $existingFiles = $dbUsers->get_array($userFilesKey);
+            if (!is_array($existingFiles)) {
+                $existingFiles = [];
+            }
+
+            if (!in_array($fileId, $existingFiles, true) && !databasePushVerified($dbUsers, $userFilesKey, $fileId)) {
                 $indexWarning = '工作区名称已更新，但兼容文件列表索引暂未更新';
                 error_log("Workspace rename user_files index update failed for {$username}/{$fileId}");
             }
+        } catch (Throwable $error) {
+            $indexWarning = '工作区名称已更新，但兼容文件列表索引暂未更新';
+            $safeError = sanitizeSingleLineLogText($error->getMessage(), 512);
+            error_log("Workspace rename user_files index update failed for {$username}/{$fileId}: {$safeError}");
         }
 
         respond([

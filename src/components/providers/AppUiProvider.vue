@@ -18,8 +18,8 @@ const { theme, themeOverrides } = useNaiveTheme()
   <NConfigProvider :theme="theme" :theme-overrides="themeOverrides" :locale="zhCN" :date-locale="dateZhCN">
     <NLoadingBarProvider>
       <NDialogProvider>
-        <NNotificationProvider placement="top-right">
-          <NMessageProvider placement="top-right" :max="4">
+        <NNotificationProvider placement="bottom-right">
+          <NMessageProvider placement="bottom-right" :max="4">
             <UiApiBridge />
             <slot />
           </NMessageProvider>
@@ -28,4 +28,3 @@ const { theme, themeOverrides } = useNaiveTheme()
     </NLoadingBarProvider>
   </NConfigProvider>
 </template>
-
