@@ -126,10 +126,7 @@ describe('Edge Cases', () => {
 - Push 到 main 或 dev 分支
 - 创建 Pull Request
 
-测试矩阵：
-
-- Node.js 20.x
-- Node.js 22.x
+CI 使用 Node.js 20，并通过仓库的可复用验证 workflow 运行检查与测试。
 
 ## 最佳实践
 

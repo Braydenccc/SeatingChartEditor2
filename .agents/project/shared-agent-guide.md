@@ -1,6 +1,6 @@
-# 多 Agent 共享指南
+# Agent 项目指南
 
-本文件是本项目 agent 文档的公共真源。`AGENTS.md`、`CLAUDE.md`、`.trae/rules/project-architecture.md` 等入口文档应由 `npm run docs:sync` 生成或同步，不要手动维护多份完整规则。
+本文件是本项目 Agent 规则的公共真源。根目录 `AGENTS.md` 应由 `npm run docs:sync` 生成，不要直接维护生成文件。
 
 ## 开发命令
 
@@ -157,9 +157,6 @@ EditorView.vue
 - `.agents/retiehe_web_host/SKILL.md`
 - `.agents/retiehe_web_host/references/REFERENCE.md`
 - `.agents/rules/Retinbox Web Hosting Documentation.md`
-- `.trae/rules/rth-php-functions.md`
-- `.trae/rules/rth-database.md`
-- `.trae/rules/rth-overview.md`
 
 关键规则：
 
