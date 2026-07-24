@@ -369,6 +369,11 @@
   flex-shrink: 0;
 }
 
+/* 保留按钮焦点本身和 focus-visible 轮廓，但不让 Naive UI 额外改变焦点背景。 */
+.n-button {
+  --n-color-focus: var(--n-color) !important;
+}
+
 html,
 body {
   width: 100%;

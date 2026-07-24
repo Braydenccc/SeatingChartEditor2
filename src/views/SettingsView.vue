@@ -18,8 +18,7 @@
       <NTabs
         v-model:value="activeTab"
         class="settings-tabs"
-        type="card"
-        size="small"
+        size="medium"
         :theme-overrides="settingsTabsThemeOverrides"
       >
         <NTabPane name="global" tab="全局设置" />

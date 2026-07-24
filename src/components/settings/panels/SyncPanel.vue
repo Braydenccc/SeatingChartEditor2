@@ -55,14 +55,15 @@
         />
       </div>
 
-      <div class="backup-mode-group">
-        <NSwitch v-model:value="enableBackup"><template #checked>自动备份已开启</template><template #unchecked>自动备份已关闭</template></NSwitch>
-        <p v-if="enableBackup" class="hint-text hint-green">
-          备份模式开启：工作区列表将以 SCE 云为主视角，保存/删除同时将静默同步至 WebDAV。
-        </p>
-        <p v-else class="hint-text">
-          关闭时可单独使用 WebDAV 或 SCE 云，或将两者同时指定为可切换的独立写入目标。
-        </p>
+      <div class="setting-item">
+        <label class="setting-label">启用备份模式</label>
+        <n-flex vertical align="start">
+          <NSwitch v-model:value="enableBackup"></NSwitch>
+          <div class="info-box">
+            <Info :size="16" />
+            <span>备份模式开启，工作区列表将以 SCE 云为主视角，保存/删除同时将静默同步至 WebDAV。关闭时可单独使用 WebDAV 或 SCE 云，或将两者同时指定为可切换的独立写入目标。</span>
+          </div>
+        </n-flex>
       </div>
 
       <div
@@ -110,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { NButton, NInput, NRadioButton, NRadioGroup, NSwitch } from 'naive-ui'
+import { NButton, NInput, NRadioButton, NRadioGroup, NSwitch, NAlert, NFlex } from 'naive-ui'
 import { ref, computed, watch } from 'vue'
 import { Info } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
@@ -309,16 +310,6 @@ const handleSave = async () => {
 
 .setting-input {
   width: 100%;
-}
-
-.backup-mode-group,
-.sync-preference-group {
-  background: var(--color-bg-subtle);
-  border: 1px dashed var(--color-border-strong);
-  padding: 14px;
-  border-radius: 6px;
-  margin-top: 16px;
-  margin-bottom: 16px;
 }
 
 .sync-preference-group .section-label {

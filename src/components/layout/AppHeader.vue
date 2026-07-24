@@ -261,6 +261,8 @@ onBeforeUnmount(() => {
 
 /* ===== 统一按钮样式 ===== */
 .header-btn {
+  --n-color-focus: color-mix(in srgb, var(--color-text-inverse) 12%, transparent) !important;
+  --n-text-color-focus: var(--color-text-inverse) !important;
   position: relative;
   display: flex;
   align-items: center;
@@ -322,6 +324,7 @@ onBeforeUnmount(() => {
 
 /* 登录按钮特殊样式 */
 .login-btn {
+  --n-color-focus: color-mix(in srgb, var(--color-text-inverse) 18%, transparent) !important;
   background: color-mix(in srgb, var(--color-text-inverse) 18%, transparent);
   border-color: color-mix(in srgb, var(--color-text-inverse) 30%, transparent);
 }
@@ -354,6 +357,8 @@ onBeforeUnmount(() => {
 }
 
 .theme-btn {
+  --n-color-focus: transparent !important;
+  --n-text-color-focus: color-mix(in srgb, var(--color-text-inverse) 60%, transparent) !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -429,6 +434,8 @@ onBeforeUnmount(() => {
 }
 
 .theme-btn.active {
+  --n-color-focus: color-mix(in srgb, var(--color-text-inverse) 20%, transparent) !important;
+  --n-text-color-focus: var(--color-text-inverse) !important;
   background: color-mix(in srgb, var(--color-text-inverse) 20%, transparent);
   color: var(--color-text-inverse);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-inverse) 10%, transparent);
@@ -603,6 +610,7 @@ onBeforeUnmount(() => {
   }
 
   .header-btn {
+    --n-color-focus: transparent !important;
     width: 100%;
     min-height: 44px;
     height: 44px;
