@@ -4,6 +4,7 @@ import { useLogger } from '../useLogger'
 
 const createApis = () => {
   const destroy = vi.fn()
+  const dialogWarning = vi.fn()
   const message = {
     info: vi.fn(),
     success: vi.fn(),
@@ -12,8 +13,14 @@ const createApis = () => {
     loading: vi.fn(() => ({ destroy }))
   }
   return {
-    apis: { message, dialog: {}, notification: {}, loadingBar: {} } as unknown as UiApiSet,
+    apis: {
+      message,
+      dialog: { warning: dialogWarning },
+      notification: {},
+      loadingBar: {}
+    } as unknown as UiApiSet,
     message,
+    dialogWarning,
     destroy
   }
 }
@@ -68,5 +75,25 @@ describe('useLogger feedback bridge', () => {
 
     finish()
     expect(destroy).toHaveBeenCalledTimes(1)
+  })
+
+  it('records a warning without a toast and opens a persistent alert', async () => {
+    const { apis, message, dialogWarning } = createApis()
+    registerUiApis(apis)
+    const logger = useLogger()
+    const references = [{ ruleId: 'rule-1' }]
+
+    logger.warning('学生仍被规则引用', { references }, false)
+    const result = logger.alert({
+      title: '无法删除学生',
+      content: '学生仍被规则引用',
+      type: 'warning'
+    })
+
+    expect(message.warning).not.toHaveBeenCalled()
+    expect(logger.logs.value[0].context).toEqual({ references })
+    expect(dialogWarning).toHaveBeenCalledTimes(1)
+    await dialogWarning.mock.calls[0][0].onPositiveClick()
+    await expect(result).resolves.toBeUndefined()
   })
 })

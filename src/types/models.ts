@@ -208,6 +208,23 @@ export interface Rule {
   predicates?: RulePredicate[]
 }
 
+export type RuleReferencedEntityType = 'student' | 'tag' | 'numericAttribute' | 'zone'
+
+export interface RuleEntityReference {
+  entityType: RuleReferencedEntityType
+  entityId: number | string
+  ruleId: string
+  ruleDescription: string
+  predicate: string
+  locations: string[]
+}
+
+export interface EntityDeletionResult {
+  success: boolean
+  reason?: 'not-found' | 'referenced-by-rules'
+  references: RuleEntityReference[]
+}
+
 // 工作区元数据
 export interface WorkspaceMeta {
   version: string

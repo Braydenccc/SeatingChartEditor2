@@ -129,6 +129,22 @@ describe('useAuth', () => {
     expect(requestBody.encryptedPassword).toBeUndefined()
   })
 
+  it('rejects an invalid login username without making a request', async () => {
+    const { useAuth } = await import('../useAuth')
+    const result = await useAuth().login('非法 用户', 'Password1')
+
+    expect(result).toEqual({ success: false, message: '用户名或密码不正确' })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects an invalid registration username without making a request', async () => {
+    const { useAuth } = await import('../useAuth')
+    const result = await useAuth().register('非法 用户', 'Password1')
+
+    expect(result).toEqual({ success: false, message: '用户名格式无效' })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('passes through change_password failure responses', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({
       success: true,

@@ -8,6 +8,7 @@ import { fetchWithRetry } from '@/utils/fetchHelpers'
 import { useAuth, getOrCreateCsrfToken } from '../useAuth'
 import { useWebDav } from '../useWebDav'
 import { buildWebDavWorkspacePath } from '@/utils/webdavPath'
+import { WEBDAV_REQUEST_TIMEOUT_MS } from '@/platform/webdavTransport'
 
 type AuthApi = ReturnType<typeof useAuth>
 
@@ -60,7 +61,9 @@ describe('useWebDav', () => {
           'Content-Type': 'application/json'
         })
       }),
-      2
+      2,
+      1000,
+      { timeoutMs: WEBDAV_REQUEST_TIMEOUT_MS }
     )
   })
 
@@ -80,7 +83,9 @@ describe('useWebDav', () => {
           Authorization: expect.stringMatching(/^Basic /)
         })
       }),
-      2
+      2,
+      1000,
+      { timeoutMs: WEBDAV_REQUEST_TIMEOUT_MS }
     )
   })
 
@@ -128,6 +133,12 @@ describe('useWebDav', () => {
 
     expect(mockedFetchWithRetry.mock.calls[0][0]).toBe(`https://dav.example.com/root${encodedPath}`)
     expect(new Headers(mockedFetchWithRetry.mock.calls[1][1]?.headers).get('x-dav-path')).toBe(encodedPath)
+  })
+
+  it('does not treat an MKCOL conflict as a successful directory initialization', async () => {
+    mockedFetchWithRetry.mockResolvedValueOnce(new Response(null, { status: 409 }))
+
+    await expect(useWebDav().mkcol(config, '/sce_data')).rejects.toThrow('WebDAV 请求失败 (409)')
   })
 
 })

@@ -1,12 +1,15 @@
 import { ref, computed } from 'vue'
-import { useSeatChart } from './useSeatChart'
+import {
+  assignStudentRaw,
+  clearSeatRaw,
+  createSeatSnapshot,
+  getSeatRaw,
+  restoreSeatSnapshotRaw,
+  swapSeatsRaw,
+  toggleEmptyRaw
+} from './seatChartState'
 import { useLogger } from './useLogger'
-
-interface SeatSnapshotEntry {
-  id: string
-  studentId: number | null
-  isEmpty: boolean
-}
+import type { SeatSnapshotEntry } from './seatChartState'
 
 type UndoCommand =
   | { type: 'assign'; seatId: string; studentId: number; previousSeatId: string | null }
@@ -23,16 +26,9 @@ const redoStack = ref<UndoCommand[]>([])
 const highlightedSeats = ref<Set<string>>(new Set())
 
 export function useUndo() {
-  const { seats, assignStudent, clearSeat, swapSeats, toggleEmpty, clearAllSeats } = useSeatChart()
-  const { info } = useLogger()
+  const { info, warning } = useLogger()
 
-  const createSnapshot = () => {
-    return seats.value.map(seat => ({
-      id: seat.id,
-      studentId: seat.studentId,
-      isEmpty: seat.isEmpty
-    }))
-  }
+  const createSnapshot = () => createSeatSnapshot()
 
   const cloneSnapshot = (snapshot: SeatSnapshotEntry[]) => {
     return snapshot.map(item => ({ ...item }))
@@ -55,14 +51,12 @@ export function useUndo() {
     return { ...command }
   }
 
-  const restoreSnapshot = (snapshot: SeatSnapshotEntry[]) => {
-    snapshot.forEach(data => {
-      const seat = seats.value.find(s => s.id === data.id)
-      if (seat) {
-        seat.isEmpty = data.isEmpty
-        seat.studentId = data.isEmpty ? null : data.studentId
-      }
-    })
+  const restoreSnapshot = (snapshot: SeatSnapshotEntry[]) => restoreSeatSnapshotRaw(snapshot)
+
+  const resetHistoryState = () => {
+    undoStack.value = []
+    redoStack.value = []
+    highlightedSeats.value = new Set()
   }
 
   const pushCommand = (command: UndoCommand) => {
@@ -113,7 +107,7 @@ export function useUndo() {
       case 'undo_wrapper':
         if (command.snapshot) {
           command.snapshot.forEach(s => {
-            const current = seats.value.find(seat => seat.id === s.id)
+            const current = getSeatRaw(s.id)
             if (current && (current.studentId !== s.studentId || current.isEmpty !== s.isEmpty)) {
               affected.push(s.id)
             }
@@ -143,9 +137,14 @@ export function useUndo() {
 
   const undo = () => {
     if (!canUndo.value) return false
-    const command = undoStack.value.pop()
+    const command = undoStack.value[undoStack.value.length - 1]
     if (!command) return false
-    executeUndo(command)
+    if (!executeUndo(command)) {
+      resetHistoryState()
+      warning('座位状态已变化，撤销历史已安全失效')
+      return false
+    }
+    undoStack.value.pop()
     redoStack.value.push(cloneCommand(command))
 
     const affectedSeats = getAffectedSeats(command)
@@ -157,9 +156,14 @@ export function useUndo() {
 
   const redo = () => {
     if (!canRedo.value) return false
-    const command = redoStack.value.pop()
+    const command = redoStack.value[redoStack.value.length - 1]
     if (!command) return false
-    executeRedo(command)
+    if (!executeRedo(command)) {
+      resetHistoryState()
+      warning('座位状态已变化，重做历史已安全失效')
+      return false
+    }
+    redoStack.value.pop()
     undoStack.value.push(cloneCommand(command))
 
     const affectedSeats = getAffectedSeats(command)
@@ -171,53 +175,57 @@ export function useUndo() {
 
   const executeUndo = (command: UndoCommand) => {
     switch (command.type) {
-      case 'assign':
+      case 'assign': {
+        const targetSeat = getSeatRaw(command.seatId)
+        if (!targetSeat) return false
         if (command.previousSeatId) {
-          assignStudent(command.previousSeatId, command.studentId, false)
+          const previousSeat = getSeatRaw(command.previousSeatId)
+          if (!previousSeat || previousSeat.isEmpty || previousSeat.id === targetSeat.id) return false
+          if (!assignStudentRaw(previousSeat.id, command.studentId)) return false
         }
-        clearSeat(command.seatId, false)
-        break
+        return clearSeatRaw(command.seatId)
+      }
       case 'clear':
-        if (command.studentId !== null) assignStudent(command.seatId, command.studentId, false)
-        break
+        return command.studentId === null
+          ? getSeatRaw(command.seatId) !== null
+          : assignStudentRaw(command.seatId, command.studentId)
       case 'swap':
-        swapSeats(command.seatId1, command.seatId2, false)
-        break
+        return swapSeatsRaw(command.seatId1, command.seatId2)
       case 'toggleEmpty':
-        toggleEmpty(command.seatId, false)
-        break
+        return toggleEmptyRaw(command.seatId)
       case 'batch':
-        restoreSnapshot(command.beforeSnapshot)
-        break
+        return restoreSnapshot(command.beforeSnapshot)
       case 'redo_wrapper':
-        restoreSnapshot(command.snapshot)
-        break
+        return restoreSnapshot(command.snapshot)
+      default:
+        return false
     }
   }
 
   const executeRedo = (command: UndoCommand) => {
     switch (command.type) {
-      case 'assign':
+      case 'assign': {
+        const targetSeat = getSeatRaw(command.seatId)
+        if (!targetSeat || targetSeat.isEmpty) return false
         if (command.previousSeatId) {
-          clearSeat(command.previousSeatId, false)
+          const previousSeat = getSeatRaw(command.previousSeatId)
+          if (!previousSeat || previousSeat.id === targetSeat.id) return false
+          if (!clearSeatRaw(previousSeat.id)) return false
         }
-        assignStudent(command.seatId, command.studentId, false)
-        break
+        return assignStudentRaw(command.seatId, command.studentId)
+      }
       case 'clear':
-        clearSeat(command.seatId, false)
-        break
+        return clearSeatRaw(command.seatId)
       case 'swap':
-        swapSeats(command.seatId1, command.seatId2, false)
-        break
+        return swapSeatsRaw(command.seatId1, command.seatId2)
       case 'toggleEmpty':
-        toggleEmpty(command.seatId, false)
-        break
+        return toggleEmptyRaw(command.seatId)
       case 'batch':
-        restoreSnapshot(command.afterSnapshot)
-        break
+        return restoreSnapshot(command.afterSnapshot)
       case 'undo_wrapper':
-        restoreSnapshot(command.snapshot)
-        break
+        return restoreSnapshot(command.snapshot)
+      default:
+        return false
     }
   }
 
@@ -231,19 +239,32 @@ export function useUndo() {
   }
 
   const recordClear = (seatId: string, studentId: number | null) => {
+    if (studentId === null) return false
     pushCommand({
       type: 'clear',
       seatId,
       studentId
     })
+    return true
   }
 
   const recordSwap = (seatId1: string, seatId2: string) => {
+    const seat1 = getSeatRaw(seatId1)
+    const seat2 = getSeatRaw(seatId2)
+    if (
+      !seat1 ||
+      !seat2 ||
+      seat1.isEmpty ||
+      seat2.isEmpty ||
+      seatId1 === seatId2 ||
+      seat1.studentId === seat2.studentId
+    ) return false
     pushCommand({
       type: 'swap',
       seatId1,
       seatId2
     })
+    return true
   }
 
   const recordToggleEmpty = (seatId: string) => {
@@ -274,9 +295,7 @@ export function useUndo() {
   const isHighlighted = (seatId: string) => highlightedSeats.value.has(seatId)
 
   const clearHistory = () => {
-    undoStack.value = []
-    redoStack.value = []
-    highlightedSeats.value = new Set()
+    resetHistoryState()
   }
 
   // 别名方法

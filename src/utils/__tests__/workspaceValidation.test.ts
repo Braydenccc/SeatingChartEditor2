@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { maxSeatGroupCount } from '@/constants/seatConfig'
+import { maxRuleBandCount } from '@/constants/ruleTypes'
 import { WORKSPACE_SCHEMA_VERSION, type Workspace } from '@/types/models'
 import { validateWorkspaceDocument } from '../workspaceValidation'
 
@@ -132,6 +133,91 @@ describe('workspaceValidation', () => {
       expect.stringContaining('引用了不存在的学生 99'),
       expect.stringContaining('引用了不存在的选区 88')
     ]))
+  })
+
+  it.each([
+    { label: 'numeric string', value: '3', error: '必须是有限数字' },
+    { label: 'NaN', value: Number.NaN, error: '必须是有限数字' },
+    { label: 'positive infinity', value: Number.POSITIVE_INFINITY, error: '必须是有限数字' },
+    { label: 'fractional layer count', value: 2.5, error: '必须是整数' },
+    { label: 'oversized layer count', value: maxRuleBandCount + 1, error: `不能大于 ${maxRuleBandCount}` }
+  ])('rejects $label in numeric rule params', ({ value, error }) => {
+    const workspace = createWorkspace()
+    workspace.studentAttributeDefinitions = [{
+      id: 'score',
+      name: '成绩',
+      unit: '分',
+      min: null,
+      max: null,
+      precision: 0,
+      enabled: true
+    }]
+    workspace.rules = [{
+      priority: 'prefer',
+      subjects: [{ type: 'all', id: null }],
+      predicate: 'ATTRIBUTE_DISTRIBUTE_BANDS',
+      params: { attributeId: 'score', bandCount: value as number }
+    }]
+
+    const result = validateWorkspaceDocument(workspace)
+
+    expect(result.valid).toBe(false)
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.stringContaining(`rules[0].params.bandCount ${error}`)
+    ]))
+  })
+
+  it('rejects oversized numeric params inside composite sub-rules', () => {
+    const workspace = createWorkspace()
+    workspace.studentAttributeDefinitions = [{
+      id: 'score',
+      name: '成绩',
+      unit: '分',
+      min: null,
+      max: null,
+      precision: 0,
+      enabled: true
+    }]
+    workspace.rules = [{
+      priority: 'prefer',
+      subjects: [{ type: 'all', id: null }],
+      predicate: 'ATTRIBUTE_DISTRIBUTE_BANDS',
+      params: { attributeId: 'score', bandCount: 3 },
+      logicOperator: 'AND',
+      subRules: [{
+        predicate: 'ATTRIBUTE_DISTRIBUTE_BANDS',
+        not: false,
+        params: { attributeId: 'score', bandCount: maxRuleBandCount + 1 }
+      }]
+    }]
+
+    const result = validateWorkspaceDocument(workspace)
+
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain(
+      `rules[0].subRules[0].params.bandCount 不能大于 ${maxRuleBandCount}`
+    )
+  })
+
+  it('accepts the safe numeric layer-count boundary', () => {
+    const workspace = createWorkspace()
+    workspace.studentAttributeDefinitions = [{
+      id: 'score',
+      name: '成绩',
+      unit: '分',
+      min: null,
+      max: null,
+      precision: 0,
+      enabled: true
+    }]
+    workspace.rules = [{
+      priority: 'prefer',
+      subjects: [{ type: 'all', id: null }],
+      predicate: 'ATTRIBUTE_DISTRIBUTE_BANDS',
+      params: { attributeId: 'score', bandCount: maxRuleBandCount }
+    }]
+
+    expect(validateWorkspaceDocument(workspace)).toMatchObject({ valid: true, errors: [] })
   })
 
   it('rejects ambiguous seat identities and duplicate student assignments', () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useAssignment } from '../useAssignment'
+import { maxRuleBandCount } from '@/constants/ruleTypes'
 
 const assignmentFixtures = vi.hoisted(() => ({
   students: { value: [] as any[] },
@@ -123,6 +124,31 @@ describe('useAssignment', () => {
       expect(typeof assignment.runSmartAssignment).toBe('function')
       expect(typeof assignment.cancelSmartAssignment).toBe('function')
       expect(assignment.isAssignmentCancelRequested.value).toBe(false)
+    })
+
+    it('rejects an oversized bandCount before starting the assignment algorithm', async () => {
+      assignmentFixtures.students.value = [{
+        id: 1,
+        name: '甲',
+        numericAttributes: { score: 90 }
+      }]
+      assignmentFixtures.seats.value = [createSeat('seat-0-0-0')]
+      assignmentFixtures.rules.value = [{
+        id: 'unsafe-band-count',
+        enabled: true,
+        priority: 'prefer',
+        predicate: 'ATTRIBUTE_DISTRIBUTE_BANDS',
+        subjects: [{ type: 'all', id: null }],
+        params: { attributeId: 'score', bandCount: maxRuleBandCount + 1 }
+      }]
+
+      const result = await assignment.runSmartAssignment({ iterations: 0 })
+
+      expect(result.success).toBe(false)
+      expect(result.message).toContain(`不能大于 ${maxRuleBandCount}`)
+      expect(result.message).toContain('排位未开始')
+      expect(assignmentFixtures.clearAllSeats).not.toHaveBeenCalled()
+      expect(assignmentFixtures.assignStudent).not.toHaveBeenCalled()
     })
 
     it('should request cancellation when smart assignment is triggered while running', async () => {
@@ -328,6 +354,60 @@ describe('useAssignment', () => {
       expect(assignmentFixtures.clearAllSeats).not.toHaveBeenCalled()
       expect(assignmentFixtures.assignStudent).not.toHaveBeenCalled()
       expect(assignmentFixtures.createSnapshot).not.toHaveBeenCalled()
+      expect(assignmentFixtures.recordBatch).not.toHaveBeenCalled()
+    })
+
+    it('commits and reports an exact required continuous rule with a zero value range', async () => {
+      assignmentFixtures.students.value = [
+        { id: 1, name: '甲', numericAttributes: { score: 10 } },
+        { id: 2, name: '乙', numericAttributes: { score: 10 } }
+      ]
+      assignmentFixtures.seats.value = [
+        createSeat('seat-0-0-0'),
+        createSeat('seat-1-0-0')
+      ]
+      assignmentFixtures.rules.value = [{
+        id: 'required-near-balance',
+        enabled: true,
+        priority: 'required',
+        predicate: 'ATTRIBUTE_GROUP_BALANCE',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: { attributeId: 'score', aggregate: 'average' }
+      }]
+
+      const result = await assignment.runSmartAssignment({ iterations: 0 })
+
+      expect(result.success).toBe(true)
+      expect(result.report?.satisfied).toHaveLength(1)
+      expect(result.report?.violated).toHaveLength(0)
+      expect(assignmentFixtures.clearAllSeats).toHaveBeenCalledOnce()
+      expect(assignmentFixtures.recordBatch).toHaveBeenCalledOnce()
+    })
+
+    it('keeps the original seats and reports a required continuous rule outside tolerance', async () => {
+      assignmentFixtures.students.value = [
+        { id: 1, name: '甲', numericAttributes: { score: 10 } },
+        { id: 2, name: '乙', numericAttributes: { score: 10.3 } }
+      ]
+      assignmentFixtures.seats.value = [
+        createSeat('seat-0-0-0'),
+        createSeat('seat-1-0-0')
+      ]
+      assignmentFixtures.rules.value = [{
+        id: 'required-imbalanced',
+        enabled: true,
+        priority: 'required',
+        predicate: 'ATTRIBUTE_GROUP_BALANCE',
+        subjects: [{ type: 'person', id: 1 }, { type: 'person', id: 2 }],
+        params: { attributeId: 'score', aggregate: 'average' }
+      }]
+
+      const result = await assignment.runSmartAssignment({ iterations: 0 })
+
+      expect(result.success).toBe(false)
+      expect(result.report?.satisfied).toHaveLength(0)
+      expect(result.report?.violated).toHaveLength(1)
+      expect(assignmentFixtures.clearAllSeats).not.toHaveBeenCalled()
       expect(assignmentFixtures.recordBatch).not.toHaveBeenCalled()
     })
   })

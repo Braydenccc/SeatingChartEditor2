@@ -15,6 +15,8 @@ import { apiFetch } from '@/platform/apiClient'
 import { useLogger } from '../useLogger'
 
 const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0))
+const canonicalFileId = '0123456789abcdef0123456789abcdef'
+const legacyCanonicalFileId = 'fedcba9876543210fedcba9876543210'
 
 const jsonResponse = (data: unknown) => new Response(JSON.stringify(data), {
   status: 200,
@@ -70,6 +72,7 @@ const createLoggerMock = (overrides: Partial<LoggerApi> = {}): LoggerApi => ({
   success: vi.fn(),
   warning: vi.fn(),
   error: vi.fn(),
+  alert: vi.fn(() => Promise.resolve()),
   confirm: vi.fn(),
   beginTask: vi.fn(() => vi.fn()),
   clearLogs: vi.fn(),
@@ -128,6 +131,38 @@ describe('useCloudWorkspace', () => {
     expect(workspace.isFetching.value).toBe(false)
   })
 
+  it('discovers legacy extensionless mirrors and prefers the canonical .sce file without duplicates', async () => {
+    vi.mocked(useAuth).mockReturnValue(createAuthMock({
+      currentUser: ref(null),
+      isLoggedIn: computed(() => false),
+      token: ref(null),
+      authType: ref('webdav')
+    }))
+    mockListFiles.mockResolvedValueOnce([
+      { name: canonicalFileId, isCollection: false, href: canonicalFileId, lastModified: 'old', size: 10 },
+      { name: `${canonicalFileId}.sce`, isCollection: false, href: `${canonicalFileId}.sce`, lastModified: 'new', size: 20 },
+      { name: legacyCanonicalFileId, isCollection: false, href: legacyCanonicalFileId, lastModified: 'legacy', size: 30 },
+      { name: '普通工作区.sce', isCollection: false, href: '普通工作区.sce', lastModified: 'normal', size: 40 },
+      { name: 'settings.json', isCollection: false, href: 'settings.json', lastModified: 'ignored', size: 50 }
+    ])
+
+    const result = await useCloudWorkspace().listWorkspaces()
+
+    expect(result.success).toBe(true)
+    expect(result.data).toHaveLength(3)
+    expect(result.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        fileId: `${canonicalFileId}.sce`,
+        metadata: expect.objectContaining({ name: canonicalFileId, size: 20 })
+      }),
+      expect.objectContaining({
+        fileId: legacyCanonicalFileId,
+        metadata: expect.objectContaining({ name: legacyCanonicalFileId, size: 30 })
+      }),
+      expect.objectContaining({ fileId: '普通工作区.sce' })
+    ]))
+  })
+
   it('returns message on invalid JSON and stops save flow', async () => {
     const workspace = useCloudWorkspace()
 
@@ -151,7 +186,7 @@ describe('useCloudWorkspace', () => {
     mockGetFileText.mockResolvedValueOnce('{}')
 
     await expect(workspace.saveWorkspaceToCloud('班级 #1%', {}, null, 'webdav'))
-      .resolves.toEqual({ success: true })
+      .resolves.toEqual({ success: true, data: { fileId } })
     await expect(workspace.loadWorkspaceFromCloud(fileId, 'webdav'))
       .resolves.toMatchObject({ success: true })
     await expect(workspace.deleteWorkspaceFromCloud(fileId, 'webdav'))
@@ -242,6 +277,97 @@ describe('useCloudWorkspace', () => {
     const [, options] = vi.mocked(apiFetch).mock.calls[0]
     if (typeof options?.body !== 'string') throw new Error('Expected a JSON request body')
     expect(JSON.parse(options.body)).toMatchObject({ fileId: 'stale-id' })
+  })
+
+  it('waits for the WebDAV mirror before reporting an SCE save as complete', async () => {
+    vi.mocked(useAuth).mockReturnValue(createAuthMock({ backupMode: ref(true) }))
+    vi.mocked(apiFetch).mockResolvedValueOnce(jsonResponse({
+      success: true,
+      data: { fileId: 'mirrored-id' }
+    }))
+    const mirrorDeferred = createDeferred<boolean>()
+    mockPutFile.mockReturnValueOnce(mirrorDeferred.promise)
+    const workspace = useCloudWorkspace()
+
+    let settled = false
+    const savePromise = workspace.saveWorkspaceToCloud('镜像工作区', {}).then(result => {
+      settled = true
+      return result
+    })
+    await flushPromises()
+
+    expect(mockPutFile).toHaveBeenCalledTimes(1)
+    expect(mockPutFile).toHaveBeenCalledWith(
+      expect.anything(),
+      '/sce_data/mirrored-id.sce',
+      expect.any(String),
+      'application/json'
+    )
+    expect(settled).toBe(false)
+    expect(workspace.isFetching.value).toBe(true)
+
+    mirrorDeferred.resolve(true)
+    await expect(savePromise).resolves.toMatchObject({ success: true, data: { fileId: 'mirrored-id' } })
+    expect(workspace.isFetching.value).toBe(false)
+  })
+
+  it('keeps the SCE save successful and returns a visible warning when its WebDAV mirror fails', async () => {
+    vi.mocked(useAuth).mockReturnValue(createAuthMock({ backupMode: ref(true) }))
+    vi.mocked(apiFetch).mockResolvedValueOnce(jsonResponse({
+      success: true,
+      data: { fileId: 'mirrored-id' }
+    }))
+    mockPutFile.mockRejectedValueOnce(new Error('配额已满'))
+    const workspace = useCloudWorkspace()
+
+    await expect(workspace.saveWorkspaceToCloud('镜像工作区', {})).resolves.toMatchObject({
+      success: true,
+      backupWarning: 'SCE 云端已保存，但 WebDAV 备份失败：配额已满'
+    })
+  })
+
+  it('serializes save and delete mirrors for the same WebDAV file id', async () => {
+    vi.mocked(useAuth).mockReturnValue(createAuthMock({ backupMode: ref(true) }))
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce(jsonResponse({ success: true, data: { fileId: 'same-id' } }))
+      .mockResolvedValueOnce(jsonResponse({ success: true }))
+    const saveDeferred = createDeferred<boolean>()
+    const deleteDeferred = createDeferred<boolean>()
+    mockPutFile.mockReturnValueOnce(saveDeferred.promise)
+    mockDeleteFile.mockImplementation((_config, path) => (
+      path === '/sce_data/same-id.sce' ? deleteDeferred.promise : Promise.resolve(true)
+    ))
+    const workspace = useCloudWorkspace()
+
+    const savePromise = workspace.saveWorkspaceToCloud('同一工作区', {})
+    await flushPromises()
+    const deletePromise = workspace.deleteWorkspaceFromCloud('same-id', 'retiehe')
+    await flushPromises()
+
+    expect(mockPutFile).toHaveBeenCalledTimes(1)
+    expect(mockDeleteFile).not.toHaveBeenCalled()
+
+    saveDeferred.resolve(true)
+    await savePromise
+    await flushPromises()
+    expect(mockDeleteFile).toHaveBeenNthCalledWith(1, expect.anything(), '/sce_data/same-id.sce')
+
+    deleteDeferred.resolve(true)
+    await expect(deletePromise).resolves.toMatchObject({ success: true })
+    expect(mockDeleteFile).toHaveBeenNthCalledWith(2, expect.anything(), '/sce_data/same-id')
+  })
+
+  it('deletes both canonical and legacy WebDAV mirror names for an SCE workspace', async () => {
+    vi.mocked(useAuth).mockReturnValue(createAuthMock({ backupMode: ref(true) }))
+    vi.mocked(apiFetch).mockResolvedValueOnce(jsonResponse({ success: true }))
+
+    await expect(useCloudWorkspace().deleteWorkspaceFromCloud(canonicalFileId, 'retiehe'))
+      .resolves.toMatchObject({ success: true })
+
+    expect(mockDeleteFile.mock.calls.map(([, path]) => path)).toEqual([
+      `/sce_data/${canonicalFileId}.sce`,
+      `/sce_data/${canonicalFileId}`
+    ])
   })
 
   it('rejects a successful SCE save response without a valid file id', async () => {

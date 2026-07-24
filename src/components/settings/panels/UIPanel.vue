@@ -77,15 +77,15 @@
 
       <section class="setting-section">
         <h3 class="section-title">显示与交互</h3>
-        <p class="section-desc">调整默认缩放、动画和座位卡信息密度。</p>
+        <p class="section-desc">调整自适应缩放上限、动画和座位卡信息密度。</p>
 
-        <NFormItem class="setting-item" label="默认缩放比例（%）" :show-feedback="false">
+        <NFormItem class="setting-item" label="自适应缩放上限（%）" :show-feedback="false">
           <div class="field-stack">
             <div class="slider-row">
               <NSlider v-model:value="defaultZoomModel" :min="50" :max="200" :step="10" />
               <NInputNumber class="zoom-number-input" :value="localSettings.defaultZoom" :min="50" :max="200" :step="10" @update:value="updateDefaultZoom" />
             </div>
-            <span class="hint-text">打开工作区时的初始缩放比例（50-200%）</span>
+            <span class="hint-text">上限可设为 50-200%；手动缩放仍可在 20-300% 范围内调整</span>
           </div>
         </NFormItem>
 

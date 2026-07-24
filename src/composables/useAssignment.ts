@@ -12,7 +12,13 @@ import { useSeatChart } from './useSeatChart'
 import { useZoneData } from './useZoneData'
 import { useSeatRules } from './useSeatRules'
 import { useUndo } from './useUndo'
-import { PENALTY_WEIGHTS, RulePriority, PREDICATE_META } from '../constants/ruleTypes'
+import {
+  PENALTY_WEIGHTS,
+  RulePriority,
+  PREDICATE_META,
+  getPredicateNumberParamError,
+  maxRuleBandCount
+} from '../constants/ruleTypes'
 import { isGuardSeatId, parseSeatId } from '@/utils/seatHelpers'
 import {
   areSeatPositionsDeskmates,
@@ -21,6 +27,12 @@ import {
   getSeatDepthRatio
 } from '@/utils/seatTopology'
 import { shuffleArray } from '@/utils/shuffleArray'
+import {
+  compareAssignmentLexicographicScores,
+  evaluateRuleAcceptance,
+  getRequiredRuleAcceptanceFailureCount,
+  hasRequiredRuleAcceptancePolicy
+} from '@/utils/assignmentRuleAcceptance'
 import type {
   AssignmentIterationInfo,
   LegacyRuleSubject,
@@ -158,6 +170,7 @@ interface ProbabilityConfig {
 interface AssignmentMoveResult {
   accepted: boolean
   newScore: number
+  newRequiredAcceptanceFailures: number
   newRequiredScore: number
   newSoftScore: number
   useEmptySeat: boolean
@@ -166,9 +179,15 @@ interface AssignmentMoveResult {
 
 interface AssignmentScorePreview {
   score: number
+  requiredAcceptanceFailures: number
   requiredScore: number
   softScore: number
-  updates: Array<[number, number]> | null
+  updates: Array<[number, number, number]> | null
+}
+
+interface AssignmentUnitEvaluation {
+  score: number
+  requiredAcceptanceFailures: number
 }
 
 export interface AssignmentViolationReport {
@@ -584,15 +603,46 @@ export function useAssignment() {
     const params = rule.params || {}
     const weight = PENALTY_WEIGHTS[rule.priority] ?? PENALTY_WEIGHTS.optional
     const positioned = []
+    const targetGroupCounts = new Map<number, number>()
+
+    const finalize = (
+      positivePenalties: number,
+      details: Record<string, number>,
+      acceptanceInput: {
+        evaluated?: boolean
+        normalizedViolation?: number | null
+        hardViolation?: boolean
+      } = {}
+    ) => {
+      const acceptance = evaluateRuleAcceptance({
+        predicate,
+        priority: rule.priority,
+        not: rule.not,
+        evaluated: acceptanceInput.evaluated,
+        exactSatisfied: positivePenalties <= 0,
+        normalizedViolation: acceptanceInput.normalizedViolation,
+        hardViolation: acceptanceInput.hardViolation
+      })
+      const effectivePenalties = applyGlobalRuleNegation(
+        rule,
+        positivePenalties,
+        acceptance.positiveSatisfied,
+        acceptanceInput.evaluated !== false
+      )
+      return returnDetails
+        ? { penalties: effectivePenalties, details, satisfied: acceptance.satisfied, acceptance }
+        : effectivePenalties
+    }
 
     for (const subj of expandedSubjects) {
       if (subj.type !== 'single') continue
-      const value = getNumericValue(rule, subj.studentId, studentList)
-      if (value === undefined) continue
       const seatId = assignment.get(subj.studentId)
       if (!seatId || isGuardSeatId(seatId)) continue
       const parsed = parseSeatId(seatId)
       if (!parsed) continue
+      targetGroupCounts.set(parsed.groupIndex, (targetGroupCounts.get(parsed.groupIndex) || 0) + 1)
+      const value = getNumericValue(rule, subj.studentId, studentList)
+      if (value === undefined) continue
       positioned.push({
         studentId: subj.studentId,
         value,
@@ -604,32 +654,48 @@ export function useAssignment() {
     }
 
     if (positioned.length === 0 || (positioned.length === 1 && predicate !== 'ATTRIBUTE_GROUP_BALANCE')) {
-      return returnDetails ? { penalties: 0, details: { positionedCount: positioned.length, missingCount: expandedSubjects.length - positioned.length } } : 0
-    }
-
-    const finalize = (positivePenalties: number, details: Record<string, number>) => {
-      const effectivePenalties = applyGlobalRuleNegation(rule, positivePenalties, positivePenalties <= 0)
-      return returnDetails ? { penalties: effectivePenalties, details } : effectivePenalties
+      return finalize(0, {
+        positionedCount: positioned.length,
+        missingCount: expandedSubjects.length - positioned.length
+      }, { evaluated: false })
     }
 
     let penalties = 0
     const values = positioned.map(item => item.value)
     const minValue = Math.min(...values)
     const maxValue = Math.max(...values)
-    const valueRange = Math.max(1, maxValue - minValue)
+    const rawValueRange = maxValue - minValue
+    const valueRangeEpsilon = Number.EPSILON * Math.max(1, Math.abs(minValue), Math.abs(maxValue))
+    const hasValueRange = rawValueRange > valueRangeEpsilon
 
     if (predicate === 'ATTRIBUTE_ROW_GRADIENT') {
+      if (!hasValueRange) {
+        return finalize(0, {
+          positionedCount: positioned.length,
+          avgDiff: 0,
+          normalizedViolation: 0
+        }, { evaluated: false, normalizedViolation: 0 })
+      }
       let totalDiff = 0
+      let squaredDiffTotal = 0
+      let evaluatedCount = 0
       for (const item of positioned) {
         if (item.backRatio === null) continue
-        const valueRatio = (item.value - minValue) / valueRange
+        const valueRatio = (item.value - minValue) / rawValueRange
         const targetBackRatio = params.direction === 'highFront' ? 1 - valueRatio : valueRatio
         const diff = Math.abs(item.backRatio - targetBackRatio)
         totalDiff += diff
+        squaredDiffTotal += diff * diff
+        evaluatedCount++
         penalties += diff * diff * weight * 1.8
       }
-      const avgDiff = totalDiff / positioned.length
-      return finalize(penalties, { positionedCount: positioned.length, avgDiff })
+      const avgDiff = evaluatedCount > 0 ? totalDiff / evaluatedCount : 0
+      const normalizedViolation = evaluatedCount > 0 ? squaredDiffTotal / evaluatedCount : 0
+      return finalize(
+        penalties,
+        { positionedCount: positioned.length, avgDiff, normalizedViolation },
+        { evaluated: evaluatedCount > 0, normalizedViolation }
+      )
     }
 
     if (predicate === 'ATTRIBUTE_GROUP_BALANCE') {
@@ -640,25 +706,36 @@ export function useAssignment() {
           positionedCount: positioned.length,
           groupCount: participatingGroupIndexes.size,
           emptyGroupCount: 0
-        })
+        }, { evaluated: false })
       }
 
-      const groupMap = new Map<number, { sum: number; count: number }>()
+      const groupMap = new Map<number, { sum: number; count: number; targetCount: number }>()
       for (const groupIndex of participatingGroupIndexes) {
-        groupMap.set(groupIndex, { sum: 0, count: 0 })
+        groupMap.set(groupIndex, {
+          sum: 0,
+          count: 0,
+          targetCount: targetGroupCounts.get(groupIndex) || 0
+        })
       }
       for (const item of positioned) {
-        const group = groupMap.get(item.groupIndex) || { sum: 0, count: 0 }
+        const group = groupMap.get(item.groupIndex) || {
+          sum: 0,
+          count: 0,
+          targetCount: targetGroupCounts.get(item.groupIndex) || 0
+        }
         group.sum += item.value
         group.count += 1
         groupMap.set(item.groupIndex, group)
       }
 
       const groups = [...groupMap.values()]
-      const emptyGroupCount = groups.filter(group => group.count === 0).length
+      const emptyGroupCount = groups.filter(group => group.targetCount === 0).length
+      const metricGroups = groups.filter(group => (
+        group.count > 0 || (params.aggregate === 'sum' && group.targetCount === 0)
+      ))
       const metrics = params.aggregate === 'sum'
-        ? groups.map(group => group.sum)
-        : groups.filter(group => group.count > 0).map(group => group.sum / group.count)
+        ? metricGroups.map(group => group.sum)
+        : metricGroups.map(group => group.sum / group.count)
       if (params.aggregate !== 'sum' && emptyGroupCount > 0) {
         penalties += emptyGroupCount * weight
       }
@@ -667,22 +744,47 @@ export function useAssignment() {
           positionedCount: positioned.length,
           groupCount: groups.length,
           emptyGroupCount
+        }, {
+          evaluated: true,
+          normalizedViolation: 0,
+          hardViolation: emptyGroupCount > 0
         })
       }
       const mean = metrics.reduce((sum, value) => sum + value, 0) / metrics.length
+      const normalizationRange = hasValueRange
+        ? rawValueRange
+        : Math.max(1, Math.abs(minValue), Math.abs(maxValue))
+      let squaredNormalizedDiffTotal = 0
       for (const metric of metrics) {
-        const normalizedDiff = Math.abs(metric - mean) / valueRange
+        const normalizedDiff = Math.abs(metric - mean) / normalizationRange
+        squaredNormalizedDiffTotal += normalizedDiff * normalizedDiff
         penalties += normalizedDiff * normalizedDiff * weight * 2.5
       }
-      return finalize(penalties, {
-        positionedCount: positioned.length,
-        groupCount: groups.length,
-        emptyGroupCount
-      })
+      const normalizedViolation = squaredNormalizedDiffTotal / metrics.length
+      return finalize(
+        penalties,
+        {
+          positionedCount: positioned.length,
+          groupCount: groups.length,
+          emptyGroupCount,
+          normalizedViolation
+        },
+        {
+          evaluated: true,
+          normalizedViolation,
+          hardViolation: emptyGroupCount > 0
+        }
+      )
     }
 
     if (predicate === 'ATTRIBUTE_DISTRIBUTE_BANDS') {
-      const bandCount = Math.max(2, Number(params.bandCount || 3))
+      const rawBandCount = params.bandCount
+      const bandCount = typeof rawBandCount === 'number' &&
+        Number.isInteger(rawBandCount) &&
+        rawBandCount >= 2 &&
+        rawBandCount <= maxRuleBandCount
+        ? rawBandCount
+        : 3
       const sorted = [...positioned].sort((a, b) => a.value - b.value)
       const bandByStudent = new Map<number, number>()
       sorted.forEach((item, index) => {
@@ -704,10 +806,14 @@ export function useAssignment() {
         const min = Math.min(...counts)
         penalties += (max - min) * weight * 0.45
       }
-      return finalize(penalties, { positionedCount: positioned.length, bandCount })
+      return finalize(
+        penalties,
+        { positionedCount: positioned.length, bandCount },
+        { evaluated: true }
+      )
     }
 
-    return finalize(0, { positionedCount: positioned.length })
+    return finalize(0, { positionedCount: positioned.length }, { evaluated: false })
   }
 
   const checkAttributePairViolation = (
@@ -869,7 +975,9 @@ export function useAssignment() {
     let penalties = 0
     let details = null
     let evaluated = false
-    let positiveSatisfied = true
+    let exactSatisfied = true
+    let normalizedViolation: number | null = null
+    let hardViolation = false
 
     if (predicate === 'DISTRIBUTE_EVENLY') {
       // 收集已分配学生的座位信息
@@ -891,8 +999,30 @@ export function useAssignment() {
       }
 
       if (positioned.length <= 1) {
+        const acceptance = evaluateRuleAcceptance({
+          predicate,
+          priority: rule.priority,
+          not: rule.not,
+          evaluated: false,
+          exactSatisfied: true
+        })
         if (returnDetails) {
-          return { penalties: 0, minDistance: Infinity, avgDistance: 0 }
+          return {
+            penalties: 0,
+            details: {
+              minDistance: Infinity,
+              avgDistance: 0,
+              positionedCount: positioned.length,
+              idealMinDistance: Infinity,
+              closePairs: [],
+              adjacentPairs: [],
+              distanceOnePairs: [],
+              isIdeal: true,
+              normalizedViolation: 0
+            },
+            satisfied: acceptance.satisfied,
+            acceptance
+          }
         }
         return 0
       }
@@ -973,6 +1103,10 @@ export function useAssignment() {
       }
 
       if (returnDetails) {
+        normalizedViolation = Number.isFinite(idealMinDistance) && idealMinDistance > 0
+          ? Math.max(0, idealMinDistance - minDistance) / idealMinDistance
+          : 0
+        hardViolation = adjacentPairs.length > 0
         details = { 
           minDistance, 
           avgDistance, 
@@ -981,10 +1115,16 @@ export function useAssignment() {
           closePairs,
           adjacentPairs,
           distanceOnePairs,
-          isIdeal: minDistance >= idealMinDistance && adjacentPairs.length === 0
+          isIdeal: minDistance >= idealMinDistance && adjacentPairs.length === 0,
+          normalizedViolation
         }
+      } else {
+        normalizedViolation = Number.isFinite(idealMinDistance) && idealMinDistance > 0
+          ? Math.max(0, idealMinDistance - minDistance) / idealMinDistance
+          : 0
+        hardViolation = adjacentPairs.length > 0
       }
-      positiveSatisfied = (minDistance >= idealMinDistance && adjacentPairs.length === 0) || penalties <= 0
+      exactSatisfied = (minDistance >= idealMinDistance && adjacentPairs.length === 0) || penalties <= 0
     }
 
     if (predicate === 'CLUSTER_TOGETHER') {
@@ -1005,13 +1145,27 @@ export function useAssignment() {
         penalties = (keySet.size - 1) * PENALTY_WEIGHTS[rule.priority] * 0.2
       }
       evaluated = positionedCount > 1
-      positiveSatisfied = keySet.size <= 1
+      exactSatisfied = keySet.size <= 1
     }
 
-    penalties = applyGlobalRuleNegation(rule, penalties, positiveSatisfied, evaluated)
+    const acceptance = evaluateRuleAcceptance({
+      predicate,
+      priority: rule.priority,
+      not: rule.not,
+      evaluated,
+      exactSatisfied,
+      normalizedViolation,
+      hardViolation
+    })
+    penalties = applyGlobalRuleNegation(
+      rule,
+      penalties,
+      acceptance.positiveSatisfied,
+      evaluated
+    )
 
     if (returnDetails) {
-      return { penalties, details }
+      return { penalties, details, satisfied: acceptance.satisfied, acceptance }
     }
     return penalties
   }
@@ -1321,27 +1475,41 @@ export function useAssignment() {
     return -weight - (excess > 0 ? excess * weight * 0.1 : 0)
   }
 
-  const scoreRule = (
+  const evaluateRuleScoringUnit = (
     rule: AssignmentRule,
     assignment: AssignmentMap,
     studentList: Student[],
     context: AssignmentContext | null
-  ) => {
+  ): AssignmentUnitEvaluation => {
     const weight = PENALTY_WEIGHTS[rule.priority] ?? PENALTY_WEIGHTS.optional
 
     if (rule.subRules && rule.subRules.length > 1) {
       const subScores: number[] = []
+      const subSatisfied: boolean[] = []
+      let tracksRequiredAcceptance = false
       for (const subRule of rule.subRules) {
         if (!subRule.predicate) continue
         const subSubjects = getCompiledSubjects(subRule, studentList)
         let subScore = 0
+        let isSubSatisfied = true
+        const tracksSubRuleAcceptance = rule.priority === RulePriority.REQUIRED &&
+          hasRequiredRuleAcceptancePolicy(subRule.predicate)
+        tracksRequiredAcceptance ||= tracksSubRuleAcceptance
 
         if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
-          const result = checkGroupViolation(subRule, subSubjects, assignment)
+          const result = checkGroupViolation(subRule, subSubjects, assignment, tracksSubRuleAcceptance)
           subScore = -(typeof result === 'object' ? result.penalties : result)
+          isSubSatisfied = typeof result === 'object' ? result.satisfied : subScore >= 0
         } else if (isAttributePredicate(subRule.predicate) && subRule.predicate !== 'ATTRIBUTE_PAIR_DELTA') {
-          const result = checkAttributeGroupViolation(subRule, subSubjects, assignment, studentList)
+          const result = checkAttributeGroupViolation(
+            subRule,
+            subSubjects,
+            assignment,
+            studentList,
+            tracksSubRuleAcceptance
+          )
           subScore = -(typeof result === 'object' ? result.penalties : result)
+          isSubSatisfied = typeof result === 'object' ? result.satisfied : subScore >= 0
         } else {
           for (const subject of subSubjects) {
             if (subRule.predicate === 'ATTRIBUTE_PAIR_DELTA') {
@@ -1358,32 +1526,70 @@ export function useAssignment() {
               }
             }
           }
+          isSubSatisfied = subScore >= 0
         }
         subScores.push(subScore)
+        subSatisfied.push(isSubSatisfied)
       }
 
-      if (rule.logicOperator === 'OR') return Math.max(...subScores)
-      return subScores.reduce((sum, s) => sum + s, 0)
+      const score = rule.logicOperator === 'OR'
+        ? Math.max(...subScores)
+        : subScores.reduce((sum, value) => sum + value, 0)
+      const satisfied = rule.logicOperator === 'OR'
+        ? subSatisfied.some(Boolean)
+        : subSatisfied.every(Boolean)
+      return {
+        score,
+        requiredAcceptanceFailures: getRequiredRuleAcceptanceFailureCount(rule.priority, satisfied)
+      }
     }
 
     const subjects = getCompiledSubjects(rule, studentList)
+    const tracksRequiredAcceptance = rule.priority === RulePriority.REQUIRED &&
+      hasRequiredRuleAcceptancePolicy(rule.predicate)
 
     if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
-      const result = checkGroupViolation(rule, subjects, assignment)
-      return -(typeof result === 'object' ? result.penalties : result)
+      const result = checkGroupViolation(rule, subjects, assignment, tracksRequiredAcceptance)
+      const score = -(typeof result === 'object' ? result.penalties : result)
+      const satisfied = typeof result === 'object' ? result.satisfied : score >= 0
+      return {
+        score,
+        requiredAcceptanceFailures: getRequiredRuleAcceptanceFailureCount(rule.priority, satisfied)
+      }
     }
 
     if (isAttributePredicate(rule.predicate) && rule.predicate !== 'ATTRIBUTE_PAIR_DELTA') {
-      const result = checkAttributeGroupViolation(rule, subjects, assignment, studentList)
-      return -(typeof result === 'object' ? result.penalties : result)
+      const result = checkAttributeGroupViolation(
+        rule,
+        subjects,
+        assignment,
+        studentList,
+        tracksRequiredAcceptance
+      )
+      const score = -(typeof result === 'object' ? result.penalties : result)
+      const satisfied = typeof result === 'object' ? result.satisfied : score >= 0
+      return {
+        score,
+        requiredAcceptanceFailures: getRequiredRuleAcceptanceFailureCount(rule.priority, satisfied)
+      }
     }
 
     let score = 0
     for (const subject of subjects) {
       score += scoreSubjectForRule(rule, subject, assignment, studentList, context)
     }
-    return score
+    return {
+      score,
+      requiredAcceptanceFailures: getRequiredRuleAcceptanceFailureCount(rule.priority, score >= 0)
+    }
   }
+
+  const scoreRule = (
+    rule: AssignmentRule,
+    assignment: AssignmentMap,
+    studentList: Student[],
+    context: AssignmentContext | null
+  ) => evaluateRuleScoringUnit(rule, assignment, studentList, context).score
 
   const buildScoringUnits = (rules: AssignmentRule[], studentList: Student[]) => {
     const units: AssignmentScoringUnit[] = []
@@ -1443,17 +1649,28 @@ export function useAssignment() {
     }
   }
 
+  const evaluateScoringUnit = (
+    unit: AssignmentScoringUnit,
+    assignment: AssignmentMap,
+    studentList: Student[],
+    context: AssignmentContext
+  ): AssignmentUnitEvaluation => {
+    if (unit.type === 'subject') {
+      const score = scoreSubjectForRule(unit.rule, unit.subject, assignment, studentList, context)
+      return {
+        score,
+        requiredAcceptanceFailures: getRequiredRuleAcceptanceFailureCount(unit.rule.priority, score >= 0)
+      }
+    }
+    return evaluateRuleScoringUnit(unit.rule, assignment, studentList, context)
+  }
+
   const scoreUnit = (
     unit: AssignmentScoringUnit,
     assignment: AssignmentMap,
     studentList: Student[],
     context: AssignmentContext
-  ) => {
-    if (unit.type === 'subject') {
-      return scoreSubjectForRule(unit.rule, unit.subject, assignment, studentList, context)
-    }
-    return scoreRule(unit.rule, assignment, studentList, context)
-  }
+  ) => evaluateScoringUnit(unit, assignment, studentList, context).score
 
   // ==================== 新引擎：评分函数 ====================
 
@@ -1574,16 +1791,6 @@ export function useAssignment() {
     return score
   }
 
-  const compareLexicographicScores = (
-    requiredScoreA: number,
-    softScoreA: number,
-    requiredScoreB: number,
-    softScoreB: number
-  ) => {
-    if (requiredScoreA !== requiredScoreB) return requiredScoreA - requiredScoreB
-    return softScoreA - softScoreB
-  }
-
   const evaluateScoreParts = (
     assignment: AssignmentMap,
     activeRules: AssignmentRule[],
@@ -1591,22 +1798,28 @@ export function useAssignment() {
     context: AssignmentContext | null
   ) => {
     if (context?.scoringUnits) {
+      let requiredAcceptanceFailures = 0
       let requiredScore = 0
       let softScore = 0
       for (const unit of context.scoringUnits) {
-        const unitScore = scoreUnit(unit, assignment, studentList, context)
-        if (unit.rule.priority === RulePriority.REQUIRED) requiredScore += unitScore
-        else softScore += unitScore
+        const evaluation = evaluateScoringUnit(unit, assignment, studentList, context)
+        requiredAcceptanceFailures += evaluation.requiredAcceptanceFailures
+        if (unit.rule.priority === RulePriority.REQUIRED) requiredScore += evaluation.score
+        else softScore += evaluation.score
       }
-      return { requiredScore, softScore }
+      return { requiredAcceptanceFailures, requiredScore, softScore }
     }
 
-    const requiredRules = activeRules.filter(rule => rule.priority === RulePriority.REQUIRED)
-    const softRules = activeRules.filter(rule => rule.priority !== RulePriority.REQUIRED)
-    return {
-      requiredScore: evaluateScore(assignment, requiredRules, studentList, null),
-      softScore: evaluateScore(assignment, softRules, studentList, null)
+    let requiredAcceptanceFailures = 0
+    let requiredScore = 0
+    let softScore = 0
+    for (const rule of activeRules) {
+      const evaluation = evaluateRuleScoringUnit(rule, assignment, studentList, null)
+      requiredAcceptanceFailures += evaluation.requiredAcceptanceFailures
+      if (rule.priority === RulePriority.REQUIRED) requiredScore += evaluation.score
+      else softScore += evaluation.score
     }
+    return { requiredAcceptanceFailures, requiredScore, softScore }
   }
 
   // ==================== 新引擎：智能初始解 ====================
@@ -1798,7 +2011,9 @@ export function useAssignment() {
     studentList: Student[]
     context: AssignmentContext | null
     unitScores: number[]
+    unitRequiredAcceptanceFailures: number[]
     totalScore: number
+    requiredAcceptanceFailures: number
     requiredScore: number
     softScore: number
 
@@ -1812,7 +2027,9 @@ export function useAssignment() {
       this.studentList = studentList
       this.context = context
       this.unitScores = []
+      this.unitRequiredAcceptanceFailures = []
       this.totalScore = 0
+      this.requiredAcceptanceFailures = 0
       this.requiredScore = 0
       this.softScore = 0
       this.rebuild(assignment)
@@ -1820,11 +2037,14 @@ export function useAssignment() {
 
     rebuild(assignment: AssignmentMap) {
       this.unitScores = []
+      this.unitRequiredAcceptanceFailures = []
       this.totalScore = 0
+      this.requiredAcceptanceFailures = 0
       this.requiredScore = 0
       this.softScore = 0
       if (!this.context?.scoringUnits) {
         const parts = evaluateScoreParts(assignment, this.activeRules, this.studentList, this.context)
+        this.requiredAcceptanceFailures = parts.requiredAcceptanceFailures
         this.requiredScore = parts.requiredScore
         this.softScore = parts.softScore
         this.totalScore = parts.requiredScore + parts.softScore
@@ -1832,10 +2052,12 @@ export function useAssignment() {
       }
       for (let i = 0; i < this.context.scoringUnits.length; i++) {
         const unit = this.context.scoringUnits[i]
-        const unitScore = scoreUnit(unit, assignment, this.studentList, this.context)
-        this.unitScores[i] = unitScore
-        if (unit.rule.priority === RulePriority.REQUIRED) this.requiredScore += unitScore
-        else this.softScore += unitScore
+        const evaluation = evaluateScoringUnit(unit, assignment, this.studentList, this.context)
+        this.unitScores[i] = evaluation.score
+        this.unitRequiredAcceptanceFailures[i] = evaluation.requiredAcceptanceFailures
+        this.requiredAcceptanceFailures += evaluation.requiredAcceptanceFailures
+        if (unit.rule.priority === RulePriority.REQUIRED) this.requiredScore += evaluation.score
+        else this.softScore += evaluation.score
       }
       this.totalScore = this.requiredScore + this.softScore
     }
@@ -1859,6 +2081,7 @@ export function useAssignment() {
         const parts = evaluateScoreParts(assignment, this.activeRules, this.studentList, this.context)
         return {
           score: parts.requiredScore + parts.softScore,
+          requiredAcceptanceFailures: parts.requiredAcceptanceFailures,
           requiredScore: parts.requiredScore,
           softScore: parts.softScore,
           updates: null
@@ -1870,28 +2093,34 @@ export function useAssignment() {
         const parts = evaluateScoreParts(assignment, this.activeRules, this.studentList, null)
         return {
           score: parts.requiredScore + parts.softScore,
+          requiredAcceptanceFailures: parts.requiredAcceptanceFailures,
           requiredScore: parts.requiredScore,
           softScore: parts.softScore,
           updates: null
         }
       }
+      let requiredAcceptanceFailures = this.requiredAcceptanceFailures
       let requiredScore = this.requiredScore
       let softScore = this.softScore
-      const updates: Array<[number, number]> = []
+      const updates: Array<[number, number, number]> = []
       for (const unitIndex of affected) {
         const unit = context.scoringUnits[unitIndex]
         if (!unit) continue
-        const newUnitScore = scoreUnit(unit, assignment, this.studentList, context)
+        const evaluation = evaluateScoringUnit(unit, assignment, this.studentList, context)
+        const newUnitScore = evaluation.score
         const oldUnitScore = this.unitScores[unitIndex] ?? 0
+        const oldRequiredAcceptanceFailures = this.unitRequiredAcceptanceFailures[unitIndex] ?? 0
+        requiredAcceptanceFailures += evaluation.requiredAcceptanceFailures - oldRequiredAcceptanceFailures
         if (unit.rule.priority === RulePriority.REQUIRED) {
           requiredScore += newUnitScore - oldUnitScore
         } else {
           softScore += newUnitScore - oldUnitScore
         }
-        updates.push([unitIndex, newUnitScore])
+        updates.push([unitIndex, newUnitScore, evaluation.requiredAcceptanceFailures])
       }
       return {
         score: requiredScore + softScore,
+        requiredAcceptanceFailures,
         requiredScore,
         softScore,
         updates
@@ -1900,12 +2129,14 @@ export function useAssignment() {
 
     commitPreview(preview: AssignmentScorePreview) {
       this.totalScore = preview.score
+      this.requiredAcceptanceFailures = preview.requiredAcceptanceFailures
       this.requiredScore = preview.requiredScore
       this.softScore = preview.softScore
       if (!preview.updates) return
       for (let i = 0; i < preview.updates.length; i++) {
-        const [unitIndex, unitScore] = preview.updates[i]
+        const [unitIndex, unitScore, requiredAcceptanceFailures] = preview.updates[i]
         this.unitScores[unitIndex] = unitScore
+        this.unitRequiredAcceptanceFailures[unitIndex] = requiredAcceptanceFailures
       }
     }
   }
@@ -1916,6 +2147,8 @@ export function useAssignment() {
     tracker: ScoreTracker
     currentScore: number
     bestScore: number
+    currentRequiredAcceptanceFailures: number
+    bestRequiredAcceptanceFailures: number
     currentRequiredScore: number
     currentSoftScore: number
     bestRequiredScore: number
@@ -1937,6 +2170,8 @@ export function useAssignment() {
       this.tracker = new ScoreTracker(this.current, activeRules, studentList, context)
       this.currentScore = this.tracker.totalScore
       this.bestScore = this.currentScore
+      this.currentRequiredAcceptanceFailures = this.tracker.requiredAcceptanceFailures
+      this.bestRequiredAcceptanceFailures = this.currentRequiredAcceptanceFailures
       this.currentRequiredScore = this.tracker.requiredScore
       this.currentSoftScore = this.tracker.softScore
       this.bestRequiredScore = this.currentRequiredScore
@@ -1962,13 +2197,16 @@ export function useAssignment() {
     }
 
     updateBestIfBetter() {
-      if (compareLexicographicScores(
+      if (compareAssignmentLexicographicScores(
+        this.currentRequiredAcceptanceFailures,
         this.currentRequiredScore,
         this.currentSoftScore,
+        this.bestRequiredAcceptanceFailures,
         this.bestRequiredScore,
         this.bestSoftScore
       ) > 0) {
         this.bestScore = this.currentScore
+        this.bestRequiredAcceptanceFailures = this.currentRequiredAcceptanceFailures
         this.bestRequiredScore = this.currentRequiredScore
         this.bestSoftScore = this.currentSoftScore
         this.best = new Map(this.current)
@@ -1987,6 +2225,7 @@ export function useAssignment() {
     rebuildScore(activeRules: AssignmentRule[], studentList: Student[], context: AssignmentContext | null) {
       this.tracker = new ScoreTracker(this.current, activeRules, studentList, context)
       this.currentScore = this.tracker.totalScore
+      this.currentRequiredAcceptanceFailures = this.tracker.requiredAcceptanceFailures
       this.currentRequiredScore = this.tracker.requiredScore
       this.currentSoftScore = this.tracker.softScore
     }
@@ -2121,6 +2360,7 @@ export function useAssignment() {
         if (strategy.shouldTrigger(state, this.reheatCount)) {
           this.reheatCount++
           const result = strategy.execute(state, this.reheatCount, activeRules, studentList, availableSeats, context)
+          state.updateBestIfBetter()
           return { shouldReheat: true, ...result }
         }
       }
@@ -2304,18 +2544,22 @@ export function useAssignment() {
       if (!moveResult || !moveResult.accepted) continue
 
       state.currentScore = moveResult.newScore
+      state.currentRequiredAcceptanceFailures = moveResult.newRequiredAcceptanceFailures
       state.currentRequiredScore = moveResult.newRequiredScore
       state.currentSoftScore = moveResult.newSoftScore
       if (moveResult.useEmptySeat && moveResult.emptySeatIdx >= 0) {
         state.emptySeats[moveResult.emptySeatIdx] = seatA
       }
-      if (compareLexicographicScores(
+      if (compareAssignmentLexicographicScores(
+        state.currentRequiredAcceptanceFailures,
         state.currentRequiredScore,
         state.currentSoftScore,
+        state.bestRequiredAcceptanceFailures,
         state.bestRequiredScore,
         state.bestSoftScore
       ) >= 0) {
         state.bestScore = state.currentScore
+        state.bestRequiredAcceptanceFailures = state.currentRequiredAcceptanceFailures
         state.bestRequiredScore = state.currentRequiredScore
         state.bestSoftScore = state.currentSoftScore
         state.best = new Map(state.current)
@@ -2371,7 +2615,11 @@ export function useAssignment() {
     const ruleAffectedStudentIds = buildRuleAffectedStudentIds(activeRules, studentList, assignedStudentIds)
     let violatingStudents = computeViolatingStudents(state.current, activeRules, studentList, context)
 
-    if (state.bestRequiredScore === 0 && state.bestSoftScore === 0) {
+    if (
+      state.bestRequiredAcceptanceFailures === 0 &&
+      state.bestRequiredScore === 0 &&
+      state.bestSoftScore === 0
+    ) {
       randomizePlateauSolution(state, activeRules, studentList, availableSeats, context, {
         assignedStudentIds,
         partnerMap,
@@ -2431,13 +2679,18 @@ export function useAssignment() {
       if (moveResult) {
         if (moveResult.accepted) {
           state.currentScore = moveResult.newScore
+          state.currentRequiredAcceptanceFailures = moveResult.newRequiredAcceptanceFailures
           state.currentRequiredScore = moveResult.newRequiredScore
           state.currentSoftScore = moveResult.newSoftScore
           if (moveResult.useEmptySeat && moveResult.emptySeatIdx >= 0) {
             state.emptySeats[moveResult.emptySeatIdx] = seatA
           }
           if (state.updateBestIfBetter()) {
-            if (state.bestRequiredScore === 0 && state.bestSoftScore === 0) {
+            if (
+              state.bestRequiredAcceptanceFailures === 0 &&
+              state.bestRequiredScore === 0 &&
+              state.bestSoftScore === 0
+            ) {
               if (onProgress) onProgress(100)
               break
             }
@@ -2532,11 +2785,18 @@ export function useAssignment() {
     const movedStudents = [studentA, partner, studentC, studentD]
     const scorePreview = state.tracker.previewScore(state.current, movedStudents)
     const newScore = scorePreview.score
-    const requiredDelta = scorePreview.requiredScore - state.currentRequiredScore
-    const delta = requiredDelta !== 0
-      ? requiredDelta
-      : scorePreview.softScore - state.currentSoftScore
-    const accepted = delta >= 0 || Math.random() < Math.exp(delta / T)
+    const acceptanceFailureDelta = scorePreview.requiredAcceptanceFailures -
+      state.currentRequiredAcceptanceFailures
+    let accepted: boolean
+    if (acceptanceFailureDelta !== 0) {
+      accepted = acceptanceFailureDelta < 0
+    } else {
+      const requiredDelta = scorePreview.requiredScore - state.currentRequiredScore
+      const delta = requiredDelta !== 0
+        ? requiredDelta
+        : scorePreview.softScore - state.currentSoftScore
+      accepted = delta >= 0 || Math.random() < Math.exp(delta / T)
+    }
     
     if (!accepted) {
       state.current.set(studentA, seatA)
@@ -2554,6 +2814,7 @@ export function useAssignment() {
     return {
       accepted,
       newScore,
+      newRequiredAcceptanceFailures: scorePreview.requiredAcceptanceFailures,
       newRequiredScore: scorePreview.requiredScore,
       newSoftScore: scorePreview.softScore,
       useEmptySeat: false,
@@ -2601,11 +2862,18 @@ export function useAssignment() {
     const movedStudents = useEmptySeat || studentB === undefined ? [studentA] : [studentA, studentB]
     const scorePreview = state.tracker.previewScore(state.current, movedStudents)
     const newScore = scorePreview.score
-    const requiredDelta = scorePreview.requiredScore - state.currentRequiredScore
-    const delta = requiredDelta !== 0
-      ? requiredDelta
-      : scorePreview.softScore - state.currentSoftScore
-    const accepted = delta >= 0 || Math.random() < Math.exp(delta / T)
+    const acceptanceFailureDelta = scorePreview.requiredAcceptanceFailures -
+      state.currentRequiredAcceptanceFailures
+    let accepted: boolean
+    if (acceptanceFailureDelta !== 0) {
+      accepted = acceptanceFailureDelta < 0
+    } else {
+      const requiredDelta = scorePreview.requiredScore - state.currentRequiredScore
+      const delta = requiredDelta !== 0
+        ? requiredDelta
+        : scorePreview.softScore - state.currentSoftScore
+      accepted = delta >= 0 || Math.random() < Math.exp(delta / T)
+    }
     
     if (!accepted) {
       if (useEmptySeat) {
@@ -2626,6 +2894,7 @@ export function useAssignment() {
     return {
       accepted,
       newScore,
+      newRequiredAcceptanceFailures: scorePreview.requiredAcceptanceFailures,
       newRequiredScore: scorePreview.requiredScore,
       newSoftScore: scorePreview.softScore,
       useEmptySeat,
@@ -2663,8 +2932,8 @@ export function useAssignment() {
 
           if (subRule.predicate === 'DISTRIBUTE_EVENLY' || subRule.predicate === 'CLUSTER_TOGETHER') {
             const result = checkGroupViolation(subRule, subSubjects, solution, true)
-            const penalty = typeof result === 'object' ? result.penalties : result
             const details = typeof result === 'object' ? result.details : null
+            const ruleSatisfied = typeof result === 'object' ? result.satisfied : result <= 0
 
             if (subRule.predicate === 'DISTRIBUTE_EVENLY' && details) {
               distributeEvenlyDetails.push({
@@ -2677,21 +2946,15 @@ export function useAssignment() {
               })
             }
 
-            // 对于均匀分散规则：当最小距离理想且互不相邻时就返回成功
-            let ruleSatisfied = false
-            if (!subRule.not && subRule.predicate === 'DISTRIBUTE_EVENLY' && details?.isIdeal) {
-              ruleSatisfied = true
-            } else if (penalty <= 0) {
-              ruleSatisfied = true
-            }
-
             if (!ruleSatisfied) {
               subSatisfied = false
               
               if (subRule.predicate === 'DISTRIBUTE_EVENLY' && details) {
                 // 显示最小距离信息
                 const minDistFormatted = details.minDistance === Infinity ? 'N/A' : details.minDistance.toFixed(2)
-                const idealDistFormatted = details.idealMinDistance.toFixed(2)
+                const idealDistFormatted = details.idealMinDistance === undefined || details.idealMinDistance === Infinity
+                  ? 'N/A'
+                  : details.idealMinDistance.toFixed(2)
                 subRuleViolations.push(`最小距离 ${minDistFormatted}（理想≥${idealDistFormatted}）`)
                 
                 // 显示距离为1的学生对（最高优先级）
@@ -2738,8 +3001,8 @@ export function useAssignment() {
               }
             } else {
               const result = checkAttributeGroupViolation(subRule, subSubjects, solution, studentList, true)
-              const penalty = typeof result === 'object' ? result.penalties : result
-              if (penalty > 0) {
+              const ruleSatisfied = typeof result === 'object' ? result.satisfied : result <= 0
+              if (!ruleSatisfied) {
                 subSatisfied = false
                 subRuleViolations.push('数值分布偏差')
               }
@@ -2792,8 +3055,8 @@ export function useAssignment() {
       const subjects = getCompiledSubjects(rule, studentList)
       if (rule.predicate === 'DISTRIBUTE_EVENLY' || rule.predicate === 'CLUSTER_TOGETHER') {
         const result = checkGroupViolation(rule, subjects, solution, true)
-        const penalty = typeof result === 'object' ? result.penalties : result
         const details = typeof result === 'object' ? result.details : null
+        const ruleSatisfied = typeof result === 'object' ? result.satisfied : result <= 0
 
         if (rule.predicate === 'DISTRIBUTE_EVENLY' && details) {
           distributeEvenlyDetails.push({
@@ -2806,10 +3069,7 @@ export function useAssignment() {
           })
         }
 
-        // 对于均匀分散规则：当最小距离理想且互不相邻时就返回成功
-        if (!rule.not && rule.predicate === 'DISTRIBUTE_EVENLY' && details?.isIdeal) {
-          satisfied.push(rule)
-        } else if (penalty <= 0) {
+        if (ruleSatisfied) {
           satisfied.push(rule)
         } else {
           // 失败时给出不满足的具体学生
@@ -2818,7 +3078,9 @@ export function useAssignment() {
           if (rule.predicate === 'DISTRIBUTE_EVENLY' && details) {
             // 显示最小距离信息
             const minDistFormatted = details.minDistance === Infinity ? 'N/A' : details.minDistance.toFixed(2)
-            const idealDistFormatted = details.idealMinDistance.toFixed(2)
+            const idealDistFormatted = details.idealMinDistance === undefined || details.idealMinDistance === Infinity
+              ? 'N/A'
+              : details.idealMinDistance.toFixed(2)
             violationReasons.push(`最小距离 ${minDistFormatted}（理想≥${idealDistFormatted}）`)
             
             // 显示距离为1的学生对（最高优先级）
@@ -2888,8 +3150,8 @@ export function useAssignment() {
           }
         } else {
           const result = checkAttributeGroupViolation(rule, subjects, solution, studentList, true)
-          const penalty = typeof result === 'object' ? result.penalties : result
-          if (penalty > 0) {
+          const ruleSatisfied = typeof result === 'object' ? result.satisfied : result <= 0
+          if (!ruleSatisfied) {
             isSatisfied = false
             violationReasons.push('数值分布偏差')
           }
@@ -2953,6 +3215,44 @@ export function useAssignment() {
     zones: zones.value,
     activeRules
   })
+
+  const getUnsafeRuleNumberParam = (rule: RuleInput) => {
+    const conditions: Array<{
+      predicate: string | undefined
+      params: RuleParams | undefined
+      context: string
+    }> = [{
+      predicate: rule.predicate,
+      params: rule.params,
+      context: ''
+    }]
+
+    if (Array.isArray(rule.subRules)) {
+      rule.subRules.forEach((subRule, index) => {
+        conditions.push({
+          predicate: typeof subRule.predicate === 'string' ? subRule.predicate : undefined,
+          params: subRule.params,
+          context: `子规则 ${index + 1} 的`
+        })
+      })
+    }
+
+    for (const condition of conditions) {
+      if (!condition.predicate) continue
+      const meta = PREDICATE_META[condition.predicate]
+      if (!meta) continue
+      for (const param of meta.params) {
+        if (param.type !== 'number') continue
+        const value = condition.params?.[param.key]
+        if (value === null || value === undefined || value === '') {
+          return { label: `${condition.context}${param.label}`, error: '不能为空' }
+        }
+        const error = getPredicateNumberParamError(value, param)
+        if (error) return { label: `${condition.context}${param.label}`, error }
+      }
+    }
+    return null
+  }
 
   const ownsAssignmentRun = (run: AssignmentRunToken) => (
     currentAssignmentRun === run && !run.canceled
@@ -3018,6 +3318,15 @@ export function useAssignment() {
       // 收集规则
       const { getActiveRules } = useSeatRules()
       const rawActiveRules = useRules ? [...getActiveRules()] : []
+      for (let index = 0; index < rawActiveRules.length; index += 1) {
+        const invalidParam = getUnsafeRuleNumberParam(rawActiveRules[index])
+        if (!invalidParam) continue
+        const ruleName = rawActiveRules[index].id || `第 ${index + 1} 条规则`
+        return {
+          success: false,
+          message: `规则「${ruleName}」的数值参数「${invalidParam.label}」${invalidParam.error}，排位未开始`
+        }
+      }
       const inputSignature = createAssignmentInputSignature(rawActiveRules)
       const { rules: activeRules, context: assignmentContext } = useRules
         ? compileRulesForAssignment(rawActiveRules, studentList, availableSeats)

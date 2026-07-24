@@ -1,6 +1,6 @@
 import { WORKSPACE_SCHEMA_VERSION, type Workspace } from '@/types/models'
 import { MAX_WORKSPACE_GROUPS, MAX_WORKSPACE_SEATS } from '@/constants/workspaceLimits'
-import { PREDICATE_META } from '@/constants/ruleTypes'
+import { PREDICATE_META, getPredicateNumberParamError } from '@/constants/ruleTypes'
 import { generateGuardSeatId, generateSeatId } from '@/utils/seatHelpers'
 import { hasRepresentableNumberInputRange, normalizeNumberInput } from '@/utils/inputNormalization'
 
@@ -210,11 +210,8 @@ const validateRuleParams = (
       return
     }
     if (param.type === 'number') {
-      if (typeof candidate !== 'number' || !Number.isFinite(candidate)) {
-        errors.push(`${paramPath} 必须是数字`)
-      } else if (param.min !== undefined && candidate < param.min) {
-        errors.push(`${paramPath} 不能小于 ${param.min}`)
-      }
+      const error = getPredicateNumberParamError(candidate, param)
+      if (error) errors.push(`${paramPath} ${error}`)
     }
     if (param.type === 'select' && param.options && !param.options.some(option => option.value === candidate)) {
       errors.push(`${paramPath} 不是有效选项`)

@@ -19,6 +19,7 @@ const mocks = await vi.hoisted(async () => {
     isRefreshing: ref(false),
     errorMessage: ref(''),
     isManagingCloud: ref(false),
+    isSavingWorkspace: ref(false),
     push: vi.fn(),
     refresh: vi.fn(async () => undefined),
     getAutoSaveBackup: vi.fn(async () => null),
@@ -75,7 +76,8 @@ vi.mock('@/composables/useWorkspace', () => ({
     saveLastWorkspace: mocks.saveLastWorkspace,
     getLastWorkspace: mocks.getLastWorkspace,
     clearLastWorkspace: mocks.clearLastWorkspace,
-    getWorkspaceJson: mocks.getWorkspaceJson
+    getWorkspaceJson: mocks.getWorkspaceJson,
+    isSavingWorkspace: mocks.isSavingWorkspace
   })
 }))
 vi.mock('@/composables/useLogger', () => ({
@@ -143,11 +145,31 @@ const mountView = () => mount(FilesView, {
   }
 })
 
+const createDeferred = <T>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>(res => { resolve = res })
+  return { promise, resolve }
+}
+
 describe('FilesView cloud refresh', () => {
   beforeEach(() => {
     mocks.token.value = null
     mocks.isLoggedIn.value = false
     mocks.autoSaveBackup.value = null
+    mocks.isRefreshing.value = false
+    mocks.isManagingCloud.value = false
+    mocks.isSavingWorkspace.value = false
+    mocks.exportToExcel.mockReset()
+    mocks.saveWorkspace.mockReset()
+    mocks.saveWorkspaceAs.mockReset()
+    mocks.saveWorkspaceToCloud.mockReset()
+    mocks.renameWorkspaceInCloud.mockReset()
+    mocks.getWorkspaceJson.mockReset()
+    mocks.getWorkspaceJson.mockReturnValue('{"workspace":true}')
+    mocks.refresh.mockClear()
+    mocks.success.mockReset()
+    mocks.warning.mockReset()
+    mocks.error.mockReset()
   })
 
   it('waits for a token and refreshes when login finishes after mount', async () => {
@@ -194,6 +216,128 @@ describe('FilesView cloud refresh', () => {
     expect(wrapper.get('input[aria-label="修改工作区 一班 的名称"]').attributes('aria-label')).toBe('修改工作区 一班 的名称')
     expect(wrapper.get('[aria-label="保存名称"]').attributes('aria-label')).toBe('保存名称')
     expect(wrapper.get('[aria-label="取消改名"]').attributes('aria-label')).toBe('取消改名')
+    wrapper.unmount()
+  })
+
+  it('does not report a canceled Excel save as successful', async () => {
+    mocks.exportToExcel.mockResolvedValueOnce({ success: false, canceled: true, path: null })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const exportButton = wrapper.findAll('button').find(button => button.text().includes('导出名单到 Excel'))
+    expect(exportButton).toBeDefined()
+    await exportButton!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.success).not.toHaveBeenCalledWith('Excel导出成功！')
+    expect(mocks.error).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('reports Excel export success only after the file save succeeds', async () => {
+    mocks.exportToExcel.mockResolvedValueOnce({ success: true, canceled: false, path: null })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const exportButton = wrapper.findAll('button').find(button => button.text().includes('导出名单到 Excel'))
+    expect(exportButton).toBeDefined()
+    await exportButton!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.success).toHaveBeenCalledWith('Excel导出成功！')
+    wrapper.unmount()
+  })
+
+  it('does not report a canceled local workspace save as an error', async () => {
+    mocks.saveWorkspace.mockResolvedValueOnce({ success: false, canceled: true })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const saveButton = wrapper.findAll('button').find(button => button.text().includes('保存到本地'))
+    expect(saveButton).toBeDefined()
+    await saveButton!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.success).not.toHaveBeenCalledWith('工作区已成功保存到本地！')
+    expect(mocks.error).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('shows the concrete local workspace save error', async () => {
+    mocks.saveWorkspaceAs.mockResolvedValueOnce({
+      success: false,
+      canceled: false,
+      error: '磁盘空间不足'
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const saveAsButton = wrapper.findAll('button').find(button => button.text().includes('另存为'))
+    expect(saveAsButton).toBeDefined()
+    await saveAsButton!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.error).toHaveBeenCalledWith('磁盘空间不足')
+    wrapper.unmount()
+  })
+
+  it('blocks repeated cloud creates from the Enter key while one operation is pending', async () => {
+    mocks.token.value = 'token'
+    mocks.isLoggedIn.value = true
+    const deferred = createDeferred<{ success: boolean; data: { fileId: string } }>()
+    mocks.saveWorkspaceToCloud.mockReturnValueOnce(deferred.promise)
+    const wrapper = mountView()
+    await flushPromises()
+    const input = wrapper.get('input[placeholder="云端工作区名称"]')
+
+    await input.setValue('新工作区')
+    await input.trigger('keyup', { key: 'Enter' })
+    await input.trigger('keyup', { key: 'Enter' })
+
+    expect(mocks.saveWorkspaceToCloud).toHaveBeenCalledTimes(1)
+    expect(input.attributes('disabled')).toBeDefined()
+
+    deferred.resolve({ success: true, data: { fileId: 'created-id' } })
+    await flushPromises()
+    wrapper.unmount()
+  })
+
+  it('blocks repeated cloud renames from the Enter key while one operation is pending', async () => {
+    mocks.token.value = 'token'
+    mocks.isLoggedIn.value = true
+    const deferred = createDeferred<{ success: boolean }>()
+    mocks.renameWorkspaceInCloud.mockReturnValueOnce(deferred.promise)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[aria-label="修改名称"]').trigger('click')
+    const input = wrapper.get('input[aria-label="修改工作区 一班 的名称"]')
+
+    await input.setValue('新名称')
+    await input.trigger('keyup', { key: 'Enter' })
+    await input.trigger('keyup', { key: 'Enter' })
+
+    expect(mocks.renameWorkspaceInCloud).toHaveBeenCalledTimes(1)
+    expect(input.attributes('disabled')).toBeDefined()
+
+    deferred.resolve({ success: true })
+    await flushPromises()
+    wrapper.unmount()
+  })
+
+  it('disables both local save entries while a local save is in progress', async () => {
+    mocks.isSavingWorkspace.value = true
+    const wrapper = mountView()
+    await flushPromises()
+
+    const saveButton = wrapper.findAll('button').find(button => button.text().includes('保存到本地'))
+    const saveAsButton = wrapper.findAll('button').find(button => button.text().includes('另存为'))
+    expect(saveButton?.attributes('disabled')).toBeDefined()
+    expect(saveAsButton?.attributes('disabled')).toBeDefined()
+
+    await saveButton!.trigger('click')
+    await saveAsButton!.trigger('click')
+    expect(mocks.saveWorkspace).not.toHaveBeenCalled()
+    expect(mocks.saveWorkspaceAs).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 })

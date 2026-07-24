@@ -1078,6 +1078,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  registerViewport(null, null)
   if (viewportRef.value) {
     viewportRef.value.removeEventListener('touch-seat-drop', handleTouchSeatDrop)
   }

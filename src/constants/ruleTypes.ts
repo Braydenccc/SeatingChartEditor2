@@ -3,6 +3,7 @@
  * Rules DSL v3 — 完整谓词枚举、权重定义、UI 文本
  */
 import type { RuleParams, RulePriority as RulePriorityValue } from '@/types/models'
+import { maxSeatGroupCount } from '@/constants/seatConfig'
 
 export interface PredicateOption {
   value: string | number
@@ -14,6 +15,8 @@ export interface PredicateParamSpec {
   label: string
   type: 'number' | 'select' | 'zone' | 'attribute'
   min?: number
+  max?: number
+  integer?: boolean
   options?: PredicateOption[]
   default: unknown
 }
@@ -23,6 +26,20 @@ export interface PredicateMeta {
   minSubjects: number
   params: PredicateParamSpec[]
   ordered?: boolean
+}
+
+// 分层评分会遍历“分层数 × 大组数”，与布局支持的最大大组数保持同一安全上界。
+export const maxRuleBandCount = maxSeatGroupCount
+
+export function getPredicateNumberParamError(
+  value: unknown,
+  spec: PredicateParamSpec
+): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '必须是有限数字'
+  if (spec.integer && !Number.isInteger(value)) return '必须是整数'
+  if (spec.min !== undefined && value < spec.min) return `不能小于 ${spec.min}`
+  if (spec.max !== undefined && value > spec.max) return `不能大于 ${spec.max}`
+  return null
 }
 
 // ==================== 优先级 ====================
@@ -152,8 +169,8 @@ export const PREDICATE_META: Record<string, PredicateMeta> = {
     relation: 'single',
     minSubjects: 1,
     params: [
-      { key: 'minRow', label: '最前排', type: 'number', min: 1, default: 1 },
-      { key: 'maxRow', label: '最后排', type: 'number', min: 1, default: 3 }
+      { key: 'minRow', label: '最前排', type: 'number', min: 1, integer: true, default: 1 },
+      { key: 'maxRow', label: '最后排', type: 'number', min: 1, integer: true, default: 3 }
     ]
   },
   NOT_IN_COLUMN_TYPE: {
@@ -192,8 +209,8 @@ export const PREDICATE_META: Record<string, PredicateMeta> = {
     relation: 'single',
     minSubjects: 1,
     params: [
-      { key: 'minGroup', label: '最左大组', type: 'number', min: 1, default: 1 },
-      { key: 'maxGroup', label: '最右大组', type: 'number', min: 1, default: 2 }
+      { key: 'minGroup', label: '最左大组', type: 'number', min: 1, integer: true, default: 1 },
+      { key: 'maxGroup', label: '最右大组', type: 'number', min: 1, integer: true, default: 2 }
     ]
   },
   MUST_BE_SEATMATES: {
@@ -320,7 +337,15 @@ export const PREDICATE_META: Record<string, PredicateMeta> = {
     minSubjects: 1,
     params: [
       { key: 'attributeId', label: '数值属性', type: 'attribute', default: 'score' },
-      { key: 'bandCount', label: '分层数', type: 'number', min: 2, default: 3 }
+      {
+        key: 'bandCount',
+        label: '分层数',
+        type: 'number',
+        min: 2,
+        max: maxRuleBandCount,
+        integer: true,
+        default: 3
+      }
     ]
   }
 }

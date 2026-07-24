@@ -281,7 +281,8 @@ function isAuthorized($sessionDb, $profileDb, $usersDb, $username, $token) {
     }
 
     if (time() > (int)$data['expiry']) {
-        $sessionDb->delete($username);
+        // 认证读路径不能无锁删除：读取旧会话后，登录或改密可能已经写入了新会话。
+        // 新登录会覆盖这个过期值；显式登出和账号安全操作负责在用户租约内删除。
         return false;
     }
 
@@ -411,26 +412,47 @@ function isHttpsRequest() {
     return false;
 }
 
-function setAppCookie($name, $value, $days, $httpOnly = true) {
-    $options = [
-        'expires' => time() + ($days * 86400),
+function buildAppCookieOptions($expires, $httpOnly, $secure) {
+    return [
+        'expires' => $expires,
         'path' => '/',
-        'secure' => isHttpsRequest(),
+        'secure' => $secure,
         'httponly' => $httpOnly,
         'samesite' => 'Lax'
     ];
-    setcookie($name, $value, $options);
+}
+
+function getLegacySameSiteCookiePath() {
+    return '/; SameSite=Lax';
+}
+
+function writeAppCookie($name, $value, $expires, $httpOnly = true) {
+    $secure = isHttpsRequest();
+    if (PHP_VERSION_ID >= 70300) {
+        return setcookie(
+            $name,
+            $value,
+            buildAppCookieOptions($expires, $httpOnly, $secure)
+        );
+    }
+
+    return setcookie(
+        $name,
+        $value,
+        $expires,
+        getLegacySameSiteCookiePath(),
+        '',
+        $secure,
+        $httpOnly
+    );
+}
+
+function setAppCookie($name, $value, $days, $httpOnly = true) {
+    return writeAppCookie($name, $value, time() + ($days * 86400), $httpOnly);
 }
 
 function clearAppCookie($name, $httpOnly = true) {
-    $options = [
-        'expires' => time() - 3600,
-        'path' => '/',
-        'secure' => isHttpsRequest(),
-        'httponly' => $httpOnly,
-        'samesite' => 'Lax'
-    ];
-    setcookie($name, '', $options);
+    return writeAppCookie($name, '', time() - 3600, $httpOnly);
 }
 
 function sanitizeDbKey($key) {
@@ -500,6 +522,48 @@ function databaseValueMatchesExpected($value, $expectedValues) {
         }
     }
     return false;
+}
+
+function restoreDatabaseValueIfOwned($db, $key, $ownedValue, $previousValue) {
+    if (!is_string($ownedValue) || ($previousValue !== null && !is_string($previousValue))) {
+        return ['success' => false, 'outcome' => 'invalid_restore_value'];
+    }
+
+    try {
+        $currentValue = $db->get($key);
+        if ($currentValue === null) {
+            return ['success' => true, 'outcome' => 'absent'];
+        }
+        if (!databaseValueMatchesExpected($currentValue, $ownedValue)) {
+            return ['success' => true, 'outcome' => 'ownership_changed'];
+        }
+
+        $confirmedValue = $db->get($key);
+        if (!databaseValueMatchesExpected($confirmedValue, $ownedValue)) {
+            return ['success' => true, 'outcome' => 'ownership_changed'];
+        }
+
+        if ($previousValue === null) {
+            if ($db->delete($key) === false) {
+                return ['success' => false, 'outcome' => 'delete_failed'];
+            }
+            $remainingValue = $db->get($key);
+            return [
+                'success' => $remainingValue === null,
+                'outcome' => $remainingValue === null ? 'deleted' : 'delete_unconfirmed'
+            ];
+        }
+
+        if (!databaseSetVerified($db, $key, $previousValue)) {
+            return ['success' => false, 'outcome' => 'restore_failed'];
+        }
+        return ['success' => true, 'outcome' => 'restored'];
+    } catch (Throwable $error) {
+        $safeKey = sanitizeSingleLineLogText($key, 128);
+        $safeError = sanitizeSingleLineLogText($error->getMessage(), 512);
+        error_log("Owned database value restore failed for {$safeKey}: {$safeError}");
+        return ['success' => false, 'outcome' => 'exception'];
+    }
 }
 
 function databaseDeleteExpectedValueVerified($db, $key, $expectedValues) {

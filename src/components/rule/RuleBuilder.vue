@@ -108,6 +108,7 @@
                     v-if="param.type === 'number'"
                     :value="getNumberParam(ruleIndex, param.key)"
                     :min="param.min ?? 1"
+                    :max="param.max"
                     class="detail-input"
                     @update:value="value => setNumberParamValue(ruleIndex, param, value)"
                   />
@@ -451,6 +452,7 @@ const setNumberParamValue = (
 ) => {
   setParamValue(ruleIndex, param.key, normalizeNumberInput(value, {
     min: param.min ?? 1,
+    max: param.max,
     precision: 0
   }))
 }

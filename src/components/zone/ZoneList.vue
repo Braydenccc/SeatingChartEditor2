@@ -36,6 +36,8 @@ import { useZoneData } from '@/composables/useZoneData'
 import { useTagData } from '@/composables/useTagData'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import { useEditorCommands } from '@/composables/useEditorCommands'
+import { useUiFeedback } from '@/composables/useLogger'
+import { showRuleReferenceBlockFeedback } from '@/utils/ruleReferenceFeedback'
 import type { Zone } from '@/types/models'
 
 const {
@@ -53,6 +55,7 @@ const {
 const { tags } = useTagData()
 const { activeWorkbenchDialog } = useEditorWorkbench()
 const { finishZoneEditing, startGlobalZoneEditing } = useEditorCommands()
+const uiFeedback = useUiFeedback()
 
 const startGlobalZoneEdit = (zoneId: number) => {
   const zone = zones.value.find(item => item.id === zoneId)
@@ -92,7 +95,19 @@ const handleUpdateZone = (zoneId: number, updates: Partial<Zone>) => {
 // 删除选区
 const handleDeleteZone = (zoneId: number) => {
   const wasSelected = selectedZoneId.value === zoneId
-  deleteZone(zoneId)
+  const zone = zones.value.find(item => item.id === zoneId)
+  const deletion = deleteZone(zoneId)
+  if (!deletion.success && deletion.reason === 'referenced-by-rules') {
+    showRuleReferenceBlockFeedback(
+      uiFeedback,
+      '无法删除选区',
+      `选区“${zone?.name || '未命名'}”`,
+      deletion.references
+    )
+    return
+  }
+  if (!deletion.success) return
+  uiFeedback.success(`已成功删除选区“${zone?.name || '未命名'}”`)
   // 如果删除的是当前选中的选区,退出选区编辑模式
   if (wasSelected) {
     finishZoneEditing()

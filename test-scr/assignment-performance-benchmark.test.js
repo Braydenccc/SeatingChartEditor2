@@ -159,5 +159,5 @@ maybeDescribe('assignment performance benchmark', () => {
     }
 
     console.table(rows)
-  })
+  }, 120000)
 })

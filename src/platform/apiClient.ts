@@ -156,6 +156,32 @@ const canRetryRequest = (method: string, headers: Headers) => {
   return headers.has('Idempotency-Key') || headers.has('X-Idempotency-Key')
 }
 
+const getAbortReason = (signal: AbortSignal) => (
+  signal.reason ?? new DOMException('请求已取消', 'AbortError')
+)
+
+const waitForRetry = (delay: number, callerSignal: AbortSignal | null | undefined): Promise<void> => {
+  if (!callerSignal) {
+    return new Promise(resolve => setTimeout(resolve, delay))
+  }
+  if (callerSignal.aborted) {
+    return Promise.reject(getAbortReason(callerSignal))
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      callerSignal.removeEventListener('abort', abortFromCaller)
+      resolve()
+    }, delay)
+    const abortFromCaller = () => {
+      clearTimeout(timeoutId)
+      callerSignal.removeEventListener('abort', abortFromCaller)
+      reject(getAbortReason(callerSignal))
+    }
+    callerSignal.addEventListener('abort', abortFromCaller, { once: true })
+  })
+}
+
 const createAttemptSignal = (callerSignal: AbortSignal | null | undefined, timeoutMs: number) => {
   const controller = new AbortController()
   let timedOut = false
@@ -232,7 +258,7 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}, retr
           // The response is being discarded before retrying; abort/cancel errors are non-fatal here.
         }
         attemptSignal.cleanup()
-        await new Promise(resolve => setTimeout(resolve, delay))
+        await waitForRetry(delay, callerSignal)
         continue
       }
 
@@ -253,7 +279,7 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}, retr
         if (timedOut) throw new Error('请求超时')
         throw error
       }
-      await new Promise(resolve => setTimeout(resolve, delay))
+      await waitForRetry(delay, callerSignal)
     }
   }
 

@@ -63,7 +63,7 @@ describe('WorkbenchDialogs', () => {
   })
 
   it('merges advanced layout changes onto the transferred basic draft', async () => {
-    vi.spyOn(uiFeedback, 'requestUiConfirm').mockResolvedValue(true)
+    const confirmSpy = vi.spyOn(uiFeedback, 'requestUiConfirm').mockResolvedValue(true)
     const initialConfig = {
       groupCount: 2,
       columnsPerGroup: 2,
@@ -90,6 +90,9 @@ describe('WorkbenchDialogs', () => {
     await wrapper.get('.confirm-seat-config').trigger('click')
     await flushPromises()
 
+    expect(confirmSpy).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringMatching(/保留兼容座位的状态.*清空撤销\/重做历史/)
+    }))
     expect(seatChart.seatConfig.value).toMatchObject({
       ...advancedConfig,
       shiftDistance: 6,

@@ -60,7 +60,7 @@ const handleDialogVisible = (visible: boolean) => {
 const handleSeatConfigConfirm = async (newConfig: Partial<SeatConfig>) => {
   const confirmed = await confirm({
     title: '应用座位配置',
-    content: '修改座位布局会重新生成座位并清除现有分配，是否继续？',
+    content: '修改座位布局会保留兼容座位的状态，使不兼容座位上的学生回到候选区，并清空撤销/重做历史。是否继续？',
     positiveText: '应用配置',
     type: 'warning'
   })

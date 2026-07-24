@@ -22,10 +22,22 @@
       <span
         v-else
         class="zone-name"
-        @dblclick="startEditName"
+        @click.stop
+        @dblclick.stop="startEditName"
       >
         {{ zone.name }}
       </span>
+      <NButton
+        v-if="!isEditingName"
+        class="rename-zone-btn"
+        size="tiny"
+        quaternary
+        circle
+        :aria-label="`重命名选区 ${zone.name}`"
+        @click.stop="startEditName"
+      >
+        <Pencil :size="12" stroke-width="2.2" />
+      </NButton>
       <NCheckbox
         class="zone-visible-checkbox"
         :checked="zone.visible"
@@ -43,7 +55,7 @@
           class="zone-tag"
           :style="{ background: getTagColor(tagId) }"
         >
-          {{ getTagName(tagId) }}
+          <span class="zone-tag-name">{{ getTagName(tagId) }}</span>
           <NButton
             class="remove-tag-btn"
             size="tiny"
@@ -116,8 +128,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { NButton, NCheckbox, NEmpty, NInput, NPopover, NPopconfirm, NScrollbar } from 'naive-ui'
-import { X, Plus } from 'lucide-vue-next'
-import { useLogger } from '@/composables/useLogger'
+import { Pencil, Plus, X } from 'lucide-vue-next'
 import type { Tag, Zone } from '@/types/models'
 
 const props = withDefaults(defineProps<{
@@ -138,8 +149,6 @@ const emit = defineEmits<{
   'remove-tag': [zoneId: number, tagId: number]
   'toggle-visible': [zoneId: number]
 }>()
-
-const { warning, success } = useLogger()
 
 const isEditingName = ref(false)
 const editedName = ref('')
@@ -200,7 +209,6 @@ const removeTag = (tagId: number) => {
 // 删除选区
 const handleDelete = () => {
   emit('delete-zone', props.zone.id)
-  success(`已成功删除选区“${props.zone.name}”`)
 }
 
 </script>
@@ -242,6 +250,7 @@ const handleDelete = () => {
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+  min-width: 0;
 }
 
 .zone-color-indicator {
@@ -255,6 +264,10 @@ const handleDelete = () => {
 
 .zone-name {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text-primary);
@@ -262,9 +275,15 @@ const handleDelete = () => {
 
 .zone-name-input {
   flex: 1;
+  min-width: 0;
+}
+
+.rename-zone-btn {
+  flex-shrink: 0;
 }
 
 .zone-visible-checkbox {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -288,6 +307,8 @@ const handleDelete = () => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
   padding: 3px 8px;
   border-radius: 12px;
   color: var(--color-text-inverse);
@@ -295,7 +316,15 @@ const handleDelete = () => {
   font-weight: 500;
 }
 
+.zone-tag-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .remove-tag-btn {
+  flex-shrink: 0;
   color: var(--color-text-inverse);
 }
 
@@ -339,6 +368,11 @@ const handleDelete = () => {
 @media (max-width: 768px) {
   .zone-item {
     padding: 10px;
+  }
+
+  .rename-zone-btn {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .zone-name {

@@ -40,7 +40,10 @@ interface RotationGroup {
 - **工作区持久化**: `.sce` schema `2.3` 会保存完整 `rotationGroups`。`getRotationData()` 返回深拷贝，`replaceRotationData()` 先校验再整体替换并保留组/选区 ID，`resetRotationData()` 用于新建工作区；加载缺少该字段的旧工作区时必须恢复为空数组，不能沿用上一个工作区的轮换状态。
 - **引用校验**: 工作区写入共享状态前会检查轮换组和局部选区 ID 唯一性、类型及全部 `seatIds`。引用不存在座位的轮换数据会拒绝加载并保留当前工作区。
 - **布局缩减清理**: `zoneRotationState.ts` 保存无 `useSeatChart` 依赖的轮换状态与纯清理函数。布局删除行、列或大组后，普通选区和轮换局部选区会一起裁剪已不存在的座位 ID，避免保存出无法再次加载的工作区。
+- **全局选区删除保护**: `useZoneData.deleteZone()` 处理供智能排位规则使用的全局选区。若任意启用或禁用规则在顶层参数、组合子规则或嵌套条件中通过 `zoneId` 引用该选区，领域层会阻止删除并返回包含规则 ID、描述、谓词和引用路径的 `EntityDeletionResult`；UI 保持当前编辑会话并提示用户先处理相关规则。
+- **轮换局部选区边界**: `RotationGroup.zones` 是 `useZoneRotation` 管理的独立局部模型，不是规则引擎的全局 `Zone`，也不会被排位规则的 `params.zoneId` 解析。删除轮换局部选区继续使用 `deleteZoneFromGroup()`，不受全局规则引用保护影响；反过来，删除全局选区也不会级联删除同名或同编号的轮换局部选区。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **选区名复用风险**: 轮换组内部的局部选区使用的是全局 `nextZoneId`。如果要做 UI 展示，记得一定要拿 `getZoneColor` 方法来匹配，而不是死编码。
 - **孤立引用**: 如果你在大画布里通过拖拽删除了某一排，记得底层会有一个 `cleanupInvalidSeats` 的拦截器执行。这保证了 Zone 不会记录一堆图谱里不存在的空指针。
+- **不要混用两类选区 ID**: 规则编辑器只能写入 `useZoneData` 的全局选区 ID。轮换界面只能操作轮换组内的局部选区；新增 UI 或导入格式时不得根据名称或裸 ID 在两种模型之间自动关联。

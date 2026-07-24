@@ -3,6 +3,7 @@ import { safeStorageGet as storageGet, safeStorageSet as storageSet, safeStorage
 import { encrypt, decrypt, encryptPasswordForTransport } from '@/utils/crypto'
 import { apiFetch, clearRetieheSessionCookies } from '@/platform/apiClient'
 import { isTauriRuntime } from '@/platform/runtime'
+import { isValidAccountUsername } from '@/utils/authValidation'
 import type { AuthType, AuthUser, WebDavConfig } from '@/types/models'
 
 interface AuthResponseData {
@@ -336,17 +337,25 @@ export function useAuth() {
         return !!currentUser.value || !!webdavConfig.value
     })
     const callAuthApi = async (action: 'login' | 'register', username: string, password: string): Promise<AuthApiResult> => {
+        const normalizedUsername = username.trim()
+        if (!isValidAccountUsername(normalizedUsername)) {
+            return {
+                success: false,
+                message: action === 'login' ? '用户名或密码不正确' : '用户名格式无效'
+            }
+        }
+
         try {
             cancelScheduledFetchSyncSettings()
             const csrfToken = getOrCreateCsrfToken()
             const requestBody: Record<string, unknown> = {
                 action,
-                username,
+                username: normalizedUsername,
                 _csrf: csrfToken
             }
 
             if (password) {
-                await attachPasswordField(requestBody, 'password', 'encryptedPassword', password, username)
+                await attachPasswordField(requestBody, 'password', 'encryptedPassword', password, normalizedUsername)
             }
 
             const response = await apiFetch('/api/auth.php', {

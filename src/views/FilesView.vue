@@ -44,11 +44,11 @@
             <template #icon><FolderOpen :size="18" stroke-width="2" /></template>
             <span>加载本地</span>
           </NButton>
-          <NButton class="action-button" secondary attr-type="button" @click="handleSaveWorkspace">
+          <NButton class="action-button" secondary attr-type="button" :disabled="isSavingWorkspace" @click="handleSaveWorkspace">
             <template #icon><Save :size="18" stroke-width="2" /></template>
             <span>保存到本地</span>
           </NButton>
-          <NButton class="action-button" secondary attr-type="button" @click="handleSaveWorkspaceAs">
+          <NButton class="action-button" secondary attr-type="button" :disabled="isSavingWorkspace" @click="handleSaveWorkspaceAs">
             <template #icon><Save :size="18" stroke-width="2" /></template>
             <span>另存为</span>
           </NButton>
@@ -71,6 +71,7 @@
               type="text"
               placeholder="云端工作区名称"
               maxlength="50"
+              :disabled="isCloudActionBusy"
               @keyup.enter="handleCreateCloudWorkspace"
             />
             <NButton
@@ -128,6 +129,7 @@
                         size="small"
                         type="text"
                         maxlength="50"
+                        :disabled="isCloudActionBusy"
                         :input-props="{ 'aria-label': `修改工作区 ${getWorkspaceName(ws)} 的名称` }"
                         @keyup.enter="handleRenameWorkspace(ws)"
                         @keyup.esc="handleCancelRename"
@@ -314,6 +316,7 @@ const sdesTargets = ref<SdesImportTarget[]>([])
 const sdesFileName = ref('')
 const isImportingSdes = ref(false)
 const isRestoringAutoSave = ref(false)
+const isCloudOperationInFlight = ref(false)
 
 const {
   createNewWorkspace,
@@ -324,7 +327,8 @@ const {
   saveLastWorkspace,
   getLastWorkspace,
   clearLastWorkspace,
-  getWorkspaceJson
+  getWorkspaceJson,
+  isSavingWorkspace
 } = useWorkspace()
 const {
   autoSaveBackup,
@@ -362,7 +366,9 @@ const { tags } = useTagData()
 const { beginExcelRosterImport } = useRosterExcelImport()
 
 const cloudWorkspaces = computed(() => workspaces.value || [])
-const isCloudActionBusy = computed(() => isRefreshing.value || isManagingCloud.value)
+const isCloudActionBusy = computed(() => (
+  isRefreshing.value || isManagingCloud.value || isCloudOperationInFlight.value
+))
 const showWorkspaceManager = computed(() => !!token.value || !!autoSaveBackup.value)
 const goEditorAfterSuccess = () => router.push('/editor')
 const cloudLoadLabel = computed(() => isLoggedIn.value ? '从云端加载' : '登录后从云端加载')
@@ -428,20 +434,22 @@ const handleNewWorkspace = async () => {
 }
 
 const handleSaveWorkspace = async () => {
-  const isSuccess = await saveWorkspace()
-  if (isSuccess) {
+  if (isSavingWorkspace.value) return
+  const result = await saveWorkspace()
+  if (result.success) {
     success('工作区已成功保存到本地！')
-  } else {
-    error('工作区保存到本地失败，请查看控制台了解详情')
+  } else if (!result.canceled) {
+    error(result.error || '工作区保存到本地失败')
   }
 }
 
 const handleSaveWorkspaceAs = async () => {
-  const isSuccess = await saveWorkspaceAs()
-  if (isSuccess) {
+  if (isSavingWorkspace.value) return
+  const result = await saveWorkspaceAs()
+  if (result.success) {
     success('工作区已成功另存到本地！')
-  } else {
-    error('工作区另存到本地失败，请查看控制台了解详情')
+  } else if (!result.canceled) {
+    error(result.error || '工作区另存到本地失败')
   }
 }
 
@@ -475,9 +483,11 @@ const handleLoadWorkspace = async (event: Event | null = null) => {
 }
 
 const handleCreateCloudWorkspace = async () => {
+  if (isCloudActionBusy.value) return
   const trimmedName = newCloudWorkspaceName.value.trim()
   if (!trimmedName) return
 
+  isCloudOperationInFlight.value = true
   try {
     const jsonContent = getWorkspaceJson()
     if (!jsonContent) {
@@ -500,9 +510,12 @@ const handleCreateCloudWorkspace = async () => {
       })
     }
     success('云端工作区已新增')
+    if (result.backupWarning) warning(result.backupWarning)
     await refresh()
   } catch (err) {
     error(`新增失败: ${getErrorMessage(err)}`)
+  } finally {
+    isCloudOperationInFlight.value = false
   }
 }
 
@@ -564,9 +577,11 @@ const handleCancelRename = () => {
 }
 
 const handleRenameWorkspace = async (workspace: CloudWorkspaceFile) => {
+  if (isCloudActionBusy.value) return
   const trimmedName = editingWorkspaceName.value.trim()
   if (!trimmedName) return
 
+  isCloudOperationInFlight.value = true
   try {
     const result = await renameWorkspaceInCloud(workspace.fileId, trimmedName, 'retiehe')
     if (!result.success) {
@@ -579,6 +594,8 @@ const handleRenameWorkspace = async (workspace: CloudWorkspaceFile) => {
     await refresh()
   } catch (err) {
     error(`改名失败: ${getErrorMessage(err)}`)
+  } finally {
+    isCloudOperationInFlight.value = false
   }
 }
 
@@ -600,6 +617,7 @@ const handleRemoveCloudWorkspace = async (workspace: CloudWorkspaceFile) => {
   const lastWorkspace = getLastWorkspace()
   if (lastWorkspace?.type === 'cloud' && lastWorkspace.fileId === workspace.fileId) clearLastWorkspace()
   success(`已删除“${name}”`)
+  if (result.backupWarning) warning(result.backupWarning)
   await refresh()
 }
 
@@ -635,7 +653,12 @@ const handleImportExcel = async (event: Event | null = null) => {
 
 const handleExportExcel = async () => {
   try {
-    await exportToExcel(students.value, tags.value)
+    const result = await exportToExcel(students.value, tags.value)
+    if (!result || result.canceled) return
+    if (!result.success) {
+      error('Excel导出失败，请稍后重试')
+      return
+    }
     success('Excel导出成功！')
   } catch (err) {
     error(`导出失败: ${getErrorMessage(err)}`)

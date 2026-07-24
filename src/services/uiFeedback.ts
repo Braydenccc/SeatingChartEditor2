@@ -15,6 +15,13 @@ export interface ConfirmRequest {
   type?: 'warning' | 'error' | 'info'
 }
 
+export interface AlertRequest {
+  title: string
+  content: string
+  positiveText?: string
+  type?: 'warning' | 'error' | 'info'
+}
+
 let uiApis: UiApiSet | null = null
 
 export const registerUiApis = (apis: UiApiSet) => {
@@ -27,14 +34,19 @@ export const clearUiApis = () => {
 
 export const getUiApis = () => uiApis
 
+const getDialogCreator = (type: ConfirmRequest['type']) => {
+  if (!uiApis) return null
+  return type === 'error'
+    ? uiApis.dialog.error
+    : type === 'info'
+      ? uiApis.dialog.info
+      : uiApis.dialog.warning
+}
+
 export const requestUiConfirm = (request: ConfirmRequest): Promise<boolean> => {
-  if (!uiApis) return Promise.resolve(false)
+  const create = getDialogCreator(request.type)
+  if (!create) return Promise.resolve(false)
   return new Promise(resolve => {
-    const create = request.type === 'error'
-      ? uiApis!.dialog.error
-      : request.type === 'info'
-        ? uiApis!.dialog.info
-        : uiApis!.dialog.warning
     create({
       title: request.title,
       content: request.content,
@@ -51,3 +63,30 @@ export const requestUiConfirm = (request: ConfirmRequest): Promise<boolean> => {
   })
 }
 
+export const requestUiAlert = (request: AlertRequest): Promise<void> => {
+  const create = getDialogCreator(request.type)
+  if (!create) return Promise.resolve()
+  return new Promise(resolve => {
+    create({
+      title: request.title,
+      content: request.content,
+      positiveText: request.positiveText || '知道了',
+      closable: false,
+      maskClosable: false,
+      closeOnEsc: false,
+      style: {
+        maxHeight: 'calc(100dvh - 32px)',
+        display: 'flex',
+        flexDirection: 'column'
+      },
+      contentStyle: {
+        maxHeight: 'min(60dvh, 480px)',
+        minHeight: 0,
+        overflowY: 'auto',
+        overflowWrap: 'anywhere',
+        whiteSpace: 'pre-wrap'
+      },
+      onPositiveClick: () => resolve()
+    })
+  })
+}

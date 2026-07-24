@@ -65,3 +65,25 @@ describe('nativeStorage in Tauri', () => {
     await expect(writeStoredText('sce-autosave-backup', 'latest')).resolves.toBe(false)
   })
 })
+
+describe('nativeStorage in Web', () => {
+  beforeEach(() => {
+    mocks.isTauriRuntime.mockReset().mockReturnValue(false)
+  })
+
+  it('returns null only when the browser storage key is missing', async () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null)
+
+    await expect(readStoredText('sce-autosave-backup')).resolves.toBeNull()
+    expect(getItem).toHaveBeenCalledWith('sce-autosave-backup')
+  })
+
+  it('surfaces browser storage read failures', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('permission denied')
+    })
+
+    await expect(readStoredText('sce-autosave-backup'))
+      .rejects.toThrow('读取浏览器存储“sce-autosave-backup”失败：permission denied')
+  })
+})

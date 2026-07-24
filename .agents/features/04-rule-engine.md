@@ -14,6 +14,7 @@ related_files:
 ## 2. 源代码入口 (Source Files)
 - 规则配置字典: `src/constants/ruleTypes.ts` (存放枚举、默认参数、谓词元数据)
 - 规则中枢逻辑: `src/composables/useSeatRules.ts`
+- 规则共享状态与实体引用查询: `src/composables/seatRuleState.ts`
 
 ## 3. 数据模型 / 核心API (Data Models & Core API)
 
@@ -36,6 +37,21 @@ interface RuleSubject {
   id: number | string;  
 }
 
+interface RuleEntityReference {
+  entityType: 'student' | 'tag' | 'numericAttribute' | 'zone';
+  entityId: number | string;
+  ruleId: string;
+  ruleDescription: string;
+  predicate: string;
+  locations: string[]; // 例如 $.subjects[0]、$.subRules[1].params.zoneId
+}
+
+interface EntityDeletionResult {
+  success: boolean;
+  reason?: 'not-found' | 'referenced-by-rules';
+  references: RuleEntityReference[];
+}
+
 // PREDICATE_META 结构示例
 const PREDICATE_META = {
   IN_ROW_RANGE: {
@@ -54,6 +70,8 @@ const PREDICATE_META = {
 - **平埔展开 (`expandEntriesToStudentIds`)**: 由于规则主体支持“标签(Tag)”，真正的算法计算前，必须利用此函数将一个规则平铺展开成若干个“学生实例(StudentId)”。
 - **全体主体 (`type: 'all'`)**: 用于数值参考等班级级规则，展开时表示当前学生列表中的全部学生，不需要额外 `id`。
 - **数值参考谓词**: `ATTRIBUTE_ROW_GRADIENT`、`ATTRIBUTE_GROUP_BALANCE`、`ATTRIBUTE_PAIR_DELTA`、`ATTRIBUTE_DISTRIBUTE_BANDS` 通过 `params.attributeId` 绑定学生数值属性。`PREDICATE_META` 支持 `attribute` 参数类型，由规则 UI 渲染为属性选择器。
+- **递归实体引用查询 (`getRuleReferences`)**: 删除学生、标签、数值属性或全局选区前，`seatRuleState.ts` 会遍历全部规则，而不只扫描当前启用规则或顶层字段。查询覆盖 v5 `subjects`、兼容字段 `subjectsA/subjectsB`、legacy `subject`、组合 `subRules`、嵌套 `conditions`，以及各层 `params.zoneId` / `params.attributeId`；结果按规则聚合并保留精确引用路径。禁用规则仍属于持久化配置，删除其依赖实体同样会被阻止。`type: 'all'` 表示动态全体范围，不包含某个学生的悬空 ID，因此不会单独阻止学生删除。
+- **删除保护边界**: 各实体 composable 在任何关联数据变更前调用引用查询，并返回结构化 `EntityDeletionResult`。交互层必须根据 `references` 提示用户先修改或删除规则，不能静默级联改写规则。工作区加载、新建和回滚使用专门的 `clear/replace` 原子状态路径，在整体替换规则与实体时不走单实体删除流程。
 - **高级拓扑冲突 (`detectConflicts`)**: 利用笛卡尔组合判断所有激活的规则是否存在矛盾。这是整个系统的最强亮点。比如判定：“规则A要求张三离李四超过 3 步”，同时“规则B要求张三离李四不得超过 2 步”，就会抛出异常。
 - **统一座位拓扑**: 行号、讲台方向、异构大组行数、同桌关系和座位深度由纯函数 `src/utils/seatTopology.ts` 统一计算。冲突预检不再使用全局默认行数；当前同桌关系允许同排列差 1～2，因此“必须同桌”和最小距离 2 可以同时成立，距离大于 2 才是结构性冲突。
 - **同桌图可行性**: 排位前检查会把 REQUIRED 学生关系图嵌入真实可用座位同桌图，同时考虑禁止同桌边和单人座位域。搜索达到预算上限时只给警告，不把“尚未证明不可行”误判为阻断错误。
@@ -64,5 +82,6 @@ const PREDICATE_META = {
   1. `ruleTypes.ts` 中添加对应的 `PREDICATE_META`。
   2. `useSeatRules.ts` 的 `renderRuleText` 中加上 switch-case 的文案。
   3. `useAssignment.ts`（核心算法层）中补齐其惩罚函数的实现。不需要改动已有 UI，它会自动识别 `meta` 渲染出参数框。
-- **数值参数边界**: 规则编辑器的 `NInputNumber` 必须先通过 `normalizeNumberInput` 处理空值、最小值和整数精度，再写入 `RuleParams`。
+- **数值参数边界**: 规则编辑器的 `NInputNumber` 必须先通过 `normalizeNumberInput` 处理空值、上下界和整数精度，再写入 `RuleParams`。规则创建、更新、规则 JSON 导入、工作区加载和智能排位入口都必须按 `PREDICATE_META` 拒绝非数值、`NaN`、无穷值及不符合整数约束的参数；数值分层的 `bandCount` 只接受 2～50 的整数，避免异常配置放大同步评分循环。
 - **复合规则落盘**: 工作区保存必须保留 `not`、`logicOperator`、`subRules`，否则规则工作台创建的复合规则和数值参数会在保存后丢失。
+- **新增引用字段**: 新规则若增加学生、标签、属性或选区 ID 字段，必须同步扩展 `seatRuleState.ts` 的语义引用识别并补充嵌套路径测试；不能只在某个删除按钮上增加临时判断。

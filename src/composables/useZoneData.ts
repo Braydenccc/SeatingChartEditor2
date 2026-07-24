@@ -1,7 +1,8 @@
 import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
-import type { Zone, UseZoneDataReturn } from '@/types'
+import type { EntityDeletionResult, Zone, UseZoneDataReturn } from '@/types'
 import { useTagData } from './useTagData'
+import { getRuleReferences } from './seatRuleState'
 
 // 选区数据管理
 const zones = ref<Zone[]>([])
@@ -41,11 +42,19 @@ export function useZoneData(): UseZoneDataReturn {
   }
 
   // 删除选区
-  const deleteZone = (zoneId: number): void => {
+  const deleteZone = (zoneId: number): EntityDeletionResult => {
+    if (!zones.value.some(zone => zone.id === zoneId)) {
+      return { success: false, reason: 'not-found', references: [] }
+    }
+    const references = getRuleReferences('zone', zoneId)
+    if (references.length > 0) {
+      return { success: false, reason: 'referenced-by-rules', references }
+    }
     zones.value = zones.value.filter(z => z.id !== zoneId)
     if (selectedZoneId.value === zoneId) {
       selectedZoneId.value = null
     }
+    return { success: true, references: [] }
   }
 
   // 为选区添加标签

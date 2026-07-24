@@ -54,6 +54,7 @@ describe('useZoneRotation', () => {
         const seat = seatMap.get(update.seatId)
         if (seat) seat.studentId = update.studentId
       }
+      return true
     })
   })
 
@@ -125,6 +126,20 @@ describe('useZoneRotation', () => {
     expect(seatMap.get('seat-0-2-0')?.studentId).toBe(1)
   })
 
+  it('reports no moved seats when the atomic seat update is rejected', () => {
+    rotation.replaceRotationData([
+      swapGroup(1, ['seat-0-0-0'], ['seat-0-1-0'])
+    ])
+    const before = [...seatMap.values()].map(seat => seat.studentId)
+    batchUpdateSeats.mockReturnValue(false)
+
+    const result = rotation.applyZoneRotation(seatMap)
+
+    expect(result.moved).toBe(0)
+    expect(result.errors.join('\n')).toContain('无法原子写入')
+    expect([...seatMap.values()].map(seat => seat.studentId)).toEqual(before)
+  })
+
   it('clones replaced rotation data and advances both persisted ID counters', () => {
     const source = [swapGroup(5, ['seat-0-0-0'], ['seat-0-1-0'])]
     const result = rotation.replaceRotationData(source)
@@ -144,6 +159,25 @@ describe('useZoneRotation', () => {
     rotation.resetRotationData()
     expect(rotation.getRotationData()).toEqual([])
     expect(rotation.addRotGroup().id).toBe(1)
+  })
+
+  it('keeps an explicitly selected rotation zone active until editing is cleared', () => {
+    const group = rotation.addRotGroup()
+    const zone = rotation.addZoneToGroup(group.id)
+
+    expect(zone).not.toBeNull()
+    if (!zone) return
+
+    rotation.setEditingZone(zone.id)
+    rotation.setEditingZone(zone.id)
+
+    expect(rotation.editingZoneId.value).toBe(zone.id)
+
+    rotation.toggleSeatInEditingZone('seat-0-0-0')
+    expect(zone.seatIds).toEqual(['seat-0-0-0'])
+
+    rotation.clearEditingZone()
+    expect(rotation.editingZoneId.value).toBeNull()
   })
 
   it('rejects malformed persisted rotation data without replacing current state', () => {

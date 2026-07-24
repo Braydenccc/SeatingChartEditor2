@@ -39,6 +39,7 @@ import type {
   WorkspaceSeat
 } from '@/types/models'
 import type { AuthType } from '@/types/models'
+import type { WorkspaceSaveResult } from '@/types/composables'
 
 interface WorkspaceSeatInput extends Partial<WorkspaceSeat> {
   groupIndex?: number
@@ -96,6 +97,9 @@ const LAST_WORKSPACE_COOKIE = 'sce_last_workspace'
 
 const FILE_EXT = '.sce'
 const currentLocalWorkspacePath = ref<string | null>(null)
+const isSavingWorkspace = ref(false)
+let workspaceSaveQueue: Promise<void> = Promise.resolve()
+let pendingWorkspaceSaveCount = 0
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -475,14 +479,16 @@ export function useWorkspace() {
   }
 
   // 保存工作区
-  const saveWorkspace = async (options: SaveWorkspaceOptions = {}) => {
+  const performSaveWorkspace = async (options: SaveWorkspaceOptions = {}): Promise<WorkspaceSaveResult> => {
     try {
       const json = getWorkspaceJson()
-      if (!json) return false
+      if (!json) {
+        return { success: false, canceled: false, error: '生成工作区数据失败' }
+      }
 
       if (isTauriRuntime() && currentLocalWorkspacePath.value && !options.saveAs) {
         await writeTextFilePath(currentLocalWorkspacePath.value, json)
-        return true
+        return { success: true, canceled: false }
       }
 
       const result = await saveTextFile(json, {
@@ -497,10 +503,32 @@ export function useWorkspace() {
         currentLocalWorkspacePath.value = result.path
       }
 
-      return result.success
+      if (result.canceled) return { success: false, canceled: true }
+      if (!result.success) return { success: false, canceled: false, error: '工作区保存失败' }
+      return { success: true, canceled: false }
     } catch (error) {
-      return false
+      return {
+        success: false,
+        canceled: false,
+        error: getErrorMessage(error) || '工作区保存失败'
+      }
     }
+  }
+
+  const saveWorkspace = (options: SaveWorkspaceOptions = {}): Promise<WorkspaceSaveResult> => {
+    pendingWorkspaceSaveCount += 1
+    isSavingWorkspace.value = true
+
+    const operation = workspaceSaveQueue.then(() => performSaveWorkspace(options))
+    workspaceSaveQueue = operation.then(
+      () => undefined,
+      () => undefined
+    )
+
+    return operation.finally(() => {
+      pendingWorkspaceSaveCount = Math.max(0, pendingWorkspaceSaveCount - 1)
+      isSavingWorkspace.value = pendingWorkspaceSaveCount > 0
+    })
   }
 
   const saveWorkspaceAs = () => saveWorkspace({ saveAs: true })
@@ -653,7 +681,8 @@ export function useWorkspace() {
           }).filter((update): update is { seatId: string; isEmpty: boolean; studentId: number | null } => update !== null)
 
           if (updates.length > 0) {
-            batchUpdateSeats(updates, false)  // recordUndo=false，历史数据恢复不记录
+            const restored = batchUpdateSeats(updates, false)  // recordUndo=false，历史数据恢复不记录
+            if (!restored) throw new Error('工作区座位分配包含冲突，无法原子恢复')
           }
         }
 
@@ -1038,6 +1067,7 @@ export function useWorkspace() {
     saveLastWorkspace,
     getLastWorkspace,
     clearLastWorkspace,
+    isSavingWorkspace,
     saveWorkspace,
     saveWorkspaceAs,
     loadWorkspace,

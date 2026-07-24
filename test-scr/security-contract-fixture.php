@@ -72,6 +72,13 @@ function fixtureAssert($condition, $message) {
     }
 }
 
+fixtureAssert(isValidUsername('a'), 'one-character username is valid');
+fixtureAssert(isValidUsername(str_repeat('a', 32)), '32-character username is valid');
+fixtureAssert(!isValidUsername(''), 'empty username is invalid');
+fixtureAssert(!isValidUsername(str_repeat('a', 33)), '33-character username is invalid');
+fixtureAssert(!isValidUsername('invalid username'), 'username containing spaces is invalid');
+fixtureAssert(!isValidUsername('中文'), 'non-ASCII username is invalid');
+
 $boundedDb = new Database('fixture_bounded');
 fixtureAssert(databasePushBounded($boundedDb, 'events', 'one', 2), 'first bounded push');
 fixtureAssert(databasePushBounded($boundedDb, 'events', 'two', 2), 'second bounded push');
@@ -92,6 +99,20 @@ fixtureAssert(revokeUserSessionVerified($sessionRevocationDb, 'disabled_user'), 
 fixtureAssert($sessionRevocationDb->get('disabled_user') === null, 'session revocation removes the stored token');
 fixtureAssert(revokeUserSessionVerified($sessionRevocationDb, 'disabled_user'), 'session revocation is idempotent when already absent');
 $sessionRevocationDb->set('disabled_user', '{"tokenHash":"stale"}');
+
+$restoreDb = new Database('fixture_restore_owned_value');
+$restoreDb->set('restore_user', 'new-value');
+$restoredValue = restoreDatabaseValueIfOwned($restoreDb, 'restore_user', 'new-value', 'old-value');
+fixtureAssert($restoredValue['success'] && $restoredValue['outcome'] === 'restored', 'owned value is restored');
+fixtureAssert($restoreDb->get('restore_user') === 'old-value', 'previous value is present after restore');
+$restoreDb->set('delete_user', 'issued-value');
+$deletedValue = restoreDatabaseValueIfOwned($restoreDb, 'delete_user', 'issued-value', null);
+fixtureAssert($deletedValue['success'] && $deletedValue['outcome'] === 'deleted', 'new owned value is deleted when no previous value existed');
+fixtureAssert($restoreDb->get('delete_user') === null, 'new owned value is absent after rollback');
+$restoreDb->set('concurrent_user', 'concurrent-value');
+$concurrentValue = restoreDatabaseValueIfOwned($restoreDb, 'concurrent_user', 'issued-value', 'old-value');
+fixtureAssert($concurrentValue['success'] && $concurrentValue['outcome'] === 'ownership_changed', 'concurrent value is not overwritten');
+fixtureAssert($restoreDb->get('concurrent_user') === 'concurrent-value', 'concurrent value remains unchanged');
 Database::throwOnNextGet('fixture_session_revocation', 'disabled_user');
 fixtureAssert(!revokeUserSessionVerified($sessionRevocationDb, 'disabled_user'), 'session revocation fails closed on database read errors');
 fixtureAssert($sessionRevocationDb->get('disabled_user') !== null, 'failed session revocation preserves the token for a safe retry');
@@ -134,6 +155,22 @@ $sessionUsersDb->set($sessionUsername, 'password-hash-v2');
 fixtureAssert(
     !isAuthorized($sessionStateDb, $sessionProfileDb, $sessionUsersDb, $sessionUsername, $sessionToken),
     'changing the password hash invalidates an in-flight token issued from old credentials'
+);
+
+$expiredSessionValue = json_encode([
+    'tokenHash' => hash('sha256', $sessionToken),
+    'expiry' => time() - 1,
+    'sessionEpoch' => $sessionEpoch,
+    'credentialFingerprint' => getPasswordHashFingerprint('password-hash-v2')
+]);
+$sessionStateDb->set($sessionUsername, $expiredSessionValue);
+fixtureAssert(
+    !isAuthorized($sessionStateDb, $sessionProfileDb, $sessionUsersDb, $sessionUsername, $sessionToken),
+    'expired session is rejected'
+);
+fixtureAssert(
+    $sessionStateDb->get($sessionUsername) === $expiredSessionValue,
+    'authorization read does not delete a session that may have been concurrently rotated'
 );
 
 $usersDb = new Database('fixture_users');
@@ -310,6 +347,17 @@ fixtureAssert(!isHttpsRequest(), 'forwarded protocol is ignored without explicit
 putenv('TRUST_PROXY_PROTO_HEADERS=1');
 fixtureAssert(isHttpsRequest(), 'forwarded protocol is accepted with explicit trust');
 putenv('TRUST_PROXY_PROTO_HEADERS');
+
+$cookieExpires = time() + 86400;
+$cookieOptions = buildAppCookieOptions($cookieExpires, true, true);
+fixtureAssert($cookieOptions['expires'] === $cookieExpires, 'cookie expiry is preserved');
+fixtureAssert($cookieOptions['path'] === '/', 'cookie path is root scoped');
+fixtureAssert($cookieOptions['secure'] === true, 'cookie secure flag is preserved');
+fixtureAssert($cookieOptions['httponly'] === true, 'cookie HttpOnly flag is preserved');
+fixtureAssert($cookieOptions['samesite'] === 'Lax', 'cookie SameSite policy is Lax');
+fixtureAssert(getLegacySameSiteCookiePath() === '/; SameSite=Lax', 'PHP 7.2 cookie path carries SameSite=Lax');
+fixtureAssert(setAppCookie('sce_fixture_cookie', 'value', 1, true), 'cookie write succeeds on the active PHP runtime');
+fixtureAssert(clearAppCookie('sce_fixture_cookie', true), 'cookie clear succeeds on the active PHP runtime');
 
 $permissionDb = new Database('fixture_permissions');
 $targetFileId = 'abcdef0123456789abcdef0123456789';

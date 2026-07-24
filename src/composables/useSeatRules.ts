@@ -2,11 +2,12 @@
  * useSeatRules.ts - 规则系统状态管理
  * 提供规则 CRUD、冲突检测、自然语言渲染、导入导出
  */
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useStudentData } from './useStudentData'
 import { useTagData } from './useTagData'
 import { useZoneData } from './useZoneData'
 import { useStudentAttributes } from './useStudentAttributes'
+import { getRuleReferences, rules } from './seatRuleState'
 import { isPositionInRowRange, maxDeskmateColumnDistance } from '@/utils/seatTopology'
 import {
   RulePriority,
@@ -14,7 +15,8 @@ import {
   COLUMN_TYPE_LABELS,
   SCOPE_LABELS,
   PREDICATE_META,
-  getDefaultParams
+  getDefaultParams,
+  getPredicateNumberParamError
 } from '../constants/ruleTypes'
 import type {
   Rule,
@@ -53,7 +55,6 @@ interface ExpandedRuleSubjects {
 
 type SubjectOverlap = (first: Rule, second: Rule) => boolean
 
-const rules = ref<Rule[]>([])
 let _idCounter = 1
 // 规则数据模型版本：
 // v3: legacy subject.kind（student/pair/tag/tag_pair）
@@ -501,32 +502,76 @@ export function useSeatRules() {
     const unique = new Set(selected.map(getEntryKey))
     if (unique.size !== selected.length) warnings.push('对象集合存在重复对象')
 
-    for (const paramSpec of meta.params) {
-      const val = ruleData.params?.[paramSpec.key]
-      if (val === null || val === undefined || val === '') {
-        warnings.push(`参数「${paramSpec.label}」不能为空`)
+    const validatePredicateParams = (
+      predicate: string,
+      params: RuleParams | undefined,
+      context = ''
+    ) => {
+      const predicateMeta = PREDICATE_META[predicate]
+      if (!predicateMeta) {
+        warnings.push(`${context}未知谓词: ${predicate}`)
+        return
       }
-      if (paramSpec.type === 'number' && typeof val === 'number') {
-        if (paramSpec.min !== undefined && val < paramSpec.min) {
-          warnings.push(`参数「${paramSpec.label}」最小值为 ${paramSpec.min}`)
+
+      for (const paramSpec of predicateMeta.params) {
+        const val = params?.[paramSpec.key]
+        const paramLabel = `${context}参数「${paramSpec.label}」`
+        if (val === null || val === undefined || val === '') {
+          warnings.push(`${paramLabel}不能为空`)
+          continue
+        }
+        if (paramSpec.type === 'number') {
+          const error = getPredicateNumberParamError(val, paramSpec)
+          if (error) warnings.push(`${paramLabel}${error}`)
+        }
+        if (paramSpec.type === 'attribute' && (typeof val !== 'string' || !getAttributeById(val))) {
+          warnings.push(`${paramLabel}未选择有效数值属性`)
         }
       }
-      if (paramSpec.type === 'attribute' && (typeof val !== 'string' || !getAttributeById(val))) {
-        warnings.push(`参数「${paramSpec.label}」未选择有效数值属性`)
+
+      const minRow = params?.minRow
+      const maxRow = params?.maxRow
+      if (predicate === 'IN_ROW_RANGE' &&
+        typeof minRow === 'number' &&
+        typeof maxRow === 'number' &&
+        minRow > maxRow) {
+        warnings.push(`${context}最前排不能大于最后排`)
+      }
+
+      const minGroup = params?.minGroup
+      const maxGroup = params?.maxGroup
+      if (predicate === 'IN_GROUP_RANGE' &&
+        typeof minGroup === 'number' &&
+        typeof maxGroup === 'number' &&
+        minGroup > maxGroup) {
+        warnings.push(`${context}最左大组不能大于最右大组`)
       }
     }
 
-    if (ruleData.predicate === 'IN_ROW_RANGE' &&
-      ruleData.params?.minRow !== undefined &&
-      ruleData.params.maxRow !== undefined &&
-      ruleData.params.minRow > ruleData.params.maxRow) {
-      warnings.push('最前排不能大于最后排')
-    }
-    if (ruleData.predicate === 'IN_GROUP_RANGE' &&
-      ruleData.params?.minGroup !== undefined &&
-      ruleData.params.maxGroup !== undefined &&
-      ruleData.params.minGroup > ruleData.params.maxGroup) {
-      warnings.push('最左大组不能大于最右大组')
+    validatePredicateParams(ruleData.predicate, ruleData.params)
+
+    if (Array.isArray(ruleData.subRules)) {
+      ruleData.subRules.forEach((subRule, index) => {
+        const context = `子规则 ${index + 1}：`
+        if (typeof subRule.predicate !== 'string' || !subRule.predicate) {
+          warnings.push(`${context}请选择规则类型`)
+          return
+        }
+        const subRuleMeta = PREDICATE_META[subRule.predicate]
+        if (!subRuleMeta) {
+          warnings.push(`${context}未知谓词: ${subRule.predicate}`)
+          return
+        }
+        const subRuleSubjects = Array.isArray(subRule.subjects) && subRule.subjects.length > 0
+          ? subRule.subjects.map(normalizeSubjectEntry).filter((entry): entry is RuleSubject => entry !== null)
+          : subjects
+        if (subRuleSubjects.length < subRuleMeta.minSubjects) {
+          warnings.push(
+            `${context}谓词「${RULE_TYPE_LABELS[subRule.predicate]}」至少需要 ${subRuleMeta.minSubjects} 个对象`
+          )
+        }
+        validatePredicateParams(subRule.predicate, subRule.params, context)
+      })
     }
 
     return { valid: warnings.length === 0, warnings }
@@ -935,6 +980,8 @@ export function useSeatRules() {
   const updateRule = (ruleId: string, patch: RuleInput) => {
     const rule = rules.value.find(r => r.id === ruleId)
     if (!rule) return false
+    const candidate: RuleInput = { ...rule, ...patch }
+    if (!validateRule(candidate).valid) return false
     Object.assign(rule, patch)
     rule.updatedAt = Date.now()
     return true
@@ -1050,6 +1097,7 @@ export function useSeatRules() {
     exportRules,
     importRules,
 
-    normalizeRuleShape
+    normalizeRuleShape,
+    getRuleReferences
   }
 }

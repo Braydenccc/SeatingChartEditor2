@@ -35,14 +35,17 @@ jobs:
       - name: Run type check
         run: npm run type-check
 
-      - name: Run full Vitest suite
-        run: npm run test:run
+      - name: Run Vitest with core coverage gate
+        run: npm run test:ci
 
       - name: Test safe test-environment build wrapper
         run: npm run test:build-test
 
       - name: Test safe deployment ordering
         run: node --test test-scr/deploy-staging.test.js
+
+      - name: Test safe main deployment wrapper
+        run: npm run test:deploy-main
 
       - name: Test PHP security source contracts
         run: node --test test-scr/php-security-source-contract.test.js
@@ -84,8 +87,12 @@ jobs:
           retention-days: 30
 
   php-contract:
-    name: Retinbox PHP lint and contract fixture
+    name: Retinbox PHP ${{ matrix.php-version }} lint and contract fixture
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['7.2', '8.2']
 
     steps:
       - name: Checkout verified commit
@@ -96,7 +103,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: ${{ matrix.php-version }}
           coverage: none
 
       - name: Lint Retinbox PHP functions

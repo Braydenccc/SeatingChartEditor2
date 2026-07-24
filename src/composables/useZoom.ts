@@ -1,4 +1,5 @@
-import { ref, nextTick } from 'vue'
+import { computed, ref, nextTick, watch } from 'vue'
+import { useGlobalSettings } from '@/composables/useGlobalSettings'
 
 const MIN_SCALE = 0.2
 const MAX_SCALE = 3.0
@@ -7,11 +8,18 @@ const STEP = 0.1
 const scale = ref(1.0)
 const panX = ref(0)
 const panY = ref(0)
+const { settings } = useGlobalSettings()
+const autoFitScaleLimit = computed(() => {
+    const configuredScale = settings.value.ui.defaultZoom / 100
+    if (!Number.isFinite(configuredScale)) return 1.0
+    return Math.max(MIN_SCALE, Math.min(MAX_SCALE, configuredScale))
+})
 
 let viewportEl: HTMLElement | null = null
 let chartEl: HTMLElement | null = null
 let isFitting = false
 let hasPendingFit = false
+let stopWatchingFitScaleLimit: (() => void) | null = null
 
 export function useZoom() {
     const zoomIn = () => {
@@ -42,6 +50,14 @@ export function useZoom() {
     const registerViewport = (vp: HTMLElement | null, chart: HTMLElement | null) => {
         viewportEl = vp
         chartEl = chart
+        stopWatchingFitScaleLimit?.()
+        stopWatchingFitScaleLimit = null
+
+        if (vp && chart) {
+            stopWatchingFitScaleLimit = watch(autoFitScaleLimit, () => {
+                void fitToViewport()
+            }, { flush: 'post' })
+        }
     }
 
     const fitToViewport = async () => {
@@ -76,7 +92,7 @@ export function useZoom() {
             const fitScale = Math.min(
                 availW / chartRect.width,
                 availH / chartRect.height,
-                1.0
+                autoFitScaleLimit.value
             )
             if (!Number.isFinite(fitScale)) return
 
@@ -104,6 +120,7 @@ export function useZoom() {
         setPan,
         MIN_SCALE,
         MAX_SCALE,
+        autoFitScaleLimit,
         registerViewport,
         fitToViewport,
     }

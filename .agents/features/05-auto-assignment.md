@@ -12,6 +12,7 @@ related_files:
 
 ## 2. 源代码入口 (Source Files)
 - 退火算法核心: `src/composables/useAssignment.ts`
+- 必须规则验收策略: `src/utils/assignmentRuleAcceptance.ts`
 - 规则惩罚依赖: `src/constants/ruleTypes.ts`
 - 座位拓扑判定库: `src/composables/useSeatChart.ts` (依赖里面的 `validateRepulsion` 等方法)
 
@@ -39,7 +40,12 @@ let currentReverse = new Map<SeatId, StudentId>() // 用于以 O(1) 交换两人
   - `ATTRIBUTE_GROUP_BALANCE`: 按大组统计均值或合计值，组间差距越大扣分越多。
   - `ATTRIBUTE_PAIR_DELTA`: 对两两对象检查属性差值上限，超出部分追加扣分。
   - `ATTRIBUTE_DISTRIBUTE_BANDS`: 按属性排序分层后，惩罚同一层在大组间分布不均。
-- **数值缺失策略**: 学生缺失某个属性值时跳过该数值规则，不视为违规，不阻断排位。
+- **必须规则验收策略 v1 (`evaluateRuleAcceptance`)**: 原始惩罚分仍用于退火持续寻找更优解；最终报告和提交门禁复用同一个验收结果，避免报告显示满足但拒绝提交，或反向出现不一致。只有连续型 `required` 规则使用无量纲容差：
+  - `DISTRIBUTE_EVENLY`: 最小距离相对理想值的缺口不超过 10%；任何相邻座位仍作为硬违规严格拒绝。
+  - `ATTRIBUTE_ROW_GRADIENT`: 前后深度比例的均方误差不超过 0.04，即 RMSE 不超过 20%，约等于常见五排布局的一排偏差。
+  - `ATTRIBUTE_GROUP_BALANCE`: 按属性值域归一化后的组间均方误差不超过 0.01，即 RMSE 不超过 10%；存在有可用座位但没有规则目标的空大组时仍严格拒绝。
+  - 位置、同桌、距离、聚集、属性差值和属性分层等离散谓词继续按布尔结果严格验收；`prefer` / `optional` 不使用必须级容差。缺失数值导致规则无法评估时继续视为不阻断。策略集中在版本化常量中，不要求旧工作区新增字段。
+- **数值缺失与归一化策略**: 学生缺失某个属性值时跳过该对象，不视为违规，不阻断排位；大组均衡会分别统计“规则目标”和“可评估数值”，在至少存在一个可评估值时，只有完全没有规则目标的大组才触发空组硬错误，只有缺失值目标的大组不参与误差计算。非零属性值域直接用于无量纲归一化，避免计量单位改变验收结果；行梯度遇到所有有效值相等时视为无法评估，不会把同值学生强行推向同一侧。
 - **数值初始解**: 对 `prefer` 级 `ATTRIBUTE_ROW_GRADIENT` 会先按属性排序分配前后排座位，再交给退火继续优化；同值学生和同排候选座位会随机打破平局，避免数组顺序固定化；`required` 规则仍主要靠评分保证，避免抢占同桌绑定等硬约束的初始位置。
 - **偏向变异 (`violatingStudents` list + ruleAffectedStudentIds)**: 正常退火是随机抽 2 人换位置，但在 `useAssignment.ts` 中，每次循环都会预先整理出一批**“正在犯规的人的名单”**。变异时优先移动违规学生；若暂无明确违规学生，则优先从被规则覆盖的学生池中抽取；最后才回落到全体已分配学生。这样无规则学生更多承担随机填空角色，但仍可参与交换，避免局部子问题封死。
 - **线程脱离避卡 (`setTimeout(0)`)**: JavaScript 是单线程的，死循环 5w 次计算会锁死标签页。本项目规定每隔 1000 次执行一次 `await new Promise(r => setTimeout(r, 0))`，向主 UI 框架注入呼吸孔，使画面进度条 `assignmentProgress.value` 可以持续滚动更新。

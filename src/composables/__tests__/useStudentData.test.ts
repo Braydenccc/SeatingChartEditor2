@@ -187,6 +187,45 @@ describe('useStudentData', () => {
       expect(studentData.students.value[0]).toMatchObject({ id: zeroId, studentNumber: 0 })
       expect(useUndo().canUndo.value).toBe(false)
     })
+
+    it('should clear a selected blank student and its seat assignment after a successful reduction', () => {
+      const seatChart = useSeatChart()
+      const undo = useUndo()
+      studentData.setStudentCount(2)
+      const selectedId = studentData.students.value[0].id
+      studentData.selectStudent(selectedId)
+      seatChart.assignStudent('seat-0-0-0', selectedId)
+
+      expect(studentData.setStudentCount(1)).toBe(true)
+
+      expect(studentData.students.value.some(student => student.id === selectedId)).toBe(false)
+      expect(studentData.selectedStudentId.value).toBeNull()
+      expect(studentData.getSelectedStudent.value).toBeNull()
+      expect(seatChart.getStudentAtSeat('seat-0-0-0')).toBeNull()
+      expect(undo.canUndo.value).toBe(false)
+      expect(undo.canRedo.value).toBe(false)
+    })
+
+    it('should preserve students, selection, seats and history when a reduction cannot complete atomically', () => {
+      const seatChart = useSeatChart()
+      const undo = useUndo()
+      studentData.setStudentCount(2)
+      const selectedId = studentData.students.value[0].id
+      const retainedId = studentData.students.value[1].id
+      studentData.updateStudent(retainedId, { name: '保留学生' })
+      studentData.selectStudent(selectedId)
+      seatChart.assignStudent('seat-0-0-0', selectedId)
+      expect(undo.canUndo.value).toBe(true)
+
+      expect(studentData.setStudentCount(0)).toBe(false)
+
+      expect(studentData.students.value.map(student => student.id)).toEqual([selectedId, retainedId])
+      expect(studentData.selectedStudentId.value).toBe(selectedId)
+      expect(studentData.getSelectedStudent.value?.id).toBe(selectedId)
+      expect(seatChart.getStudentAtSeat('seat-0-0-0')).toBe(selectedId)
+      expect(undo.canUndo.value).toBe(true)
+      expect(undo.canRedo.value).toBe(false)
+    })
   })
 
   describe('sortedStudents', () => {

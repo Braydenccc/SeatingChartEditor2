@@ -217,13 +217,21 @@ function issueSessionToken($sessionDb, $username, $rememberMe = false, $sessionE
 }
 
 function setAuthCookies($username, $tokenData) {
-    setAppCookie('sce_username', $username, $tokenData['expiryDays'], true);
-    setAppCookie('sce_token', $tokenData['token'], $tokenData['expiryDays'], true);
+    $usernameWritten = setAppCookie('sce_username', $username, $tokenData['expiryDays'], true);
+    $tokenWritten = $usernameWritten && setAppCookie('sce_token', $tokenData['token'], $tokenData['expiryDays'], true);
+    if (!$usernameWritten || !$tokenWritten) {
+        clearAppCookie('sce_username', true);
+        clearAppCookie('sce_token', true);
+        throw new RuntimeException('authentication cookie write failed');
+    }
 }
 
 function clearAuthCookies() {
-    clearAppCookie('sce_username', true);
-    clearAppCookie('sce_token', true);
+    $usernameCleared = clearAppCookie('sce_username', true);
+    $tokenCleared = clearAppCookie('sce_token', true);
+    if (!$usernameCleared || !$tokenCleared) {
+        throw new RuntimeException('authentication cookie clear failed');
+    }
 }
 
 function sanitizeUserSettings($settings) {
@@ -242,11 +250,8 @@ function sanitizeUserSettings($settings) {
 try {
     $input = parseRequestInput();
 
-    $action = $input['action'];
+    $action = isset($input['action']) && is_string($input['action']) ? $input['action'] : '';
     $username = isset($input['username']) && is_string($input['username']) ? trim($input['username']) : '';
-    $password = readPasswordField($input, 'password', 'encryptedPassword', $username);
-    $currentPassword = isset($input['currentPassword']) && is_string($input['currentPassword']) ? $input['currentPassword'] : '';
-    $newPassword = isset($input['newPassword']) && is_string($input['newPassword']) ? $input['newPassword'] : '';
 
     $allowedActions = ['register', 'login', 'verify', 'logout', 'change_password', 'set_settings', 'get_settings'];
     if (!in_array($action, $allowedActions, true)) {
@@ -255,6 +260,13 @@ try {
 
     if (!ensureCsrfMatched($input)) {
         respond(['success' => false, 'message' => 'CSRF 校验失败'], 403);
+    }
+
+    if ($action === 'register' && !isValidUsername($username)) {
+        respond(['success' => false, 'message' => '用户名格式无效']);
+    }
+    if ($action === 'login' && !isValidUsername($username)) {
+        respond(['success' => false, 'message' => '用户名或密码不正确']);
     }
 
     $db = new Database("users");
@@ -268,8 +280,9 @@ try {
             respond(['success' => false, 'message' => '用户名格式无效']);
         }
 
-        validatePassword($password);
         checkRateLimit($username);
+        $password = readPasswordField($input, 'password', 'encryptedPassword', $username);
+        validatePassword($password);
 
         $existingHash = $db->get($username);
         if ($existingHash !== null) {
@@ -456,6 +469,22 @@ try {
         }
 
         try {
+            setAuthCookies($username, $issuedToken);
+        } catch (Throwable $error) {
+            failRegistrationWithRollback(
+                $db,
+                $profileDb,
+                $sessionDb,
+                $registrationLockDb,
+                $lease,
+                $username,
+                $expectedValues,
+                'cookie_write_failed',
+                '登录状态写入失败，请稍后重试'
+            );
+        }
+
+        try {
             $leaseReleased = releaseRegistrationLease($registrationLockDb, $lease);
         } catch (Throwable $error) {
             $leaseReleased = false;
@@ -463,7 +492,6 @@ try {
         if (!$leaseReleased) {
             error_log("Registration lease release failed after successful commit for {$username}");
         }
-        setAuthCookies($username, $issuedToken);
         logSecurityEvent('register_success', $username, ['lease_released' => $leaseReleased]);
         respond([
             'success' => true,
@@ -477,45 +505,89 @@ try {
         ensureHttps();
         checkIpRateLimit();
 
-        if (!isValidUsername($username) || $password === '') {
+        if (!isValidUsername($username)) {
             respond(['success' => false, 'message' => '用户名或密码不正确']);
         }
 
         checkRateLimit($username);
-
-        $existingHash = $db->get($username);
-        if ($existingHash === null) {
-            logSecurityEvent('login_failed', $username, ['reason' => 'user_not_found']);
+        $password = readPasswordField($input, 'password', 'encryptedPassword', $username);
+        if ($password === '') {
             respond(['success' => false, 'message' => '用户名或密码不正确']);
         }
 
-        if (password_verify($password, $existingHash)) {
+        $loginSecurityLockDb = new Database('registration_locks');
+        $loginSecurityLease = acquireUserSecurityLease($loginSecurityLockDb, $username);
+        if ($loginSecurityLease === null) {
+            respond(['success' => false, 'message' => '账号正在更新，请稍后重试'], 409);
+        }
+
+        try {
+            $existingHash = $db->get($username);
+            if ($existingHash === null) {
+                releaseUserSecurityLease($loginSecurityLockDb, $loginSecurityLease, $username, 'login_user_not_found');
+                logSecurityEvent('login_failed', $username, ['reason' => 'user_not_found']);
+                respond(['success' => false, 'message' => '用户名或密码不正确']);
+            }
+            if (!password_verify($password, $existingHash)) {
+                releaseUserSecurityLease($loginSecurityLockDb, $loginSecurityLease, $username, 'login_invalid_password');
+                logSecurityEvent('login_failed', $username, ['reason' => 'invalid_password']);
+                respond(['success' => false, 'message' => '用户名或密码不正确']);
+            }
+
             $profile = getUserProfile($profileDb, $username);
             if (isset($profile['status']) && $profile['status'] === 'disabled') {
+                releaseUserSecurityLease($loginSecurityLockDb, $loginSecurityLease, $username, 'login_disabled');
                 logSecurityEvent('login_failed', $username, ['reason' => 'user_disabled']);
                 respond(['success' => false, 'message' => '账号已被禁用'], 403);
             }
 
             $sessionEpoch = getUserSessionEpoch($profile);
             if ($sessionEpoch === null) {
+                releaseUserSecurityLease($loginSecurityLockDb, $loginSecurityLease, $username, 'login_invalid_epoch');
                 logSecurityEvent('login_failed', $username, ['reason' => 'invalid_session_epoch']);
                 respond(['success' => false, 'message' => '账号安全状态异常，请联系管理员'], 503);
             }
 
+            $previousSessionValue = $sessionDb->get($username);
+            if ($previousSessionValue !== null && !is_string($previousSessionValue)) {
+                throw new RuntimeException('invalid previous session value');
+            }
             $issuedToken = issueSessionToken($sessionDb, $username, false, $sessionEpoch, $existingHash);
-            setAuthCookies($username, $issuedToken);
-            logSecurityEvent('login_success', $username);
-            respond([
-                'success' => true,
-                'message' => '登录成功',
-                'data' => [
-                    'username' => $username
-                ]
-            ]);
-        } else {
-            logSecurityEvent('login_failed', $username, ['reason' => 'invalid_password']);
-            respond(['success' => false, 'message' => '用户名或密码不正确']);
+            try {
+                setAuthCookies($username, $issuedToken);
+            } catch (Throwable $cookieError) {
+                $sessionRollback = restoreDatabaseValueIfOwned(
+                    $sessionDb,
+                    $username,
+                    $issuedToken['storedValue'],
+                    $previousSessionValue
+                );
+                logSecurityEvent('login_failed', $username, [
+                    'reason' => 'cookie_write_failed',
+                    'session_rollback_success' => $sessionRollback['success'],
+                    'session_rollback_outcome' => $sessionRollback['outcome']
+                ]);
+                throw new RuntimeException(
+                    $sessionRollback['success']
+                        ? 'authentication cookie write failed after session rollback'
+                        : 'authentication cookie write failed and session rollback was not confirmed',
+                    0,
+                    $cookieError
+                );
+            }
+        } catch (Throwable $error) {
+            releaseUserSecurityLease($loginSecurityLockDb, $loginSecurityLease, $username, 'login_exception');
+            throw $error;
         }
+        releaseUserSecurityLease($loginSecurityLockDb, $loginSecurityLease, $username, 'login_complete');
+        logSecurityEvent('login_success', $username);
+        respond([
+            'success' => true,
+            'message' => '登录成功',
+            'data' => [
+                'username' => $username
+            ]
+        ]);
     } elseif ($action === 'verify') {
         $authUsername = getAuthenticatedUsername($sessionDb);
         if ($authUsername === null) {
@@ -534,10 +606,33 @@ try {
             clearAuthCookies();
             respond(['success' => false, 'message' => 'Token过期或无效'], 401);
         }
-        if (!databaseDeleteVerified($sessionDb, $authUsername)) {
-            respond(['success' => false, 'message' => '会话失效失败，请稍后重试'], 503);
+
+        $logoutSecurityLockDb = new Database('registration_locks');
+        $logoutSecurityLease = acquireUserSecurityLease($logoutSecurityLockDb, $authUsername);
+        if ($logoutSecurityLease === null) {
+            respond(['success' => false, 'message' => '账号正在更新，请稍后重试'], 409);
         }
-        clearAuthCookies();
+
+        try {
+            // 获取租约前认证通过并不代表当前会话仍属于本请求；登录或改密可能已轮换 Token。
+            // 在与所有会话写入方共享的用户租约内重新认证，避免旧登出请求删除新会话。
+            $confirmedAuthUsername = getAuthenticatedUsername($sessionDb);
+            if ($confirmedAuthUsername === null || !hash_equals($authUsername, $confirmedAuthUsername)) {
+                releaseUserSecurityLease($logoutSecurityLockDb, $logoutSecurityLease, $authUsername, 'logout_token_rotated');
+                logSecurityEvent('logout_failed', $authUsername, ['reason' => 'token_rotated']);
+                clearAuthCookies();
+                respond(['success' => false, 'message' => 'Token过期或无效'], 401);
+            }
+            if (!databaseDeleteVerified($sessionDb, $authUsername)) {
+                releaseUserSecurityLease($logoutSecurityLockDb, $logoutSecurityLease, $authUsername, 'logout_revoke_failed');
+                respond(['success' => false, 'message' => '会话失效失败，请稍后重试'], 503);
+            }
+            clearAuthCookies();
+            releaseUserSecurityLease($logoutSecurityLockDb, $logoutSecurityLease, $authUsername, 'logout_complete');
+        } catch (Throwable $error) {
+            releaseUserSecurityLease($logoutSecurityLockDb, $logoutSecurityLease, $authUsername, 'logout_exception');
+            throw $error;
+        }
         logSecurityEvent('logout_success', $authUsername);
         respond(['success' => true, 'message' => '登出成功']);
     } elseif ($action === 'change_password') {
@@ -584,6 +679,10 @@ try {
                 respond(['success' => false, 'message' => '密码处理失败，请稍后重试'], 503);
             }
 
+            $previousSessionValue = $sessionDb->get($authUsername);
+            if ($previousSessionValue !== null && !is_string($previousSessionValue)) {
+                throw new RuntimeException('invalid previous session value');
+            }
             if (!revokeUserSessionVerified($sessionDb, $authUsername)) {
                 releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_revoke_failed');
                 respond(['success' => false, 'message' => '旧会话吊销失败，请稍后重试'], 503);
@@ -599,12 +698,41 @@ try {
                 $sessionEpoch,
                 $newPasswordHash
             );
+            try {
+                setAuthCookies($authUsername, $issuedToken);
+            } catch (Throwable $cookieError) {
+                $passwordRollback = restoreDatabaseValueIfOwned(
+                    $db,
+                    $authUsername,
+                    $newPasswordHash,
+                    $existingHash
+                );
+                $sessionRollback = restoreDatabaseValueIfOwned(
+                    $sessionDb,
+                    $authUsername,
+                    $issuedToken['storedValue'],
+                    $previousSessionValue
+                );
+                logSecurityEvent('change_password_failed', $authUsername, [
+                    'reason' => 'cookie_write_failed',
+                    'password_rollback_success' => $passwordRollback['success'],
+                    'password_rollback_outcome' => $passwordRollback['outcome'],
+                    'session_rollback_success' => $sessionRollback['success'],
+                    'session_rollback_outcome' => $sessionRollback['outcome']
+                ]);
+                throw new RuntimeException(
+                    $passwordRollback['success'] && $sessionRollback['success']
+                        ? 'authentication cookie write failed after credential rollback'
+                        : 'authentication cookie write failed and credential rollback was not confirmed',
+                    0,
+                    $cookieError
+                );
+            }
             releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_complete');
         } catch (Throwable $error) {
             releaseUserSecurityLease($securityLockDb, $securityLease, $authUsername, 'change_password_exception');
             throw $error;
         }
-        setAuthCookies($authUsername, $issuedToken);
         logSecurityEvent('change_password_success', $authUsername);
         respond(['success' => true, 'message' => '密码已修改']);
     } elseif ($action === 'set_settings') {

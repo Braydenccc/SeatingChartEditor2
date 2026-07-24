@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearUiApis, registerUiApis, requestUiConfirm, type UiApiSet } from '../uiFeedback'
+import {
+  clearUiApis,
+  registerUiApis,
+  requestUiAlert,
+  requestUiConfirm,
+  type UiApiSet
+} from '../uiFeedback'
 
 const createApis = () => {
   const warning = vi.fn()
@@ -38,5 +44,44 @@ describe('uiFeedback', () => {
     error.mock.calls[0][0].onEsc()
 
     await expect(result).resolves.toBe(false)
+  })
+
+  it('opens a persistent single-button alert through the shared dialog bridge', async () => {
+    const { apis, warning } = createApis()
+    registerUiApis(apis)
+
+    const result = requestUiAlert({
+      title: '无法删除学生',
+      content: '学生仍被规则引用',
+      type: 'warning'
+    })
+    const dialogOptions = warning.mock.calls[0][0]
+
+    expect(dialogOptions).toMatchObject({
+      title: '无法删除学生',
+      content: '学生仍被规则引用',
+      positiveText: '知道了',
+      closable: false,
+      maskClosable: false,
+      closeOnEsc: false,
+      style: expect.objectContaining({
+        maxHeight: 'calc(100dvh - 32px)',
+        display: 'flex'
+      }),
+      contentStyle: expect.objectContaining({
+        maxHeight: 'min(60dvh, 480px)',
+        overflowY: 'auto',
+        overflowWrap: 'anywhere',
+        whiteSpace: 'pre-wrap'
+      })
+    })
+    expect(dialogOptions.negativeText).toBeUndefined()
+    await dialogOptions.onPositiveClick()
+
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  it('resolves an alert immediately when the bridge is unavailable', async () => {
+    await expect(requestUiAlert({ title: '提示', content: '内容' })).resolves.toBeUndefined()
   })
 })

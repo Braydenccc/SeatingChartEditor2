@@ -10,12 +10,21 @@ import type {
   RuleSubject,
   RulePredicate,
   RuleParams,
+  RuleReferencedEntityType,
+  RuleEntityReference,
+  EntityDeletionResult,
   GroupConfig,
   SeatPosition,
   AssignmentIterationInfo
 } from './models'
 
 // Composable 返回类型定义
+
+export interface WorkspaceSaveResult {
+  success: boolean
+  canceled: boolean
+  error?: string
+}
 
 // useStudentData 返回类型
 export interface UseStudentDataReturn {
@@ -33,7 +42,8 @@ export interface UseStudentDataReturn {
       numericAttributes?: Record<string, unknown>
     }
   ) => void
-  deleteStudent: (studentId: number) => void
+  deleteStudent: (studentId: number) => EntityDeletionResult
+  lastStudentDeletionResult: Ref<EntityDeletionResult | null>
   addTagToStudents: (tagId: number, studentIds: number[]) => void
   removeTagFromStudent: (tagId: number, studentId: number) => void
   removeTagFromStudents: (tagId: number) => void
@@ -51,7 +61,7 @@ export interface UseTagDataReturn {
   editTag: (tagId: number, tagData: Partial<Tag>) => void
   updateTag: (tagId: number, tagData: Partial<Tag>) => void
   getTagById: (tagId: number) => Tag | undefined
-  deleteTag: (tagId: number) => void
+  deleteTag: (tagId: number) => EntityDeletionResult
   clearAllTags: () => void
   replaceTagData: (tags: Tag[]) => void
   setShowTagsInSeatChart: (show: boolean) => void
@@ -64,7 +74,7 @@ export interface UseZoneDataReturn {
   selectedZoneId: Ref<number | null>
   addZone: () => number
   updateZone: (zoneId: number, updates: Partial<Zone>) => void
-  deleteZone: (zoneId: number) => void
+  deleteZone: (zoneId: number) => EntityDeletionResult
   addTagToZone: (zoneId: number, tagId: number) => void
   removeTagFromZone: (zoneId: number, tagId: number) => void
   addSeatToZone: (zoneId: number, seatId: string) => void
@@ -117,6 +127,10 @@ export interface UseSeatRulesReturn {
   clearAllRules: () => void
   getRuleText: (rule: Rule) => string
   validateRule: (rule: Rule) => { valid: boolean; errors: string[] }
+  getRuleReferences: (
+    entityType: RuleReferencedEntityType,
+    entityId: number | string
+  ) => RuleEntityReference[]
   [key: string]: unknown
 }
 

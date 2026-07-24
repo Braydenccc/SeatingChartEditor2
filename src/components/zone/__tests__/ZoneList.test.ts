@@ -1,7 +1,9 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { NPopconfirm } from 'naive-ui'
 import ZoneItem from '../ZoneItem.vue'
 import ZoneList from '../ZoneList.vue'
+import type { EntityDeletionResult } from '@/types/models'
 
 const mocks = await vi.hoisted(async () => {
   const { ref } = await import('vue')
@@ -18,7 +20,7 @@ const mocks = await vi.hoisted(async () => {
     activeWorkbenchDialog: ref<string | null>(null),
     addZone: vi.fn(),
     updateZone: vi.fn(),
-    deleteZone: vi.fn(),
+    deleteZone: vi.fn<(zoneId: number) => EntityDeletionResult>(() => ({ success: true, references: [] })),
     addTagToZone: vi.fn(),
     removeTagFromZone: vi.fn(),
     getZoneColor: vi.fn(() => 'var(--color-info)'),
@@ -26,6 +28,7 @@ const mocks = await vi.hoisted(async () => {
     finishZoneEditing: vi.fn(),
     startGlobalZoneEditing: vi.fn(),
     warning: vi.fn(),
+    alert: vi.fn(() => Promise.resolve()),
     success: vi.fn()
   }
 })
@@ -54,14 +57,23 @@ vi.mock('@/composables/useEditorCommands', () => ({
   })
 }))
 vi.mock('@/composables/useLogger', () => ({
-  useLogger: () => ({ warning: mocks.warning, success: mocks.success })
+  useLogger: () => ({ warning: mocks.warning, success: mocks.success }),
+  useUiFeedback: () => ({ warning: mocks.warning, alert: mocks.alert, success: mocks.success })
 }))
 
 describe('ZoneList', () => {
   const mountedWrappers: Array<ReturnType<typeof mount>> = []
 
+  const confirmZoneDeletion = (wrapper: ReturnType<typeof mount>) => {
+    const onPositiveClick = wrapper.findComponent(NPopconfirm).props('onPositiveClick') as (() => void) | undefined
+    expect(onPositiveClick).toBeTypeOf('function')
+    onPositiveClick?.()
+  }
+
   beforeEach(() => {
+    vi.clearAllMocks()
     mocks.selectedZoneId.value = null
+    mocks.deleteZone.mockReturnValue({ success: true, references: [] })
   })
 
   afterEach(() => {
@@ -94,7 +106,70 @@ describe('ZoneList', () => {
     expect(mocks.removeTagFromZone).toHaveBeenCalledWith(1, 7)
     expect(mocks.startGlobalZoneEditing).not.toHaveBeenCalled()
 
-    await wrapper.get('.zone-name').trigger('dblclick')
+    await wrapper.get('[aria-label="重命名选区 前排"]').trigger('click')
+    expect(mocks.startGlobalZoneEditing).not.toHaveBeenCalled()
     expect(wrapper.get('input[aria-label="修改选区 前排 的名称"]').attributes('aria-label')).toBe('修改选区 前排 的名称')
+  })
+
+  it('does not select the zone while double-clicking its name to rename it', async () => {
+    const wrapper = mount(ZoneList)
+    mountedWrappers.push(wrapper)
+    const name = wrapper.get('.zone-name')
+
+    await name.trigger('click')
+    await name.trigger('click')
+    await name.trigger('dblclick')
+
+    expect(mocks.startGlobalZoneEditing).not.toHaveBeenCalled()
+    expect(mocks.finishZoneEditing).not.toHaveBeenCalled()
+    expect(wrapper.get('input[aria-label="修改选区 前排 的名称"]').attributes('aria-label')).toBe('修改选区 前排 的名称')
+  })
+
+  it('reports the rules that block a zone deletion', async () => {
+    mocks.deleteZone.mockReturnValue({
+      success: false,
+      reason: 'referenced-by-rules',
+      references: [{
+        entityType: 'zone',
+        entityId: 1,
+        ruleId: 'rule-1',
+        ruleDescription: '前排规则',
+        predicate: 'IN_ZONE',
+        locations: ['$.params.zoneId']
+      }]
+    })
+    const wrapper = mount(ZoneList)
+    mountedWrappers.push(wrapper)
+
+    confirmZoneDeletion(wrapper)
+    await wrapper.vm.$nextTick()
+
+    expect(mocks.warning).toHaveBeenCalledWith(
+      expect.stringContaining('“前排规则”（rule-1）'),
+      expect.objectContaining({ references: expect.any(Array) }),
+      false
+    )
+    expect(mocks.alert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '无法删除选区',
+        content: expect.stringContaining('“前排规则”（rule-1）'),
+        positiveText: '知道了',
+        type: 'warning'
+      })
+    )
+    expect(mocks.finishZoneEditing).not.toHaveBeenCalled()
+    expect(mocks.success).not.toHaveBeenCalled()
+  })
+
+  it('reports success exactly once after the parent confirms deletion', async () => {
+    const wrapper = mount(ZoneList)
+    mountedWrappers.push(wrapper)
+
+    confirmZoneDeletion(wrapper)
+    await wrapper.vm.$nextTick()
+
+    expect(mocks.deleteZone).toHaveBeenCalledWith(1)
+    expect(mocks.success).toHaveBeenCalledTimes(1)
+    expect(mocks.success).toHaveBeenCalledWith('已成功删除选区“前排”')
   })
 })

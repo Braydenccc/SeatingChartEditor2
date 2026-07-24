@@ -31,7 +31,7 @@
             <template #icon><Sparkles :size="14" stroke-width="2" /></template>
             <span>排入学生</span>
           </NButton>
-          <NButton size="small" secondary @click="clearSelection">
+          <NButton size="small" secondary @click="cancelSeatSelection">
             <template #icon><X :size="14" stroke-width="2" /></template>
             <span>取消选择</span>
           </NButton>
@@ -62,7 +62,7 @@
             <template #icon><LayoutGrid :size="14" stroke-width="2" /></template>
             <span>切换空置</span>
           </NButton>
-          <NButton size="small" secondary @click="clearSelection">
+          <NButton size="small" secondary @click="cancelSeatSelection">
             <X :size="14" stroke-width="2" />
             <span>取消选择</span>
           </NButton>
@@ -86,9 +86,11 @@
             <NInput
               class="context-input"
               size="small"
-              :value="selectedStudent.name"
+              :value="selectedStudentNameInputValue"
               placeholder="未命名"
-              @change="handleSelectedStudentNameChange"
+              @update:value="handleSelectedStudentNameChange"
+              @blur="commitSelectedStudentName"
+              @keyup.enter="commitSelectedStudentName"
             />
           </label>
           <label class="field-row">
@@ -190,11 +192,12 @@
 
 <script setup lang="ts">
 import { NButton, NInput, NInputNumber } from 'naive-ui'
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { ArrowLeftRight, Check, Edit3, LayoutGrid, Shuffle, Sparkles, UserMinus, X } from 'lucide-vue-next'
 import BatchEditDialog from '@/components/student/BatchEditDialog.vue'
 import StudentEditDialog from '@/components/student/StudentEditDialog.vue'
 import { useEditMode } from '@/composables/useEditMode'
+import { useEditorCommands } from '@/composables/useEditorCommands'
 import { useLogger } from '@/composables/useLogger'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useSelection } from '@/composables/useSelection'
@@ -204,9 +207,10 @@ import { useTagData } from '@/composables/useTagData'
 import { useUndo } from '@/composables/useUndo'
 import { normalizeNumberInput } from '@/utils/inputNormalization'
 import { shuffleArray } from '@/utils/shuffleArray'
-import type { NumericAttributeDefinition } from '@/types/models'
+import type { NumericAttributeDefinition, Student } from '@/types/models'
 
 const { currentMode, EditMode } = useEditMode()
+const { cancelSeatSelection } = useEditorCommands()
 const { logs, clearLogs, success, warning } = useLogger()
 const { seats, seatConfig, getSeat, clearSeat, toggleEmpty, getStudentAtSeat, findSeatByStudent, assignStudent, swapSeats } = useSeatChart()
 const { selectedCount, selectedSeatsArray, clearSelection, isSelectionMode } = useSelection()
@@ -242,6 +246,26 @@ const unassignedCount = computed(() => students.value.filter(student => !findSea
 const recentLogs = computed(() => logs.value.slice(0, 5))
 
 const selectedStudent = computed(() => students.value.find(student => student.id === selectedStudentId.value) || null)
+const selectedStudentNameDraft = shallowRef<{ entity: Student; value: string } | null>(null)
+const selectedStudentNameInputValue = computed(() => {
+  const student = selectedStudent.value
+  if (!student) return ''
+  return selectedStudentNameDraft.value?.entity === student && students.value.includes(student)
+    ? selectedStudentNameDraft.value.value
+    : student.name
+})
+watch(
+  selectedStudent,
+  (nextStudent, previousStudent) => {
+    const draft = selectedStudentNameDraft.value
+    if (!draft || draft.entity === nextStudent) return
+    selectedStudentNameDraft.value = null
+    if (draft.entity === previousStudent && students.value.includes(draft.entity)) {
+      updateStudent(draft.entity.id, { name: draft.value.trim() })
+    }
+  },
+  { flush: 'sync' }
+)
 const selectedStudentSeat = computed(() => selectedStudent.value ? findSeatByStudent(selectedStudent.value.id) : null)
 const singleSelectedSeat = computed(() => {
   const seatId = selectedSeatsArray.value[0]
@@ -299,8 +323,20 @@ const formatLogTime = (timestamp: string | number | Date) => {
 }
 
 const handleSelectedStudentNameChange = (value: string) => {
-  if (!selectedStudent.value) return
-  updateStudent(selectedStudent.value.id, { name: value })
+  const student = selectedStudent.value
+  if (!student || !students.value.includes(student)) return
+  selectedStudentNameDraft.value = {
+    entity: student,
+    value
+  }
+}
+
+const commitSelectedStudentName = () => {
+  const draft = selectedStudentNameDraft.value
+  const student = selectedStudent.value
+  if (!draft || !student || draft.entity !== student || !students.value.includes(draft.entity)) return
+  selectedStudentNameDraft.value = null
+  updateStudent(draft.entity.id, { name: draft.value.trim() })
 }
 
 const handleSelectedStudentNumberChange = (value: number | null) => {

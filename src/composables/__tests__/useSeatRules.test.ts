@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useSeatRules } from '../useSeatRules'
+import { maxRuleBandCount } from '@/constants/ruleTypes'
 import { requireDefined } from '@/test-utils/testHelpers'
 
 vi.mock('../useStudentData', () => ({
@@ -92,6 +93,74 @@ describe('useSeatRules', () => {
 
       expect(requireDefined(result1.rule).id).not.toBe(requireDefined(result2.rule).id)
       expect(seatRules.rules.value).toHaveLength(2)
+    })
+  })
+
+  describe('numeric rule parameter safety', () => {
+    const createBandRule = (bandCount: unknown) => ({
+      predicate: 'ATTRIBUTE_DISTRIBUTE_BANDS',
+      subjects: [{ type: 'all' as const, id: null }],
+      params: { attributeId: 'score', bandCount: bandCount as number }
+    })
+
+    it.each([
+      { label: 'numeric string', value: '3', warning: '必须是有限数字' },
+      { label: 'NaN', value: Number.NaN, warning: '必须是有限数字' },
+      { label: 'positive infinity', value: Number.POSITIVE_INFINITY, warning: '必须是有限数字' },
+      { label: 'fractional layer count', value: 2.5, warning: '必须是整数' },
+      { label: 'oversized layer count', value: maxRuleBandCount + 1, warning: `不能大于 ${maxRuleBandCount}` }
+    ])('rejects $label without storing the rule', ({ value, warning }) => {
+      const result = seatRules.addRule(createBandRule(value))
+
+      expect(result.success).toBe(false)
+      expect(result.warnings).toEqual(expect.arrayContaining([expect.stringContaining(warning)]))
+      expect(seatRules.rules.value).toHaveLength(0)
+    })
+
+    it.each([2, 3, maxRuleBandCount])('accepts valid bandCount %i', bandCount => {
+      const result = seatRules.addRule(createBandRule(bandCount))
+
+      expect(result.success).toBe(true)
+      expect(seatRules.rules.value[0]?.params.bandCount).toBe(bandCount)
+    })
+
+    it('rejects malformed numeric params during JSON import', () => {
+      const result = seatRules.importRules(JSON.stringify({
+        rules: [createBandRule('3')]
+      }))
+
+      expect(result).toMatchObject({ success: true, imported: 0 })
+      expect(result.errors).toHaveLength(1)
+      expect(seatRules.rules.value).toHaveLength(0)
+    })
+
+    it('validates numeric params inside composite sub-rules', () => {
+      const result = seatRules.addRule({
+        ...createBandRule(3),
+        logicOperator: 'AND',
+        subRules: [
+          { ...createBandRule(3), not: false },
+          { ...createBandRule(maxRuleBandCount + 1), not: false }
+        ]
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.warnings).toEqual(expect.arrayContaining([
+        expect.stringContaining(`子规则 2：参数「分层数」不能大于 ${maxRuleBandCount}`)
+      ]))
+      expect(seatRules.rules.value).toHaveLength(0)
+    })
+
+    it('rejects an invalid numeric update and keeps the stored value', () => {
+      const added = seatRules.addRule(createBandRule(3))
+      const id = requireDefined(added.rule).id
+
+      const updated = seatRules.updateRule(id, {
+        params: { attributeId: 'score', bandCount: Number.POSITIVE_INFINITY }
+      })
+
+      expect(updated).toBe(false)
+      expect(requireDefined(seatRules.rules.value[0]).params.bandCount).toBe(3)
     })
   })
 

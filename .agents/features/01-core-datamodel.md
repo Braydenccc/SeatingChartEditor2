@@ -10,7 +10,8 @@ description: 定义系统最底层的“座位”、“学生”与“工作区�
 
 ## 2. 源代码入口 (Source Files)
 - 学生数据源: `src/composables/useStudentData.ts`
-- 座位数据源: `src/composables/useSeatChart.ts`
+- 座位领域入口: `src/composables/useSeatChart.ts`
+- 座位底层状态与原始写入: `src/composables/seatChartState.ts`
 - 数据中枢与格式定义: `src/composables/useWorkspace.ts`
 - 自动保存备份: `src/composables/useAutoSave.ts`
 - 工作区结构校验: `src/utils/workspaceValidation.ts`
@@ -76,7 +77,8 @@ interface Zone {
 - **不可用座位不变量**: 座位状态的单项更新、批量更新、工作区恢复、布局重建和 Undo 快照恢复都统一保证 `isEmpty === true` 时 `studentId === null`。交换或拖拽若任一端是不可用座位会原子拒绝，不记录无效 Undo。
 - **渲染数据准备 (`organizedSeats`)**: 原生 `seats.value` 是扁平一维数组，为了让 Vue 能通过嵌套 `v-for` 渲染出大组-列-行的 UI 表格组合，专门设计了 `organizedSeats` computed，以 $O(n)$ 复杂度预分桶成三维数组 `[group][col][row]`。
 - **护法特殊座位**: 左右护法与普通座位共享 `seatMap`、分配、交换、清空和撤销机制，但不进入 `organizedSeats`。编辑器通过 `visibleGuardSeats` 渲染讲台两侧；渲染时根据讲台视觉位置决定左右槽位，讲台在顶部时左右护法顺序互换，讲台在底部时保持 `左护法 / 讲台 / 右护法`。默认不进入 `getAvailableSeats()`，只有显式传入并开启 `guardSeats.includeInAutoAssignment` 时才可被智能排位使用。
-- **自动保存恢复**: `useAutoSave()` 监听完整工作区签名，每次逻辑变更都会按顺序覆盖平台存储中的唯一 `sce-autosave-backup` 快照；快照记录同时包含保存时间与工作区数据，避免分键写入产生不一致。启动时 `App.vue` 每次都会检查现有快照并显示恢复提示，文件页会在工作区列表顶部显示自动保存卡片，统一调用 `restoreAutoSaveBackup()` 应用工作区数据。旧版 `sce-autosave-time` 数据仍可读取，并会在下一次保存时清理。
+- **双槽自动保存恢复**: `useAutoSave()` 监听完整工作区签名，并用串行、可合并的 writer 更新兼容旧版本的 current 槽 `sce-autosave-backup`。启动时 `App.vue` 必须先调用 `getAutoSaveBackup({ preserveCurrentAsRecovery: true })`，在启用 watcher 前把尚未受保护的 current 复制到 `sce-autosave-recovery-pending`；此后自动保存和启动期云恢复只能推进 current，不能覆盖 `recovery-pending`。公开的 `AutoSaveBackup.slot` 与 `snapshotId` 用于区分槽位和精确消费候选，禁止按序列化字符串猜测状态。选择“稍后处理”只关闭提示，不消费候选；`restoreAutoSaveBackup()` 仅在工作区成功应用、回读确认新的 current 并写入 handled marker 后消费对应候选。用户明确选择“忽略此备份”时，`discardAutoSaveRecovery()` 会先确认 current 有效；若 current 已损坏，则先用唯一有效 recovery 修复并读回 current，再写 handled marker，最后消费 recovery。若 recovery 槽损坏或拒绝读取而只剩 current 可确认有效，普通备份读取不能解除写保护；只有用户显式恢复并成功建立保护副本，或显式忽略并清理损坏槽后，自动保存才会恢复。同一份已处理 current 在下次启动时不会再次生成提示，后续实际编辑产生新的 `snapshotId` 后才会成为新的恢复候选。任何建立保护、修复 current、写标记或消费操作失败时都保留唯一有效快照。旧的原始 `sce-autosave-backup` + `sce-autosave-time`、旧 ISO handled marker 及旧记录格式仍可读取，下一次 current 写入会升级记录并清理旧时间标记。
+- **座位状态与 Undo 依赖方向**: `seatChartState.ts` 是无历史副作用的底层状态层，唯一持有 `seatConfig`、`seats`、O(1) `seatMap` 及 `*Raw` 原始写入/快照恢复函数。`useSeatChart.ts` 组合这些原始操作，并仅在需要记录用户操作时单向调用 `useUndo()`；`useUndo.ts` 直接依赖 `seatChartState.ts` 回放原始操作，禁止反向导入 `useSeatChart.ts`。因此依赖方向固定为 `useSeatChart -> useUndo -> seatChartState`，同时 `useSeatChart -> seatChartState`，避免撤销回放再次记录历史及 `useSeatChart <-> useUndo` 循环依赖。
 - **工作区契约版本**: 当前 `.sce` schema 为 `2.3`。持久化层允许学生、标签和选区使用数字或字符串 ID，加载时统一按字符串键映射到运行时数字 ID；高于当前 schema 的文件会在迁移和状态写入前拒绝，避免新版本字段被旧版本静默覆盖。
 - **原子加载**: 所有本地、云端和自动保存数据都会先复制、迁移并通过 `workspaceValidation.ts` 完整校验。迁移阶段会把旧版数字字符串学号转换为数字；对于分支前允许保存的数值属性值，会按实际有限数值扩展对应定义的上下限和小数位，从而保留旧数据而不在重载时截断。校验覆盖布局、座位 ID/坐标一致性、学生唯一分配、数值属性定义、轮换座位引用和规则对象/参数引用；只有候选数据有效时才写入共享状态，不能解析的规则不会静默丢弃。写入阶段异常会通过可信运行态快照恢复学生、标签、选区、规则和轮换的原始 ID，并同步恢复撤销、选择及编辑模式，不能重新导入快照后再挂回旧 ID；成功切换工作区后会清理工作台弹层、移动面板和选区编辑会话。
 - **本地路径提交**: Tauri 本地文件路径只在工作区成功应用后更新。云端或自动保存来源会清除旧本地路径，避免后续“保存”误覆盖先前文件。

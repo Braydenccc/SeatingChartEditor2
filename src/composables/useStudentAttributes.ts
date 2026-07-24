@@ -1,9 +1,10 @@
 import { computed, ref } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
-import type { NumericAttributeDefinition } from '@/types'
+import type { EntityDeletionResult, NumericAttributeDefinition } from '@/types'
 import { hasRepresentableNumberInputRange } from '@/utils/inputNormalization'
 import { useStudentData } from './useStudentData'
 import { attributeDefinitions, createDefaultAttributeDefinitions } from './studentAttributeState'
+import { getRuleReferences } from './seatRuleState'
 
 const showNumericAttributesInEditor = ref(true)
 let nextAttributeId = 1
@@ -120,7 +121,7 @@ export function useStudentAttributes(): {
   showNumericAttributesInEditor: Ref<boolean>
   addAttribute: (definition?: Partial<NumericAttributeDefinition>) => string
   updateAttribute: (attributeId: string, updates: Partial<NumericAttributeDefinition>) => boolean
-  deleteAttribute: (attributeId: string) => boolean
+  deleteAttribute: (attributeId: string) => EntityDeletionResult
   clearAttributeDefinitions: () => void
   replaceAttributeDefinitions: (
     definitions?: Partial<NumericAttributeDefinition>[],
@@ -205,14 +206,18 @@ export function useStudentAttributes(): {
 
   const deleteAttribute = (attributeId: string) => {
     const index = attributeDefinitions.value.findIndex(def => def.id === attributeId)
-    if (index === -1) return false
+    if (index === -1) return { success: false, reason: 'not-found', references: [] } satisfies EntityDeletionResult
+    const references = getRuleReferences('numericAttribute', attributeId)
+    if (references.length > 0) {
+      return { success: false, reason: 'referenced-by-rules', references } satisfies EntityDeletionResult
+    }
     attributeDefinitions.value.splice(index, 1)
     students.value.forEach(student => {
       const nextAttributes = { ...(student.numericAttributes || {}) }
       delete nextAttributes[attributeId]
       updateStudent(student.id, { numericAttributes: nextAttributes })
     })
-    return true
+    return { success: true, references: [] } satisfies EntityDeletionResult
   }
 
   const clearAttributeDefinitions = () => {

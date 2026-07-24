@@ -79,8 +79,10 @@
                   <NInput
                     class="context-input"
                     size="small"
-                    :value="activeAttribute.name"
-                    @change="value => updateActiveAttribute({ name: value })"
+                    :value="getActiveAttributeTextValue('name')"
+                    @update:value="value => updateActiveAttributeTextDraft('name', value)"
+                    @blur="commitActiveAttributeText('name')"
+                    @keyup.enter="commitActiveAttributeText('name')"
                   />
                 </label>
                 <label class="field-row">
@@ -88,9 +90,11 @@
                   <NInput
                     class="context-input"
                     size="small"
-                    :value="activeAttribute.unit"
+                    :value="getActiveAttributeTextValue('unit')"
                     placeholder="可选"
-                    @change="value => updateActiveAttribute({ unit: value })"
+                    @update:value="value => updateActiveAttributeTextDraft('unit', value)"
+                    @blur="commitActiveAttributeText('unit')"
+                    @keyup.enter="commitActiveAttributeText('unit')"
                   />
                 </label>
                 <div class="field-grid">
@@ -166,8 +170,10 @@
                   <NInput
                     class="context-input"
                     size="small"
-                    :value="activeTag.name"
-                    @change="value => updateActiveTag({ name: value })"
+                    :value="getActiveTagNameValue()"
+                    @update:value="updateActiveTagNameDraft"
+                    @blur="commitActiveTagName"
+                    @keyup.enter="commitActiveTagName"
                   />
                 </label>
                 <label class="field-row">
@@ -223,18 +229,20 @@
                 <span>{{ students.length }} 人 · {{ enabledAttributes.length }} 个数值属性 · {{ tags.length }} 个标签</span>
               </div>
               <div class="student-count-control">
-                <label>共</label>
+                <label :for="studentCountInputId">共</label>
                 <NInputNumber
                   :value="targetStudentCount"
                   :min="0"
+                  :input-props="{ id: studentCountInputId, 'aria-label': '学生总人数' }"
                   class="student-count-input"
                   size="small"
+                  :disabled="isChangingStudentCount"
                   :status="isCountError ? 'error' : undefined"
                   @update:value="updateTargetStudentCount"
                   @blur="handleStudentCountChange"
                   @keyup.enter="handleStudentCountChange"
                 />
-                <label>人</label>
+                <span aria-hidden="true">人</span>
               </div>
               <NButton size="small" secondary attr-type="button" @click="goFilesView">
                 <template #icon><FileInput :size="15" /></template>
@@ -264,14 +272,18 @@
                 <div class="mobile-student-card">
                   <div class="mobile-primary-fields">
                     <NInput
-                      :value="student.name"
+                      :value="getStudentNameInputValue(student)"
                       placeholder="未命名"
-                      @change="value => handleStudentNameChange(student, value)"
+                      :input-props="{ 'aria-label': getStudentControlAriaLabel(student, '姓名', index) }"
+                      @update:value="value => updateStudentNameDraft(student, value)"
+                      @blur="commitStudentName(student)"
+                      @keyup.enter="commitStudentName(student)"
                     />
                     <NInputNumber
                       :value="student.studentNumber"
                       :show-button="false"
                       placeholder="学号"
+                      :input-props="{ 'aria-label': getStudentControlAriaLabel(student, '学号', index) }"
                       @update:value="value => handleStudentNumberChange(student, value)"
                     />
                   </div>
@@ -283,6 +295,7 @@
                         :min="attribute.min ?? undefined"
                         :max="attribute.max ?? undefined"
                         :value="getNumericCellValue(student, attribute.id)"
+                        :input-props="{ 'aria-label': getStudentControlAriaLabel(student, attribute.name, index) }"
                         @update:value="value => setNumericDraft(student.id, attribute.id, value)"
                         @blur="commitNumericAttributeChange(student, attribute, getNumericCellValue(student, attribute.id))"
                       />
@@ -301,7 +314,14 @@
                 <template #suffix>
                   <NPopconfirm positive-text="删除" negative-text="取消" @positive-click="handleDeleteStudent(student.id)">
                     <template #trigger>
-                      <NButton class="mobile-delete-button" quaternary circle type="error" title="删除学生"><Trash2 :size="16" /></NButton>
+                      <NButton
+                        class="mobile-delete-button"
+                        quaternary
+                        circle
+                        type="error"
+                        title="删除学生"
+                        :aria-label="getStudentControlAriaLabel(student, '删除学生', index)"
+                      ><Trash2 :size="16" /></NButton>
                     </template>
                     删除学生“{{ student.name || '未命名' }}”？
                   </NPopconfirm>
@@ -316,7 +336,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref, watch } from 'vue'
+import { computed, h, ref, shallowRef, useId, watch } from 'vue'
 import {
   NButton,
   NCheckbox,
@@ -336,7 +356,7 @@ import { BarChart3, Check, FileInput, PanelLeft, Plus, Settings, Tag, Trash2 } f
 import TagStudentSelector from './TagStudentSelector.vue'
 import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 import { getNextColor } from '@/constants/tagColors'
-import { useLogger } from '@/composables/useLogger'
+import { useUiFeedback } from '@/composables/useLogger'
 import { useRouter } from 'vue-router'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentData } from '@/composables/useStudentData'
@@ -345,6 +365,7 @@ import { useExportSettings } from '@/composables/useExportSettings'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useSettingsDialog } from '@/composables/useSettingsDialog'
 import { normalizeNumberInput, normalizeRequiredNumberInput } from '@/utils/inputNormalization'
+import { showRuleReferenceBlockFeedback } from '@/utils/ruleReferenceFeedback'
 import type { NumericAttributeDefinition, Student, Tag as StudentTag } from '@/types/models'
 
 const props = withDefaults(defineProps<{
@@ -365,7 +386,7 @@ const overlayProps = computed(() => ({
 
 // 使用composables
 const { tags, addTag, editTag, deleteTag } = useTagData()
-const { students, addStudent, setStudentCount, updateStudent, deleteStudent, removeTagFromStudents, addTagToStudents, removeTagFromStudent } = useStudentData()
+const { students, addStudent, setStudentCount, updateStudent, deleteStudent, lastStudentDeletionResult, removeTagFromStudents, addTagToStudents, removeTagFromStudent } = useStudentData()
 const { removeTagFromAllZones } = useZoneData()
 const { exportSettings } = useExportSettings()
 const {
@@ -378,7 +399,8 @@ const {
   showNumericAttributesInEditor
 } = useStudentAttributes()
 const { openSettings } = useSettingsDialog()
-const { warning, success, confirm } = useLogger()
+const uiFeedback = useUiFeedback()
+const { warning, success, confirm } = uiFeedback
 const router = useRouter()
 
 const selectInputText = (event: FocusEvent) => {
@@ -391,7 +413,18 @@ const goFilesView = () => {
 // 学生人数控制
 const targetStudentCount = ref<number | null>(0)
 const isCountError = ref(false)
+const isChangingStudentCount = ref(false)
+const studentCountInputId = `${useId()}-student-count`
 const numericDrafts = ref<Record<string, number | null>>({})
+type StudentNameDraft = { entity: Student; value: string }
+type AttributeTextDraft = {
+  entity: NumericAttributeDefinition
+  values: Partial<Record<'name' | 'unit', string>>
+}
+type TagNameDraft = { entity: StudentTag; value: string }
+const studentNameDrafts = shallowRef<Record<number, StudentNameDraft>>({})
+const attributeTextDrafts = shallowRef<Record<string, AttributeTextDraft>>({})
+const tagNameDrafts = shallowRef<Record<number, TagNameDraft>>({})
 type RosterContext =
   | { type: 'overview'; id: null }
   | { type: 'attribute'; id: string }
@@ -438,11 +471,12 @@ const tableColumns = computed<DataTableColumns<Student>>(() => [
     key: 'studentNumber',
     width: 86,
     fixed: 'left',
-    render: (student) => h(NInputNumber, {
+    render: (student, index) => h(NInputNumber, {
       value: student.studentNumber,
       size: 'small',
       showButton: false,
       placeholder: '学号',
+      inputProps: { 'aria-label': getStudentControlAriaLabel(student, '学号', index) },
       onFocus: selectInputText,
       'onUpdate:value': (value: number | null) => handleStudentNumberChange(student, value)
     })
@@ -452,12 +486,17 @@ const tableColumns = computed<DataTableColumns<Student>>(() => [
     key: 'name',
     width: 150,
     fixed: 'left',
-    render: (student) => h(NInput, {
-      value: student.name,
+    render: (student, index) => h(NInput, {
+      value: getStudentNameInputValue(student),
       size: 'small',
       placeholder: '未命名',
+      inputProps: { 'aria-label': getStudentControlAriaLabel(student, '姓名', index) },
       onFocus: selectInputText,
-      onChange: (value: string) => handleStudentNameChange(student, value)
+      'onUpdate:value': (value: string) => updateStudentNameDraft(student, value),
+      onBlur: () => commitStudentName(student),
+      onKeyup: (event: KeyboardEvent) => {
+        if (event.key === 'Enter') commitStudentName(student)
+      }
     })
   },
   ...enabledAttributes.value.map(attribute => ({
@@ -469,13 +508,14 @@ const tableColumns = computed<DataTableColumns<Student>>(() => [
       type: activeContext.value.type === 'attribute' && activeContext.value.id === attribute.id ? 'primary' : 'default',
       onClick: () => openAttributeContext(attribute.id)
     }, { default: () => attribute.unit ? `${attribute.name}（${attribute.unit}）` : attribute.name }),
-    render: (student: Student) => h(NInputNumber, {
+    render: (student: Student, index: number) => h(NInputNumber, {
       value: getNumericCellValue(student, attribute.id),
       size: 'small',
       showButton: false,
       step: getAttributeStep(attribute),
       min: attribute.min ?? undefined,
       max: attribute.max ?? undefined,
+      inputProps: { 'aria-label': getStudentControlAriaLabel(student, attribute.name, index) },
       onFocus: selectInputText,
       'onUpdate:value': (value: number | null) => setNumericDraft(student.id, attribute.id, value),
       onBlur: () => commitNumericAttributeChange(student, attribute, getNumericCellValue(student, attribute.id)),
@@ -506,7 +546,7 @@ const tableColumns = computed<DataTableColumns<Student>>(() => [
     width: 58,
     fixed: 'right',
     align: 'center',
-    render: (student) => h(NPopconfirm, {
+    render: (student, index) => h(NPopconfirm, {
       positiveText: '删除',
       negativeText: '取消',
       onPositiveClick: () => handleDeleteStudent(student.id)
@@ -516,12 +556,18 @@ const tableColumns = computed<DataTableColumns<Student>>(() => [
         quaternary: true,
         circle: true,
         type: 'error',
-        title: '删除学生'
+        title: '删除学生',
+        'aria-label': getStudentControlAriaLabel(student, '删除学生', index)
       }, { default: () => h(Trash2, { size: 14 }) }),
       default: () => `删除学生“${student.name || '未命名'}”？`
     })
   }
 ])
+
+const getStudentControlAriaLabel = (student: Student, field: string, index: number) => {
+  const identity = student.name || '未命名学生'
+  return `第 ${index + 1} 行，${identity}，${field}`
+}
 
 // 监听学生列表变化，同步人数输入框
 watch(students, (newStudents) => {
@@ -529,6 +575,53 @@ watch(students, (newStudents) => {
     targetStudentCount.value = newStudents.length
   }
 }, { immediate: true })
+
+watch(
+  () => students.value.map(student => student),
+  (currentStudents) => {
+    const currentById = new Map(currentStudents.map(student => [student.id, student]))
+    const nextDrafts: Record<number, StudentNameDraft> = {}
+    let changed = false
+    for (const [studentId, draft] of Object.entries(studentNameDrafts.value)) {
+      const id = Number(studentId)
+      if (currentById.get(id) === draft.entity) nextDrafts[id] = draft
+      else changed = true
+    }
+    if (changed) studentNameDrafts.value = nextDrafts
+  },
+  { flush: 'sync' }
+)
+
+watch(
+  () => attributeDefinitions.value.map(attribute => attribute),
+  (currentAttributes) => {
+    const currentById = new Map(currentAttributes.map(attribute => [attribute.id, attribute]))
+    const nextDrafts: Record<string, AttributeTextDraft> = {}
+    let changed = false
+    for (const [attributeId, draft] of Object.entries(attributeTextDrafts.value)) {
+      if (currentById.get(attributeId) === draft.entity) nextDrafts[attributeId] = draft
+      else changed = true
+    }
+    if (changed) attributeTextDrafts.value = nextDrafts
+  },
+  { flush: 'sync' }
+)
+
+watch(
+  () => tags.value.map(tag => tag),
+  (currentTags) => {
+    const currentById = new Map(currentTags.map(tag => [tag.id, tag]))
+    const nextDrafts: Record<number, TagNameDraft> = {}
+    let changed = false
+    for (const [tagId, draft] of Object.entries(tagNameDrafts.value)) {
+      const id = Number(tagId)
+      if (currentById.get(id) === draft.entity) nextDrafts[id] = draft
+      else changed = true
+    }
+    if (changed) tagNameDrafts.value = nextDrafts
+  },
+  { flush: 'sync' }
+)
 
 watch(activeTag, (tag) => {
   if (!tag) {
@@ -561,6 +654,65 @@ const updateActiveAttribute = (updates: Partial<NumericAttributeDefinition>) => 
   updateAttribute(activeAttribute.value.id, updates)
 }
 
+const getActiveAttributeTextValue = (field: 'name' | 'unit') => {
+  const attribute = activeAttribute.value
+  if (!attribute) return ''
+  const draft = attributeTextDrafts.value[attribute.id]
+  return draft?.entity === attribute && Object.prototype.hasOwnProperty.call(draft.values, field)
+    ? draft.values[field] ?? ''
+    : attribute[field]
+}
+
+const updateActiveAttributeTextDraft = (field: 'name' | 'unit', value: string) => {
+  const attribute = activeAttribute.value
+  if (!attribute || !attributeDefinitions.value.includes(attribute)) return
+  const currentDraft = attributeTextDrafts.value[attribute.id]
+  attributeTextDrafts.value = {
+    ...attributeTextDrafts.value,
+    [attribute.id]: {
+      entity: attribute,
+      values: {
+        ...(currentDraft?.entity === attribute ? currentDraft.values : {}),
+        [field]: value
+      }
+    }
+  }
+}
+
+const clearActiveAttributeTextDraft = (
+  attributeId: string,
+  field: 'name' | 'unit',
+  expectedDraft: AttributeTextDraft
+) => {
+  const currentDraft = attributeTextDrafts.value[attributeId]
+  if (currentDraft !== expectedDraft || !Object.prototype.hasOwnProperty.call(currentDraft.values, field)) return
+  const nextValues = { ...currentDraft.values }
+  delete nextValues[field]
+  const nextAttributeDrafts = { ...attributeTextDrafts.value }
+  if (Object.keys(nextValues).length === 0) delete nextAttributeDrafts[attributeId]
+  else nextAttributeDrafts[attributeId] = { entity: currentDraft.entity, values: nextValues }
+  attributeTextDrafts.value = nextAttributeDrafts
+}
+
+const commitActiveAttributeText = (field: 'name' | 'unit') => {
+  const attribute = activeAttribute.value
+  if (!attribute) return
+  const draft = attributeTextDrafts.value[attribute.id]
+  if (
+    !draft ||
+    draft.entity !== attribute ||
+    !attributeDefinitions.value.includes(draft.entity) ||
+    !Object.prototype.hasOwnProperty.call(draft.values, field)
+  ) return
+  const value = (draft.values[field] ?? '').trim()
+  clearActiveAttributeTextDraft(attribute.id, field, draft)
+  if (field === 'name' && !value) {
+    warning('属性名称不能为空')
+    return
+  }
+  updateAttribute(attribute.id, field === 'name' ? { name: value } : { unit: value })
+}
+
 const updateActiveAttributeRange = (key: 'min' | 'max', value: number | null) => {
   updateActiveAttribute({ [key]: normalizeNumberInput(value) })
 }
@@ -587,6 +739,40 @@ const updateActiveTag = (updates: Partial<StudentTag>) => {
     return
   }
   editTag(activeTag.value.id, updates)
+}
+
+const getActiveTagNameValue = () => {
+  const tag = activeTag.value
+  if (!tag) return ''
+  const draft = tagNameDrafts.value[tag.id]
+  return draft?.entity === tag
+    ? draft.value
+    : tag.name
+}
+
+const updateActiveTagNameDraft = (value: string) => {
+  const tag = activeTag.value
+  if (!tag || !tags.value.includes(tag)) return
+  tagNameDrafts.value = {
+    ...tagNameDrafts.value,
+    [tag.id]: { entity: tag, value }
+  }
+}
+
+const commitActiveTagName = () => {
+  const tag = activeTag.value
+  if (!tag) return
+  const draft = tagNameDrafts.value[tag.id]
+  if (!draft || draft.entity !== tag || !tags.value.includes(draft.entity)) return
+  const value = draft.value.trim()
+  const nextDrafts = { ...tagNameDrafts.value }
+  if (nextDrafts[tag.id] === draft) delete nextDrafts[tag.id]
+  tagNameDrafts.value = nextDrafts
+  if (!value) {
+    warning('标签名称不能为空')
+    return
+  }
+  editTag(tag.id, { name: value })
 }
 
 const handleAddAttributeFromHeader = () => {
@@ -624,8 +810,17 @@ const handleDeleteActiveAttribute = async () => {
     type: 'error'
   })
   if (!confirmed) return
-  const deleted = deleteAttribute(activeAttribute.value.id)
-  if (deleted) {
+  const deletion = deleteAttribute(activeAttribute.value.id)
+  if (!deletion.success && deletion.reason === 'referenced-by-rules') {
+    showRuleReferenceBlockFeedback(
+      uiFeedback,
+      '无法删除数值属性',
+      `数值属性“${attributeName}”`,
+      deletion.references
+    )
+    return
+  }
+  if (deletion.success) {
     success('已删除数值属性')
     showOverviewContext()
   }
@@ -662,10 +857,20 @@ const handleDeleteActiveTag = async () => {
     type: 'error'
   })
   if (!confirmed) return
+  const deletion = deleteTag(tagId)
+  if (!deletion.success && deletion.reason === 'referenced-by-rules') {
+    showRuleReferenceBlockFeedback(
+      uiFeedback,
+      '无法删除标签',
+      `标签“${tagName}”`,
+      deletion.references
+    )
+    return
+  }
+  if (!deletion.success) return
   removeTagFromStudents(tagId)
   removeTagFromAllZones(tagId)
   if (exportSettings.value.tagSettings) delete exportSettings.value.tagSettings[tagId]
-  deleteTag(tagId)
   success(`已删除标签“${tagName}”`)
   showOverviewContext()
 }
@@ -675,7 +880,8 @@ const updateTargetStudentCount = (value: number | null) => {
   targetStudentCount.value = normalizeNumberInput(value, { min: 0, precision: 0 })
 }
 
-const handleStudentCountChange = () => {
+const handleStudentCountChange = async () => {
+  if (isChangingStudentCount.value) return
   const nextCount = Number(targetStudentCount.value)
   if (!Number.isInteger(nextCount) || nextCount < 0) {
     targetStudentCount.value = students.value.length
@@ -683,13 +889,50 @@ const handleStudentCountChange = () => {
     return
   }
 
-  const success = setStudentCount(nextCount)
-
-  if (!success) {
-    // 无法满足要求，标红提示
-    isCountError.value = true
-  } else {
+  const currentCount = students.value.length
+  if (nextCount === currentCount) {
     isCountError.value = false
+    return
+  }
+
+  isChangingStudentCount.value = true
+  try {
+    if (nextCount < currentCount) {
+      const toDelete = currentCount - nextCount
+      const accepted = await confirm({
+        title: '减少学生人数',
+        content: `将尝试删除 ${toDelete} 名资料完全空白的学生，并清理其座位分配和撤销/重做历史。确认继续吗？`,
+        positiveText: '确认减少',
+        negativeText: '取消',
+        type: 'warning'
+      })
+      if (!accepted) {
+        targetStudentCount.value = currentCount
+        isCountError.value = false
+        return
+      }
+    }
+
+    const applied = setStudentCount(nextCount)
+
+    if (!applied) {
+      const deletion = lastStudentDeletionResult.value
+      if (deletion?.reason === 'referenced-by-rules') {
+        showRuleReferenceBlockFeedback(
+          uiFeedback,
+          '无法减少学生人数',
+          '部分空白学生',
+          deletion.references
+        )
+      } else {
+        warning('无法减少到目标人数：只能自动删除资料完全空白的学生')
+      }
+      isCountError.value = true
+    } else {
+      isCountError.value = false
+    }
+  } finally {
+    isChangingStudentCount.value = false
   }
 }
 
@@ -699,7 +942,28 @@ const handleAddStudent = () => {
   isCountError.value = false
 }
 
-const handleStudentNameChange = (student: Student, value: string) => {
+const getStudentNameInputValue = (student: Student) => {
+  const draft = studentNameDrafts.value[student.id]
+  return draft?.entity === student
+    ? draft.value
+    : student.name
+}
+
+const updateStudentNameDraft = (student: Student, value: string) => {
+  if (!students.value.includes(student)) return
+  studentNameDrafts.value = {
+    ...studentNameDrafts.value,
+    [student.id]: { entity: student, value }
+  }
+}
+
+const commitStudentName = (student: Student) => {
+  const draft = studentNameDrafts.value[student.id]
+  if (!draft || draft.entity !== student || !students.value.includes(draft.entity)) return
+  const value = draft.value.trim()
+  const nextDrafts = { ...studentNameDrafts.value }
+  if (nextDrafts[student.id] === draft) delete nextDrafts[student.id]
+  studentNameDrafts.value = nextDrafts
   updateStudent(student.id, { name: value })
 }
 
@@ -786,7 +1050,17 @@ const handleStudentTagsChange = (student: Student, value: Array<string | number>
 }
 
 const handleDeleteStudent = (studentId: number) => {
-  deleteStudent(studentId)
+  const student = students.value.find(item => item.id === studentId)
+  const deletion = deleteStudent(studentId)
+  if (!deletion.success && deletion.reason === 'referenced-by-rules') {
+    showRuleReferenceBlockFeedback(
+      uiFeedback,
+      '无法删除学生',
+      `学生“${student?.name || '未命名'}”`,
+      deletion.references
+    )
+    return
+  }
   isCountError.value = false
 }
 

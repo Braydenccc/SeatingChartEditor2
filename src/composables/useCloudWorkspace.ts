@@ -1,11 +1,11 @@
 import { ref, computed } from 'vue'
 import { useAuth } from './useAuth'
-import { useWebDav } from './useWebDav'
+import { useWebDav, type WebDavFileEntry } from './useWebDav'
 import { getOrCreateCsrfToken } from './useAuth'
 import { useLogger } from './useLogger'
 import { apiFetch } from '@/platform/apiClient'
 import { buildWebDavWorkspacePath } from '@/utils/webdavPath'
-import type { AuthType } from '@/types/models'
+import type { AuthType, WebDavConfig } from '@/types/models'
 
 export interface CloudWorkspaceFile {
     fileId: string
@@ -23,6 +23,7 @@ export interface CloudWorkspaceResult<TData = Record<string, unknown>> {
     success: boolean
     message?: string
     error?: string
+    backupWarning?: string
     source?: AuthType
     data?: TData
 }
@@ -40,6 +41,51 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isValidWorkspaceFileId = (value: unknown): value is string =>
     typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value)
+
+const canonicalSceFileIdPattern = /^[a-f0-9]{32}$/i
+const workspaceFileExtension = '.sce'
+
+const buildWebDavMirrorFileId = (canonicalFileId: string) => (
+    `${canonicalFileId}${workspaceFileExtension}`
+)
+
+const getCanonicalMirrorIdFromFileName = (fileName: string) => {
+    if (canonicalSceFileIdPattern.test(fileName)) return fileName
+    if (!fileName.toLowerCase().endsWith(workspaceFileExtension)) return null
+    const baseName = fileName.slice(0, -workspaceFileExtension.length)
+    return canonicalSceFileIdPattern.test(baseName) ? baseName : null
+}
+
+const selectVisibleWebDavWorkspaceFiles = (files: WebDavFileEntry[]) => {
+    const selected = new Map<string, WebDavFileEntry>()
+
+    files.forEach(file => {
+        if (file.isCollection) return
+        const canonicalMirrorId = getCanonicalMirrorIdFromFileName(file.name)
+        if (!file.name.toLowerCase().endsWith(workspaceFileExtension) && !canonicalMirrorId) return
+
+        const key = canonicalMirrorId
+            ? `mirror:${canonicalMirrorId.toLowerCase()}`
+            : `file:${file.name}`
+        const current = selected.get(key)
+        const isCurrentCanonicalFile = current?.name.toLowerCase().endsWith(workspaceFileExtension) === true
+        const isNextCanonicalFile = file.name.toLowerCase().endsWith(workspaceFileExtension)
+        if (!current || (!isCurrentCanonicalFile && isNextCanonicalFile)) {
+            selected.set(key, file)
+        }
+    })
+
+    return [...selected.values()]
+}
+
+const getDirectWebDavDeleteFileIds = (fileId: string) => {
+    const canonicalMirrorId = getCanonicalMirrorIdFromFileName(fileId)
+    if (!canonicalMirrorId) return [fileId]
+    const pairedFileId = fileId.toLowerCase().endsWith(workspaceFileExtension)
+        ? canonicalMirrorId
+        : buildWebDavMirrorFileId(canonicalMirrorId)
+    return [fileId, pairedFileId]
+}
 
 const parseWorkspaceFile = (value: unknown, source: AuthType): CloudWorkspaceFile | null => {
     if (!isRecord(value) || typeof value.fileId !== 'string' || !isRecord(value.metadata)) return null
@@ -72,6 +118,33 @@ const getErrorMessage = (errorValue: unknown, fallback: string) =>
     errorValue instanceof Error ? errorValue.message : fallback
 
 const workspaceFormatErrorMessage = '工作区数据格式错误'
+
+const webDavMirrorQueues = new Map<string, Promise<void>>()
+
+const enqueueWebDavMirror = async (
+    config: WebDavConfig,
+    fileId: string,
+    operation: () => Promise<unknown>
+) => {
+    const queueKey = JSON.stringify([
+        config.url.replace(/\/+$/, ''),
+        config.username || '',
+        fileId
+    ])
+    const previous = webDavMirrorQueues.get(queueKey) ?? Promise.resolve()
+    const current = previous.catch(() => undefined).then(async () => {
+        await operation()
+    })
+    webDavMirrorQueues.set(queueKey, current)
+
+    try {
+        await current
+    } finally {
+        if (webDavMirrorQueues.get(queueKey) === current) {
+            webDavMirrorQueues.delete(queueKey)
+        }
+    }
+}
 
 export function useCloudWorkspace() {
     const { currentUser, token, authType, webdavConfig, backupMode } = useAuth()
@@ -166,12 +239,14 @@ export function useCloudWorkspace() {
             tasks.push((async () => {
                 startFetch()
                 try {
-                    const files = await listFiles(config, '/sce_data')
+                    const files = selectVisibleWebDavWorkspaceFiles(await listFiles(config, '/sce_data'))
                     return {
                         success: true,
                         source: 'webdav',
-                        data: files.filter(f => !f.isCollection && f.name.endsWith('.sce')).map(f => {
-                            const nameWithoutExt = f.name.substring(0, f.name.length - 4)
+                        data: files.map(f => {
+                            const nameWithoutExt = f.name.toLowerCase().endsWith(workspaceFileExtension)
+                                ? f.name.substring(0, f.name.length - workspaceFileExtension.length)
+                                : f.name
                             return {
                                 fileId: f.name,
                                 source: 'webdav' as const,
@@ -247,7 +322,7 @@ export function useCloudWorkspace() {
             try {
                 const targetFileId = fileId || `${name}.sce`
                 await putFile(webdavConfig.value, buildWebDavWorkspacePath(targetFileId), jsonStr, 'application/json')
-                return { success: true }
+                return { success: true, data: { fileId: targetFileId } }
             } catch (err) {
                 console.error(err)
                 return { success: false, message: getErrorMessage(err, '保存失败') }
@@ -274,14 +349,25 @@ export function useCloudWorkspace() {
             }
         }
 
+        let backupWarning: string | undefined
         if (primaryResult.success && backupMode.value && webdavConfig.value) {
+            const config = webdavConfig.value
             const targetFileId = primaryFileId ?? fileId ?? `${name}.sce`
+            startFetch()
             try {
-                putFile(webdavConfig.value, buildWebDavWorkspacePath(targetFileId), jsonStr, 'application/json').catch(e => {
-                    console.error('静默备份到WebDAV失败:', e)
+                await enqueueWebDavMirror(config, targetFileId, async () => {
+                    await putFile(
+                        config,
+                        buildWebDavWorkspacePath(buildWebDavMirrorFileId(targetFileId)),
+                        jsonStr,
+                        'application/json'
+                    )
                 })
             } catch (e) {
-                console.error('静默备份到WebDAV失败:', e)
+                console.error('备份到 WebDAV 失败:', e)
+                backupWarning = `SCE 云端已保存，但 WebDAV 备份失败：${getErrorMessage(e, '未知错误')}`
+            } finally {
+                endFetch()
             }
         }
 
@@ -295,6 +381,7 @@ export function useCloudWorkspace() {
             success: primaryResult.success,
             message: primaryResult.message,
             error: primaryResult.error,
+            backupWarning,
             source: primaryResult.source,
             data: primaryData
         }
@@ -331,12 +418,17 @@ export function useCloudWorkspace() {
     }
 
     // Delete a workspace
-    const deleteWorkspaceFromCloud = async (fileId: string, source: AuthType = authType.value) => {
+    const deleteWorkspaceFromCloud = async (
+        fileId: string,
+        source: AuthType = authType.value
+    ): Promise<CloudWorkspaceResult<Record<string, unknown> | CloudWorkspaceFile[]>> => {
         if (source === 'webdav' && !(backupMode.value && token.value)) {
             if (!webdavConfig.value) return { success: false, message: '请先连接 WebDAV' }
             startFetch()
             try {
-                await deleteFile(webdavConfig.value, buildWebDavWorkspacePath(fileId))
+                for (const targetFileId of getDirectWebDavDeleteFileIds(fileId)) {
+                    await deleteFile(webdavConfig.value, buildWebDavWorkspacePath(targetFileId))
+                }
                 return { success: true }
             } catch (err) {
                 console.error(err)
@@ -348,17 +440,30 @@ export function useCloudWorkspace() {
 
         const primaryResult = await callWorkspaceApi('delete', { fileId })
 
+        let backupWarning: string | undefined
         if (primaryResult.success && backupMode.value && webdavConfig.value) {
+            const config = webdavConfig.value
+            startFetch()
             try {
-                deleteFile(webdavConfig.value, buildWebDavWorkspacePath(fileId)).catch(e => {
-                    console.log('WebDAV静默删除文件失败:', e)
+                await enqueueWebDavMirror(config, fileId, async () => {
+                    await deleteFile(
+                        config,
+                        buildWebDavWorkspacePath(buildWebDavMirrorFileId(fileId))
+                    )
+                    await deleteFile(config, buildWebDavWorkspacePath(fileId))
                 })
             } catch (e) {
-                console.log('WebDAV静默删除文件失败:', e)
+                console.error('WebDAV 备份删除失败:', e)
+                backupWarning = `SCE 云端已删除，但 WebDAV 备份删除失败：${getErrorMessage(e, '未知错误')}`
+            } finally {
+                endFetch()
             }
         }
 
-        return primaryResult
+        return {
+            ...primaryResult,
+            backupWarning
+        }
     }
 
     const renameWorkspaceInCloud = async (fileId: string, name: string, source: AuthType = authType.value) => {

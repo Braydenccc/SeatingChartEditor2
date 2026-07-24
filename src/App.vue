@@ -35,7 +35,8 @@ const {
   flushAutoSave,
   autoSaveBackup,
   getAutoSaveBackup,
-  restoreAutoSaveBackup
+  restoreAutoSaveBackup,
+  discardAutoSaveRecovery
 } = useAutoSave()
 const { isWelcomeIntroVisible, showWelcomeIntroIfNeeded } = useWelcomeOnboarding()
 
@@ -182,6 +183,7 @@ const handleRestoreAutoSavePrompt = async () => {
     }
 
     showAutoSavePrompt.value = false
+    startAutoSave()
     success('已恢复自动保存的工作区')
     showWelcomeIntroIfNeeded()
   } finally {
@@ -191,8 +193,29 @@ const handleRestoreAutoSavePrompt = async () => {
 
 const handleDismissAutoSavePrompt = () => {
   showAutoSavePrompt.value = false
+  startAutoSave()
   warning('已暂不恢复自动保存，可在文件页的自动保存卡片中恢复')
   continueStartup()
+}
+
+const handleDiscardAutoSavePrompt = async () => {
+  if (isRestoringAutoSave.value) return
+
+  isRestoringAutoSave.value = true
+  try {
+    const discarded = await discardAutoSaveRecovery()
+    if (!discarded) {
+      error('无法忽略这份自动保存，受保护的恢复副本仍会保留')
+      return
+    }
+
+    showAutoSavePrompt.value = false
+    startAutoSave()
+    warning('已忽略这份自动保存')
+    continueStartup()
+  } finally {
+    isRestoringAutoSave.value = false
+  }
 }
 
 onMounted(async () => {
@@ -207,11 +230,11 @@ onMounted(async () => {
   }
 
   try {
-    const backup = await getAutoSaveBackup()
-    startAutoSave()
+    const backup = await getAutoSaveBackup({ preserveCurrentAsRecovery: true })
     if (backup) {
       showAutoSavePrompt.value = true
     } else {
+      startAutoSave()
       continueStartup()
     }
   } catch (autoSaveError) {
@@ -293,6 +316,9 @@ onBeforeUnmount(() => {
           <p class="autosave-message">可以先恢复这份自动保存，也可以稍后在文件页顶部的自动保存卡片中打开。</p>
 
           <template #footer><div class="autosave-actions">
+            <NButton class="autosave-discard" attr-type="button" secondary type="error" :disabled="isRestoringAutoSave" @click="handleDiscardAutoSavePrompt">
+              忽略此备份
+            </NButton>
             <NButton class="autosave-secondary" attr-type="button" secondary :disabled="isRestoringAutoSave" @click="handleDismissAutoSavePrompt">
               稍后处理
             </NButton>
@@ -362,6 +388,7 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
+.autosave-discard,
 .autosave-secondary,
 .autosave-primary {
   min-height: 38px;
@@ -374,6 +401,7 @@ onBeforeUnmount(() => {
     flex-direction: column-reverse;
   }
 
+  .autosave-discard,
   .autosave-secondary,
   .autosave-primary {
     width: 100%;

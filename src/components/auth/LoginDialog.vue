@@ -19,9 +19,7 @@
                     type="text"
                     placeholder="请输入字母或数字"
                     required
-                    maxlength="32"
-                    pattern="[A-Za-z0-9_\-]{1,32}"
-                    title="只能包含字母、数字、下划线和连字符"
+                    :maxlength="ACCOUNT_USERNAME_MAX_LENGTH"
                     autocomplete="username"
                     :input-props="inputAccessibilityProps(accountInputId(mode.value, 'username'), 'username')"
                     @update:value="clearInvalidField('username')"
@@ -156,6 +154,12 @@ import { Check } from 'lucide-vue-next'
 import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useWebDav } from '@/composables/useWebDav'
+import {
+  ACCOUNT_USERNAME_FORMAT_MESSAGE,
+  ACCOUNT_USERNAME_MAX_LENGTH,
+  ACCOUNT_USERNAME_PATTERN_SOURCE,
+  isValidAccountUsername
+} from '@/utils/authValidation'
 import { validatePasswordStrength, PASSWORD_MIN_LENGTH } from '@/utils/passwordValidator'
 
 const props = defineProps({
@@ -209,7 +213,11 @@ const inputAccessibilityProps = (id: string, field: LoginField, descriptionId?: 
   return {
     id,
     'aria-describedby': describedBy || undefined,
-    'aria-invalid': isInvalid ? true : undefined
+    'aria-invalid': isInvalid ? true : undefined,
+    ...(field === 'username' ? {
+      pattern: ACCOUNT_USERNAME_PATTERN_SOURCE,
+      title: ACCOUNT_USERNAME_FORMAT_MESSAGE
+    } : {})
   }
 }
 
@@ -306,6 +314,14 @@ const handleSubmit = async () => {
     return
   }
 
+  const normalizedUsername = username.value.trim()
+  if (!isValidAccountUsername(normalizedUsername)) {
+    invalidFields.value = new Set(['username'])
+    hasClientValidationError.value = true
+    errorMessage.value = ACCOUNT_USERNAME_FORMAT_MESSAGE
+    return
+  }
+
   if (tabMode.value === 'register') {
     const validation = validatePasswordStrength(password.value)
     if (!validation.isValid) {
@@ -319,7 +335,7 @@ const handleSubmit = async () => {
   loading.value = true
 
   const action = tabMode.value === 'login' ? login : register
-  const result = await action(username.value.trim(), password.value)
+  const result = await action(normalizedUsername, password.value)
 
   if (result.success) {
     successMessage.value = result.message ?? '操作成功'

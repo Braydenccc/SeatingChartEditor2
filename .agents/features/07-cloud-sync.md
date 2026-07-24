@@ -23,7 +23,7 @@ related_files:
 ```typescript
 // useAuth.ts 控制着当前的全局读写源
 const authType = ref<'retiehe' | 'webdav'>('retiehe')
-const backupMode = ref<boolean>(false) // 若开启，存入 retiehe 时会静默镜像抄送到 webdav
+const backupMode = ref<boolean>(false) // 若开启，存入 retiehe 时会等待镜像抄送到 webdav
 ```
 
 ## 4. 关键实现节点 (Implementation Details)
@@ -36,6 +36,7 @@ const backupMode = ref<boolean>(false) // 若开启，存入 retiehe 时会静�
 - **不依赖第三方库**: WebDAV 解析直接手写使用了原生的 `new DOMParser().parseFromString(text, 'text/xml')`，零 npm 依赖，避免了包体积膨胀。
 - **工作区列表管理**: SCE 云端工作区列表以 `users` 库中的 `{username}_files` 数组为准；删除工作区会在 `scefiles` 对应记录的 `metadata` 上写入 `deleted` 标记和 `deletedAt` 时间，不删除数据库值。`list`、`load`、`rename` 和覆盖保存都会忽略已标记删除的工作区。
 - **云工作区写入契约**: 新建 SCE 云工作区的 128 位十六进制 `fileId` 由服务端生成；客户端 `fileId` 只在对应工作区已存在时用于覆盖保存，不存在的自定义 ID 会被忽略并替换为服务端 ID。客户端始终以保存响应中的 canonical `fileId` 为准，并拒绝缺少有效 ID 的成功响应。单条 `scefiles` KV 在外层 JSON 编码后必须同时不超过 60000 字节和字符；写入会回读校验，失败不得返回成功。保存或重命名已确认写入后，兼容 `{username}_files` 索引读取、追加或回读失败（包括数据库抛异常）不会把主操作改判为失败：后端记录告警，并以 `success: true`、实际 `fileId` 和 `indexWarning` 返回；列表读取同时以权限表补齐索引。
+- **WebDAV 镜像契约**: SCE 备份模式以 `<canonicalFileId>.sce` 作为镜像文件名；保存与删除按 canonical ID 串行并等待镜像操作完成。SCE 主操作成功而镜像失败时保持主操作成功，同时向界面返回可见告警。WebDAV 列表兼容当前 32 位十六进制 ID 的旧无后缀镜像；新旧文件并存时只展示 `.sce` 文件，删除时会同时清理新旧文件。
 - **显式覆盖与来源绑定**: 保存弹层只有在用户明确选择当前 provider 的已有工作区时才传覆盖 `fileId`。未选择时遇到同名会阻止保存并提示改名或显式覆盖；切换 SCE/WebDAV 会清除旧选择，提交前再次校验 ID 属于当前来源。
 - **WebDAV 路径边界**: 应用状态保存原始文件 ID，只在传输边界把它验证并编码成单一 URL path segment。`/`、反斜杠、控制字符、`.` 和 `..` 会被拒绝；PROPFIND 先取得末段再解码，避免双重编码和路径穿越。
 - **DAV 代理安全边界**: Web 代理只连接预解析且确认公网的 HTTPS 地址，并通过 cURL resolve pin 固定目标 IP、保留 hostname/SNI/TLS、禁止代理与重定向，再复核实际连接 IP。请求体按实际读取字节执行 10 MiB 上限，不信任 `Content-Length` 作为最终依据。

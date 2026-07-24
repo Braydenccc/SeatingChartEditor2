@@ -14,9 +14,13 @@ const createElement = (rectProvider: () => { width: number; height: number }, tr
 describe('useZoom', () => {
   let useZoom: typeof UseZoomFactory
   let zoom: ReturnType<typeof UseZoomFactory>
+  let globalSettings: ReturnType<typeof import('../useGlobalSettings')['useGlobalSettings']>
 
   beforeEach(async () => {
     vi.resetModules()
+    const { useGlobalSettings } = await import('../useGlobalSettings')
+    globalSettings = useGlobalSettings()
+    globalSettings.resetSettings('ui')
     ;({ useZoom } = await import('../useZoom'))
     zoom = useZoom()
     zoom.resetZoom()
@@ -79,5 +83,33 @@ describe('useZoom', () => {
     expect(zoom.scale.value).toBe(0.8)
     expect(zoom.panX.value).toBe(0)
     expect(zoom.panY.value).toBe(0)
+  })
+
+  it('uses the configured default zoom as the auto-fit upper limit', async () => {
+    const viewport = createElement(() => ({ width: 1000, height: 800 }))
+    const chart = createElement(() => ({ width: 400, height: 300 }))
+    globalSettings.updateSetting('ui.defaultZoom', 60, { immediate: true })
+
+    zoom.registerViewport(viewport, chart)
+    await zoom.fitToViewport()
+
+    expect(zoom.autoFitScaleLimit.value).toBe(0.6)
+    expect(zoom.scale.value).toBe(0.6)
+  })
+
+  it('refits immediately when the limit changes without restricting manual zoom', async () => {
+    const viewport = createElement(() => ({ width: 1000, height: 800 }))
+    const chart = createElement(() => ({ width: 400, height: 300 }))
+    globalSettings.updateSetting('ui.defaultZoom', 60, { immediate: true })
+    zoom.registerViewport(viewport, chart)
+    await zoom.fitToViewport()
+
+    globalSettings.updateSetting('ui.defaultZoom', 80, { immediate: true })
+    await vi.waitFor(() => expect(zoom.scale.value).toBe(0.8))
+
+    zoom.zoomIn()
+    expect(zoom.scale.value).toBe(0.9)
+    zoom.setScale(2.5)
+    expect(zoom.scale.value).toBe(2.5)
   })
 })

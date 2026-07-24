@@ -10,6 +10,12 @@ npm run test:ui
 npm run test:watch
 ```
 
+自动排位性能基准默认跳过，需要显式运行：
+
+```bash
+npm run test:assignment:benchmark
+```
+
 ## 测试结构
 
 ```
@@ -114,10 +120,14 @@ describe('Edge Cases', () => {
 
 ## 覆盖率目标
 
-- Lines: 70%
-- Functions: 70%
-- Branches: 60%
-- Statements: 70%
+当前覆盖率门禁统计核心业务层 `src/composables/*.ts`、`src/utils/*.ts` 与 `src/platform/*.ts`，Vue 组件和视图仍会运行测试，但暂不计入这一阶段的覆盖率聚合。
+
+- 核心业务层总计：Lines 70%、Functions 75%、Branches 65%、Statements 70%。
+- `src/composables/*.ts`：Lines 70%、Functions 75%、Branches 65%、Statements 70%。
+- `src/utils/*.ts`：Lines 75%、Functions 80%、Branches 65%、Statements 75%。
+- `src/platform/*.ts`：Lines 65%、Functions 70%、Branches 70%、Statements 65%。
+
+这些阈值按总计和目录层级聚合，不是逐文件门禁；修改低覆盖的关键文件时仍应补充对应回归测试。
 
 ## CI/CD
 

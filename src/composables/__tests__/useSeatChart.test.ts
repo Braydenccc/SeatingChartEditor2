@@ -16,7 +16,8 @@ vi.mock('../useUndo', () => ({
     recordSwap: vi.fn(),
     recordToggleEmpty: vi.fn(),
     recordBatch: vi.fn(),
-    createSnapshot: vi.fn(() => [])
+    createSnapshot: vi.fn(() => []),
+    clearHistory: vi.fn()
   })
 }))
 
@@ -133,6 +134,35 @@ describe('useSeatChart', () => {
       expect(seatChart.studentSeatMap.value).not.toBe(firstIndex)
       expect(seatChart.studentSeatMap.value.get(1)?.id).toBe('seat-0-0-1')
       expect(seatChart.findSeatByStudent(1)?.id).toBe('seat-0-0-1')
+    })
+  })
+
+  describe('batchUpdateSeats', () => {
+    it('does not partially write when any target seat is missing', () => {
+      seatChart.assignStudent('seat-0-0-0', 1, false)
+      const before = seatChart.seats.value.map(seat => ({ ...seat }))
+
+      const result = seatChart.batchUpdateSeats([
+        { seatId: 'seat-0-0-0', studentId: 2 },
+        { seatId: 'seat-missing', studentId: 3 }
+      ], false)
+
+      expect(result).toBe(false)
+      expect(seatChart.seats.value).toEqual(before)
+    })
+
+    it('does not partially write when the final state assigns one student twice', () => {
+      seatChart.assignStudent('seat-0-0-0', 1, false)
+      seatChart.assignStudent('seat-0-0-1', 2, false)
+      const before = seatChart.seats.value.map(seat => ({ ...seat }))
+
+      const result = seatChart.batchUpdateSeats([
+        { seatId: 'seat-0-0-0', studentId: 3 },
+        { seatId: 'seat-0-0-1', studentId: 3 }
+      ], false)
+
+      expect(result).toBe(false)
+      expect(seatChart.seats.value).toEqual(before)
     })
   })
 

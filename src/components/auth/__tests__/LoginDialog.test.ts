@@ -117,6 +117,24 @@ describe('LoginDialog', () => {
     expect(passwordProps['aria-describedby']).toBeUndefined()
   })
 
+  it.each([
+    { mode: 'login' as const, action: () => mocks.login },
+    { mode: 'register' as const, action: () => mocks.register }
+  ])('blocks an invalid username before the $mode request', async ({ mode, action }) => {
+    const wrapper = await mountDialog(mode)
+    await setInputValue(wrapper, `-${mode}-username`, '非法 用户')
+    await setInputValue(wrapper, `-${mode}-password`, 'Password1')
+
+    await getPane(wrapper, mode).get('form').trigger('submit')
+    await flushPromises()
+
+    expect(action()).not.toHaveBeenCalled()
+    expect(wrapper.get('.error-message').text()).toContain('用户名只能包含字母、数字、下划线和连字符')
+    const usernameProps = getInput(wrapper, `-${mode}-username`).props('inputProps') as Record<string, unknown>
+    expect(usernameProps['aria-invalid']).toBe(true)
+    expect(usernameProps.pattern).toBe('[A-Za-z0-9_-]{1,32}')
+  })
+
   it('does not mark credentials invalid for a server-side failure', async () => {
     mocks.login.mockResolvedValue({ success: false, message: '服务暂不可用' })
     const wrapper = await mountDialog()

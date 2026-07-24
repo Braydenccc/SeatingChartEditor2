@@ -1,4 +1,4 @@
-import { safeStorageGet, safeStorageRemove, safeStorageSet } from '@/utils/storage'
+import { safeStorageRemove, safeStorageSet } from '@/utils/storage'
 import { isTauriRuntime } from './runtime'
 import { writeTextFileAtomicPath } from './files'
 
@@ -22,7 +22,12 @@ const createStorageError = (operation: '读取' | '删除', key: string, cause: 
 
 export async function readStoredText(key: string): Promise<string | null> {
   if (!isTauriRuntime()) {
-    return safeStorageGet(key)
+    try {
+      return globalThis.localStorage.getItem(key)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`读取浏览器存储“${key}”失败：${detail}`)
+    }
   }
 
   try {

@@ -132,6 +132,70 @@ describe('useAutoSave', () => {
     }))
   })
 
+  it('protects a legacy current snapshot before autosave can advance the current slot', async () => {
+    const autoSave = useAutoSave()
+    const time = '2026-07-05T08:00:00.000Z'
+    mocks.storage.set('sce-autosave-backup', createWorkspaceJson(time, '张三'))
+    mocks.storage.set('sce-autosave-time', time)
+
+    const protectedBackup = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+
+    expect(protectedBackup.slot).toBe('recovery-pending')
+    expect(protectedBackup.snapshotId).toBeTruthy()
+    expect(JSON.parse(mocks.storage.get('sce-autosave-recovery-pending'))).toMatchObject({
+      type: 'sce-autosave',
+      version: 2,
+      snapshotId: protectedBackup.snapshotId,
+      workspace: {
+        students: [{ name: '张三' }]
+      }
+    })
+
+    expect(autoSave.startAutoSave()).toBe(true)
+    workspaceJson.value = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    await nextTick()
+    await autoSave.flushAutoSave()
+
+    expect(JSON.parse(mocks.storage.get('sce-autosave-backup')).workspace.students[0].name).toBe('李四')
+    expect(JSON.parse(mocks.storage.get('sce-autosave-recovery-pending')).workspace.students[0].name).toBe('张三')
+    expect(autoSave.autoSaveBackup.value?.slot).toBe('recovery-pending')
+    expect(autoSave.autoSaveBackup.value?.data.students[0]?.name).toBe('张三')
+  })
+
+  it('keeps the protected recovery slot intact when a later current write fails', async () => {
+    const autoSave = useAutoSave()
+    const time = '2026-07-05T08:00:00.000Z'
+    mocks.storage.set('sce-autosave-backup', createWorkspaceJson(time, '张三'))
+    mocks.storage.set('sce-autosave-time', time)
+    await autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true })
+    const protectedRecord = mocks.storage.get('sce-autosave-recovery-pending')
+
+    mocks.writeStoredText.mockResolvedValueOnce(false)
+    await expect(autoSave.performAutoSave(
+      createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    )).resolves.toBe(false)
+
+    expect(mocks.storage.get('sce-autosave-recovery-pending')).toBe(protectedRecord)
+    expect(autoSave.autoSaveBackup.value?.data.students[0]?.name).toBe('张三')
+  })
+
+  it('blocks autosave when the startup snapshot cannot be copied into the protected slot', async () => {
+    const autoSave = useAutoSave()
+    const time = '2026-07-05T08:00:00.000Z'
+    const legacySnapshot = createWorkspaceJson(time, '张三')
+    mocks.storage.set('sce-autosave-backup', legacySnapshot)
+    mocks.storage.set('sce-autosave-time', time)
+    mocks.writeStoredText.mockResolvedValueOnce(false)
+
+    await expect(autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true }))
+      .rejects.toThrow('无法建立受保护的自动保存恢复副本')
+
+    expect(autoSave.startAutoSave()).toBe(false)
+    expect(mocks.storage.get('sce-autosave-backup')).toBe(legacySnapshot)
+  })
+
   it('distinguishes storage read failures from a missing backup', async () => {
     const autoSave = useAutoSave()
     mocks.readStoredText.mockRejectedValueOnce(new Error('permission denied'))
@@ -169,6 +233,206 @@ describe('useAutoSave', () => {
       .rejects.toThrow('自动保存备份缺少有效的保存时间')
   })
 
+  it('reports an empty current slot instead of treating it as absent', async () => {
+    const autoSave = useAutoSave()
+    mocks.storage.set('sce-autosave-backup', '')
+
+    await expect(autoSave.getAutoSaveBackup())
+      .rejects.toThrow('自动保存备份内容为空')
+
+    expect(autoSave.startAutoSave()).toBe(false)
+  })
+
+  it('serializes concurrent reads while preserving each request options and loading state', async () => {
+    const autoSave = useAutoSave()
+    const time = '2026-07-05T08:00:00.000Z'
+    mocks.storage.set('sce-autosave-backup', createWorkspaceJson(time, '张三'))
+    mocks.storage.set('sce-autosave-time', time)
+    const releaseRecoveryReads: Array<() => void> = []
+    mocks.readStoredText.mockImplementation(async (key: string) => {
+      if (key === 'sce-autosave-recovery-pending') {
+        await new Promise<void>(resolve => releaseRecoveryReads.push(resolve))
+      }
+      return mocks.storage.get(key) ?? null
+    })
+
+    const currentRead = autoSave.getAutoSaveBackup()
+    const protectedRead = autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true })
+
+    await vi.waitFor(() => expect(releaseRecoveryReads).toHaveLength(1))
+    expect(autoSave.isAutoSaveBackupLoading.value).toBe(true)
+    releaseRecoveryReads[0]?.()
+    const current = requireDefined(await currentRead)
+
+    await vi.waitFor(() => expect(releaseRecoveryReads).toHaveLength(2))
+    expect(current.slot).toBe('current')
+    expect(autoSave.isAutoSaveBackupLoading.value).toBe(true)
+    releaseRecoveryReads[1]?.()
+    const protectedBackup = requireDefined(await protectedRead)
+
+    expect(protectedBackup.slot).toBe('recovery-pending')
+    expect(autoSave.autoSaveBackup.value?.slot).toBe('recovery-pending')
+    expect(autoSave.isAutoSaveBackupLoading.value).toBe(false)
+  })
+
+  it('uses a valid recovery slot when the current slot is malformed', async () => {
+    const autoSave = useAutoSave()
+    await autoSave.performAutoSave(createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三'))
+    const validRecord = mocks.storage.get('sce-autosave-backup')
+    mocks.storage.set('sce-autosave-recovery-pending', validRecord)
+    mocks.storage.set('sce-autosave-backup', '{malformed-current')
+
+    const loaded = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+
+    expect(loaded.slot).toBe('recovery-pending')
+    expect(loaded.data.students[0]?.name).toBe('张三')
+    expect(autoSave.startAutoSave()).toBe(true)
+  })
+
+  it('keeps the only valid current snapshot write-protected when recovery is malformed', async () => {
+    const autoSave = useAutoSave()
+    await autoSave.performAutoSave(createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三'))
+    const currentRecord = mocks.storage.get('sce-autosave-backup')
+    const malformedRecovery = '{malformed-recovery'
+    mocks.storage.set('sce-autosave-recovery-pending', malformedRecovery)
+    mocks.writeStoredText.mockClear()
+
+    const loaded = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+
+    expect(loaded.slot).toBe('current')
+    expect(loaded.data.students[0]?.name).toBe('张三')
+    expect(mocks.storage.get('sce-autosave-recovery-pending')).toBe(malformedRecovery)
+    expect(mocks.writeStoredText).not.toHaveBeenCalled()
+    await autoSave.getAutoSaveBackup()
+    expect(autoSave.startAutoSave()).toBe(false)
+
+    workspaceJson.value = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    await nextTick()
+    await autoSave.flushAutoSave()
+
+    expect(mocks.storage.get('sce-autosave-backup')).toBe(currentRecord)
+  })
+
+  it('keeps the only valid current snapshot write-protected when recovery is empty', async () => {
+    const autoSave = useAutoSave()
+    await autoSave.performAutoSave(createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三'))
+    const currentRecord = mocks.storage.get('sce-autosave-backup')
+    mocks.storage.set('sce-autosave-recovery-pending', '')
+    mocks.writeStoredText.mockClear()
+
+    const loaded = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+
+    expect(loaded.slot).toBe('current')
+    expect(loaded.data.students[0]?.name).toBe('张三')
+    expect(mocks.storage.get('sce-autosave-recovery-pending')).toBe('')
+    expect(mocks.writeStoredText).not.toHaveBeenCalled()
+    expect(autoSave.startAutoSave()).toBe(false)
+
+    workspaceJson.value = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    await nextTick()
+    await autoSave.flushAutoSave()
+
+    expect(mocks.storage.get('sce-autosave-backup')).toBe(currentRecord)
+  })
+
+  it('keeps the only valid current snapshot write-protected when recovery cannot be read', async () => {
+    const autoSave = useAutoSave()
+    await autoSave.performAutoSave(createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三'))
+    const currentRecord = mocks.storage.get('sce-autosave-backup')
+    mocks.readStoredText.mockImplementation(async (key: string) => {
+      if (key === 'sce-autosave-recovery-pending') throw new Error('recovery permission denied')
+      return mocks.storage.get(key) ?? null
+    })
+
+    const loaded = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+
+    expect(loaded.slot).toBe('current')
+    expect(autoSave.startAutoSave()).toBe(false)
+    workspaceJson.value = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    await nextTick()
+    await autoSave.flushAutoSave()
+    expect(mocks.storage.get('sce-autosave-backup')).toBe(currentRecord)
+  })
+
+  it('repairs a malformed recovery slot after explicit restore before unlocking autosave', async () => {
+    const autoSave = useAutoSave()
+    await autoSave.performAutoSave(createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三'))
+    mocks.storage.set('sce-autosave-recovery-pending', '{malformed-recovery')
+    const loaded = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+
+    expect(autoSave.startAutoSave()).toBe(false)
+    await expect(autoSave.restoreAutoSaveBackup(loaded)).resolves.toBe(true)
+
+    expect(autoSave.autoSaveBackup.value).toBeNull()
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(false)
+    expect(JSON.parse(mocks.storage.get('sce-autosave-handled-time'))).toMatchObject({
+      snapshotId: loaded.snapshotId
+    })
+    expect(autoSave.isAutoSaveEnabled.value).toBe(true)
+  })
+
+  it('explicitly ignores a protected current and removes its damaged recovery slot before unlocking', async () => {
+    const autoSave = useAutoSave()
+    await autoSave.performAutoSave(createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三'))
+    mocks.storage.set('sce-autosave-recovery-pending', '{malformed-recovery')
+    await autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true })
+
+    expect(autoSave.startAutoSave()).toBe(false)
+    await expect(autoSave.discardAutoSaveRecovery()).resolves.toBe(true)
+
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(false)
+    expect(autoSave.autoSaveBackup.value).toBeNull()
+    expect(autoSave.isAutoSaveEnabled.value).toBe(true)
+  })
+
+  it('repairs a malformed current before explicitly ignoring the only valid recovery', async () => {
+    const autoSave = useAutoSave()
+    await autoSave.performAutoSave(createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三'))
+    const recoveryRecord = mocks.storage.get('sce-autosave-backup')
+    mocks.storage.set('sce-autosave-recovery-pending', recoveryRecord)
+    mocks.storage.set('sce-autosave-backup', '{malformed-current')
+    const recovery = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+
+    await expect(autoSave.discardAutoSaveRecovery()).resolves.toBe(true)
+
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(false)
+    expect(JSON.parse(mocks.storage.get('sce-autosave-backup'))).toMatchObject({
+      snapshotId: recovery.snapshotId,
+      workspace: {
+        students: [{ name: '张三' }]
+      }
+    })
+    await expect(autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true }))
+      .resolves.toBeNull()
+  })
+
+  it('keeps the only valid recovery when malformed current repair fails during ignore', async () => {
+    const autoSave = useAutoSave()
+    await autoSave.performAutoSave(createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三'))
+    const recoveryRecord = mocks.storage.get('sce-autosave-backup')
+    mocks.storage.set('sce-autosave-recovery-pending', recoveryRecord)
+    mocks.storage.set('sce-autosave-backup', '{malformed-current')
+    await autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true })
+    mocks.writeStoredText.mockResolvedValueOnce(false)
+
+    await expect(autoSave.discardAutoSaveRecovery()).resolves.toBe(false)
+
+    expect(mocks.storage.get('sce-autosave-recovery-pending')).toBe(recoveryRecord)
+    expect(mocks.storage.get('sce-autosave-backup')).toBe('{malformed-current')
+  })
+
   it('restores a backup and records it as the last autosave workspace', async () => {
     const autoSave = useAutoSave()
     const time = '2026-07-05T08:00:00.000Z'
@@ -185,7 +449,174 @@ describe('useAutoSave', () => {
       name: '自动保存',
       time
     })
+    expect(mocks.writeStoredText).toHaveBeenCalledWith(
+      'sce-autosave-handled-time',
+      expect.stringContaining(backup.snapshotId)
+    )
+    await expect(autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true }))
+      .resolves.toBeNull()
+  })
+
+  it('consumes a protected candidate only after its workspace restores successfully', async () => {
+    const autoSave = useAutoSave()
+    const time = '2026-07-05T08:00:00.000Z'
+    mocks.storage.set('sce-autosave-backup', createWorkspaceJson(time, '张三'))
+    mocks.storage.set('sce-autosave-time', time)
+    const backup = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+
+    mocks.applyWorkspaceData.mockResolvedValueOnce(false)
+    await expect(autoSave.restoreAutoSaveBackup(backup)).resolves.toBe(false)
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(true)
+
+    mocks.applyWorkspaceData.mockResolvedValueOnce(true)
+    await expect(autoSave.restoreAutoSaveBackup(backup)).resolves.toBe(true)
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(false)
+    expect(mocks.storage.has('sce-autosave-backup')).toBe(true)
+    expect(autoSave.autoSaveBackup.value).toBeNull()
+    await expect(autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true }))
+      .resolves.toBeNull()
+  })
+
+  it('explicitly discards only the protected recovery candidate', async () => {
+    const autoSave = useAutoSave()
+    const time = '2026-07-05T08:00:00.000Z'
+    mocks.storage.set('sce-autosave-backup', createWorkspaceJson(time, '张三'))
+    mocks.storage.set('sce-autosave-time', time)
+    await autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true })
+
+    await expect(autoSave.discardAutoSaveRecovery()).resolves.toBe(true)
+
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(false)
+    expect(mocks.storage.has('sce-autosave-backup')).toBe(true)
+  })
+
+  it('keeps recovery until a deferred restored-current write succeeds and reads back', async () => {
+    const autoSave = useAutoSave()
+    const restoredJson = createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三')
+    const newerJson = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    await autoSave.performAutoSave(restoredJson)
+    const recovery = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+    await autoSave.performAutoSave(newerJson)
+    mocks.applyWorkspaceData.mockImplementationOnce(async () => {
+      workspaceJson.value = restoredJson
+      return true
+    })
+    const deferred = deferredWrite()
+    mocks.writeStoredText.mockImplementationOnce(deferred.implementation)
+
+    const restorePromise = autoSave.restoreAutoSaveBackup(recovery)
+    await vi.waitFor(() => expect(mocks.writeStoredText).toHaveBeenCalledTimes(4))
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(true)
+
+    deferred.release()
+    await expect(restorePromise).resolves.toBe(true)
+
+    expect(JSON.parse(mocks.storage.get('sce-autosave-backup')).workspace.students[0].name).toBe('张三')
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(false)
+  })
+
+  it('retains recovery when the restored-current write fails and readback is stale', async () => {
+    const autoSave = useAutoSave()
+    const restoredJson = createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三')
+    const newerJson = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    await autoSave.performAutoSave(restoredJson)
+    const recovery = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+    await autoSave.performAutoSave(newerJson)
+    mocks.applyWorkspaceData.mockImplementationOnce(async () => {
+      workspaceJson.value = restoredJson
+      return true
+    })
+    mocks.writeStoredText.mockResolvedValueOnce(false)
+
+    await expect(autoSave.restoreAutoSaveBackup(recovery)).resolves.toBe(true)
+
+    expect(JSON.parse(mocks.storage.get('sce-autosave-backup')).workspace.students[0].name).toBe('李四')
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(true)
+    expect(mocks.loggerError).toHaveBeenCalledWith(
+      '自动保存恢复成功，但读回的当前快照与恢复结果不一致'
+    )
+  })
+
+  it('does not consume a newer recovery record through a stale backup object', async () => {
+    const autoSave = useAutoSave()
+    const firstJson = createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三')
+    const secondJson = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    await autoSave.performAutoSave(firstJson)
+    const staleRecovery = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+    await autoSave.performAutoSave(secondJson)
+    const newerRecoveryRecord = mocks.storage.get('sce-autosave-backup')
+    mocks.storage.set('sce-autosave-recovery-pending', newerRecoveryRecord)
+    mocks.applyWorkspaceData.mockImplementationOnce(async () => {
+      workspaceJson.value = firstJson
+      return true
+    })
+
+    await expect(autoSave.restoreAutoSaveBackup(staleRecovery)).resolves.toBe(true)
+
+    expect(JSON.parse(mocks.storage.get('sce-autosave-recovery-pending')).workspace.students[0].name).toBe('李四')
+    expect(mocks.loggerError).toHaveBeenCalledWith(
+      '自动保存已恢复，但受保护的恢复副本未能消费并将继续保留'
+    )
+  })
+
+  it('does not re-prompt an explicitly ignored snapshot after a no-edit restart', async () => {
+    const autoSave = useAutoSave()
+    const snapshot = createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三')
+    await autoSave.performAutoSave(snapshot)
+    await autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true })
+
+    await expect(autoSave.discardAutoSaveRecovery()).resolves.toBe(true)
+    const handledMarker = JSON.parse(mocks.storage.get('sce-autosave-handled-time'))
+    expect(handledMarker).toMatchObject({
+      type: 'sce-autosave-handled',
+      version: 1
+    })
+
+    await expect(autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true }))
+      .resolves.toBeNull()
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(false)
+    expect(autoSave.autoSaveBackup.value?.slot).toBe('current')
+  })
+
+  it('keeps legacy ISO handled markers compatible with protected startup reads', async () => {
+    const autoSave = useAutoSave()
+    const time = '2026-07-05T08:00:00.000Z'
+    mocks.storage.set('sce-autosave-backup', createWorkspaceJson(time, '张三'))
+    mocks.storage.set('sce-autosave-time', time)
+    mocks.storage.set('sce-autosave-handled-time', time)
+
+    await expect(autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true }))
+      .resolves.toBeNull()
+
+    expect(mocks.storage.has('sce-autosave-recovery-pending')).toBe(false)
     expect(mocks.writeStoredText).not.toHaveBeenCalled()
+    expect(autoSave.autoSaveBackup.value?.slot).toBe('current')
+  })
+
+  it('keeps an updated current snapshot when ignoring an older recovery candidate', async () => {
+    const autoSave = useAutoSave()
+    const oldJson = createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三')
+    const updatedJson = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
+    await autoSave.performAutoSave(oldJson)
+    await autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true })
+    await autoSave.performAutoSave(updatedJson)
+
+    await expect(autoSave.discardAutoSaveRecovery()).resolves.toBe(true)
+
+    expect(JSON.parse(mocks.storage.get('sce-autosave-backup')).workspace.students[0].name).toBe('李四')
+    const nextRecovery = requireDefined(await autoSave.getAutoSaveBackup({
+      preserveCurrentAsRecovery: true
+    }))
+    expect(nextRecovery.slot).toBe('recovery-pending')
+    expect(nextRecovery.data.students[0]?.name).toBe('李四')
   })
 
   it('does not write a new backup when only the generated meta timestamp changes', async () => {
@@ -370,7 +801,7 @@ describe('useAutoSave', () => {
     autoSave.startAutoSave()
 
     const clearPromise = autoSave.clearAutoSaveBackup()
-    await vi.waitFor(() => expect(pendingRemovals).toHaveLength(3))
+    await vi.waitFor(() => expect(pendingRemovals).toHaveLength(1))
 
     workspaceJson.value = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
     await nextTick()
@@ -398,7 +829,7 @@ describe('useAutoSave', () => {
     autoSave.startAutoSave()
 
     const clearPromise = autoSave.clearAutoSaveBackup()
-    await vi.waitFor(() => expect(pendingRemovals).toHaveLength(3))
+    await vi.waitFor(() => expect(pendingRemovals).toHaveLength(1))
 
     workspaceJson.value = createWorkspaceJson('2026-07-05T08:01:00.000Z', '李四')
     await nextTick()
@@ -428,7 +859,7 @@ describe('useAutoSave', () => {
     const autoSave = useAutoSave()
     await autoSave.performAutoSave()
     mocks.removeStoredText.mockImplementation(async (key: string) => {
-      if (key === 'sce-autosave-backup') {
+      if (key === 'sce-autosave-backup' || key === 'sce-autosave-recovery-pending') {
         mocks.storage.delete(key)
         return true
       }
@@ -440,11 +871,45 @@ describe('useAutoSave', () => {
     expect(autoSave.autoSaveBackup.value).toBeNull()
     expect(mocks.storage.has('sce-autosave-backup')).toBe(false)
     expect(mocks.loggerError).not.toHaveBeenCalled()
-    expect(console.warn).toHaveBeenCalledWith('自动保存备份已清理，但旧版自动保存标记清理失败')
+    expect(console.warn).toHaveBeenCalledWith('自动保存备份已清理，但旧版时间或已处理标记清理失败')
 
     mocks.removeStoredText.mockResolvedValue(true)
     await expect(autoSave.performAutoSave()).resolves.toBe(true)
     expect(mocks.writeStoredText).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not touch recovery when removing the current backup fails', async () => {
+    const autoSave = useAutoSave()
+    await autoSave.performAutoSave(
+      createWorkspaceJson('2026-07-05T08:00:00.000Z', '张三')
+    )
+    await autoSave.getAutoSaveBackup({ preserveCurrentAsRecovery: true })
+    const protectedRecord = mocks.storage.get('sce-autosave-recovery-pending')
+    mocks.removeStoredText.mockClear()
+    mocks.removeStoredText.mockResolvedValue(false)
+
+    await expect(autoSave.clearAutoSaveBackup()).resolves.toBe(false)
+
+    expect(mocks.removeStoredText).toHaveBeenCalledTimes(1)
+    expect(mocks.removeStoredText).toHaveBeenCalledWith('sce-autosave-backup')
+    expect(mocks.storage.get('sce-autosave-recovery-pending')).toBe(protectedRecord)
+  })
+
+  it('clears autosave storage in current, legacy and recovery order', async () => {
+    const autoSave = useAutoSave()
+    mocks.storage.set('sce-autosave-backup', 'current')
+    mocks.storage.set('sce-autosave-time', 'legacy-time')
+    mocks.storage.set('sce-autosave-handled-time', 'handled')
+    mocks.storage.set('sce-autosave-recovery-pending', 'recovery')
+
+    await expect(autoSave.clearAutoSaveBackup()).resolves.toBe(true)
+
+    expect(mocks.removeStoredText.mock.calls.map(([key]) => key)).toEqual([
+      'sce-autosave-backup',
+      'sce-autosave-time',
+      'sce-autosave-handled-time',
+      'sce-autosave-recovery-pending'
+    ])
   })
 
   it('keeps a successful backup when legacy marker cleanup fails', async () => {

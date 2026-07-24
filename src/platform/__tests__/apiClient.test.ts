@@ -97,6 +97,40 @@ describe('apiClient', () => {
     expect(cancelRetryBody).toHaveBeenCalledOnce()
   })
 
+  it('interrupts response retry delay when the caller cancels', async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { apiFetch } = await import('../apiClient')
+    const request = apiFetch('/api/workspace.php', { signal: controller.signal }, 3, 1000)
+    await vi.advanceTimersByTimeAsync(0)
+    const reason = new DOMException('用户取消', 'AbortError')
+    const assertion = expect(request).rejects.toBe(reason)
+
+    controller.abort(reason)
+
+    await assertion
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('interrupts failure retry delay when the caller cancels', async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.stubGlobal('fetch', fetchMock)
+    const { apiFetch } = await import('../apiClient')
+    const request = apiFetch('/api/workspace.php', { signal: controller.signal }, 3, 1000)
+    await vi.advanceTimersByTimeAsync(0)
+    const reason = new DOMException('用户取消', 'AbortError')
+    const assertion = expect(request).rejects.toBe(reason)
+
+    controller.abort(reason)
+
+    await assertion
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('composes the caller signal with a finite request timeout', async () => {
     vi.useFakeTimers()
     const fetchMock = vi.fn((_url: string, options?: RequestInit) => new Promise<Response>((_resolve, reject) => {

@@ -182,8 +182,8 @@ export function useZoneRotation() {
     if (editingZoneId.value === zoneId) editingZoneId.value = null
   }
 
-  const selectEditingZone = (zoneId: number) => {
-    editingZoneId.value = editingZoneId.value === zoneId ? null : zoneId
+  const setEditingZone = (zoneId: number) => {
+    editingZoneId.value = zoneId
   }
 
   const clearEditingZone = () => { editingZoneId.value = null }
@@ -336,7 +336,12 @@ export function useZoneRotation() {
 
     // 使用统一接口一次提交，recordUndo=false 因为外层已使用 recordBatch
     if (updates.length > 0) {
-      batchUpdateSeats(updates, false)
+      if (!batchUpdateSeats(updates, false)) {
+        return {
+          moved: 0,
+          errors: ['轮换结果无法原子写入座位状态，操作已取消']
+        }
+      }
     }
 
     return { moved: updates.length, errors }
@@ -361,7 +366,7 @@ export function useZoneRotation() {
     updateRotGroup,
     addZoneToGroup,
     deleteZoneFromGroup,
-    selectEditingZone,
+    setEditingZone,
     clearEditingZone,
     toggleSeatInEditingZone,
     getRotZoneHighlights,

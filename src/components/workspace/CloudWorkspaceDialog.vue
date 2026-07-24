@@ -46,6 +46,7 @@
                 :input-props="{ id: 'cloud-workspace-name' }"
                 placeholder="例如：2026级二班座位表"
                 maxlength="50"
+                :disabled="isSaving || isFetching"
                 @keyup.enter="handleSave"
                 autofocus
               />
@@ -78,7 +79,7 @@
             <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
             
             <div class="dialog-actions">
-              <NButton type="primary" block :loading="isSaving" @click="handleSave" :disabled="!workspaceName.trim()">
+              <NButton type="primary" block :loading="isSaving" @click="handleSave" :disabled="isSaving || isFetching || !workspaceName.trim()">
                 {{ isSaving ? '保存中...' : (selectedOverwriteId ? '覆盖已有工作区' : '保存为新工作区') }}
               </NButton>
             </div>
@@ -180,7 +181,7 @@ const emit = defineEmits<{
 
 const { isFetching, listWorkspaces, saveWorkspaceToCloud, loadWorkspaceFromCloud, deleteWorkspaceFromCloud } = useCloudWorkspace()
 const { getWorkspaceJson, applyWorkspaceData, saveLastWorkspace, getLastWorkspace, clearLastWorkspace } = useWorkspace()
-const { success, error, confirm } = useLogger()
+const { success, warning, error, confirm } = useLogger()
 const { token, webdavConfig, authType, backupMode } = useAuth()
 
 const isSaveMode = ref(false)
@@ -258,6 +259,7 @@ const selectForOverwrite = (ws: CloudWorkspaceFile) => {
 }
 
 const handleSave = async () => {
+  if (isSaving.value || isFetching.value) return
   const trimmedName = workspaceName.value.trim()
   if (!trimmedName) return
 
@@ -294,6 +296,7 @@ const handleSave = async () => {
     
     if (result.success) {
       success('工作区已保存至云端！')
+      if (result.backupWarning) warning(result.backupWarning)
 
       const savedFileId = result.data?.fileId || targetFileId
       if (savedFileId) {
@@ -378,6 +381,7 @@ const confirmDelete = async (ws: CloudWorkspaceFile) => {
     const lastWorkspace = getLastWorkspace()
     if (lastWorkspace?.type === 'cloud' && lastWorkspace.fileId === ws.fileId) clearLastWorkspace()
     success(`工作区 ${ws.metadata.name} 已删除`)
+    if (result.backupWarning) warning(result.backupWarning)
     await fetchWorkspaces()
   } else {
     error(result.message || '删除失败')

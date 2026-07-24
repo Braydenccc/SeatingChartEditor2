@@ -1,7 +1,7 @@
 import { fetchWithRetry } from '@/utils/fetchHelpers'
 import { getOrCreateCsrfToken, useAuth } from './useAuth'
 import { isTauriRuntime } from '@/platform/runtime'
-import { webdavFetch } from '@/platform/webdavTransport'
+import { WEBDAV_REQUEST_TIMEOUT_MS, webdavFetch } from '@/platform/webdavTransport'
 import { decodeWebDavHrefFilename } from '@/utils/webdavPath'
 import type { WebDavConfig } from '@/types/models'
 
@@ -126,7 +126,9 @@ export function useWebDav() {
           'x-dav-path': path.startsWith('http') ? `${new URL(path).pathname}${new URL(path).search}` : path,
           'X-CSRF-Token': csrfToken
         }
-      }, 2)
+      }, 2, 1000, {
+        timeoutMs: WEBDAV_REQUEST_TIMEOUT_MS
+      })
 
       return handleResponse(response)
     }
@@ -159,7 +161,7 @@ export function useWebDav() {
   // 创建文件夹 (MKCOL)
   const mkcol = async (config: WebDavConfig, path: string) => {
     const collPath = path.endsWith('/') ? path : path + '/'
-    await request(config, collPath, { method: 'MKCOL' }, { noThrowStatuses: [405, 409] })
+    await request(config, collPath, { method: 'MKCOL' }, { noThrowStatuses: [405] })
     return true
   }
 

@@ -48,7 +48,6 @@
       placement="bottom"
       height="min(68dvh, calc(100% - 8px))"
       display-directive="show"
-      :native-scrollbar="false"
       :z-index="999"
       role="dialog"
       aria-modal="true"
@@ -59,8 +58,7 @@
     >
       <NDrawerContent
         closable
-        :native-scrollbar="false"
-        :body-style="{ overflow: 'hidden' }"
+        :body-style="{ minHeight: 0, overflow: 'hidden' }"
         :body-content-style="{ height: '100%', padding: 0, overflow: 'hidden' }"
         @close="closeMobileDrawer"
       >

@@ -1,5 +1,11 @@
 import { ref } from 'vue'
-import { getUiApis, requestUiConfirm, type ConfirmRequest } from '@/services/uiFeedback'
+import {
+  getUiApis,
+  requestUiAlert,
+  requestUiConfirm,
+  type AlertRequest,
+  type ConfirmRequest
+} from '@/services/uiFeedback'
 
 export const LogType = {
   INFO: 'info',
@@ -55,7 +61,11 @@ export function useLogger() {
 
   const info = (message: string, context: Record<string, unknown> = {}) => addLog(message, LogType.INFO, context)
   const success = (message: string, context: Record<string, unknown> = {}) => addLog(message, LogType.SUCCESS, context)
-  const warning = (message: string, context: Record<string, unknown> = {}) => addLog(message, LogType.WARNING, context)
+  const warning = (
+    message: string,
+    context: Record<string, unknown> = {},
+    immediate = true
+  ) => addLog(message, LogType.WARNING, context, immediate)
   const error = (message: string | Error, context: Record<string, unknown> = {}) => {
     if (message instanceof Error) {
       return addLog(message.message, LogType.ERROR, {
@@ -83,6 +93,7 @@ export function useLogger() {
     success,
     warning,
     error,
+    alert: (request: AlertRequest) => requestUiAlert(request),
     confirm: (request: ConfirmRequest) => requestUiConfirm(request),
     beginTask,
     clearLogs,

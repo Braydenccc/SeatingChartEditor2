@@ -56,6 +56,9 @@ describe('SeatConfigPanel', () => {
     await flushPromises()
 
     expect(confirmSpy).toHaveBeenCalledOnce()
+    expect(confirmSpy).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('清空撤销/重做历史')
+    }))
     expect(seatChart.seatConfig.value.groupCount).toBe(3)
     expect(seatChart.seatConfig.value.groups).toHaveLength(3)
 

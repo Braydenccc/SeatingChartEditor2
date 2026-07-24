@@ -226,8 +226,8 @@ const applyDraft = async () => {
     const accepted = await confirm({
       title: '应用座位表配置',
       content: assignedSeatCount.value > 0
-        ? `当前有 ${assignedSeatCount.value} 个已分配座位。应用后，不兼容座位上的学生会回到候选区，确认继续吗？`
-        : '应用后将按草稿重新协调座位布局，确认继续吗？',
+        ? `当前有 ${assignedSeatCount.value} 个已分配座位。应用后会保留兼容座位的状态，不兼容座位上的学生会回到候选区，并清空撤销/重做历史。确认继续吗？`
+        : '应用后将按草稿重新协调座位布局，并清空撤销/重做历史。确认继续吗？',
       positiveText: '应用配置',
       negativeText: '取消',
       type: 'warning'

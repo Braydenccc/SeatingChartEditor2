@@ -20,6 +20,7 @@ const mocks = await vi.hoisted(async () => {
     getLastWorkspace: vi.fn(),
     clearLastWorkspace: vi.fn(),
     success: vi.fn(),
+    warning: vi.fn(),
     error: vi.fn(),
     confirm: vi.fn()
   }
@@ -44,7 +45,7 @@ vi.mock('@/composables/useWorkspace', () => ({
   })
 }))
 vi.mock('@/composables/useLogger', () => ({
-  useLogger: () => ({ success: mocks.success, error: mocks.error, confirm: mocks.confirm })
+  useLogger: () => ({ success: mocks.success, warning: mocks.warning, error: mocks.error, confirm: mocks.confirm })
 }))
 vi.mock('@/composables/useAuth', () => ({
   useAuth: () => ({
@@ -93,6 +94,12 @@ const findButtonByText = (wrapper: ReturnType<typeof mount>, text: string) => {
   return button
 }
 
+const createDeferred = <T>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>(res => { resolve = res })
+  return { promise, resolve }
+}
+
 describe('CloudWorkspaceDialog', () => {
   beforeEach(() => {
     mocks.isFetching.value = false
@@ -100,9 +107,13 @@ describe('CloudWorkspaceDialog', () => {
     mocks.webdavConfig.value = { url: 'https://dav.example.test', username: 'tester', password: 'secret' }
     mocks.authType.value = 'retiehe'
     mocks.backupMode.value = false
+    mocks.listWorkspaces.mockReset()
     mocks.listWorkspaces.mockResolvedValue({ success: true, data: workspaces })
+    mocks.saveWorkspaceToCloud.mockReset()
     mocks.saveWorkspaceToCloud.mockResolvedValue({ success: true, data: { fileId: 'saved-workspace' } })
+    mocks.loadWorkspaceFromCloud.mockReset()
     mocks.loadWorkspaceFromCloud.mockResolvedValue({ success: false })
+    mocks.warning.mockReset()
   })
 
   afterEach(() => {
@@ -134,6 +145,38 @@ describe('CloudWorkspaceDialog', () => {
       'sce-workspace',
       'retiehe'
     )
+  })
+
+  it('shows a warning when SCE save succeeds but its WebDAV backup fails', async () => {
+    mocks.saveWorkspaceToCloud.mockResolvedValueOnce({
+      success: true,
+      data: { fileId: 'saved-workspace' },
+      backupWarning: 'SCE 云端已保存，但 WebDAV 备份失败'
+    })
+    const wrapper = await mountDialog()
+
+    await wrapper.get('#cloud-workspace-name').setValue('三班')
+    await findButtonByText(wrapper, '保存为新工作区').trigger('click')
+    await flushPromises()
+
+    expect(mocks.warning).toHaveBeenCalledWith('SCE 云端已保存，但 WebDAV 备份失败')
+  })
+
+  it('blocks repeated keyboard saves while the first cloud save is pending', async () => {
+    const deferred = createDeferred<{ success: boolean; data: { fileId: string } }>()
+    mocks.saveWorkspaceToCloud.mockReturnValueOnce(deferred.promise)
+    const wrapper = await mountDialog()
+    const input = wrapper.get('#cloud-workspace-name')
+
+    await input.setValue('三班')
+    await input.trigger('keyup', { key: 'Enter' })
+    await input.trigger('keyup', { key: 'Enter' })
+
+    expect(mocks.saveWorkspaceToCloud).toHaveBeenCalledTimes(1)
+    expect(input.attributes('disabled')).toBeDefined()
+
+    deferred.resolve({ success: true, data: { fileId: 'saved-workspace' } })
+    await flushPromises()
   })
 
   it('clears the selected file id on both provider switches while preserving the name', async () => {

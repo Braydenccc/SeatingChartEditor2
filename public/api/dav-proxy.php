@@ -81,10 +81,6 @@ function resolvePublicHostAddresses($host) {
 }
 
 function buildDavTarget($baseUrl, $path) {
-    if (!supportsGlobalIpRangeValidation()) {
-        jsonProxyError('当前运行环境不支持安全的 WebDAV 地址校验', 503);
-    }
-
     if ($baseUrl === '' || $path === '') {
         jsonProxyError('缺少 WebDAV 地址或路径', 400);
     }

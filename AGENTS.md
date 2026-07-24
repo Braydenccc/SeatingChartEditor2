@@ -32,7 +32,7 @@ This file provides guidance to Codex when working with code in this repository.
 | `npm run build:desktop:win` | 构建 Tauri Windows 安装包（NSIS/MSI） |
 | `npm run build:test` | 构建测试环境版本，会临时 patch 指定文件并自动还原 |
 | `npm run preview` | 预览构建结果 |
-| `npm run deploy:main` | 合并到 `main` 并推送生产分支 |
+| `npm run deploy:main` | 通过安全快进检查和精确 lease，将当前提交推送到 `origin/main`；不切换或合并本地 `main` |
 | `npm run test` | 运行 Vitest watch 模式 |
 | `npm run test:run` | 运行 Vitest 单次测试 |
 | `npm run test:coverage` | 生成覆盖率报告 |

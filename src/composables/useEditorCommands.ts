@@ -16,9 +16,14 @@ export type EditorToolCommand = 'normal' | 'swap' | 'clear' | 'empty'
 export function useEditorCommands() {
   const workbench = useEditorWorkbench()
   const { currentMode, setMode, clearFirstSelectedSeat, EditMode } = useEditMode()
-  const { isSelectionMode, selectedCount, toggleSelectionMode: toggleRawSelectionMode } = useSelection()
+  const {
+    clearSelection,
+    isSelectionMode,
+    selectedCount,
+    toggleSelectionMode: toggleRawSelectionMode
+  } = useSelection()
   const { clearZoneSelection, selectZone } = useZoneData()
-  const { clearEditingZone, selectEditingZone } = useZoneRotation()
+  const { clearEditingZone, setEditingZone } = useZoneRotation()
   const { info } = useLogger()
   const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
   const isLandscape = useMediaQuery('(orientation: landscape)')
@@ -42,7 +47,7 @@ export function useEditorCommands() {
 
   const startRotationZoneEditing = (zoneId: number, session: ZoneEditSession) => {
     clearZoneSelection()
-    selectEditingZone(zoneId)
+    setEditingZone(zoneId)
     clearFirstSelectedSeat()
     if (isSelectionMode.value) toggleRawSelectionMode()
     setMode(EditMode.ZONE_EDIT)
@@ -94,6 +99,11 @@ export function useEditorCommands() {
     }
   }
 
+  const cancelSeatSelection = () => {
+    clearSelection()
+    workbench.closeMobileDrawer()
+  }
+
   const openWorkbenchDialog = (dialog: Exclude<WorkbenchDialog, null>) => {
     finishZoneEditing()
     workbench.openDialog(dialog)
@@ -112,6 +122,7 @@ export function useEditorCommands() {
     selectedCount,
     activateTool,
     toggleSelectionMode,
+    cancelSeatSelection,
     finishZoneEditing,
     startGlobalZoneEditing,
     startRotationZoneEditing,

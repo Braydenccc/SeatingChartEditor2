@@ -80,14 +80,16 @@ import { computed } from 'vue'
 import { Check, Eraser, Eye, Trash2 } from 'lucide-vue-next'
 import { useEditorCommands } from '@/composables/useEditorCommands'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
-import { useLogger } from '@/composables/useLogger'
+import { useUiFeedback } from '@/composables/useLogger'
 import { useTagData } from '@/composables/useTagData'
 import { useZoneData } from '@/composables/useZoneData'
 import { useZoneRotation } from '@/composables/useZoneRotation'
+import { showRuleReferenceBlockFeedback } from '@/utils/ruleReferenceFeedback'
 
 const { finishZoneEditing } = useEditorCommands()
 const { zoneEditSession } = useEditorWorkbench()
-const { success, warning, confirm } = useLogger()
+const uiFeedback = useUiFeedback()
+const { success, warning, confirm } = uiFeedback
 const { tags } = useTagData()
 const {
   zones,
@@ -194,7 +196,17 @@ const deleteActiveZone = async () => {
   })
   if (!confirmed) return
   if (activeGlobalZone.value) {
-    deleteZone(activeGlobalZone.value.id)
+    const deletion = deleteZone(activeGlobalZone.value.id)
+    if (!deletion.success && deletion.reason === 'referenced-by-rules') {
+      showRuleReferenceBlockFeedback(
+        uiFeedback,
+        '无法删除选区',
+        `选区“${activeName.value}”`,
+        deletion.references
+      )
+      return
+    }
+    if (!deletion.success) return
     warning('已删除选区')
     finishEditing()
     return

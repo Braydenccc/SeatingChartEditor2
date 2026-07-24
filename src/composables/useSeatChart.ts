@@ -1,51 +1,35 @@
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useZoneData } from './useZoneData'
 import { useUndo } from './useUndo'
 import { pruneRotationSeatIds } from './zoneRotationState'
+import {
+  assignStudentRaw,
+  batchUpdateSeatsRaw,
+  clearAllSeatsRaw,
+  clearSeatRaw,
+  defaultGuardSeatsConfig,
+  getSeatRaw,
+  hasSeatRaw,
+  replaceSeatChartStateRaw,
+  replaceSeatsRaw,
+  seatConfig,
+  seats,
+  swapSeatsRaw,
+  toggleEmptyRaw,
+  updateSeatStateRaw
+} from './seatChartState'
 import { parseSeatId, generateSeatId, generateGuardSeatId, isGuardSeatId } from '@/utils/seatHelpers'
 import type { GroupConfig, GuardSeatsConfig, Seat, SeatConfig, SeatPosition } from '@/types/models'
+import type { BatchSeatUpdate, SeatStateUpdate } from './seatChartState'
 
 type GuardSide = 'left' | 'right'
 type ColumnType = 'wall' | 'aisle' | 'edge' | 'center'
-type SeatStateUpdate = Partial<Pick<Seat, 'studentId' | 'isEmpty'>>
-type BatchSeatUpdate = SeatStateUpdate & { seatId: string }
 
 interface SelectionMove {
   srcId: string
   destId: string
   studentId: number
 }
-
-const DEFAULT_GUARD_SEATS_CONFIG: GuardSeatsConfig = {
-  enabled: true,
-  leftEnabled: true,
-  rightEnabled: true,
-  includeInAutoAssignment: false,
-  hideEmptyOnExport: true
-}
-
-// 座位表配置
-const seatConfig = ref<SeatConfig>({
-  groupCount: 4,        // 大组数量
-  columnsPerGroup: 2,   // 每大组的列数（默认值，向后兼容）
-  seatsPerColumn: 7,     // 每列的座位数（默认值，向后兼容）
-  // 每大组的独立配置
-  groups: [
-    { columns: 2, rows: 7 },
-    { columns: 2, rows: 7 },
-    { columns: 2, rows: 7 },
-    { columns: 2, rows: 7 }
-  ],
-  shiftDistance: 4,
-  podiumPosition: 'bottom',    // 讲台位置：'top'（顶部）或 'bottom'（底部）
-  guardSeats: { ...DEFAULT_GUARD_SEATS_CONFIG }
-})
-
-// 座位数据
-const seats = ref<Seat[]>([])
-
-// 座位查找索引 (id -> seat object)，O(1) 查找替代 .find()
-let seatMap = new Map<string, Seat>()
 
 // 确保 groups 数组存在且长度匹配
 function ensureGroupsArray() {
@@ -92,7 +76,7 @@ function getPodiumPosition() {
 function normalizeGuardSeatsConfig(config: Partial<GuardSeatsConfig> = {}): GuardSeatsConfig {
   const source = config || {}
   return {
-    ...DEFAULT_GUARD_SEATS_CONFIG,
+    ...defaultGuardSeatsConfig,
     ...source,
     enabled: source.enabled !== false,
     leftEnabled: source.leftEnabled !== false,
@@ -139,40 +123,13 @@ function shouldPreserveGuardSeatStudent(seat: Seat | undefined, config: GuardSea
   )
 }
 
-// 从 seats.value（响应式代理）重建索引，确保 Map 持有代理对象
-function rebuildSeatMap() {
-  const newMap = new Map<string, Seat>()
-  for (const seat of seats.value) {
-    newMap.set(seat.id, seat)
-  }
-  seatMap = newMap
-}
-
-const applySeatState = (seat: Seat, updates: SeatStateUpdate) => {
-  Object.assign(seat, updates)
-  if (seat.isEmpty) seat.studentId = null
-}
-
-const cloneSeatWithValidState = (seat: Seat): Seat => ({
-  ...seat,
-  studentId: seat.isEmpty ? null : seat.studentId
-})
-
 const replaceSeatChartState = (nextConfig: SeatConfig, nextSeats: Seat[]) => {
-  seatConfig.value = {
-    ...nextConfig,
-    groups: nextConfig.groups.map(group => ({ ...group })),
-    guardSeats: nextConfig.guardSeats
-      ? { ...nextConfig.guardSeats }
-      : { ...DEFAULT_GUARD_SEATS_CONFIG }
-  }
-  seats.value = nextSeats.map(cloneSeatWithValidState)
-  rebuildSeatMap()
+  replaceSeatChartStateRaw(nextConfig, nextSeats)
 }
 
 // 单座位状态更新（带撤销记录）
 const updateSeatState = (seatId: string, updates: SeatStateUpdate, recordUndo = true) => {
-  const seat = seatMap.get(seatId)
+  const seat = getSeatRaw(seatId)
   if (!seat) {
     console.warn(`[useSeatChart] Seat not found: ${seatId}`, { updates })
     return false
@@ -180,15 +137,7 @@ const updateSeatState = (seatId: string, updates: SeatStateUpdate, recordUndo = 
 
   const undo = recordUndo ? useUndo() : null
   const beforeSnapshot = undo?.createSnapshot()
-  const willBeEmpty = updates.isEmpty ?? seat.isEmpty
-
-  // 如果要分配新学生，先找到该学生之前所在的座位
-  if (!willBeEmpty && updates.studentId !== undefined && updates.studentId !== null && updates.studentId !== seat.studentId) {
-    const previousSeat = seats.value.find(s => s.studentId === updates.studentId && s.id !== seatId)
-    if (previousSeat) previousSeat.studentId = null
-  }
-
-  applySeatState(seat, updates)
+  updateSeatStateRaw(seatId, updates)
   if (undo && beforeSnapshot) {
     undo.recordBatch(beforeSnapshot, undo.createSnapshot())
   }
@@ -198,24 +147,15 @@ const updateSeatState = (seatId: string, updates: SeatStateUpdate, recordUndo = 
 
 // 批量状态更新（带快照机制）
 const batchUpdateSeats = (updates: BatchSeatUpdate[], recordUndo = true) => {
-  const { recordBatch, createSnapshot } = useUndo()
+  const undo = recordUndo ? useUndo() : null
+  const beforeSnapshot = undo?.createSnapshot()
+  const updated = batchUpdateSeatsRaw(updates)
+  if (!updated) return false
 
-  if (recordUndo) {
-    const beforeSnapshot = createSnapshot()
-
-    for (const { seatId, ...changes } of updates) {
-      const seat = seatMap.get(seatId)
-      if (seat) applySeatState(seat, changes)
-    }
-
-    const afterSnapshot = createSnapshot()
-    recordBatch(beforeSnapshot, afterSnapshot)
-  } else {
-    for (const { seatId, ...changes } of updates) {
-      const seat = seatMap.get(seatId)
-      if (seat) applySeatState(seat, changes)
-    }
+  if (undo && beforeSnapshot) {
+    undo.recordBatch(beforeSnapshot, undo.createSnapshot())
   }
+  return true
 }
 
 // 初始化座位表
@@ -244,8 +184,7 @@ function initializeSeats() {
 
   newSeats.push(createGuardSeat('left'), createGuardSeat('right'))
 
-  seats.value = newSeats
-  rebuildSeatMap()
+  replaceSeatsRaw(newSeats)
 }
 
 // 根据最新配置重建座位，保留仍存在且可见的座位状态
@@ -285,12 +224,8 @@ function reconcileSeatsWithConfig() {
     newSeats.push(guardSeat)
   }
 
-  seats.value = newSeats
-  rebuildSeatMap()
+  replaceSeatsRaw(newSeats)
 }
-
-// 立即初始化座位数据，避免第一次加载时空白
-initializeSeats()
 
 // 按组和列组织座位数据（用于渲染）— 单遍分桶，O(n)
 const organizedSeats = computed<Seat[][][]>(() => {
@@ -389,7 +324,7 @@ export function useSeatChart() {
   }
 
   const getTranslatedSeatId = (seatId: string, columnOffset: number, rowOffset: number) => {
-    const source = seatMap.get(seatId)
+    const source = getSeatRaw(seatId)
     if (!source || source.kind === 'guard' || isGuardSeatId(source.id)) return null
 
     const sourceGlobalColumn = toGlobalCol(source)
@@ -400,18 +335,16 @@ export function useSeatChart() {
     const destinationRow = source.rowIndex + rowOffset
     if (destinationRow < 0) return null
     const destinationId = generateSeatId(destination.groupIndex, destination.columnIndex, destinationRow)
-    return seatMap.has(destinationId) ? destinationId : null
+    return hasSeatRaw(destinationId) ? destinationId : null
   }
 
   // 分配学生到座位
   const assignStudent = (seatId: string, studentId: number, recordUndo = true) => {
-    const seat = seatMap.get(seatId)
+    const seat = getSeatRaw(seatId)
     if (seat && !seat.isEmpty) {
       const undo = recordUndo ? useUndo() : null
       const beforeSnapshot = undo?.createSnapshot()
-      const previousSeat = seats.value.find(s => s.studentId === studentId && s.id !== seatId)
-      if (previousSeat) previousSeat.studentId = null
-      seat.studentId = studentId
+      assignStudentRaw(seatId, studentId)
       if (undo && beforeSnapshot) {
         undo.recordBatch(beforeSnapshot, undo.createSnapshot())
       }
@@ -422,15 +355,12 @@ export function useSeatChart() {
 
   // 切换空置状态
   const toggleEmpty = (seatId: string, recordUndo = true) => {
-    const seat = seatMap.get(seatId)
+    const seat = getSeatRaw(seatId)
     if (seat) {
       if (seat.kind === 'guard' || isGuardSeatId(seat.id)) return
       const undo = recordUndo ? useUndo() : null
       const beforeSnapshot = undo?.createSnapshot()
-      seat.isEmpty = !seat.isEmpty
-      if (seat.isEmpty) {
-        seat.studentId = null
-      }
+      toggleEmptyRaw(seatId)
       if (undo && beforeSnapshot) {
         undo.recordBatch(beforeSnapshot, undo.createSnapshot())
       }
@@ -439,41 +369,44 @@ export function useSeatChart() {
 
   // 清空座位
   const clearSeat = (seatId: string, recordUndo = true) => {
-    const seat = seatMap.get(seatId)
-    if (seat) {
-      if (recordUndo) {
-        const { recordClear } = useUndo()
-        recordClear(seatId, seat.studentId)
-      }
-      seat.studentId = null
+    const seat = getSeatRaw(seatId)
+    if (!seat || seat.studentId === null) return false
+    if (recordUndo) {
+      const { recordClear } = useUndo()
+      recordClear(seatId, seat.studentId)
     }
+    return clearSeatRaw(seatId)
   }
 
   // 交换两个座位的学生
   const swapSeats = (seatId1: string, seatId2: string, recordUndo = true) => {
-    const seat1 = seatMap.get(seatId1)
-    const seat2 = seatMap.get(seatId2)
-    if (!seat1 || !seat2 || seat1.isEmpty || seat2.isEmpty || seatId1 === seatId2) {
+    const seat1 = getSeatRaw(seatId1)
+    const seat2 = getSeatRaw(seatId2)
+    if (
+      !seat1 ||
+      !seat2 ||
+      seat1.isEmpty ||
+      seat2.isEmpty ||
+      seatId1 === seatId2 ||
+      seat1.studentId === seat2.studentId
+    ) {
       return false
     }
     if (recordUndo) {
       const { recordSwap } = useUndo()
       recordSwap(seatId1, seatId2)
     }
-    const temp = seat1.studentId
-    seat1.studentId = seat2.studentId
-    seat2.studentId = temp
-    return true
+    return swapSeatsRaw(seatId1, seatId2)
   }
 
   // 批量移动选区学生（以拖拽起始座位为锚点，整体平移）
   const moveSelection = (selectedSeatIds: string[], anchorId: string, targetSeatId: string) => {
     if (!selectedSeatIds || selectedSeatIds.length === 0) return false
 
-    const targetSeat = seatMap.get(targetSeatId)
+    const targetSeat = getSeatRaw(targetSeatId)
     if (!targetSeat || targetSeat.isEmpty || targetSeat.kind === 'guard' || isGuardSeatId(targetSeat.id)) return false
 
-    const anchorSeat = seatMap.get(anchorId)
+    const anchorSeat = getSeatRaw(anchorId)
     if (!anchorSeat || anchorSeat.isEmpty || anchorSeat.kind === 'guard' || isGuardSeatId(anchorSeat.id)) return false
 
     const anchorGlobalColumn = toGlobalCol(anchorSeat)
@@ -487,13 +420,13 @@ export function useSeatChart() {
     // 先计算并验证全部源->目标映射；任何目标无效时不修改当前座位状态。
     const moves: SelectionMove[] = []
     for (const sid of new Set(selectedSeatIds)) {
-      const src = seatMap.get(sid)
+      const src = getSeatRaw(sid)
       if (!src || src.isEmpty || src.kind === 'guard' || isGuardSeatId(src.id)) return false
       if (src.studentId === null) continue
 
       const destId = getTranslatedSeatId(src.id, offsetCol, offsetRow)
       if (!destId) return false
-      const dest = seatMap.get(destId)
+      const dest = getSeatRaw(destId)
       if (!dest || dest.isEmpty || dest.kind === 'guard' || isGuardSeatId(dest.id)) return false
 
       moves.push({ srcId: sid, destId, studentId: src.studentId })
@@ -513,7 +446,7 @@ export function useSeatChart() {
     // 目标位置原有且不属于选区的学生，需要回填到被腾出的源座位。
     const displacedStudents: number[] = []
     for (const move of moves) {
-      const destinationStudentId = seatMap.get(move.destId)?.studentId ?? null
+      const destinationStudentId = getSeatRaw(move.destId)?.studentId ?? null
       if (destinationStudentId !== null && !sourceIdSet.has(move.destId)) {
         displacedStudents.push(destinationStudentId)
       }
@@ -546,7 +479,7 @@ export function useSeatChart() {
 
     const updates: Array<{ seat: Seat; studentId: number | null }> = []
     for (const [seatId, studentId] of finalState) {
-      const seat = seatMap.get(seatId)
+      const seat = getSeatRaw(seatId)
       if (!seat) return false
       updates.push({ seat, studentId })
     }
@@ -595,7 +528,7 @@ export function useSeatChart() {
       const sourcePosition = fromGlobalCol(srcCol)
       if (!sourcePosition) return false
       const sourceId = generateSeatId(sourcePosition.groupIndex, sourcePosition.columnIndex, srcRow)
-      const sourceSeat = seatMap.get(sourceId)
+      const sourceSeat = getSeatRaw(sourceId)
       if (!sourceSeat || sourceSeat.isEmpty || !availableSeatIds.has(sourceId) || sourceIds.has(sourceId)) {
         return false
       }
@@ -643,11 +576,12 @@ export function useSeatChart() {
     const validSeatIds = seats.value.filter(s => s.kind !== 'guard').map(s => s.id)
     cleanupInvalidSeats(validSeatIds)
     pruneRotationSeatIds(validSeatIds)
+    useUndo().clearHistory()
   }
 
   // 获取座位上的学生ID
   const getStudentAtSeat = (seatId: string) => {
-    const seat = seatMap.get(seatId)
+    const seat = getSeatRaw(seatId)
     return seat ? seat.studentId : null
   }
 
@@ -658,9 +592,7 @@ export function useSeatChart() {
 
   // 清空所有座位
   const clearAllSeats = () => {
-    seats.value.forEach(seat => {
-      seat.studentId = null
-    })
+    clearAllSeatsRaw()
   }
 
   // 判断两个座位是否为同桌
@@ -938,8 +870,8 @@ export function useSeatChart() {
    */
   const getSeatGroup = (seatId: string) => parseSeatId(seatId).groupIndex + 1
 
-  const hasSeat = (seatId: string) => seatMap.has(seatId)
-  const getSeat = (seatId: string) => seatMap.get(seatId) ?? null
+  const hasSeat = (seatId: string) => hasSeatRaw(seatId)
+  const getSeat = (seatId: string) => getSeatRaw(seatId)
 
   return {
     seatConfig,
