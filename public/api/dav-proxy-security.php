@@ -188,6 +188,13 @@ function isPublicIpAddress($ip, $forceFallback = false) {
         return false;
     }
 
+    // Keep the explicit project deny-list authoritative across PHP versions.
+    // FILTER_FLAG_GLOBAL_RANGE still treats some deprecated transition ranges,
+    // including 192.88.99.0/24, as global on PHP 8.2.
+    if (!isPublicIpAddressFallback($normalizedIp)) {
+        return false;
+    }
+
     if (!$forceFallback && supportsGlobalIpRangeValidation()) {
         $globalRangeFlag = constant('FILTER_FLAG_GLOBAL_RANGE');
         $versionFlag = $isIpv4 ? FILTER_FLAG_IPV4 : FILTER_FLAG_IPV6;
@@ -198,7 +205,7 @@ function isPublicIpAddress($ip, $forceFallback = false) {
         ) !== false;
     }
 
-    return isPublicIpAddressFallback($normalizedIp);
+    return true;
 }
 
 function normalizeIpAddress($ip) {

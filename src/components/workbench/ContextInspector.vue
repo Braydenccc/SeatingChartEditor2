@@ -711,7 +711,7 @@ const assignSelectedSeats = () => {
   gap: 7px;
   padding: 7px;
   border-left: 3px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 3px;
   background: var(--color-surface);
   color: var(--color-text-secondary);
   font-size: 12px;

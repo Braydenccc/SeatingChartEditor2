@@ -35,8 +35,13 @@ test('WebDAV proxy pins the validated address and verifies the connected peer', 
   assert.match(source, /\['fc000000000000000000000000000000', 7\]/)
   assert.match(source, /defined\('FILTER_FLAG_GLOBAL_RANGE'\)/)
   assert.match(source, /constant\('FILTER_FLAG_GLOBAL_RANGE'\)/)
+  const explicitPolicyIndex = source.indexOf('if (!isPublicIpAddressFallback($normalizedIp))')
+  const nativePolicyIndex = source.indexOf('if (!$forceFallback && supportsGlobalIpRangeValidation())')
+  assert.ok(
+    explicitPolicyIndex >= 0 && explicitPolicyIndex < nativePolicyIndex,
+    'the explicit deny-list must run before the PHP-version-dependent global-range check',
+  )
   assert.match(source, /!\$forceFallback && supportsGlobalIpRangeValidation\(\)/)
-  assert.match(source, /return isPublicIpAddressFallback\(\$normalizedIp\)/)
   assert.doesNotMatch(source, /FILTER_FLAG_NO_PRIV_RANGE|FILTER_FLAG_NO_RES_RANGE/)
   assert.doesNotMatch(
     proxySource,
