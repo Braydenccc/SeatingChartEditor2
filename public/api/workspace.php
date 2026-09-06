@@ -156,6 +156,30 @@ function validateWorkspaceContent($content) {
     return ['valid' => true, 'message' => ''];
 }
 
+/**
+ * PHP 的关联数组解码无法区分空对象和空数组；工作区中的数值属性
+ * 约定为空对象，写回或返回时需要恢复该 JSON 形态。
+ */
+function normalizeWorkspaceNumericAttributes($content) {
+    if (!is_array($content) || !isset($content['students']) || !is_array($content['students'])) {
+        return $content;
+    }
+
+    foreach ($content['students'] as $index => $student) {
+        if (!is_array($student) || !array_key_exists('numericAttributes', $student)) {
+            continue;
+        }
+
+        if ($student['numericAttributes'] === null || (
+            is_array($student['numericAttributes']) && count($student['numericAttributes']) === 0
+        )) {
+            $content['students'][$index]['numericAttributes'] = new stdClass();
+        }
+    }
+
+    return $content;
+}
+
 function isWorkspaceDeleted($fileData) {
     if (!$fileData || !is_array($fileData)) {
         return false;
@@ -211,6 +235,8 @@ try {
         if (!$validation['valid']) {
             respond(['success' => false, 'message' => '工作区格式无效: ' . $validation['message']]);
         }
+
+        $content = normalizeWorkspaceNumericAttributes($content);
 
         $hasRequestedFileId = array_key_exists('fileId', $input) && $input['fileId'] !== null && $input['fileId'] !== '';
         $requestedFileId = $hasRequestedFileId && is_string($input['fileId']) ? trim($input['fileId']) : null;
@@ -424,6 +450,7 @@ try {
         }
 
         $fileData['metadata']['name'] = $name;
+        $fileData['content'] = normalizeWorkspaceNumericAttributes($fileData['content']);
         $encodedFileData = json_encode($fileData, JSON_UNESCAPED_UNICODE);
         if (!workspaceDbValueFitsStorage($encodedFileData) || !databaseSetVerified($dbFiles, $sanitizedFileId, $encodedFileData)) {
             respond(['success' => false, 'message' => '工作区名称写入失败'], 503);
@@ -497,6 +524,7 @@ try {
             respond(['success' => false, 'message' => '无权访问该文件'], 403);
         }
 
+        $fileData['content'] = normalizeWorkspaceNumericAttributes($fileData['content']);
         respond([
             'success' => true,
             'data' => $fileData

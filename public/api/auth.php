@@ -30,6 +30,8 @@ function shouldRequireHttps() {
                 $cached = false;
             }
         }
+
+        $cached = false; // 不要求https
     }
     return $cached;
 }

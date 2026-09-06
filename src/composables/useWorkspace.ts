@@ -231,6 +231,12 @@ const normalizeLegacyStudentData = (workspace: MigratingWorkspace) => {
     }
 
     const numericAttributes = studentRecord.numericAttributes
+    // PHP 的关联数组解码会把空对象 `{}` 重新编码成 `[]`；旧云端存档因此
+    // 可能把没有数值属性的学生保存成空数组（部分旧数据也使用 null）。
+    if (numericAttributes === null || (Array.isArray(numericAttributes) && numericAttributes.length === 0)) {
+      studentRecord.numericAttributes = {}
+      return
+    }
     if (!isRecord(numericAttributes)) return
     Object.entries(numericAttributes).forEach(([attributeId, attributeValue]) => {
       let normalizedValue = attributeValue

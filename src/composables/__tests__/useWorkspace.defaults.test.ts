@@ -109,6 +109,24 @@ describe('workspace defaults', () => {
     expect(source.layout.config).not.toHaveProperty('groups')
   })
 
+  it('migrates empty numeric attribute arrays from legacy cloud JSON', async () => {
+    const source = {
+      ...createExistingWorkspace(),
+      students: [
+        { id: 8, name: '旧版学生', studentNumber: 1, tags: [], numericAttributes: [] },
+        { id: 9, name: '旧版学生二', studentNumber: 2, tags: [], numericAttributes: null }
+      ]
+    }
+
+    expect(await workspace.applyWorkspaceData(source)).toBe(true)
+    expect(studentData.students.value).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: '旧版学生', numericAttributes: {} }),
+      expect.objectContaining({ name: '旧版学生二', numericAttributes: {} })
+    ]))
+    expect(source.students[0].numericAttributes).toEqual([])
+    expect(source.students[1].numericAttributes).toBeNull()
+  })
+
   it('migrates legacy numeric student fields before strict workspace validation', async () => {
     const source = {
       ...createExistingWorkspace(),
