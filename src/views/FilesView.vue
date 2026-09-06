@@ -1,7 +1,7 @@
 <template>
   <AppPageShell title="文件" eyebrow="工作区与名单导入导出">
     <div class="files-layout">
-      <section class="panel-section">
+      <NCard class="panel-section" :bordered="false" content-style="padding: 0">
         <div class="section-header">
           <FolderOpen :size="20" stroke-width="2" />
           <div>
@@ -20,67 +20,70 @@
             </div>
           </div>
           <div class="cloud-summary-actions">
-            <button class="compact-button" type="button" :disabled="!token || isRefreshing" @click="refresh">
-              <RefreshCw :size="16" stroke-width="2" />
+            <NButton size="small" secondary attr-type="button" :loading="isRefreshing" :disabled="!token || isRefreshing" @click="refresh">
+              <template #icon><RefreshCw :size="16" stroke-width="2" /></template>
               <span>{{ isRefreshing ? '刷新中' : '刷新' }}</span>
-            </button>
-            <button class="compact-button" type="button" :title="cloudLoadTitle" @click="openCloudLoad">
-              <CloudDownload :size="16" stroke-width="2" />
+            </NButton>
+            <NButton size="small" secondary attr-type="button" :title="cloudLoadTitle" @click="openCloudLoad">
+              <template #icon><CloudDownload :size="16" stroke-width="2" /></template>
               <span>{{ cloudLoadShortLabel }}</span>
-            </button>
-            <button class="compact-button" type="button" :title="cloudSaveTitle" @click="openCloudSave">
-              <CloudUpload :size="16" stroke-width="2" />
+            </NButton>
+            <NButton size="small" secondary attr-type="button" :title="cloudSaveTitle" @click="openCloudSave">
+              <template #icon><CloudUpload :size="16" stroke-width="2" /></template>
               <span>{{ cloudSaveShortLabel }}</span>
-            </button>
+            </NButton>
           </div>
         </div>
         <p v-if="errorMessage" class="cloud-error">{{ errorMessage }}</p>
         <div class="action-grid">
-          <button class="action-button danger-soft" type="button" @click="handleNewWorkspace">
-            <FilePlus :size="18" stroke-width="2" />
-            <span>{{ isConfirming('newWorkspace').value ? '再次点击确认新建' : '新建工作区' }}</span>
-          </button>
-          <button class="action-button" type="button" @click="handleLoadWorkspace">
-            <FolderOpen :size="18" stroke-width="2" />
+          <NButton class="action-button" type="error" secondary attr-type="button" @click="handleNewWorkspace">
+            <template #icon><FilePlus :size="18" stroke-width="2" /></template>
+            <span>新建工作区</span>
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" @click="handleLoadWorkspace">
+            <template #icon><FolderOpen :size="18" stroke-width="2" /></template>
             <span>加载本地</span>
-          </button>
-          <button class="action-button" type="button" @click="handleSaveWorkspace">
-            <Save :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" :disabled="isSavingWorkspace" @click="handleSaveWorkspace">
+            <template #icon><Save :size="18" stroke-width="2" /></template>
             <span>保存到本地</span>
-          </button>
-          <button class="action-button" type="button" @click="handleSaveWorkspaceAs">
-            <Save :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" :disabled="isSavingWorkspace" @click="handleSaveWorkspaceAs">
+            <template #icon><Save :size="18" stroke-width="2" /></template>
             <span>另存为</span>
-          </button>
-          <button class="action-button" type="button" :title="cloudLoadTitle" @click="openCloudLoad">
-            <CloudDownload :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" :title="cloudLoadTitle" @click="openCloudLoad">
+            <template #icon><CloudDownload :size="18" stroke-width="2" /></template>
             <span>{{ cloudLoadLabel }}</span>
-          </button>
-          <button class="action-button" type="button" :title="cloudSaveTitle" @click="openCloudSave">
-            <CloudUpload :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" :title="cloudSaveTitle" @click="openCloudSave">
+            <template #icon><CloudUpload :size="18" stroke-width="2" /></template>
             <span>{{ cloudSaveLabel }}</span>
-          </button>
+          </NButton>
         </div>
 
         <div v-if="showWorkspaceManager" class="workspace-manager">
           <div v-if="token" class="manager-toolbar">
-            <input
-              v-model="newCloudWorkspaceName"
+            <NInput
+              v-model:value="newCloudWorkspaceName"
               class="manager-name-input"
+              size="small"
               type="text"
               placeholder="云端工作区名称"
               maxlength="50"
+              :disabled="isCloudActionBusy"
               @keyup.enter="handleCreateCloudWorkspace"
             />
-            <button
-              class="compact-button primary"
-              type="button"
+            <NButton
+              size="small"
+              type="primary"
+              attr-type="button"
               :disabled="isCloudActionBusy || !newCloudWorkspaceName.trim()"
               @click="handleCreateCloudWorkspace"
             >
-              <Plus :size="16" stroke-width="2" />
+              <template #icon><Plus :size="16" stroke-width="2" /></template>
               <span>新增</span>
-            </button>
+            </NButton>
           </div>
 
           <div class="workspace-manager-list">
@@ -94,15 +97,19 @@
               </div>
 
               <div class="workspace-row-actions">
-                <button
-                  class="icon-button primary"
-                  type="button"
+                <NButton
+                  size="small"
+                  quaternary
+                  circle
+                  type="primary"
+                  attr-type="button"
                   title="恢复自动保存"
+                  aria-label="恢复自动保存"
                   :disabled="isRestoringAutoSave"
                   @click="handleRestoreAutoSave"
                 >
                   <RotateCcw :size="15" stroke-width="2" />
-                </button>
+                </NButton>
               </div>
             </article>
 
@@ -116,11 +123,14 @@
                   <div class="workspace-row-main">
                     <CloudDownload :size="18" stroke-width="2" />
                     <div v-if="editingWorkspaceId === ws.fileId" class="workspace-edit">
-                      <input
-                        v-model="editingWorkspaceName"
+                      <NInput
+                        v-model:value="editingWorkspaceName"
                         class="workspace-edit-input"
+                        size="small"
                         type="text"
                         maxlength="50"
+                        :disabled="isCloudActionBusy"
+                        :input-props="{ 'aria-label': `修改工作区 ${getWorkspaceName(ws)} 的名称` }"
                         @keyup.enter="handleRenameWorkspace(ws)"
                         @keyup.esc="handleCancelRename"
                       />
@@ -132,48 +142,62 @@
                   </div>
 
                   <div class="workspace-row-actions">
-                    <button
-                      class="icon-button"
-                      type="button"
+                    <NButton
+                      size="small"
+                      quaternary
+                      circle
+                      attr-type="button"
                       title="加载工作区"
+                      aria-label="加载工作区"
                       :disabled="isCloudActionBusy"
                       @click="handleLoadCloudWorkspace(ws)"
                     >
                       <CloudDownload :size="15" stroke-width="2" />
-                    </button>
+                    </NButton>
                     <template v-if="editingWorkspaceId === ws.fileId">
-                      <button
-                        class="icon-button success"
-                        type="button"
+                      <NButton
+                        size="small"
+                        quaternary
+                        circle
+                        type="success"
+                        attr-type="button"
                         title="保存名称"
+                        aria-label="保存名称"
                         :disabled="isCloudActionBusy || !editingWorkspaceName.trim()"
                         @click="handleRenameWorkspace(ws)"
                       >
                         <Check :size="15" stroke-width="2" />
-                      </button>
-                      <button class="icon-button" type="button" title="取消改名" :disabled="isCloudActionBusy" @click="handleCancelRename">
+                      </NButton>
+                      <NButton size="small" quaternary circle attr-type="button" title="取消改名" aria-label="取消改名" :disabled="isCloudActionBusy" @click="handleCancelRename">
                         <X :size="15" stroke-width="2" />
-                      </button>
+                      </NButton>
                     </template>
                     <template v-else>
-                      <button
-                        class="icon-button"
-                        type="button"
+                      <NButton
+                        size="small"
+                        quaternary
+                        circle
+                        attr-type="button"
                         title="修改名称"
+                        aria-label="修改名称"
                         :disabled="isCloudActionBusy"
                         @click="handleStartRename(ws)"
                       >
                         <Pencil :size="15" stroke-width="2" />
-                      </button>
-                      <button
-                        class="icon-button danger"
-                        type="button"
+                      </NButton>
+                      <NButton
+                        size="small"
+                        quaternary
+                        circle
+                        type="error"
+                        attr-type="button"
                         title="删除工作区"
+                        aria-label="删除工作区"
                         :disabled="isCloudActionBusy"
                         @click="handleRemoveCloudWorkspace(ws)"
                       >
                         <Trash2 :size="15" stroke-width="2" />
-                      </button>
+                      </NButton>
                     </template>
                   </div>
                 </article>
@@ -181,9 +205,9 @@
             </template>
           </div>
         </div>
-      </section>
+      </NCard>
 
-      <section class="panel-section">
+      <NCard class="panel-section" :bordered="false" content-style="padding: 0">
         <div class="section-header">
           <Users :size="20" stroke-width="2" />
           <div>
@@ -193,36 +217,36 @@
         </div>
 
         <div class="action-grid">
-          <button class="action-button" type="button" @click="router.push('/students')">
-            <Users :size="18" stroke-width="2" />
+          <NButton class="action-button" secondary attr-type="button" @click="router.push('/students')">
+            <template #icon><Users :size="18" stroke-width="2" /></template>
             <span>名单与属性</span>
-          </button>
-          <button class="action-button" type="button" @click="handleDownloadTemplate">
-            <Download :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" @click="handleDownloadTemplate">
+            <template #icon><Download :size="18" stroke-width="2" /></template>
             <span>下载名单模板</span>
-          </button>
-          <button class="action-button" type="button" @click="handleImportExcel">
-            <FileInput :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" @click="handleImportExcel">
+            <template #icon><FileInput :size="18" stroke-width="2" /></template>
             <span>从 Excel 导入名单</span>
-          </button>
-          <button class="action-button" type="button" @click="openFuckSeatsImport">
-            <FileInput :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" @click="openFuckSeatsImport">
+            <template #icon><FileInput :size="18" stroke-width="2" /></template>
             <span>从不想排座位导入</span>
-          </button>
-          <button class="action-button" type="button" @click="handleExportExcel">
-            <FileOutput :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" @click="handleExportExcel">
+            <template #icon><FileOutput :size="18" stroke-width="2" /></template>
             <span>导出名单到 Excel</span>
-          </button>
-          <button class="action-button" type="button" @click="handleImportSdes">
-            <FileInput :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" @click="handleImportSdes">
+            <template #icon><FileInput :size="18" stroke-width="2" /></template>
             <span>导入 SDES</span>
-          </button>
-          <button class="action-button" type="button" @click="handleExportSdes">
-            <FileOutput :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary attr-type="button" @click="handleExportSdes">
+            <template #icon><FileOutput :size="18" stroke-width="2" /></template>
             <span>导出 SDES</span>
-          </button>
+          </NButton>
         </div>
-      </section>
+      </NCard>
     </div>
     <FuckSeatsImportDialog
       v-model:visible="showFuckSeatsImportDialog"
@@ -238,8 +262,9 @@
   </AppPageShell>
 </template>
 
-<script setup>
-import { computed, onMounted, ref } from 'vue'
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { NButton, NCard, NInput } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import {
   Check,
@@ -267,13 +292,14 @@ import SdesImportDialog from '@/components/workspace/SdesImportDialog.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
+import type { CloudWorkspaceFile } from '@/composables/useCloudWorkspace'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useCloudWorkspaceStats } from '@/composables/useCloudWorkspaceStats'
-import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useExcelData } from '@/composables/useExcelData'
 import { useLogger } from '@/composables/useLogger'
 import { useRosterExcelImport } from '@/composables/useRosterExcelImport'
 import { formatSdesReportSummary, useSdesExchange } from '@/composables/useSdesExchange'
+import type { SdesDocument, SdesImportTarget } from '@/composables/useSdesExchange'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useWorkspace } from '@/composables/useWorkspace'
@@ -281,17 +307,17 @@ import { excelFileFilters, openBinaryFile, openTextFile, sdesFileFilters } from 
 
 const router = useRouter()
 const newCloudWorkspaceName = ref('')
-const editingWorkspaceId = ref(null)
+const editingWorkspaceId = ref<string | null>(null)
 const editingWorkspaceName = ref('')
 const showFuckSeatsImportDialog = ref(false)
 const showSdesImportDialog = ref(false)
-const sdesDocument = ref(null)
-const sdesTargets = ref([])
+const sdesDocument = ref<SdesDocument | null>(null)
+const sdesTargets = ref<SdesImportTarget[]>([])
 const sdesFileName = ref('')
 const isImportingSdes = ref(false)
 const isRestoringAutoSave = ref(false)
+const isCloudOperationInFlight = ref(false)
 
-const { requestConfirm, isConfirming } = useConfirmAction()
 const {
   createNewWorkspace,
   saveWorkspace,
@@ -301,15 +327,15 @@ const {
   saveLastWorkspace,
   getLastWorkspace,
   clearLastWorkspace,
-  getWorkspaceJson
+  getWorkspaceJson,
+  isSavingWorkspace
 } = useWorkspace()
 const {
   autoSaveBackup,
   getAutoSaveBackup,
-  restoreAutoSaveBackup,
-  markSaved
+  restoreAutoSaveBackup
 } = useAutoSave()
-const { success, warning, error } = useLogger()
+const { success, warning, error, confirm } = useLogger()
 const { token, isLoggedIn } = useAuth()
 const { openCloudLoad, openCloudSave } = useCloudWorkspaceDialog()
 const {
@@ -340,7 +366,9 @@ const { tags } = useTagData()
 const { beginExcelRosterImport } = useRosterExcelImport()
 
 const cloudWorkspaces = computed(() => workspaces.value || [])
-const isCloudActionBusy = computed(() => isRefreshing.value || isManagingCloud.value)
+const isCloudActionBusy = computed(() => (
+  isRefreshing.value || isManagingCloud.value || isCloudOperationInFlight.value
+))
 const showWorkspaceManager = computed(() => !!token.value || !!autoSaveBackup.value)
 const goEditorAfterSuccess = () => router.push('/editor')
 const cloudLoadLabel = computed(() => isLoggedIn.value ? '从云端加载' : '登录后从云端加载')
@@ -350,9 +378,13 @@ const cloudSaveShortLabel = computed(() => isLoggedIn.value ? '保存' : '登录
 const cloudLoadTitle = computed(() => isLoggedIn.value ? '从云端加载工作区' : '需要先登录或配置 WebDAV')
 const cloudSaveTitle = computed(() => isLoggedIn.value ? '保存当前工作区至云端' : '需要先登录或配置 WebDAV')
 
-const getWorkspaceName = (workspace) => workspace.metadata?.name || '未命名工作区'
+watch(token, (value) => {
+  if (value) void refresh()
+}, { immediate: true })
 
-const formatWorkspaceDate = (value) => {
+const getWorkspaceName = (workspace: CloudWorkspaceFile) => workspace.metadata.name || '未命名工作区'
+
+const formatWorkspaceDate = (value?: string) => {
   if (!value) return '未知时间'
   const timestamp = Date.parse(value)
   if (!Number.isFinite(timestamp)) return '未知时间'
@@ -364,8 +396,8 @@ const formatWorkspaceDate = (value) => {
   }).format(new Date(timestamp))
 }
 
-const formatWorkspaceSize = (bytes) => {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+const formatWorkspaceSize = (bytes?: number) => {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes <= 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB']
   let value = bytes
   let unitIndex = 0
@@ -373,7 +405,7 @@ const formatWorkspaceSize = (bytes) => {
     value /= 1024
     unitIndex += 1
   }
-  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex] ?? 'B'}`
 }
 
 const autoSaveSummary = computed(() => {
@@ -389,42 +421,47 @@ const autoSaveSummary = computed(() => {
   return `${formatWorkspaceDate(backup.timeIso)} · ${studentCount} 名学生 · ${assignedCount} 个已排座位 · ${backupSize}`
 })
 
-const handleNewWorkspace = () => {
-  const confirmed = requestConfirm('newWorkspace', () => {
-    const isSuccess = createNewWorkspace()
-    if (isSuccess) {
-      markSaved()
-      goEditorAfterSuccess()
-    }
-  }, '再次点击确认新建')
-
-  if (!confirmed) {
-    warning('再次点击"新建工作区"按钮以确认清空当前工作区')
-  }
+const handleNewWorkspace = async () => {
+  const confirmed = await confirm({
+    title: '新建工作区',
+    content: '新建工作区会清空当前未另行保存的编辑内容，是否继续？',
+    positiveText: '新建',
+    type: 'warning'
+  })
+  if (!confirmed) return
+  const isSuccess = createNewWorkspace()
+  if (isSuccess) goEditorAfterSuccess()
 }
 
 const handleSaveWorkspace = async () => {
-  const isSuccess = await saveWorkspace()
-  if (isSuccess) {
-    markSaved()
+  if (isSavingWorkspace.value) return
+  const result = await saveWorkspace()
+  if (result.success) {
     success('工作区已成功保存到本地！')
-  } else {
-    error('工作区保存到本地失败，请查看控制台了解详情')
+  } else if (!result.canceled) {
+    error(result.error || '工作区保存到本地失败')
   }
 }
 
 const handleSaveWorkspaceAs = async () => {
-  const isSuccess = await saveWorkspaceAs()
-  if (isSuccess) {
-    markSaved()
+  if (isSavingWorkspace.value) return
+  const result = await saveWorkspaceAs()
+  if (result.success) {
     success('工作区已成功另存到本地！')
-  } else {
-    error('工作区另存到本地失败，请查看控制台了解详情')
+  } else if (!result.canceled) {
+    error(result.error || '工作区另存到本地失败')
   }
 }
 
-const handleLoadWorkspace = async (event = null) => {
-  const file = event?.target?.files?.[0] || null
+const getFileInput = (event: Event | null): HTMLInputElement | null => (
+  event?.target instanceof HTMLInputElement ? event.target : null
+)
+
+const getErrorMessage = (value: unknown) => value instanceof Error ? value.message : String(value)
+
+const handleLoadWorkspace = async (event: Event | null = null) => {
+  const input = getFileInput(event)
+  const file = input?.files?.[0] || null
 
   try {
     const loadedWorkspace = await loadWorkspace(file)
@@ -439,18 +476,18 @@ const handleLoadWorkspace = async (event = null) => {
       goEditorAfterSuccess()
     }
   } catch (err) {
-    error(`加载失败: ${err.message}`)
+    error(`加载失败: ${getErrorMessage(err)}`)
   } finally {
-    if (event?.target) {
-      event.target.value = ''
-    }
+    if (input) input.value = ''
   }
 }
 
 const handleCreateCloudWorkspace = async () => {
+  if (isCloudActionBusy.value) return
   const trimmedName = newCloudWorkspaceName.value.trim()
   if (!trimmedName) return
 
+  isCloudOperationInFlight.value = true
   try {
     const jsonContent = getWorkspaceJson()
     if (!jsonContent) {
@@ -463,22 +500,26 @@ const handleCreateCloudWorkspace = async () => {
       return
     }
 
-    markSaved()
     newCloudWorkspaceName.value = ''
-    saveLastWorkspace({
-      type: 'cloud',
-      name: trimmedName,
-      fileId: result.data?.fileId,
-      source: 'retiehe'
-    })
+    if (result.data?.fileId) {
+      saveLastWorkspace({
+        type: 'cloud',
+        name: trimmedName,
+        fileId: result.data.fileId,
+        source: 'retiehe'
+      })
+    }
     success('云端工作区已新增')
+    if (result.backupWarning) warning(result.backupWarning)
     await refresh()
   } catch (err) {
-    error(`新增失败: ${err.message || err}`)
+    error(`新增失败: ${getErrorMessage(err)}`)
+  } finally {
+    isCloudOperationInFlight.value = false
   }
 }
 
-const handleLoadCloudWorkspace = async (workspace) => {
+const handleLoadCloudWorkspace = async (workspace: CloudWorkspaceFile) => {
   try {
     const result = await loadWorkspaceFromCloud(workspace.fileId, 'retiehe')
     if (!result.success || !result.data?.content) {
@@ -501,7 +542,7 @@ const handleLoadCloudWorkspace = async (workspace) => {
       goEditorAfterSuccess()
     }
   } catch (err) {
-    error(`加载失败: ${err.message || err}`)
+    error(`加载失败: ${getErrorMessage(err)}`)
   }
 }
 
@@ -519,13 +560,13 @@ const handleRestoreAutoSave = async () => {
     success('已恢复自动保存的工作区')
     goEditorAfterSuccess()
   } catch (err) {
-    error(`自动保存恢复失败: ${err.message || err}`)
+    error(`自动保存恢复失败: ${getErrorMessage(err)}`)
   } finally {
     isRestoringAutoSave.value = false
   }
 }
 
-const handleStartRename = (workspace) => {
+const handleStartRename = (workspace: CloudWorkspaceFile) => {
   editingWorkspaceId.value = workspace.fileId
   editingWorkspaceName.value = getWorkspaceName(workspace)
 }
@@ -535,10 +576,12 @@ const handleCancelRename = () => {
   editingWorkspaceName.value = ''
 }
 
-const handleRenameWorkspace = async (workspace) => {
+const handleRenameWorkspace = async (workspace: CloudWorkspaceFile) => {
+  if (isCloudActionBusy.value) return
   const trimmedName = editingWorkspaceName.value.trim()
   if (!trimmedName) return
 
+  isCloudOperationInFlight.value = true
   try {
     const result = await renameWorkspaceInCloud(workspace.fileId, trimmedName, 'retiehe')
     if (!result.success) {
@@ -550,35 +593,32 @@ const handleRenameWorkspace = async (workspace) => {
     success('工作区名称已更新')
     await refresh()
   } catch (err) {
-    error(`改名失败: ${err.message || err}`)
+    error(`改名失败: ${getErrorMessage(err)}`)
+  } finally {
+    isCloudOperationInFlight.value = false
   }
 }
 
-const handleRemoveCloudWorkspace = (workspace) => {
+const handleRemoveCloudWorkspace = async (workspace: CloudWorkspaceFile) => {
   const name = getWorkspaceName(workspace)
-  const confirmed = requestConfirm(`removeCloudWorkspace_${workspace.fileId}`, async () => {
-    const result = await deleteWorkspaceFromCloud(workspace.fileId, 'retiehe')
-    if (!result.success) {
-      error(result.message || '移除工作区失败')
-      return
-    }
-
-    if (editingWorkspaceId.value === workspace.fileId) {
-      handleCancelRename()
-    }
-
-    const lastWorkspace = getLastWorkspace()
-    if (lastWorkspace?.type === 'cloud' && lastWorkspace.fileId === workspace.fileId) {
-      clearLastWorkspace()
-    }
-
-    success(`已标记删除 "${name}"`)
-    await refresh()
-  }, '再次点击确认移除')
-
-  if (!confirmed) {
-    warning(`再次点击以标记删除 "${name}"`)
+  const confirmed = await confirm({
+    title: '删除云端工作区',
+    content: `确认删除“${name}”？此操作无法在应用内撤销。`,
+    positiveText: '删除',
+    type: 'error'
+  })
+  if (!confirmed) return
+  const result = await deleteWorkspaceFromCloud(workspace.fileId, 'retiehe')
+  if (!result.success) {
+    error(result.message || '移除工作区失败')
+    return
   }
+  if (editingWorkspaceId.value === workspace.fileId) handleCancelRename()
+  const lastWorkspace = getLastWorkspace()
+  if (lastWorkspace?.type === 'cloud' && lastWorkspace.fileId === workspace.fileId) clearLastWorkspace()
+  success(`已删除“${name}”`)
+  if (result.backupWarning) warning(result.backupWarning)
+  await refresh()
 }
 
 const handleDownloadTemplate = async () => {
@@ -593,8 +633,9 @@ const handleFuckSeatsImported = () => {
   goEditorAfterSuccess()
 }
 
-const handleImportExcel = async (event = null) => {
-  const file = event?.target?.files?.[0] || await openBinaryFile({
+const handleImportExcel = async (event: Event | null = null) => {
+  const input = getFileInput(event)
+  const file = input?.files?.[0] || await openBinaryFile({
     title: '导入学生名单',
     accept: '.xlsx,.xls',
     filters: excelFileFilters
@@ -604,20 +645,23 @@ const handleImportExcel = async (event = null) => {
   try {
     await beginExcelRosterImport(file)
   } catch (err) {
-    error(`导入失败: ${err.message}`)
+    error(`导入失败: ${getErrorMessage(err)}`)
   } finally {
-    if (event?.target) {
-      event.target.value = ''
-    }
+    if (input) input.value = ''
   }
 }
 
 const handleExportExcel = async () => {
   try {
-    await exportToExcel(students.value, tags.value)
+    const result = await exportToExcel(students.value, tags.value)
+    if (!result || result.canceled) return
+    if (!result.success) {
+      error('Excel导出失败，请稍后重试')
+      return
+    }
     success('Excel导出成功！')
   } catch (err) {
-    error(`导出失败: ${err.message}`)
+    error(`导出失败: ${getErrorMessage(err)}`)
   }
 }
 
@@ -642,11 +686,11 @@ const handleImportSdes = async () => {
     sdesFileName.value = selected.name
     showSdesImportDialog.value = true
   } catch (err) {
-    error(`SDES 导入失败: ${err.message || err}`)
+    error(`SDES 导入失败: ${getErrorMessage(err)}`)
   }
 }
 
-const handleConfirmSdesImport = async (target) => {
+const handleConfirmSdesImport = async (target: SdesImportTarget) => {
   if (!sdesDocument.value || !target || isImportingSdes.value) return
 
   isImportingSdes.value = true
@@ -660,7 +704,7 @@ const handleConfirmSdesImport = async (target) => {
     showSdesImportDialog.value = false
     goEditorAfterSuccess()
   } catch (err) {
-    error(`SDES 导入失败: ${err.message || err}`)
+    error(`SDES 导入失败: ${getErrorMessage(err)}`)
   } finally {
     isImportingSdes.value = false
   }
@@ -675,13 +719,14 @@ const handleExportSdes = async () => {
       error('SDES 导出失败，请查看控制台了解详情')
     }
   } catch (err) {
-    error(`SDES 导出失败: ${err.message || err}`)
+    error(`SDES 导出失败: ${getErrorMessage(err)}`)
   }
 }
 
 onMounted(() => {
-  getAutoSaveBackup()
-  if (token.value) refresh()
+  void getAutoSaveBackup().catch((autoSaveError) => {
+    error(`读取自动保存备份失败：${getErrorMessage(autoSaveError)}`)
+  })
 })
 </script>
 
@@ -725,10 +770,6 @@ onMounted(() => {
   margin: 0;
   font-size: 13px;
   color: var(--color-text-secondary);
-}
-
-.hidden-input {
-  display: none;
 }
 
 .action-grid {
@@ -785,44 +826,6 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.compact-button {
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.compact-button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.compact-button.primary {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.compact-button.primary:hover {
-  background: var(--color-primary-hover);
-  color: var(--color-text-inverse);
-}
-
-.compact-button:disabled {
-  cursor: not-allowed;
-  color: var(--color-text-disabled);
-  background: var(--color-bg-soft);
-}
-
 .cloud-error {
   margin: -6px 0 12px;
   color: var(--color-danger);
@@ -831,27 +834,6 @@ onMounted(() => {
 
 .action-button {
   min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-subtle);
-  color: var(--color-text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.action-button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-surface);
-}
-
-.action-button.danger-soft {
-  color: var(--color-danger);
 }
 
 .workspace-manager {
@@ -873,28 +855,6 @@ onMounted(() => {
 .workspace-edit-input {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: 13px;
-  outline: none;
-}
-
-.manager-name-input {
-  min-height: 36px;
-  padding: 0 10px;
-}
-
-.workspace-edit-input {
-  min-height: 34px;
-  padding: 0 9px;
-}
-
-.manager-name-input:focus,
-.workspace-edit-input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
 .workspace-empty-row {
@@ -978,51 +938,6 @@ onMounted(() => {
   gap: 4px;
 }
 
-.icon-button {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
-
-.icon-button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.icon-button.primary {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.icon-button.primary:hover {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.icon-button.success:hover {
-  border-color: var(--color-success);
-  color: var(--color-success);
-}
-
-.icon-button.danger:hover {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-  background: var(--color-danger-bg);
-}
-
-.icon-button:disabled {
-  cursor: not-allowed;
-  color: var(--color-text-disabled);
-  background: var(--color-bg-soft);
-}
-
 @media (max-width: 900px) {
   .files-layout {
     grid-template-columns: 1fr;
@@ -1087,7 +1002,6 @@ onMounted(() => {
   .action-button {
     min-height: 44px;
     justify-content: flex-start;
-    padding: 0 14px;
   }
 }
 </style>

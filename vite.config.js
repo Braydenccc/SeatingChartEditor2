@@ -47,11 +47,11 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('vue') || id.includes('@vue')) {
-              return 'vendor-vue'
-            }
             if (id.includes('xlsx')) {
               return 'vendor-xlsx'
+            }
+            if (id.includes('/node_modules/vue/') || id.includes('/node_modules/@vue/')) {
+              return 'vendor-vue'
             }
             return 'vendor'
           }

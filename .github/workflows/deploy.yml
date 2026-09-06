@@ -1,31 +1,46 @@
 name: Deploy to Retinbox
 
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        description: Exact verified commit to deploy
+        required: true
+        type: string
+      ref_name:
+        description: Source branch that selects the deployment target
+        required: true
+        type: string
+      release_timestamp:
+        description: UTC timestamp shared by every delivery from the caller workflow run
+        required: true
+        type: string
+    secrets:
+      RTH_API_KEY:
+        required: true
+
 permissions:
   contents: read
 
-on:
-  push:
-    branches:
-      - main
-      - dev
-
 concurrency:
-  group: deploy-${{ github.ref_name }}
+  group: deploy-${{ inputs.ref_name }}
   cancel-in-progress: true
 
 jobs:
   deploy:
-    name: Deploy ${{ github.ref_name }}
+    name: Deploy ${{ inputs.ref_name }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout verified commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20.19.0'
           cache: npm
 
       - name: Install dependencies
@@ -33,8 +48,10 @@ jobs:
 
       - name: Configure deployment target
         shell: bash
+        env:
+          DEPLOY_REF_NAME: ${{ inputs.ref_name }}
         run: |
-          case "${GITHUB_REF_NAME}" in
+          case "$DEPLOY_REF_NAME" in
             main)
               echo "BUILD_SCRIPT=build:web" >> "$GITHUB_ENV"
               echo "DEPLOY_ENVIRONMENT=production" >> "$GITHUB_ENV"
@@ -48,13 +65,15 @@ jobs:
               echo "DEPLOY_URL=https://testsce.jbyc.cc" >> "$GITHUB_ENV"
               ;;
             *)
-              echo "Unsupported branch: ${GITHUB_REF_NAME}" >&2
+              echo "Unsupported branch: $DEPLOY_REF_NAME" >&2
               exit 1
               ;;
           esac
 
       - name: Prepare timestamp release version
-        run: node scripts/set-release-version.js --timestamp "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" --github-env
+        env:
+          RELEASE_TIMESTAMP_INPUT: ${{ inputs.release_timestamp }}
+        run: node scripts/set-release-version.js --timestamp "$RELEASE_TIMESTAMP_INPUT" --github-env
 
       - name: Build
         run: npm run "$BUILD_SCRIPT"

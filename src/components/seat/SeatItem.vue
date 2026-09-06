@@ -15,7 +15,14 @@
     'student-selected': isStudentSelected,
     'drag-ghost': isGhost
   }" :style="zoneHighlightStyle" :data-seat-id="seat.id" :draggable="isDraggable"
+    role="button"
+    :tabindex="isKeyboardActionable ? 0 : -1"
+    :aria-label="accessibleLabel"
+    :aria-disabled="!isKeyboardActionable"
+    :aria-pressed="isInSelection || isFirstSelected || isStudentSelected"
     @click="handleClick"
+    @keydown.enter.prevent="handleKeyboardActivate"
+    @keydown.space.prevent="handleKeyboardActivate"
     @dblclick="handleDoubleClick"
     @dragstart="handleDragStart" @dragend="handleDragEnd" @dragover.prevent="handleDragOverSeat"
     @dragenter.prevent="handleDragEnter" @dragleave="handleDragLeave" @drop.prevent="handleDrop"
@@ -37,9 +44,10 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, onUnmounted, shallowRef, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
+import { mobileWorkbenchMediaQuery } from '@/constants/layout'
 import { useStudentData } from '@/composables/useStudentData'
 import { useEditMode } from '@/composables/useEditMode'
 import { useZoneData } from '@/composables/useZoneData'
@@ -52,19 +60,24 @@ import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import { useZoom } from '@/composables/useZoom'
 import StudentCardFace from '@/components/student/StudentCardFace.vue'
+import type { Seat, Student } from '@/types/models'
 
-const props = defineProps({
-  seat: {
-    type: Object,
-    required: true
-  },
-  isDropTarget: {
-    type: Boolean,
-    default: false
-  }
+const props = withDefaults(defineProps<{
+  seat: Seat
+  isDropTarget?: boolean
+}>(), {
+  isDropTarget: false
 })
 
-const emit = defineEmits(['assign-student', 'toggle-empty', 'clear-seat', 'swap-seat', 'toggle-zone-seat', 'drag-start-seat', 'drag-enter-seat', 'drag-end-seat', 'edit-student'])
+const emit = defineEmits<{
+  (e: 'assign-student', seatId: string, studentId: number): void
+  (e: 'toggle-empty' | 'clear-seat' | 'drag-enter-seat', seatId: string): void
+  (e: 'swap-seat', seatId: string, sourceSeatId?: string): void
+  (e: 'toggle-zone-seat', seatId: string): void
+  (e: 'drag-start-seat', seatId: string, isSelection: boolean): void
+  (e: 'drag-end-seat'): void
+  (e: 'edit-student', studentId: number): void
+}>()
 
 const { students, selectedStudentId } = useStudentData()
 const { currentMode, firstSelectedSeat, EditMode } = useEditMode()
@@ -88,35 +101,48 @@ const {
 const { startDragPreview, updateDragPreview, endDragPreview, isGhostSeat } = useDragPreview()
 const { settings } = useGlobalSettings()
 const { panX, panY, setPan } = useZoom()
-const { setRightRailTab, openMobileDrawerForDrag, restoreMobileDrawerOpenedForDrag, isSeatFullscreen } = useEditorWorkbench()
+const {
+  setRightRailTab,
+  showMobileSheet,
+  openMobileDrawerForDrag,
+  restoreMobileDrawerOpenedForDrag,
+  isSeatFullscreen
+} = useEditorWorkbench()
 
 const isDragOver = ref(false)
 const isDragging = ref(false)
 let dragEnterCount = 0
-let transparentDragImageEl = null
+let transparentDragImageEl: HTMLElement | null = null
 
 // 响应式断点检测
-const isMobile = useMediaQuery('(max-width: 768px)')
+const isMobileWorkbench = useMediaQuery(mobileWorkbenchMediaQuery)
 
 // 触摸拖拽状态
-let touchDragTimer = null
+let touchDragTimer: ReturnType<typeof setTimeout> | null = null
 const TOUCH_SELECTION_MODE = {
   ADD: 'add',
   REMOVE: 'remove'
+} as const
+
+type TouchSelectionMode = typeof TOUCH_SELECTION_MODE[keyof typeof TOUCH_SELECTION_MODE]
+
+interface TouchDragData {
+  isSelection: boolean
+  seatIds: string[]
 }
 
 let touchDragActive = false
 let touchSelectionActive = false
-let touchSelectionMode = null
-let touchSelectionVisited = new Set()
-let touchMoveRafId = null
-let autoPanRafId = null
-let autoPanPoint = null
+let touchSelectionMode: TouchSelectionMode | null = null
+let touchSelectionVisited = new Set<string>()
+let touchMoveRafId: number | null = null
+let autoPanRafId: number | null = null
+let autoPanPoint: { clientX: number; clientY: number } | null = null
 let touchStartX = 0
 let touchStartY = 0
-let activeTouchDragData = null
+let activeTouchDragData: TouchDragData | null = null
 let suppressNextClick = false
-let suppressClickTimer = null
+let suppressClickTimer: ReturnType<typeof setTimeout> | null = null
 // 当前是否通过触摸交互（动态判断，解决触摸屏笔记本问题）
 // 使用 shallowRef 让 isDraggable computed 能追踪其变化
 const lastPointerWasTouch = shallowRef(false)
@@ -131,9 +157,15 @@ const hasStudent = computed(() => {
   return props.seat.studentId !== null && !props.seat.isEmpty
 })
 
-const studentInfo = computed(() => {
+const studentInfo = computed<Student | null>(() => {
   if (!hasStudent.value) return null
-  return students.value.find(s => s.id === props.seat.studentId) || { name: '未知', studentNumber: null, tags: [] }
+  return students.value.find(s => s.id === props.seat.studentId) || {
+    id: props.seat.studentId ?? -1,
+    name: '未知',
+    studentNumber: null,
+    tags: [],
+    numericAttributes: {}
+  }
 })
 
 const isFirstSelected = computed(() => {
@@ -156,7 +188,7 @@ const zoneHighlightStyle = computed(() => {
 
 const isClickable = computed(() => {
   // 手机端选择模式：所有座位都可点击
-  if (isMobile.value && isSelectionMode.value) return !isGuardSeat.value
+  if (isMobileWorkbench.value && isSelectionMode.value) return !isGuardSeat.value
   if (isSelectionMode.value) return !isGuardSeat.value
 
   if (currentMode.value === EditMode.NORMAL) {
@@ -167,6 +199,27 @@ const isClickable = computed(() => {
   if (currentMode.value === EditMode.CLEAR) return hasStudent.value
   if (currentMode.value === EditMode.ZONE_EDIT) return !isGuardSeat.value
   return false
+})
+
+const isKeyboardActionable = computed(() => {
+  if (isClickable.value) return true
+  return !isMobileWorkbench.value &&
+    currentMode.value === EditMode.NORMAL &&
+    !isGuardSeat.value
+})
+
+const accessibleLabel = computed(() => {
+  const position = `第 ${props.seat.groupIndex + 1} 组，第 ${props.seat.columnIndex + 1} 列，第 ${props.seat.rowIndex + 1} 行`
+  let state = props.seat.isEmpty
+    ? '空置座位'
+    : isGuardSeat.value
+      ? `${guardSeatLabel.value}，${hasStudent.value ? `学生 ${studentInfo.value?.name || '未知'}` : '空位'}`
+      : hasStudent.value
+        ? `学生 ${studentInfo.value?.name || '未知'}`
+        : '空位'
+
+  if (isInSelection.value || isFirstSelected.value || isStudentSelected.value) state += '，已选中'
+  return `${position}，${state}`
 })
 
 const undoHighlighted = computed(() => isHighlighted(props.seat.id))
@@ -209,7 +262,7 @@ const isDraggable = computed(() => {
 })
 
 const shouldOpenCandidateDrawerForSeatDrag = computed(() => {
-  return isMobile.value && isSeatFullscreen.value
+  return isMobileWorkbench.value && isSeatFullscreen.value
 })
 
 const getDragSeatData = () => {
@@ -243,7 +296,7 @@ const consumeSuppressedClick = () => {
 }
 
 // 记录指针类型，用于判断是否为触摸操作
-const handlePointerDown = (e) => {
+const handlePointerDown = (e: PointerEvent) => {
   lastPointerWasTouch.value = e.pointerType === 'touch' || e.pointerType === 'pen'
 }
 
@@ -253,7 +306,7 @@ const handleClick = () => {
   if (consumeSuppressedClick()) return
 
   // 手机端选择模式：点击切换选中状态
-  if (isMobile.value && isSelectionMode.value && !isGuardSeat.value) {
+  if (isMobileWorkbench.value && isSelectionMode.value && !isGuardSeat.value) {
     toggleSeatInSelection(props.seat.id)
     return
   }
@@ -269,7 +322,7 @@ const handleClick = () => {
     return
   }
 
-  if (isMobile.value && currentMode.value === EditMode.NORMAL) {
+  if (isMobileWorkbench.value && currentMode.value === EditMode.NORMAL) {
     return
   }
 
@@ -309,22 +362,30 @@ const handleClick = () => {
   }
 }
 
+const handleKeyboardActivate = () => {
+  if (!isKeyboardActionable.value) return
+  handleClick()
+}
+
 const handleContextMenuAction = () => {
   if (consumeContextSelectionSuppression()) return
-  if (lastPointerWasTouch.value || isMobile.value || isGuardSeat.value) return
+  if (lastPointerWasTouch.value || isGuardSeat.value) return
   selectSingleSeat(props.seat.id)
   setRightRailTab('selection')
+  if (isMobileWorkbench.value) showMobileSheet('context')
 }
 
 // 双击处理
 const handleDoubleClick = () => {
   if (!hasStudent.value) return
+  const student = studentInfo.value
+  if (!student) return
 
   const doubleClickAction = settings.value.editor.doubleClickAction
 
   if (doubleClickAction === 'edit') {
     // 编辑学生信息
-    emit('edit-student', studentInfo.value.id)
+    emit('edit-student', student.id)
   } else if (doubleClickAction === 'random') {
     // 随机移出 - 将学生从座位移除到候选区
     emit('clear-seat', props.seat.id)
@@ -333,7 +394,7 @@ const handleDoubleClick = () => {
 
 // ==================== HTML5 拖拽 ====================
 
-const handleDragStart = (e) => {
+const handleDragStart = (e: DragEvent) => {
   if (!isDraggable.value) {
     e.preventDefault()
     return
@@ -344,6 +405,7 @@ const handleDragStart = (e) => {
   }
   if (shouldOpenCandidateDrawerForSeatDrag.value) openMobileDrawerForDrag('candidates')
   startDragFromSeat()
+  if (!e.dataTransfer) return
   e.dataTransfer.effectAllowed = 'move'
 
   const isSelection = !lastPointerWasTouch.value && isInSelection.value && selectedSeatsArray.value.length > 1
@@ -396,8 +458,8 @@ const handleDragEnd = () => {
   emit('drag-end-seat')
 }
 
-const handleDragOverSeat = (e) => {
-  e.dataTransfer.dropEffect = 'move'
+const handleDragOverSeat = (e: DragEvent) => {
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
 }
 
 const handleDragEnter = () => {
@@ -425,14 +487,15 @@ watch(dragCleanupVersion, () => {
 
 // ==================== 触摸拖拽模拟 ====================
 
-const handleTouchStart = (e) => {
+const handleTouchStart = (e: TouchEvent) => {
   lastPointerWasTouch.value = true
   if (e.touches.length !== 1) {
     cleanupTouchDrag()
     return
   }
 
-  const touch = e.touches[0]
+  const touch = e.touches.item(0)
+  if (!touch) return
   const startX = touch.clientX
   const startY = touch.clientY
   touchStartX = startX
@@ -458,18 +521,19 @@ const handleTouchStart = (e) => {
   }, 300)
 }
 
-const handleTouchMove = (e) => {
+const handleTouchMove = (e: TouchEvent) => {
   if (e.touches.length !== 1) {
     cleanupTouchDrag()
     return
   }
 
-  const touch = e.touches[0]
+  const touch = e.touches.item(0)
+  if (!touch) return
   const dx = touch.clientX - touchStartX
   const dy = touch.clientY - touchStartY
   const moved = Math.abs(dx) > 5 || Math.abs(dy) > 5
 
-  if (!isGuardSeat.value && isMobile.value && isSelectionMode.value && !touchDragActive && !touchSelectionActive && moved) {
+  if (!isGuardSeat.value && isMobileWorkbench.value && isSelectionMode.value && !touchDragActive && !touchSelectionActive && moved) {
     if (touchDragTimer) {
       clearTimeout(touchDragTimer)
       touchDragTimer = null
@@ -604,7 +668,7 @@ const handleTouchCancel = () => {
   cleanupTouchDrag()
 }
 
-const handleTouchEnd = (e) => {
+const handleTouchEnd = (e: TouchEvent) => {
   // 涂抹选择模式结束
   if (touchSelectionActive) {
     touchSelectionActive = false
@@ -632,7 +696,8 @@ const handleTouchEnd = (e) => {
   suppressUpcomingClick()
 
   // 获取 drop 目标
-  const touch = e.changedTouches[0]
+  const touch = e.changedTouches.item(0)
+  if (!touch) return
   const targetEl = document.elementFromPoint(touch.clientX, touch.clientY)
 
   clearAllTouchHighlights()
@@ -684,15 +749,15 @@ const handleTouchEnd = (e) => {
   seatEl.dispatchEvent(event)
 }
 
-const findParentSeat = (el) => {
-  let current = el
+const findParentSeat = (el: Element | null): HTMLElement | null => {
+  let current = el instanceof HTMLElement ? el : null
   while (current && !current.dataset?.seatId) {
     current = current.parentElement
   }
   return current
 }
 
-const findParentByClass = (el, className) => {
+const findParentByClass = (el: Element | null, className: string): Element | null => {
   let current = el
   while (current) {
     if (current.classList?.contains(className)) return current
@@ -713,7 +778,7 @@ const clearAllTouchHighlights = () => {
   })
 }
 
-const autoPanNearEdge = (clientX, clientY) => {
+const autoPanNearEdge = (clientX: number, clientY: number) => {
   autoPanPoint = { clientX, clientY }
   if (!autoPanRafId) {
     autoPanRafId = requestAnimationFrame(runAutoPanNearEdge)
@@ -785,6 +850,12 @@ onUnmounted(() => {
 
 .seat-item.clickable {
   cursor: pointer;
+}
+
+.seat-item:focus-visible {
+  outline: 3px solid var(--color-info);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-selection-ring);
 }
 
 .seat-item:not(.dragging):hover {
@@ -880,7 +951,7 @@ onUnmounted(() => {
 }
 
 .empty-text {
-  font-size: 13px;
+  font-size: var(--seat-card-placeholder-size);
   color: var(--color-text-secondary);
   font-weight: 500;
 }
@@ -916,7 +987,7 @@ onUnmounted(() => {
 }
 
 .seat-placeholder {
-  font-size: 13px;
+  font-size: var(--seat-card-placeholder-size);
   color: var(--color-text-disabled);
   font-weight: 400;
 }
@@ -1006,16 +1077,15 @@ onUnmounted(() => {
 /* 拖拽吸附幽灵 */
 .seat-item.drag-ghost {
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-info) 30%, transparent);
-  background: color-mix(in srgb, var(--color-info) 8%, var(--color-bg-card));
   position: relative;
 }
 
 .seat-item.drag-ghost::before {
   content: '';
   position: absolute;
-  inset: -3px;
+  inset: var(--seat-card-border-width);
   border: 2px dashed var(--color-info);
-  border-radius: 10px;
+  border-radius: var(--seat-card-radius);
   pointer-events: none;
 }
 
@@ -1023,32 +1093,4 @@ onUnmounted(() => {
   background: color-mix(in srgb, var(--zone-color, var(--color-border-strong)) 40%, var(--color-bg-selected));
 }
 
-@media (max-width: 1366px) and (min-width: 1025px) {
-  .empty-text,
-  .seat-placeholder {
-    font-size: 11px;
-  }
-}
-
-/* 小高度屏幕优化 */
-@media (max-height: 820px) and (min-width: 1025px) {
-  .empty-text,
-  .seat-placeholder {
-    font-size: 10px;
-  }
-}
-
-@media (max-width: 768px) {
-  .empty-text,
-  .seat-placeholder {
-    font-size: 11px;
-  }
-}
-
-@media (max-width: 480px) {
-  .empty-text,
-  .seat-placeholder {
-    font-size: 10px;
-  }
-}
 </style>

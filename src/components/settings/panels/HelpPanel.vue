@@ -17,15 +17,19 @@
 
     <div class="manual-layout">
       <nav class="manual-toc" aria-label="用户手册目录">
-        <button
+        <NButton
           v-for="section in userManual.sections"
           :key="section.id"
-          :class="{ active: activeSectionId === section.id }"
-          type="button"
+          class="manual-toc-button"
+          :type="activeSectionId === section.id ? 'primary' : 'default'"
+          :secondary="activeSectionId === section.id"
+          :quaternary="activeSectionId !== section.id"
+          block
+          attr-type="button"
           @click="scrollToSection(section.id)"
         >
           {{ section.title }}
-        </button>
+        </NButton>
       </nav>
 
       <article class="manual-doc" v-html="manualHtml"></article>
@@ -34,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { BookOpen } from 'lucide-vue-next'
 import { userManual, type UserManualSection } from '@/constants/userManual'
@@ -357,28 +362,11 @@ onBeforeUnmount(() => {
   border-radius: 8px;
 }
 
-.manual-toc button {
+.manual-toc-button {
   min-height: 36px;
-  padding: 0 10px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font: inherit;
   font-size: 13px;
+  justify-content: flex-start;
   text-align: left;
-}
-
-.manual-toc button:hover {
-  background: var(--color-bg-subtle);
-  color: var(--color-primary);
-}
-
-.manual-toc button.active {
-  background: var(--color-bg-selected);
-  color: var(--color-primary);
-  font-weight: 700;
 }
 
 .manual-doc {
@@ -499,7 +487,7 @@ onBeforeUnmount(() => {
     display: none;
   }
 
-  .manual-toc button {
+  .manual-toc-button {
     flex-shrink: 0;
     white-space: nowrap;
   }

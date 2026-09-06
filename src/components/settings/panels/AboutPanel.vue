@@ -42,14 +42,18 @@
           <Cloud :size="18" />
           <span>热铁盒网页托管</span>
         </a>
-        <button type="button" class="link-item link-button" @click="openHelp">
-          <BookOpen :size="18" />
-          <span>用户手册</span>
-        </button>
-        <button type="button" class="link-item link-button" @click="openIntro">
-          <Compass :size="18" />
-          <span>查看入门简介</span>
-        </button>
+        <NButton attr-type="button" class="link-button" quaternary block @click="openHelp">
+          <span class="link-button-content">
+            <BookOpen :size="18" />
+            <span>用户手册</span>
+          </span>
+        </NButton>
+        <NButton attr-type="button" class="link-button" quaternary block @click="openIntro">
+          <span class="link-button-content">
+            <Compass :size="18" />
+            <span>查看入门简介</span>
+          </span>
+        </NButton>
       </div>
     </div>
 
@@ -72,7 +76,8 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { computed } from 'vue'
 import { BookOpen, Compass, Github, Heart, Cloud } from 'lucide-vue-next'
 import { appBuildInfo } from '@/constants/appBuildInfo'
@@ -189,9 +194,17 @@ const openIntro = () => {
 }
 
 .link-button {
-  cursor: pointer;
-  font: inherit;
+  height: 42px;
+  justify-content: flex-start;
   text-align: left;
+}
+
+.link-button-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-start;
 }
 
 .tech-tags {

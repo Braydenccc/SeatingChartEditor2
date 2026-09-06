@@ -1,7 +1,7 @@
 <template>
   <AppPageShell title="账号中心" eyebrow="用户与云端工作区">
     <div class="user-layout">
-      <section class="user-section account-section">
+      <NCard class="user-section account-section" :bordered="false" content-style="padding: 0">
         <div class="section-header">
           <User :size="20" stroke-width="2" />
           <div>
@@ -28,14 +28,14 @@
         <div v-if="!token" class="notice-row">
           <Cloud :size="18" stroke-width="2" />
           <span>登录 SCE 账号后可查看账号云端工作区统计并修改密码。</span>
-          <button class="inline-button" type="button" @click="openLoginDialog">
-            <LogIn :size="16" stroke-width="2" />
+          <NButton class="inline-button" size="small" type="primary" @click="openLoginDialog">
+            <template #icon><LogIn :size="16" stroke-width="2" /></template>
             <span>登录 SCE</span>
-          </button>
+          </NButton>
         </div>
-      </section>
+      </NCard>
 
-      <section class="user-section workspace-section">
+      <NCard class="user-section workspace-section" :bordered="false" content-style="padding: 0">
         <div class="section-header">
           <Cloud :size="20" stroke-width="2" />
           <div>
@@ -45,47 +45,35 @@
         </div>
 
         <div class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-label">工作区</span>
-            <strong>{{ workspaceCount }}</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">总大小</span>
-            <strong>{{ totalSizeText }}</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">最近更新</span>
-            <strong>{{ recentWorkspaceTimeText }}</strong>
-          </div>
-          <div class="stat-card wide">
-            <span class="stat-label">最近工作区</span>
-            <strong>{{ recentWorkspaceName }}</strong>
-          </div>
+          <NStatistic class="stat-card" label="工作区" :value="workspaceCount" :theme-overrides="statisticThemeOverrides" />
+          <NStatistic class="stat-card" label="总大小" :value="totalSizeText" :theme-overrides="statisticThemeOverrides" />
+          <NStatistic class="stat-card" label="最近更新" :value="recentWorkspaceTimeText" :theme-overrides="statisticThemeOverrides" />
+          <NStatistic class="stat-card wide" label="最近工作区" :value="recentWorkspaceName" :theme-overrides="statisticThemeOverrides" />
         </div>
 
         <p v-if="errorMessage" class="status-text danger">{{ errorMessage }}</p>
 
         <div class="action-row">
-          <button class="action-button" type="button" :disabled="!token || isRefreshing" @click="refresh">
-            <RefreshCw :size="18" stroke-width="2" />
+          <NButton class="action-button" secondary :loading="isRefreshing" :disabled="!token" @click="refresh">
+            <template #icon><RefreshCw :size="18" stroke-width="2" /></template>
             <span>{{ isRefreshing ? '刷新中' : '刷新统计' }}</span>
-          </button>
-          <button class="action-button" type="button" :title="cloudLoadTitle" @click="openCloudLoad">
-            <CloudDownload :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary :title="cloudLoadTitle" @click="openCloudLoad">
+            <template #icon><CloudDownload :size="18" stroke-width="2" /></template>
             <span>{{ cloudLoadLabel }}</span>
-          </button>
-          <button class="action-button" type="button" :title="cloudSaveTitle" @click="openCloudSave">
-            <CloudUpload :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary :title="cloudSaveTitle" @click="openCloudSave">
+            <template #icon><CloudUpload :size="18" stroke-width="2" /></template>
             <span>{{ cloudSaveLabel }}</span>
-          </button>
-          <button class="action-button" type="button" @click="router.push('/files')">
-            <FolderOpen :size="18" stroke-width="2" />
+          </NButton>
+          <NButton class="action-button" secondary @click="router.push('/files')">
+            <template #icon><FolderOpen :size="18" stroke-width="2" /></template>
             <span>前往文件页</span>
-          </button>
+          </NButton>
         </div>
-      </section>
+      </NCard>
 
-      <section class="user-section password-section">
+      <NCard class="user-section password-section" :bordered="false" content-style="padding: 0">
         <div class="section-header">
           <KeyRound :size="20" stroke-width="2" />
           <div>
@@ -95,18 +83,17 @@
         </div>
 
         <form v-if="token" class="password-form" @submit.prevent="handleChangePassword">
-          <label class="form-field">
-            <span>当前密码</span>
-            <input v-model="currentPassword" type="password" autocomplete="current-password" />
-          </label>
-          <label class="form-field">
-            <span>新密码</span>
-            <input v-model="newPassword" type="password" autocomplete="new-password" />
-          </label>
-          <label class="form-field">
-            <span>确认新密码</span>
-            <input v-model="confirmPassword" type="password" autocomplete="new-password" />
-          </label>
+          <NForm label-placement="top" size="medium">
+            <NFormItem label="当前密码">
+              <NInput v-model:value="currentPassword" type="password" show-password-on="click" autocomplete="current-password" />
+            </NFormItem>
+            <NFormItem label="新密码">
+              <NInput v-model:value="newPassword" type="password" show-password-on="click" autocomplete="new-password" />
+            </NFormItem>
+            <NFormItem label="确认新密码">
+              <NInput v-model:value="confirmPassword" type="password" show-password-on="click" autocomplete="new-password" />
+            </NFormItem>
+          </NForm>
 
           <div v-if="passwordValidation" class="requirements">
             <span :class="{ met: passwordValidation.length }">至少 8 个字符</span>
@@ -120,10 +107,10 @@
           </p>
 
           <div class="form-actions">
-            <button class="primary-button" type="submit" :disabled="isChangingPassword">
-              <KeyRound :size="18" stroke-width="2" />
+            <NButton class="submit-button" type="primary" attr-type="submit" :loading="isChangingPassword">
+              <template #icon><KeyRound :size="18" stroke-width="2" /></template>
               <span>{{ isChangingPassword ? '提交中' : '修改密码' }}</span>
-            </button>
+            </NButton>
           </div>
         </form>
 
@@ -131,13 +118,14 @@
           <Cloud :size="22" stroke-width="2" />
           <span>仅 SCE 账号支持在此修改登录密码。</span>
         </div>
-      </section>
+      </NCard>
     </div>
   </AppPageShell>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { NButton, NCard, NForm, NFormItem, NInput, NStatistic } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import {
   Cloud,
@@ -176,6 +164,7 @@ const confirmPassword = ref('')
 const isChangingPassword = ref(false)
 const passwordMessage = ref('')
 const passwordMessageType = ref('')
+const statisticThemeOverrides = { valueFontSize: '16px' }
 
 const accountTypeText = computed(() => {
   if (token.value) return 'SCE 账号'
@@ -325,21 +314,20 @@ watch(token, (value) => {
   border-radius: 8px;
   background: var(--color-bg-subtle);
   min-width: 0;
+  overflow: hidden;
 }
 
 .stat-card.wide {
   grid-column: span 1;
 }
 
-.info-label,
-.stat-label {
+.info-label {
   font-size: 12px;
   color: var(--color-text-muted);
   font-weight: 600;
 }
 
-.info-item strong,
-.stat-card strong {
+.info-item strong {
   font-size: 16px;
   color: var(--color-text-primary);
   overflow: hidden;
@@ -377,20 +365,8 @@ watch(token, (value) => {
 
 .action-button,
 .inline-button,
-.primary-button {
+.submit-button {
   min-height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-subtle);
-  color: var(--color-text-primary);
-  padding: 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 .workspace-section .action-button {
@@ -401,59 +377,9 @@ watch(token, (value) => {
   margin-left: auto;
 }
 
-.primary-button {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border-color: var(--color-primary);
-}
-
-.action-button:hover,
-.inline-button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-surface);
-}
-
-.primary-button:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
-}
-
-.action-button:disabled,
-.primary-button:disabled {
-  cursor: not-allowed;
-  color: var(--color-text-disabled);
-  border-color: var(--color-border);
-  background: var(--color-bg-soft);
-}
-
 .password-form {
   display: grid;
   gap: 10px;
-}
-
-.form-field {
-  display: grid;
-  gap: 5px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  font-weight: 600;
-}
-
-.form-field input {
-  height: 40px;
-  border: 1px solid var(--color-input-border);
-  border-radius: 8px;
-  background: var(--color-input-bg);
-  color: var(--color-text-primary);
-  padding: 0 12px;
-  font-size: 14px;
-}
-
-.form-field input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
 }
 
 .requirements {
@@ -532,7 +458,7 @@ watch(token, (value) => {
 
   .action-button,
   .inline-button,
-  .primary-button {
+  .submit-button {
     width: 100%;
   }
 }

@@ -1,26 +1,35 @@
 <template>
-  <div class="page-shell">
-    <header class="page-header">
+  <NLayout
+    class="page-shell"
+    :content-style="{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }"
+  >
+    <NLayoutHeader class="page-header" bordered>
       <div class="page-title-group">
         <p v-if="eyebrow" class="page-eyebrow">{{ eyebrow }}</p>
-        <h1>{{ title }}</h1>
+        <h1 data-route-heading tabindex="-1">{{ title }}</h1>
       </div>
       <div class="page-actions">
         <slot name="actions"></slot>
-        <button class="back-button" type="button" aria-label="返回编辑器" title="返回编辑器" @click="goEditor">
-          <ArrowLeft :size="17" stroke-width="2.2" />
+        <NButton class="back-button" size="small" secondary aria-label="返回编辑器" title="返回编辑器" @click="goEditor">
+          <template #icon><NIcon><ArrowLeft :size="17" stroke-width="2.2" /></NIcon></template>
           <span>返回编辑器</span>
-        </button>
+        </NButton>
       </div>
-    </header>
-    <main class="page-body">
+    </NLayoutHeader>
+    <NLayoutContent
+      class="page-body"
+      :native-scrollbar="contained"
+      :content-style="contained ? containedBodyStyle : undefined"
+    >
       <slot></slot>
-    </main>
-  </div>
+    </NLayoutContent>
+  </NLayout>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { CSSProperties } from 'vue'
 import { ArrowLeft } from 'lucide-vue-next'
+import { NButton, NIcon, NLayout, NLayoutContent, NLayoutHeader } from 'naive-ui'
 import { useRouter } from 'vue-router'
 
 defineProps({
@@ -31,8 +40,20 @@ defineProps({
   eyebrow: {
     type: String,
     default: ''
+  },
+  contained: {
+    type: Boolean,
+    default: false
   }
 })
+
+const containedBodyStyle: CSSProperties = {
+  height: '100%',
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden'
+}
 
 const router = useRouter()
 const goEditor = () => router.push('/editor')
@@ -79,6 +100,12 @@ const goEditor = () => router.push('/editor')
   color: var(--color-primary);
 }
 
+.page-title-group h1:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
 .page-actions {
   display: flex;
   align-items: center;
@@ -87,30 +114,10 @@ const goEditor = () => router.push('/editor')
   justify-content: flex-end;
 }
 
-.back-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-subtle);
-  color: var(--color-text-primary);
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.back-button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-surface);
-}
-
 .page-body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: 0;
 }
 
@@ -146,8 +153,7 @@ const goEditor = () => router.push('/editor')
 
   .back-button {
     min-width: 44px;
-    min-height: 40px;
-    padding: 0 10px;
+    min-height: 44px;
   }
 
   .page-body {

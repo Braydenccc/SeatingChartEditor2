@@ -1,7 +1,13 @@
 <template>
   <div class="candidate-item" :class="{ dragging: isStudentDragging, selected: isSelected, compact: displayMode === 'compact' }"
     ref="itemRef" :draggable="canHtmlDrag()"
+    role="button"
+    tabindex="0"
+    :aria-label="accessibleLabel"
+    :aria-pressed="isSelected"
     @click="handleClick"
+    @keydown.enter.prevent="handleClick"
+    @keydown.space.prevent="handleClick"
     @dragstart="handleDragStart" @dragend="handleDragEnd"
     @dblclick="handleDoubleClick"
     @contextmenu.prevent="handleContextMenu" @pointerdown="handlePointerDown" @touchstart.passive="handleTouchStart">
@@ -13,35 +19,35 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
+import { mobileWorkbenchMediaQuery } from '@/constants/layout'
 import { useStudentDragging } from '@/composables/useStudentDragging'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useStudentData } from '@/composables/useStudentData'
 import { useEditMode } from '@/composables/useEditMode'
+import { useEditorCommands } from '@/composables/useEditorCommands'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useLogger } from '@/composables/useLogger'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 import StudentCardFace from './StudentCardFace.vue'
+import type { Student } from '@/types/models'
 
-const props = defineProps({
-  student: {
-    type: Object,
-    required: true
-  },
-  displayMode: {
-    type: String,
-    default: 'grid'
-  }
+const props = withDefaults(defineProps<{
+  student: Student
+  displayMode?: 'grid' | 'compact'
+}>(), {
+  displayMode: 'grid'
 })
 
-const emit = defineEmits(['edit-student'])
+const emit = defineEmits<{ 'edit-student': [studentId: number] }>()
 
-const itemRef = ref(null)
+const itemRef = ref<HTMLElement | null>(null)
 const { getEmptySeats, assignStudent } = useSeatChart()
 const { selectedStudentId, selectStudent, clearSelection } = useStudentData()
-const { currentMode, setMode, EditMode } = useEditMode()
+const { currentMode, EditMode } = useEditMode()
+const { activateTool } = useEditorCommands()
 const { settings } = useGlobalSettings()
 const { success, warning } = useLogger()
 const {
@@ -52,11 +58,15 @@ const {
   restoreMobileDrawerAfterDrag,
   isSeatFullscreen
 } = useEditorWorkbench()
-const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
+const isMobileWorkbench = useMediaQuery(mobileWorkbenchMediaQuery)
 const isLandscape = useMediaQuery('(orientation: landscape)')
 const isFullscreenLandscape = computed(() => isSeatFullscreen.value && isMobileWorkbench.value && isLandscape.value)
 
 const isSelected = computed(() => selectedStudentId.value === props.student.id)
+const accessibleLabel = computed(() => {
+  const number = props.student.studentNumber == null ? '' : `，学号 ${props.student.studentNumber}`
+  return `候选学生 ${props.student.name || '未命名'}${number}${isSelected.value ? '，已选中' : ''}`
+})
 
 const {
   isStudentDragging,
@@ -84,7 +94,7 @@ const handleClick = () => {
     return
   }
   if (currentMode.value !== EditMode.NORMAL) {
-    setMode(EditMode.NORMAL)
+    activateTool('normal')
   }
   selectStudent(props.student.id)
   setRightRailTab('selection')
@@ -98,7 +108,7 @@ const handleContextMenu = () => {
 
   selectStudent(props.student.id)
   setRightRailTab('selection')
-  if (window.matchMedia('(max-width: 768px)').matches) {
+  if (isMobileWorkbench.value) {
     showMobileSheet('context')
   }
 }
@@ -205,6 +215,22 @@ const handleDoubleClick = () => {
   pointer-events: none;
 }
 
+.candidate-item:focus-visible {
+  outline: 3px solid var(--color-info);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-selection-ring), var(--shadow-selection-card);
+}
+
+.candidate-item.touch-drag-preview-card {
+  border-color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 10%, var(--color-bg-card));
+  box-shadow: var(--seat-card-shadow-drag);
+}
+
+.candidate-item.touch-drag-preview-card::before {
+  background: var(--color-info);
+}
+
 .candidate-item.compact {
   width: 100%;
   height: var(--candidate-card-height);
@@ -220,7 +246,7 @@ const handleDoubleClick = () => {
   .candidate-item { width: var(--seat-card-width); height: var(--seat-card-height); border-radius: var(--seat-card-radius); }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .candidate-item { width: var(--seat-card-width); height: var(--seat-card-height); border-radius: var(--seat-card-radius); }
 }
 

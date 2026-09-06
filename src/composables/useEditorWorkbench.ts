@@ -1,6 +1,6 @@
 import { computed, nextTick, ref } from 'vue'
+import type { SeatConfig } from '@/types/models'
 
-export type EditorTool = 'normal' | 'swap' | 'clear' | 'empty'
 export type WorkbenchDialog = 'seatConfig' | 'shiftRotation' | 'zoneRotation' | 'assignment' | 'rules' | null
 export type AssignmentWorkbenchPanel = 'run' | 'rules' | 'guide'
 export type RightRailTab = 'candidates' | 'selection' | 'activity'
@@ -18,10 +18,16 @@ export interface ZoneEditSession {
   subtitle?: string
 }
 
-const activeTool = ref<EditorTool>('normal')
+export interface WorkbenchDialogOptions {
+  panel?: AssignmentWorkbenchPanel
+  focusRuleId?: string
+  seatConfig?: Partial<SeatConfig>
+}
+
 const activeWorkbenchDialog = ref<WorkbenchDialog>(null)
 const assignmentWorkbenchPanel = ref<AssignmentWorkbenchPanel>('run')
 const focusedRuleId = ref('')
+const seatConfigDialogInitialConfig = ref<Partial<SeatConfig> | null>(null)
 const isWorkbenchDialogHidden = ref(false)
 const zoneEditSession = ref<ZoneEditSession | null>(null)
 const rightRailTab = ref<RightRailTab>('candidates')
@@ -31,9 +37,9 @@ const suspendedMobileDrawer = ref<MobileDrawer>(null)
 const dragOpenedMobileDrawer = ref<MobileDrawer>(null)
 const drawerBeforeDragOpen = ref<MobileDrawer>(null)
 const requestedFullscreenElement = ref<Element | null>(null)
+let fullscreenRequestVersion = 0
 const isSeatFullscreen = computed(() => mobileViewMode.value === 'seatFullscreen')
 
-const validTools = new Set<EditorTool>(['normal', 'swap', 'clear', 'empty'])
 const validDialogs = new Set<Exclude<WorkbenchDialog, null>>([
   'seatConfig',
   'shiftRotation',
@@ -61,19 +67,47 @@ const sheetToDrawer = (sheet: MobileSheet): MobileDrawer => (
   sheet === 'context' ? 'selection' : sheet
 )
 
+const cloneSeatConfig = (config: Partial<SeatConfig>): Partial<SeatConfig> => ({
+  ...config,
+  groups: config.groups?.map(group => ({ ...group })),
+  guardSeats: config.guardSeats ? { ...config.guardSeats } : undefined
+})
+
+const resetMobileDragState = () => {
+  suspendedMobileDrawer.value = null
+  dragOpenedMobileDrawer.value = null
+  drawerBeforeDragOpen.value = null
+}
+
 const requestLandscapeFullscreen = async () => {
   if (typeof document === 'undefined') return
 
+  const requestVersion = ++fullscreenRequestVersion
   await nextTick()
   const fullscreenTarget = document.querySelector('.editor-workbench') || document.documentElement
   try {
     if (!document.fullscreenElement && fullscreenTarget.requestFullscreen) {
-      await fullscreenTarget.requestFullscreen()
       requestedFullscreenElement.value = fullscreenTarget
+      await fullscreenTarget.requestFullscreen()
+      if (requestVersion !== fullscreenRequestVersion) {
+        const newerRequestOwnsTarget = requestedFullscreenElement.value === fullscreenTarget && isSeatFullscreen.value
+        if (!newerRequestOwnsTarget && document.fullscreenElement === fullscreenTarget && document.exitFullscreen) {
+          await document.exitFullscreen().catch(() => undefined)
+        }
+        return
+      }
     }
   } catch {
-    requestedFullscreenElement.value = null
+    if (
+      requestVersion === fullscreenRequestVersion &&
+      requestedFullscreenElement.value === fullscreenTarget &&
+      document.fullscreenElement !== fullscreenTarget
+    ) {
+      requestedFullscreenElement.value = null
+    }
   }
+
+  if (requestVersion !== fullscreenRequestVersion) return
 
   try {
     await window.screen?.orientation?.lock?.('landscape')
@@ -83,7 +117,11 @@ const requestLandscapeFullscreen = async () => {
 }
 
 const releaseLandscapeFullscreen = async () => {
-  if (typeof document === 'undefined') return
+  fullscreenRequestVersion += 1
+  if (typeof document === 'undefined') {
+    requestedFullscreenElement.value = null
+    return
+  }
 
   try {
     window.screen?.orientation?.unlock?.()
@@ -106,6 +144,27 @@ const releaseLandscapeFullscreen = async () => {
   }
 }
 
+const handleFullscreenChange = () => {
+  if (typeof document === 'undefined' || !requestedFullscreenElement.value) return
+  if (document.fullscreenElement === requestedFullscreenElement.value) return
+
+  fullscreenRequestVersion += 1
+  requestedFullscreenElement.value = null
+  mobileViewMode.value = 'normal'
+  mobileSheet.value = null
+  resetMobileDragState()
+
+  try {
+    window.screen?.orientation?.unlock?.()
+  } catch {
+    // Ignore unsupported unlock calls.
+  }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('fullscreenchange', handleFullscreenChange)
+}
+
 const mobileDrawer = computed<MobileDrawer>({
   get: () => sheetToDrawer(mobileSheet.value),
   set: (drawer) => {
@@ -114,31 +173,32 @@ const mobileDrawer = computed<MobileDrawer>({
 })
 
 export function useEditorWorkbench() {
-  const resetMobileDragState = () => {
-    suspendedMobileDrawer.value = null
-    dragOpenedMobileDrawer.value = null
-    drawerBeforeDragOpen.value = null
-  }
-
   const closeMobileSheet = () => {
     mobileSheet.value = null
     resetMobileDragState()
   }
 
-  const setTool = (tool: EditorTool) => {
-    if (!validTools.has(tool)) return
-    activeTool.value = tool
-  }
-
-  const resetTool = () => {
-    activeTool.value = 'normal'
+  const resetTransientWorkbenchState = () => {
+    activeWorkbenchDialog.value = null
+    assignmentWorkbenchPanel.value = 'run'
+    focusedRuleId.value = ''
+    seatConfigDialogInitialConfig.value = null
+    isWorkbenchDialogHidden.value = false
+    zoneEditSession.value = null
+    mobileSheet.value = null
+    mobileViewMode.value = 'normal'
+    resetMobileDragState()
+    return releaseLandscapeFullscreen()
   }
 
   const openDialog = (
     dialog: Exclude<WorkbenchDialog, null>,
-    options: { panel?: AssignmentWorkbenchPanel; focusRuleId?: string } = {}
+    options: WorkbenchDialogOptions = {}
   ) => {
     if (!validDialogs.has(dialog)) return
+    seatConfigDialogInitialConfig.value = dialog === 'seatConfig' && options.seatConfig
+      ? cloneSeatConfig(options.seatConfig)
+      : null
     if (dialog === 'rules') {
       activeWorkbenchDialog.value = 'assignment'
       assignmentWorkbenchPanel.value = 'rules'
@@ -158,6 +218,7 @@ export function useEditorWorkbench() {
     isWorkbenchDialogHidden.value = false
     zoneEditSession.value = null
     focusedRuleId.value = ''
+    seatConfigDialogInitialConfig.value = null
     closeMobileSheet()
   }
 
@@ -262,10 +323,10 @@ export function useEditorWorkbench() {
   }
 
   return {
-    activeTool,
     activeWorkbenchDialog,
     assignmentWorkbenchPanel,
     focusedRuleId,
+    seatConfigDialogInitialConfig,
     isWorkbenchDialogHidden,
     zoneEditSession,
     rightRailTab,
@@ -275,8 +336,6 @@ export function useEditorWorkbench() {
     mobileDrawer,
     suspendedMobileDrawer,
     dragOpenedMobileDrawer,
-    setTool,
-    resetTool,
     openDialog,
     closeDialog,
     startZoneEditSession,
@@ -294,6 +353,7 @@ export function useEditorWorkbench() {
     suspendMobileDrawerForDrag,
     restoreMobileDrawerAfterDrag,
     openMobileDrawerForDrag,
-    restoreMobileDrawerOpenedForDrag
+    restoreMobileDrawerOpenedForDrag,
+    resetTransientWorkbenchState
   }
 }

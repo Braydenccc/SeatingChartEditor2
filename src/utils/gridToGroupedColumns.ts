@@ -1,4 +1,5 @@
 import { generateSeatId } from '@/utils/seatHelpers'
+import { MAX_WORKSPACE_GROUPS, MAX_WORKSPACE_SEATS } from '@/constants/workspaceLimits'
 
 export interface GridToGroupedCell {
   sourceId?: string
@@ -115,12 +116,16 @@ const getInferredColumnRanges = (
     }
   }
 
+  let firstSeatColumn = columns
+  let lastSeatColumn = -1
+  seatColumns.forEach(column => {
+    firstSeatColumn = Math.min(firstSeatColumn, column)
+    lastSeatColumn = Math.max(lastSeatColumn, column)
+  })
   const separatorColumns = new Set<number>()
   for (let x = 0; x < columns; x += 1) {
     if (seatColumns.has(x)) continue
-    const hasSeatBefore = Array.from(seatColumns).some(column => column < x)
-    const hasSeatAfter = Array.from(seatColumns).some(column => column > x)
-    if (hasSeatBefore && hasSeatAfter) {
+    if (x > firstSeatColumn && x < lastSeatColumn) {
       separatorColumns.add(x)
     }
   }
@@ -150,9 +155,19 @@ export const convertGridToGroupedColumns = (
   columns: number,
   cells: GridToGroupedCell[]
 ): GridToGroupedResult => {
+  if (!Number.isSafeInteger(rows) || rows <= 0 || !Number.isSafeInteger(columns) || columns <= 0) {
+    throw new Error('网格 rows/columns 必须是正安全整数')
+  }
+  if (rows > Math.floor(MAX_WORKSPACE_SEATS / columns)) {
+    throw new Error(`网格普通座位数不能超过 ${MAX_WORKSPACE_SEATS}`)
+  }
+  if (!Array.isArray(cells) || cells.length > MAX_WORKSPACE_SEATS) {
+    throw new Error(`网格单元格数量不能超过 ${MAX_WORKSPACE_SEATS}`)
+  }
+
   const boundedCells = cells.filter(cell => (
-    Number.isInteger(cell.x) &&
-    Number.isInteger(cell.y) &&
+    Number.isSafeInteger(cell.x) &&
+    Number.isSafeInteger(cell.y) &&
     cell.x >= 0 &&
     cell.x < columns &&
     cell.y >= 0 &&
@@ -163,6 +178,9 @@ export const convertGridToGroupedColumns = (
     ? { ranges: explicit.ranges, separatorColumns: new Set<number>() }
     : getInferredColumnRanges(columns, boundedCells)
   const ranges = inferred.ranges
+  if (ranges.length > MAX_WORKSPACE_GROUPS) {
+    throw new Error(`网格转换后的大组数不能超过 ${MAX_WORKSPACE_GROUPS}`)
+  }
   const seats: GridGroupedSeat[] = []
   const seatMap = new Map<string, GridGroupedSeat>()
   const sourceIdToSeatId = new Map<string, string>()

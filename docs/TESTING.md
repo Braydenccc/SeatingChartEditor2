@@ -10,35 +10,41 @@ npm run test:ui
 npm run test:watch
 ```
 
+自动排位性能基准默认跳过，需要显式运行：
+
+```bash
+npm run test:assignment:benchmark
+```
+
 ## 测试结构
 
 ```
 src/
 ├── composables/
 │   ├── __tests__/
-│   │   ├── useStudentData.test.js
-│   │   ├── useSeatChart.test.js
-│   │   ├── useAssignment.test.js
-│   │   ├── useTagData.test.js
-│   │   ├── useZoneData.test.js
-│   │   ├── useUndo.test.js
-│   │   ├── useSeatRules.test.js
-│   │   ├── useEditMode.test.js
-│   │   ├── integration.test.js
-│   │   └── edge-cases.test.js
+│   │   ├── useStudentData.test.ts
+│   │   ├── useSeatChart.test.ts
+│   │   ├── useAssignment.test.ts
+│   │   ├── useTagData.test.ts
+│   │   ├── useZoneData.test.ts
+│   │   ├── useUndo.test.ts
+│   │   ├── useSeatRules.test.ts
+│   │   ├── useEditMode.test.ts
+│   │   ├── integration.test.ts
+│   │   └── edge-cases.test.ts
 │   └── ...
 └── test-utils/
-    ├── setup.js
-    ├── mocks.js
-    ├── factories.js
-    └── assertions.js
+    ├── setup.ts
+    ├── mocks.ts
+    ├── factories.ts
+    └── assertions.ts
 ```
 
 ## 测试工具
 
 ### Mocks
 
-使用 `src/test-utils/mocks.js` 创建 mock 对象：
+使用 `src/test-utils/mocks.ts` 创建 mock 对象：
 
 ```javascript
 import { createMockSeatChart, createMockStudentData } from '@/test-utils/mocks'
@@ -49,7 +55,7 @@ const studentData = createMockStudentData()
 
 ### Factories
 
-使用 `src/test-utils/factories.js` 创建测试数据：
+使用 `src/test-utils/factories.ts` 创建测试数据：
 
 ```javascript
 import { createMockStudent, createMockSeats } from '@/test-utils/factories'
@@ -60,7 +66,7 @@ const seats = createMockSeats(4, 2, 7)
 
 ### Assertions
 
-使用 `src/test-utils/assertions.js` 进行断言：
+使用 `src/test-utils/assertions.ts` 进行断言：
 
 ```javascript
 import { expectSeatToHaveStudent, expectStudentToHaveTags } from '@/test-utils/assertions'
@@ -114,10 +120,14 @@ describe('Edge Cases', () => {
 
 ## 覆盖率目标
 
-- Lines: 70%
-- Functions: 70%
-- Branches: 60%
-- Statements: 70%
+当前覆盖率门禁统计核心业务层 `src/composables/*.ts`、`src/utils/*.ts` 与 `src/platform/*.ts`，Vue 组件和视图仍会运行测试，但暂不计入这一阶段的覆盖率聚合。
+
+- 核心业务层总计：Lines 70%、Functions 75%、Branches 65%、Statements 70%。
+- `src/composables/*.ts`：Lines 70%、Functions 75%、Branches 65%、Statements 70%。
+- `src/utils/*.ts`：Lines 75%、Functions 80%、Branches 65%、Statements 75%。
+- `src/platform/*.ts`：Lines 65%、Functions 70%、Branches 70%、Statements 65%。
+
+这些阈值按总计和目录层级聚合，不是逐文件门禁；修改低覆盖的关键文件时仍应补充对应回归测试。
 
 ## CI/CD
 
@@ -126,10 +136,7 @@ describe('Edge Cases', () => {
 - Push 到 main 或 dev 分支
 - 创建 Pull Request
 
-测试矩阵：
-
-- Node.js 20.x
-- Node.js 22.x
+CI 使用 Node.js 20，并通过仓库的可复用验证 workflow 运行检查与测试。
 
 ## 最佳实践
 

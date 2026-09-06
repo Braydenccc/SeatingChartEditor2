@@ -1,26 +1,53 @@
 name: Build and Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
+    inputs:
+      commit_sha:
+        description: Exact verified commit to release
+        required: true
+        type: string
+      verification_passed:
+        description: Caller already verified commit_sha in the same workflow run
+        required: true
+        type: boolean
+      release_timestamp:
+        description: UTC timestamp shared by every delivery from the caller workflow run
+        required: true
+        type: string
   workflow_dispatch:
+    inputs:
+      release_timestamp:
+        description: Optional UTC timestamp; leave empty to generate one for this manual run
+        required: false
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
+  manual-verification:
+    name: Verify manually selected commit
+    if: inputs.verification_passed != true
+    uses: ./.github/workflows/verification.yml
+
   build:
+    name: Build and release verified commit
+    needs: manual-verification
+    if: always() && (inputs.verification_passed == true || needs.manual-verification.result == 'success')
     runs-on: windows-latest
-    permissions:
-      contents: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout verified commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '20.19.0'
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -32,8 +59,13 @@ jobs:
 
       - name: Prepare timestamp release version
         shell: pwsh
+        env:
+          RELEASE_TIMESTAMP_INPUT: ${{ inputs.release_timestamp }}
         run: |
-          $buildTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          $buildTime = $env:RELEASE_TIMESTAMP_INPUT
+          if ([string]::IsNullOrWhiteSpace($buildTime)) {
+            $buildTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          }
           node scripts/set-release-version.js --timestamp $buildTime --github-env
 
       - name: Build Desktop (Tauri)
@@ -63,7 +95,7 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_VERSION }}
           name: ${{ env.RELEASE_VERSION }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ inputs.commit_sha || github.sha }}
           files: |
             dist/release/BraydenSCE-*.exe
             dist/release/BraydenSCE-*.msi

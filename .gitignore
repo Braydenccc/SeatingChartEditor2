@@ -6,49 +6,57 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-# Node modules
-node_modules/
+# Dependencies
+/node_modules/
 
-# Build output
-dist/
-dist-ssr/
-build/
-dist_electron/
+# Build and generated output
+/dist/
+/dist-ssr/
+/build/
+/dist_electron/
 /.parcel-cache/
 
-# Vite
-.vite/
+# Vite and test output
+/.vite/
+/coverage/
+/html/
+/playwright-report/
+/blob-report/
+/test-results/
+/review_results/
+__screenshots__/
+/.vitest/
+
+# Tool-local caches and agent-specific configuration
+/.agent/
+/.claude/
+/.codex/
+/.cursor/
+/.gemini/
+/.kiro/
+/.playwright-browsers/
+/.trae/
+/.windsurf/
 
 # Env files
 .env
 .env.*
+!.env.example
+!.env.*.example
 
 # OS files
 .DS_Store
 Thumbs.db
 
 # IDEs / Editor directories
-.vscode/
-!.vscode/extensions.json
+/.vscode/
 .idea/
-
-# Claude cache
-.claude/
 
 # Misc
 .cache/
-coverage/
 *.local
-.local-*.json
+/.local-*.json
 pnpm-lock.yaml
 草稿/seat_chart_2025-11-08T19-09-44.png
 /diff_output.txt
@@ -69,14 +77,5 @@ pnpm-lock.yaml
 /cypress/videos/
 /cypress/screenshots/
 
-# Vitest
-__screenshots__/
-test-results/
-.vitest/
-
-# Playwright
-playwright-report/
-blob-report/
-
 # Git worktrees
-.worktrees/
+/.worktrees/

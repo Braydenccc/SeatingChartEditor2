@@ -2,6 +2,7 @@ import { useWorkspace } from './useWorkspace'
 import { generateGuardSeatId } from '@/utils/seatHelpers'
 import { convertGridToGroupedColumns, type GridToGroupedCell } from '@/utils/gridToGroupedColumns'
 import { isTauriRuntime } from '@/platform/runtime'
+import { MAX_WORKSPACE_SEATS } from '@/constants/workspaceLimits'
 import proxyConfig from '../../fuckseats-proxy.config.json'
 
 const proxyEndpoint = '/api/fuckseats-proxy'
@@ -63,7 +64,7 @@ interface FuckSeatsStatePayload {
   podium_guards?: Record<string, FuckSeatsStudentProfile | null>
 }
 
-interface ImportResult {
+export interface FuckSeatsImportResult {
   students: number
   tags: number
   assignedSeats: number
@@ -337,7 +338,7 @@ const getStudentTagIds = (student: FuckSeatsStudentProfile | undefined | null, t
 const normalizeSeatPosition = (seat: FuckSeatsSeat) => {
   const row = Number(seat.row)
   const col = Number(seat.col)
-  if (!Number.isInteger(row) || row <= 0 || !Number.isInteger(col) || col <= 0) {
+  if (!Number.isSafeInteger(row) || row <= 0 || !Number.isSafeInteger(col) || col <= 0) {
     throw new Error('不想排座位座位坐标无效')
   }
   return {
@@ -355,6 +356,9 @@ export const buildWorkspaceFromFuckSeatsState = (
   }
 
   const seats = Array.isArray(state.seats) ? state.seats : []
+  if (seats.length > MAX_WORKSPACE_SEATS) {
+    throw new Error(`不想排座位普通座位数不能超过 ${MAX_WORKSPACE_SEATS}`)
+  }
   const tagMap = new Map<number, any>()
   const students = new Map<number, any>()
 
@@ -389,14 +393,21 @@ export const buildWorkspaceFromFuckSeatsState = (
     return next
   }
 
-  const positions = seats.map(normalizeSeatPosition)
-  const maxRow = Math.max(1, ...positions.map(position => position.rowIndex + 1))
-  const maxCol = Math.max(1, ...positions.map(position => position.colIndex + 1))
+  let maxRow = 1
+  let maxCol = 1
+  seats.forEach(seat => {
+    const { rowIndex, colIndex } = normalizeSeatPosition(seat)
+    maxRow = Math.max(maxRow, rowIndex + 1)
+    maxCol = Math.max(maxCol, colIndex + 1)
+  })
+  if (maxRow > Math.floor(MAX_WORKSPACE_SEATS / maxCol)) {
+    throw new Error(`不想排座位普通座位数不能超过 ${MAX_WORKSPACE_SEATS}`)
+  }
   const seenPositions = new Set<string>()
   const gridCells: GridToGroupedCell[] = []
 
-  seats.forEach((seat, index) => {
-    const { rowIndex, colIndex } = positions[index]
+  seats.forEach(seat => {
+    const { rowIndex, colIndex } = normalizeSeatPosition(seat)
     const positionKey = `${colIndex}:${rowIndex}`
     if (seenPositions.has(positionKey)) {
       throw new Error(`不想排座位座位坐标重复：第 ${rowIndex + 1} 行第 ${colIndex + 1} 列`)
@@ -493,7 +504,7 @@ export function useFuckSeatsImport() {
     ) as Promise<FuckSeatsStatePayload>
   }
 
-  const importClassroom = async (classroom: FuckSeatsClassroomSummary): Promise<ImportResult> => {
+  const importClassroom = async (classroom: FuckSeatsClassroomSummary): Promise<FuckSeatsImportResult> => {
     const state = await fetchClassroomState(classroom)
     const workspace = buildWorkspaceFromFuckSeatsState(classroom, state)
     const imported = await applyWorkspaceData(workspace)
@@ -511,8 +522,8 @@ export function useFuckSeatsImport() {
     return {
       students: workspace.students.length,
       tags: workspace.tags.length,
-      assignedSeats: workspace.layout.seats.filter((seat: any) => seat.studentId != null).length,
-      emptySeats: workspace.layout.seats.filter((seat: any) => seat.empty).length
+      assignedSeats: workspace.layout.seats.filter(seat => seat.studentId != null).length,
+      emptySeats: workspace.layout.seats.filter(seat => seat.empty).length
     }
   }
 

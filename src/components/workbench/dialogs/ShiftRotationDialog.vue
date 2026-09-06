@@ -1,73 +1,65 @@
 <template>
-  <div v-if="visible" class="dialog-overlay" @click.self="emit('close')">
-    <section class="workbench-dialog">
-      <header class="dialog-header">
-        <div>
-          <h2>位移轮换</h2>
-          <p>按行列偏移整体移动当前座位中的学生</p>
-        </div>
-        <button class="icon-button" title="关闭" @click="emit('close')">
-          <X :size="18" stroke-width="2" />
-        </button>
-      </header>
-
+  <ResponsiveOverlay :show="visible" title="位移轮换" :desktop-width="620" @update:show="value => !value && emit('close')">
+      <p class="dialog-description">按行列偏移整体移动当前座位中的学生</p>
       <div class="dialog-body">
         <div class="direction-pad">
-          <button :class="{ active: form.shiftDistance < 0 }" @click="setForward">
-            <ArrowUp :size="18" stroke-width="2" />
+          <NButton size="small" :type="form.shiftDistance < 0 ? 'primary' : 'default'" :secondary="form.shiftDistance >= 0" @click="setForward">
+            <template #icon><ArrowUp :size="18" stroke-width="2" /></template>
             <span>向前</span>
-          </button>
-          <button :class="{ active: form.shiftColShift < 0 }" @click="setLeft">
-            <ArrowLeft :size="18" stroke-width="2" />
+          </NButton>
+          <NButton size="small" :type="form.shiftColShift < 0 ? 'primary' : 'default'" :secondary="form.shiftColShift >= 0" @click="setLeft">
+            <template #icon><ArrowLeft :size="18" stroke-width="2" /></template>
             <span>向左</span>
-          </button>
+          </NButton>
           <div class="shift-summary">
             <strong>{{ statusText }}</strong>
             <span>支持同时设置行偏移和列偏移</span>
           </div>
-          <button :class="{ active: form.shiftColShift > 0 }" @click="setRight">
-            <ArrowRight :size="18" stroke-width="2" />
+          <NButton size="small" :type="form.shiftColShift > 0 ? 'primary' : 'default'" :secondary="form.shiftColShift <= 0" @click="setRight">
+            <template #icon><ArrowRight :size="18" stroke-width="2" /></template>
             <span>向右</span>
-          </button>
-          <button :class="{ active: form.shiftDistance > 0 }" @click="setBackward">
-            <ArrowDown :size="18" stroke-width="2" />
+          </NButton>
+          <NButton size="small" :type="form.shiftDistance > 0 ? 'primary' : 'default'" :secondary="form.shiftDistance <= 0" @click="setBackward">
+            <template #icon><ArrowDown :size="18" stroke-width="2" /></template>
             <span>向后</span>
-          </button>
+          </NButton>
         </div>
 
         <div class="field-grid">
           <label>
             <span>行偏移</span>
-            <input v-model.number="form.shiftDistance" type="number" />
+            <NInputNumber class="shift-number-input" :value="form.shiftDistance" :precision="0" @update:value="value => updateShiftField('shiftDistance', value)" />
           </label>
           <label>
             <span>列直移</span>
-            <input v-model.number="form.shiftColShift" type="number" />
+            <NInputNumber class="shift-number-input" :value="form.shiftColShift" :precision="0" @update:value="value => updateShiftField('shiftColShift', value)" />
           </label>
           <label>
             <span>溢出列移</span>
-            <input v-model.number="form.shiftDirection" type="number" />
+            <NInputNumber class="shift-number-input" :value="form.shiftDirection" :precision="0" @update:value="value => updateShiftField('shiftDirection', value)" />
           </label>
         </div>
       </div>
 
-      <footer class="dialog-footer">
-        <button class="secondary-button" @click="resetForm">重置</button>
-        <button class="primary-button" @click="applySeatShift">
-          <RefreshCcw :size="16" stroke-width="2" />
+      <template #footer><footer class="dialog-footer">
+        <NButton secondary @click="resetForm">重置</NButton>
+        <NButton type="primary" @click="applySeatShift">
+          <template #icon><RefreshCcw :size="16" stroke-width="2" /></template>
           <span>应用位移</span>
-        </button>
-      </footer>
-    </section>
-  </div>
+        </NButton>
+      </footer></template>
+  </ResponsiveOverlay>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, RefreshCcw, X } from 'lucide-vue-next'
+import { NButton, NInputNumber } from 'naive-ui'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, RefreshCcw } from 'lucide-vue-next'
+import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 import { useLogger } from '@/composables/useLogger'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useUndo } from '@/composables/useUndo'
+import { normalizeRequiredNumberInput } from '@/utils/inputNormalization'
 
 const props = defineProps({
   visible: {
@@ -86,6 +78,12 @@ const form = reactive({
   shiftColShift: 0,
   shiftDirection: -1
 })
+
+type ShiftField = keyof typeof form
+
+const updateShiftField = (field: ShiftField, value: number | null) => {
+  form[field] = normalizeRequiredNumberInput(value, form[field], { precision: 0 })
+}
 
 const resetForm = () => {
   form.shiftDistance = Number(seatConfig.value.shiftDistance ?? 4)
@@ -120,7 +118,11 @@ const applySeatShift = () => {
   }
 
   const before = createSnapshot()
-  shiftSeats(shiftDistance, shiftDirection, shiftColShift)
+  const shifted = shiftSeats(shiftDistance, shiftDirection, shiftColShift)
+  if (!shifted) {
+    warning('当前座位布局无法完成该位移，请调整参数后重试')
+    return
+  }
   const after = createSnapshot()
   recordBatch(before, after)
   success(`座位轮换完成：${statusText.value}`)
@@ -129,72 +131,10 @@ const applySeatShift = () => {
 </script>
 
 <style scoped>
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--color-bg-overlay);
-}
-
-.workbench-dialog {
-  width: min(560px, 100%);
-  max-height: min(720px, calc(100vh - 48px));
-  display: flex;
-  flex-direction: column;
-  background: var(--color-dialog-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-}
-
-.dialog-header,
-.dialog-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px;
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-
-.dialog-footer {
-  border-top: 1px solid var(--color-border);
-  border-bottom: none;
-}
-
-.dialog-header h2 {
-  margin: 0;
-  font-size: 18px;
-  color: var(--color-text-primary);
-}
-
-.dialog-header p {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
-.icon-button {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
 
 .dialog-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  padding: 16px;
 }
 
 .direction-pad {
@@ -202,27 +142,6 @@ const applySeatShift = () => {
   grid-template-columns: 1fr 1.4fr 1fr;
   gap: 10px;
   align-items: stretch;
-}
-
-.direction-pad button,
-.primary-button,
-.secondary-button {
-  min-height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  cursor: pointer;
-}
-
-.direction-pad button.active {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
 
 .shift-summary {
@@ -262,39 +181,15 @@ const applySeatShift = () => {
   font-size: 12px;
 }
 
-.field-grid input {
-  min-height: 36px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 0 10px;
-  background: var(--color-input-bg);
-  color: var(--color-text-primary);
-}
-
-.primary-button {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.secondary-button {
-  color: var(--color-text-secondary);
+.shift-number-input {
+  width: 100%;
 }
 
 @media (max-width: 640px) {
-  .dialog-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .workbench-dialog {
-    width: 100%;
-    max-height: 92vh;
-    border-radius: 12px 12px 0 0;
-  }
 
   .field-grid {
     grid-template-columns: 1fr;
   }
+
 }
 </style>

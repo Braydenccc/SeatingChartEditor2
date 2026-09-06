@@ -11,9 +11,9 @@
 
       <div v-if="isDesktopRuntime" class="setting-item">
         <label class="setting-label">SCE 云服务地址</label>
-        <input
-          v-model="retieheApiBase"
-          type="url"
+        <NInput
+          v-model:value="retieheApiBase"
+          type="text"
           class="setting-input"
           placeholder="例如: https://your-site.example.com"
           autocomplete="off"
@@ -23,9 +23,9 @@
 
       <div class="setting-item">
         <label class="setting-label">服务器地址 (URL)</label>
-        <input
-          v-model="webdavUrl"
-          type="url"
+        <NInput
+          v-model:value="webdavUrl"
+          type="text"
           class="setting-input"
           placeholder="例如: https://pan.example.com/dav"
           autocomplete="off"
@@ -34,8 +34,8 @@
 
       <div class="setting-item">
         <label class="setting-label">用户名</label>
-        <input
-          v-model="webdavUser"
+        <NInput
+          v-model:value="webdavUser"
           type="text"
           class="setting-input"
           placeholder="请输入WebDAV用户名"
@@ -45,30 +45,25 @@
 
       <div class="setting-item">
         <label class="setting-label">密码/授权码</label>
-        <input
-          v-model="webdavPass"
+        <NInput
+          v-model:value="webdavPass"
           type="password"
+          show-password-on="click"
           class="setting-input"
           placeholder="请输入WebDAV密码/Token"
           autocomplete="new-password"
         />
       </div>
 
-      <div class="backup-mode-group">
-        <label class="switch-label">
-          <input
-            v-model="enableBackup"
-            type="checkbox"
-            class="setting-checkbox"
-          />
-          <span class="switch-text" :class="{ active: enableBackup }">开启自动备份模式</span>
-        </label>
-        <p v-if="enableBackup" class="hint-text hint-green">
-          备份模式开启：工作区列表将以 SCE 云为主视角，保存/删除同时将静默同步至 WebDAV。
-        </p>
-        <p v-else class="hint-text">
-          关闭时可单独使用 WebDAV 或 SCE 云，或将两者同时指定为可切换的独立写入目标。
-        </p>
+      <div class="setting-item">
+        <label class="setting-label">启用备份模式</label>
+        <n-flex vertical align="start">
+          <NSwitch v-model:value="enableBackup"></NSwitch>
+          <div class="info-box">
+            <Info :size="16" />
+            <span>备份模式开启，工作区列表将以 SCE 云为主视角，保存/删除同时将静默同步至 WebDAV。关闭时可单独使用 WebDAV 或 SCE 云，或将两者同时指定为可切换的独立写入目标。</span>
+          </div>
+        </n-flex>
       </div>
 
       <div
@@ -76,16 +71,10 @@
         class="sync-preference-group"
       >
         <label class="section-label">云工作区默认读写目标</label>
-        <div class="radio-selection">
-          <label v-if="hasRetiehe" class="radio-label">
-            <input v-model="preferredSync" type="radio" value="retiehe" />
-            <span>SCE 云服务</span>
-          </label>
-          <label class="radio-label">
-            <input v-model="preferredSync" type="radio" value="webdav" />
-            <span>WebDAV 网盘</span>
-          </label>
-        </div>
+        <NRadioGroup v-model:value="preferredSync" class="radio-selection" size="small">
+          <NRadioButton v-if="hasRetiehe" value="retiehe">SCE 云服务</NRadioButton>
+          <NRadioButton value="webdav">WebDAV 网盘</NRadioButton>
+        </NRadioGroup>
         <p class="hint-text">将在打开云工作区窗口时默认选中此目标。</p>
       </div>
 
@@ -97,29 +86,32 @@
       </div>
 
       <div class="action-buttons">
-        <button
+        <NButton
           v-if="hasWebdavConfigured"
-          type="button"
-          class="btn-danger"
+          attr-type="button"
+          type="error"
+          secondary
           @click="clearConfig"
           :disabled="loading"
         >
           断开/清空WebDAV
-        </button>
-        <button
-          type="button"
-          class="btn-primary"
+        </NButton>
+        <NButton
+          attr-type="button"
+          class="submit-button"
+          type="primary"
           @click="handleSave"
-          :disabled="loading"
+          :loading="loading"
         >
           {{ loading ? '验证并保存中...' : '验证并保存至账号数据库' }}
-        </button>
+        </NButton>
       </div>
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton, NInput, NRadioButton, NRadioGroup, NSwitch, NAlert, NFlex } from 'naive-ui'
 import { ref, computed, watch } from 'vue'
 import { Info } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
@@ -127,6 +119,7 @@ import { useWebDav } from '@/composables/useWebDav'
 import { useLogger } from '@/composables/useLogger'
 import { getRetieheApiBase, setRetieheApiBase } from '@/platform/apiClient'
 import { isTauriRuntime } from '@/platform/runtime'
+import type { AuthType, WebDavConfig } from '@/types/models'
 
 const { webdavConfig, backupMode, updateSyncSettings, authType, setAuthType, token } = useAuth()
 const { mkcol } = useWebDav()
@@ -137,7 +130,7 @@ const webdavUser = ref('')
 const webdavPass = ref('')
 const retieheApiBase = ref(getRetieheApiBase())
 const enableBackup = ref(false)
-const preferredSync = ref('retiehe')
+const preferredSync = ref<AuthType>('retiehe')
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -227,7 +220,7 @@ const handleSave = async () => {
       setRetieheApiBase(retieheApiBase.value)
     }
 
-    let finalConfig = null
+    let finalConfig: WebDavConfig | null = null
 
     if (isComplete) {
       finalConfig = {
@@ -239,7 +232,7 @@ const handleSave = async () => {
       try {
         await mkcol(finalConfig, 'sce_data')
       } catch (err) {
-        throw new Error(err.message || 'WebDAV 连接失败，请检查账号密码')
+        throw new Error(err instanceof Error ? err.message : 'WebDAV 连接失败，请检查账号密码')
       }
     }
 
@@ -258,8 +251,9 @@ const handleSave = async () => {
       showError('数据库保存失败: ' + result.message)
     }
   } catch (err) {
-    errorMessage.value = err.message || '异常错误'
-    showError(err.message || '保存失败')
+    const message = err instanceof Error ? err.message : '保存失败'
+    errorMessage.value = message
+    showError(message)
   } finally {
     loading.value = false
   }
@@ -316,52 +310,6 @@ const handleSave = async () => {
 
 .setting-input {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
-  font-size: 15px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-sizing: border-box;
-}
-
-.setting-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-shadow);
-}
-
-.setting-checkbox {
-  width: 18px;
-  height: 18px;
-  margin-right: 8px;
-  cursor: pointer;
-}
-
-.backup-mode-group,
-.sync-preference-group {
-  background: var(--color-bg-subtle);
-  border: 1px dashed var(--color-border-strong);
-  padding: 14px;
-  border-radius: 6px;
-  margin-top: 16px;
-  margin-bottom: 16px;
-}
-
-.switch-label {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  margin-bottom: 0;
-}
-
-.switch-text {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  font-weight: 600;
-}
-
-.switch-text.active {
-  color: var(--color-info);
 }
 
 .sync-preference-group .section-label {
@@ -378,22 +326,6 @@ const handleSave = async () => {
   display: flex;
   gap: 20px;
   margin-bottom: 8px;
-}
-
-.radio-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--color-text-primary);
-}
-
-.radio-label input[type='radio'] {
-  width: auto;
-  margin: 0;
-  padding: 0;
-  cursor: pointer;
 }
 
 .hint-text {
@@ -433,42 +365,7 @@ const handleSave = async () => {
   gap: 12px;
 }
 
-.btn-primary,
-.btn-danger {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary {
+.submit-button {
   flex: 1;
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px var(--color-primary-shadow);
-}
-
-.btn-primary:disabled,
-.btn-danger:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.btn-danger {
-  background: var(--color-surface);
-  color: var(--color-danger);
-  border: 1px solid var(--color-danger);
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: var(--color-danger-bg);
 }
 </style>

@@ -1,7 +1,8 @@
 import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
-import type { Zone, UseZoneDataReturn } from '@/types'
+import type { EntityDeletionResult, Zone, UseZoneDataReturn } from '@/types'
 import { useTagData } from './useTagData'
+import { getRuleReferences } from './seatRuleState'
 
 // 选区数据管理
 const zones = ref<Zone[]>([])
@@ -41,11 +42,19 @@ export function useZoneData(): UseZoneDataReturn {
   }
 
   // 删除选区
-  const deleteZone = (zoneId: number): void => {
+  const deleteZone = (zoneId: number): EntityDeletionResult => {
+    if (!zones.value.some(zone => zone.id === zoneId)) {
+      return { success: false, reason: 'not-found', references: [] }
+    }
+    const references = getRuleReferences('zone', zoneId)
+    if (references.length > 0) {
+      return { success: false, reason: 'referenced-by-rules', references }
+    }
     zones.value = zones.value.filter(z => z.id !== zoneId)
     if (selectedZoneId.value === zoneId) {
       selectedZoneId.value = null
     }
+    return { success: true, references: [] }
   }
 
   // 为选区添加标签
@@ -93,7 +102,8 @@ export function useZoneData(): UseZoneDataReturn {
   }
 
   // 获取座位所属的选区
-  const getZoneForSeat = (seatId: string): Zone | null => {
+  const getZoneForSeat = (seatId: unknown): Zone | null => {
+    if (typeof seatId !== 'string') return null
     return zones.value.find(z => z.seatIds.includes(seatId)) || null
   }
 
@@ -161,6 +171,15 @@ export function useZoneData(): UseZoneDataReturn {
     nextZoneId = 1
   }
 
+  const replaceZoneData = (nextZones: Zone[]): void => {
+    zones.value = nextZones.map(zone => ({
+      ...zone,
+      tagIds: [...zone.tagIds],
+      seatIds: [...zone.seatIds]
+    }))
+    syncZoneIdCounter()
+  }
+
   // 同步选区 ID 计数器（工作区加载后调用）
   const syncZoneIdCounter = (): void => {
     if (zones.value.length === 0) {
@@ -191,6 +210,7 @@ export function useZoneData(): UseZoneDataReturn {
     removeTagFromAllZones,
     cleanupInvalidSeats,
     clearAllZones,
+    replaceZoneData,
     syncZoneIdCounter
   }
 }

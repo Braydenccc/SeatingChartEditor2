@@ -19,11 +19,11 @@
       "@/*": ["./src/*"]
     },
 
-    "strict": false,
+    "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "allowJs": true,
+    "allowJs": false,
     "checkJs": false,
 
     "esModuleInterop": true,
@@ -33,8 +33,7 @@
     "src/**/*.ts",
     "src/**/*.d.ts",
     "src/**/*.tsx",
-    "src/**/*.vue",
-    "src/**/*.js"
+    "src/**/*.vue"
   ],
   "exclude": ["node_modules", "dist", "dist_electron"],
   "references": [{ "path": "./tsconfig.node.json" }]

@@ -1,13 +1,5 @@
 <template>
-  <div v-if="visible" class="seat-config-dialog-overlay" @click.self="handleCancel">
-    <div class="seat-config-dialog">
-      <div class="dialog-header">
-        <h2>座位表配置</h2>
-        <button class="close-btn" @click="handleCancel">
-          <X :size="20" />
-        </button>
-      </div>
-
+  <ResponsiveOverlay :show="visible" title="座位表配置" :desktop-width="920" @update:show="value => !value && handleCancel()">
       <div class="dialog-body">
         <div class="info-tip">
           <p>点击下方按钮来调整每大组的列数和行数</p>
@@ -33,25 +25,25 @@
                   <div class="control-item">
                     <span class="control-label">列数</span>
                     <div class="button-group">
-                      <button class="control-btn" @click="removeColumn(gIndex)" :disabled="group.columns <= 1">
+                      <NButton class="control-btn" size="tiny" quaternary circle :aria-label="`减少第 ${gIndex + 1} 组列数`" @click="removeColumn(gIndex)" :disabled="group.columns <= 1">
                         <Minus :size="14" />
-                      </button>
+                      </NButton>
                       <span class="control-value">{{ group.columns }}</span>
-                      <button class="control-btn" @click="addColumn(gIndex)" :disabled="group.columns >= 5">
+                      <NButton class="control-btn" size="tiny" quaternary circle :aria-label="`增加第 ${gIndex + 1} 组列数`" @click="addColumn(gIndex)" :disabled="group.columns >= 5">
                         <Plus :size="14" />
-                      </button>
+                      </NButton>
                     </div>
                   </div>
                   <div class="control-item">
                     <span class="control-label">行数</span>
                     <div class="button-group">
-                      <button class="control-btn" @click="removeRow(gIndex)" :disabled="group.rows <= 1">
+                      <NButton class="control-btn" size="tiny" quaternary circle :aria-label="`减少第 ${gIndex + 1} 组行数`" @click="removeRow(gIndex)" :disabled="group.rows <= 1">
                         <Minus :size="14" />
-                      </button>
+                      </NButton>
                       <span class="control-value">{{ group.rows }}</span>
-                      <button class="control-btn" @click="addRow(gIndex)" :disabled="group.rows >= 10">
+                      <NButton class="control-btn" size="tiny" quaternary circle :aria-label="`增加第 ${gIndex + 1} 组行数`" @click="addRow(gIndex)" :disabled="group.rows >= 10">
                         <Plus :size="14" />
-                      </button>
+                      </NButton>
                     </div>
                   </div>
                 </div>
@@ -63,41 +55,47 @@
         <div class="global-actions">
           <div class="global-controls">
             <div class="input-group">
-              <label>大组数量</label>
-              <div class="input-with-buttons">
-                <button class="control-btn" @click="removeGroup" :disabled="localConfig.groupCount <= 1">
+              <span id="seat-group-count-label">大组数量</span>
+              <div class="input-with-buttons" role="group" aria-labelledby="seat-group-count-label">
+                <NButton class="control-btn" size="tiny" quaternary circle aria-label="减少大组数量" @click="removeGroup" :disabled="localConfig.groupCount <= 1">
                   <Minus :size="14" />
-                </button>
+                </NButton>
                 <span class="group-count-display">{{ localConfig.groupCount }}</span>
-                <button class="control-btn" @click="addGroup" :disabled="localConfig.groupCount >= 10">
+                <NButton class="control-btn" size="tiny" quaternary circle aria-label="增加大组数量" @click="addGroup" :disabled="localConfig.groupCount >= maxSeatGroupCount">
                   <Plus :size="14" />
-                </button>
+                </NButton>
               </div>
             </div>
             <div class="input-group">
-              <label>讲台位置</label>
-              <div class="alignment-buttons">
-                <button 
+              <span id="podium-position-label">讲台位置</span>
+              <div class="alignment-buttons" role="group" aria-labelledby="podium-position-label">
+                <NButton
                   class="alignment-btn" 
-                  :class="{ active: localConfig.podiumPosition === 'bottom' }"
+                  size="small"
+                  :type="localConfig.podiumPosition === 'bottom' ? 'primary' : 'default'"
+                  :secondary="localConfig.podiumPosition !== 'bottom'"
+                  :aria-pressed="localConfig.podiumPosition === 'bottom'"
                   @click="localConfig.podiumPosition = 'bottom'"
                 >
                   底部
-                </button>
-                <button 
+                </NButton>
+                <NButton
                   class="alignment-btn" 
-                  :class="{ active: localConfig.podiumPosition === 'top' }"
+                  size="small"
+                  :type="localConfig.podiumPosition === 'top' ? 'primary' : 'default'"
+                  :secondary="localConfig.podiumPosition !== 'top'"
+                  :aria-pressed="localConfig.podiumPosition === 'top'"
                   @click="localConfig.podiumPosition = 'top'"
                 >
                   顶部
-                </button>
+                </NButton>
               </div>
             </div>
           </div>
           <div class="quick-actions">
-            <button class="quick-btn" @click="applyAllColumns">统一列数</button>
-            <button class="quick-btn" @click="applyAllRows">统一行数</button>
-            <button class="quick-btn" @click="resetConfig">重置</button>
+            <NButton size="small" type="primary" secondary @click="applyAllColumns">统一列数</NButton>
+            <NButton size="small" type="primary" secondary @click="applyAllRows">统一行数</NButton>
+            <NButton size="small" secondary @click="resetConfig">重置</NButton>
           </div>
         </div>
 
@@ -106,42 +104,44 @@
         </div>
       </div>
 
-      <div class="dialog-footer">
-        <button class="cancel-btn" @click="handleCancel">取消</button>
-        <button 
-          class="confirm-btn" 
-          :class="{ 'confirming': isConfirming }"
-          @click="handleConfirm"
-        >
-          <span v-if="isConfirming">再次点击确认应用</span>
-          <span v-else>应用配置</span>
-        </button>
-      </div>
-    </div>
-  </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <NButton secondary @click="handleCancel">取消</NButton>
+          <NButton type="primary" @click="handleConfirm">应用配置</NButton>
+        </div>
+      </template>
+  </ResponsiveOverlay>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { X, Plus, Minus } from 'lucide-vue-next'
+import { NButton } from 'naive-ui'
+import { Plus, Minus } from 'lucide-vue-next'
+import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 import { useSeatChart } from '@/composables/useSeatChart'
+import { maxSeatGroupCount } from '@/constants/seatConfig'
+import type { GroupConfig, SeatConfig } from '@/types/models'
 
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false
-  },
-  isConfirming: {
-    type: Boolean,
-    default: false
-  }
+const props = withDefaults(defineProps<{
+  visible?: boolean
+  initialConfig?: Partial<SeatConfig> | null
+}>(), {
+  visible: false,
+  initialConfig: null
 })
 
-const emit = defineEmits(['update:visible', 'confirm'])
+const emit = defineEmits<{
+  'update:visible': [value: boolean]
+  confirm: [config: Partial<SeatConfig>]
+}>()
 
-const { seatConfig, updateConfig } = useSeatChart()
+const { seatConfig } = useSeatChart()
 
-const localConfig = ref({
+const localConfig = ref<{
+  groupCount: number
+  groups: GroupConfig[]
+  podiumPosition: SeatConfig['podiumPosition']
+}>({
   groupCount: 4,
   groups: [],
   podiumPosition: 'bottom'
@@ -162,7 +162,12 @@ watch(() => props.visible, (newVal) => {
 initLocalConfig()
 
 function initLocalConfig() {
-  const config = seatConfig.value
+  const config: SeatConfig = {
+    ...seatConfig.value,
+    ...props.initialConfig,
+    groups: props.initialConfig?.groups ?? seatConfig.value.groups,
+    guardSeats: props.initialConfig?.guardSeats ?? seatConfig.value.guardSeats
+  }
   localConfig.value.groupCount = config.groupCount
   localConfig.value.podiumPosition = config.podiumPosition || 'bottom'
 
@@ -201,7 +206,7 @@ const totalSeats = computed(() => {
 })
 
 function addGroup() {
-  if (localConfig.value.groupCount >= 10) return
+  if (localConfig.value.groupCount >= maxSeatGroupCount) return
   localConfig.value.groupCount++
 
   // 确保 groups 数组长度与 groupCount 匹配
@@ -219,28 +224,28 @@ function removeGroup() {
   localConfig.value.groups.pop()
 }
 
-function addColumn(groupIndex) {
+function addColumn(groupIndex: number) {
   const group = localConfig.value.groups[groupIndex]
   if (group && group.columns < 5) {
     group.columns++
   }
 }
 
-function removeColumn(groupIndex) {
+function removeColumn(groupIndex: number) {
   const group = localConfig.value.groups[groupIndex]
   if (group && group.columns > 1) {
     group.columns--
   }
 }
 
-function addRow(groupIndex) {
+function addRow(groupIndex: number) {
   const group = localConfig.value.groups[groupIndex]
   if (group && group.rows < 10) {
     group.rows++
   }
 }
 
-function removeRow(groupIndex) {
+function removeRow(groupIndex: number) {
   const group = localConfig.value.groups[groupIndex]
   if (group && group.rows > 1) {
     group.rows--
@@ -270,7 +275,7 @@ function handleCancel() {
 }
 
 function handleConfirm() {
-  const newConfig = {
+  const newConfig: Partial<SeatConfig> = {
     groupCount: localConfig.value.groupCount,
     groups: localConfig.value.groups.map(g => ({ ...g })),
     podiumPosition: localConfig.value.podiumPosition
@@ -286,68 +291,10 @@ function handleConfirm() {
 </script>
 
 <style scoped>
-.seat-config-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--color-bg-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.seat-config-dialog {
-  background: var(--color-surface);
-  border-radius: 12px;
-  width: 100%;
-  max-width: 900px;
-  max-height: calc(100vh - 40px);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 40px var(--shadow-lg);
-}
-
-.dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border-light);
-}
-
-.dialog-header h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-primary);
-}
-
-.close-btn {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  padding: 4px;
-  color: var(--color-text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.close-btn:hover {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-}
 
 .dialog-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -463,32 +410,13 @@ function handleConfirm() {
 }
 
 .control-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  flex: 0 0 auto;
 }
 
-.control-btn:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-bg-subtle);
-}
-
-.control-btn:active:not(:disabled) {
-  transform: scale(0.95);
-}
-
-.control-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.control-btn:focus-visible,
+.alignment-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .control-value {
@@ -518,36 +446,13 @@ function handleConfirm() {
   gap: 8px;
 }
 
-.alignment-btn {
-  padding: 8px 16px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.alignment-btn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.alignment-btn.active {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-surface);
-}
-
 .input-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.input-group label {
+.input-group > span {
   font-size: 12px;
   color: var(--color-text-secondary);
   font-weight: 500;
@@ -570,23 +475,6 @@ function handleConfirm() {
 .quick-actions {
   display: flex;
   gap: 8px;
-}
-
-.quick-btn {
-  padding: 8px 16px;
-  border: 1px solid var(--color-primary);
-  background: var(--color-surface);
-  color: var(--color-primary);
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.quick-btn:hover {
-  background: var(--color-primary);
-  color: var(--color-surface);
 }
 
 .total-stats {
@@ -612,63 +500,6 @@ function handleConfirm() {
   justify-content: flex-end;
   flex-shrink: 0;
   gap: 12px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--color-border-light);
 }
 
-.cancel-btn,
-.confirm-btn {
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.cancel-btn {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-}
-
-.cancel-btn:hover {
-  background: var(--color-bg-secondary);
-  border-color: var(--color-text-disabled);
-}
-
-.confirm-btn {
-  border: none;
-  background: var(--color-primary);
-  color: var(--color-surface);
-}
-
-.confirm-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 30%, transparent);
-}
-
-.confirm-btn:active {
-  transform: translateY(0);
-}
-
-.confirm-btn.confirming {
-  background: var(--color-danger);
-}
-
-.confirm-btn.confirming:hover {
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-danger) 40%, transparent);
-}
-
-@media (max-width: 640px) {
-  .seat-config-dialog-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .seat-config-dialog {
-    max-height: 92vh;
-    border-radius: 12px 12px 0 0;
-  }
-}
 </style>

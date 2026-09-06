@@ -8,7 +8,28 @@ if (!class_exists('Database')) {
 }
 
 const FILE_ID_BYTES = 16;
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB 限制
+const MAX_WORKSPACE_DB_VALUE_BYTES = 60000;
+const MAX_WORKSPACE_DB_VALUE_CHARS = 60000;
+
+function workspaceDbValueFitsStorage($encodedValue) {
+    if (!is_string($encodedValue)) {
+        return false;
+    }
+
+    $encodedBytes = strlen($encodedValue);
+    $encodedCharacters = function_exists('mb_strlen') ? mb_strlen($encodedValue, 'UTF-8') : $encodedBytes;
+    return $encodedBytes <= MAX_WORKSPACE_DB_VALUE_BYTES && $encodedCharacters <= MAX_WORKSPACE_DB_VALUE_CHARS;
+}
+
+function generateWorkspaceFileId($dbFiles) {
+    for ($attempt = 0; $attempt < 16; $attempt++) {
+        $candidate = bin2hex(random_bytes(FILE_ID_BYTES));
+        if ($dbFiles->get(sanitizeDbKey($candidate)) === null) {
+            return $candidate;
+        }
+    }
+    return null;
+}
 
 /**
  * 验证工作区内容格式
@@ -135,6 +156,30 @@ function validateWorkspaceContent($content) {
     return ['valid' => true, 'message' => ''];
 }
 
+/**
+ * PHP 的关联数组解码无法区分空对象和空数组；工作区中的数值属性
+ * 约定为空对象，写回或返回时需要恢复该 JSON 形态。
+ */
+function normalizeWorkspaceNumericAttributes($content) {
+    if (!is_array($content) || !isset($content['students']) || !is_array($content['students'])) {
+        return $content;
+    }
+
+    foreach ($content['students'] as $index => $student) {
+        if (!is_array($student) || !array_key_exists('numericAttributes', $student)) {
+            continue;
+        }
+
+        if ($student['numericAttributes'] === null || (
+            is_array($student['numericAttributes']) && count($student['numericAttributes']) === 0
+        )) {
+            $content['students'][$index]['numericAttributes'] = new stdClass();
+        }
+    }
+
+    return $content;
+}
+
 function isWorkspaceDeleted($fileData) {
     if (!$fileData || !is_array($fileData)) {
         return false;
@@ -180,21 +225,37 @@ try {
             respond(['success' => false, 'message' => '工作区内容不能为空']);
         }
 
+        $nameLength = function_exists('mb_strlen') ? mb_strlen($name) : strlen($name);
+        if ($name === '' || $nameLength > 50) {
+            respond(['success' => false, 'message' => '工作区名称不能为空且不能超过 50 个字符']);
+        }
+
         // 验证工作区内容格式
         $validation = validateWorkspaceContent($content);
         if (!$validation['valid']) {
             respond(['success' => false, 'message' => '工作区格式无效: ' . $validation['message']]);
         }
 
-        $fileId = isset($input['fileId']) && !empty($input['fileId']) ? $input['fileId'] : bin2hex(random_bytes(FILE_ID_BYTES));
+        $content = normalizeWorkspaceNumericAttributes($content);
 
-        if (!isValidFileId($fileId)) {
+        $hasRequestedFileId = array_key_exists('fileId', $input) && $input['fileId'] !== null && $input['fileId'] !== '';
+        $requestedFileId = $hasRequestedFileId && is_string($input['fileId']) ? trim($input['fileId']) : null;
+        if ($hasRequestedFileId && !isValidFileId($requestedFileId)) {
             respond(['success' => false, 'message' => '文件ID格式无效']);
         }
 
-        // 消毒文件 ID 用作数据库键名
+        $existingFileRaw = $requestedFileId !== null
+            ? $dbFiles->get(sanitizeDbKey($requestedFileId))
+            : null;
+        $fileId = $existingFileRaw !== null
+            ? $requestedFileId
+            : generateWorkspaceFileId($dbFiles);
+        if ($fileId === null) {
+            respond(['success' => false, 'message' => '无法生成工作区文件ID，请重试'], 503);
+        }
+
+        // 只有实际存在的工作区允许沿用客户端提供的 ID；新建 ID 始终由服务端生成。
         $sanitizedFileId = sanitizeDbKey($fileId);
-        $existingFileRaw = $dbFiles->get($sanitizedFileId);
         $existingFileData = null;
         if ($existingFileRaw !== null) {
             $existingFileData = json_decode($existingFileRaw, true);
@@ -204,8 +265,8 @@ try {
         }
 
         // 检查权限（通过权限表，避免冗余的文件读取）
-        $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
-        $existingPerm = $dbPermissions->get($permKey);
+        $existingPerm = getFilePermissionRecord($dbPermissions, $fileId, $username);
+        $createdPermission = false;
 
         if ($existingPerm !== null) {
             if (!hasFilePermission($dbPermissions, $fileId, $username, 'write')) {
@@ -217,19 +278,25 @@ try {
                 isset($existingFileData['metadata']['author']) &&
                 $existingFileData['metadata']['author'] === $username
             ) {
-                grantFilePermission($dbPermissions, $fileId, $username, 'owner');
+                if (!grantFilePermission($dbPermissions, $fileId, $username, 'owner')) {
+                    respond(['success' => false, 'message' => '无法更新工作区权限记录'], 503);
+                }
             } else {
                 respond(['success' => false, 'message' => '无权限修改此文件'], 403);
             }
         } else {
-            createFilePermission($dbPermissions, $fileId, $username, 'owner');
+            if (!createFilePermission($dbPermissions, $fileId, $username, 'owner')) {
+                respond(['success' => false, 'message' => '无法创建工作区权限记录'], 503);
+            }
+            $createdPermission = true;
         }
 
-        // 检查文件大小
-        $contentSize = is_string($content) ? strlen($content) : strlen(json_encode($content));
-        if ($contentSize > MAX_FILE_SIZE) {
-            respond(['success' => false, 'message' => '文件大小超过限制（最大 5MB）']);
+        $contentJson = json_encode($content, JSON_UNESCAPED_UNICODE);
+        if (!is_string($contentJson)) {
+            if ($createdPermission) revokeFilePermission($dbPermissions, $fileId, $username);
+            respond(['success' => false, 'message' => '工作区内容无法编码']);
         }
+        $contentSize = strlen($contentJson);
 
         $metadata = [
             'author' => $username,
@@ -243,25 +310,48 @@ try {
             'content' => $content
         ];
 
-        $dbFiles->set($sanitizedFileId, json_encode($fileData));
+        $encodedFileData = json_encode($fileData, JSON_UNESCAPED_UNICODE);
+        if (!is_string($encodedFileData)) {
+            if ($createdPermission) revokeFilePermission($dbPermissions, $fileId, $username);
+            respond(['success' => false, 'message' => '工作区数据无法编码']);
+        }
+
+        if (!workspaceDbValueFitsStorage($encodedFileData)) {
+            if ($createdPermission) revokeFilePermission($dbPermissions, $fileId, $username);
+            respond(['success' => false, 'message' => '云工作区超过安全存储上限（编码后最大 60000 字节/字符），请导出本地文件或精简内容'], 413);
+        }
+
+        if (!databaseSetVerified($dbFiles, $sanitizedFileId, $encodedFileData)) {
+            if ($createdPermission) revokeFilePermission($dbPermissions, $fileId, $username);
+            respond(['success' => false, 'message' => '工作区写入失败，未确认保存成功'], 503);
+        }
 
         // 消毒用户文件列表键名
         $userFilesKey = sanitizeDbKey($username . '_files');
-        $existingFiles = $dbUsers->get_array($userFilesKey);
-        if ($existingFiles === null) {
-             $existingFiles = [];
-        }
+        $indexWarning = null;
+        try {
+            $existingFiles = $dbUsers->get_array($userFilesKey);
+            if (!is_array($existingFiles)) {
+                $existingFiles = [];
+            }
 
-        if (!in_array($fileId, $existingFiles)) {
-            $dbUsers->push($userFilesKey, $fileId);
+            if (!in_array($fileId, $existingFiles, true) && !databasePushVerified($dbUsers, $userFilesKey, $fileId)) {
+                $indexWarning = '工作区已保存，但兼容文件列表索引暂未更新';
+                error_log("Workspace user_files index update failed for {$username}/{$fileId}");
+            }
+        } catch (Throwable $error) {
+            $indexWarning = '工作区已保存，但兼容文件列表索引暂未更新';
+            $safeError = sanitizeSingleLineLogText($error->getMessage(), 512);
+            error_log("Workspace user_files index update failed for {$username}/{$fileId}: {$safeError}");
         }
 
         respond([
             'success' => true,
-            'message' => '保存成功',
+            'message' => $indexWarning ?: '保存成功',
             'data' => [
                 'fileId' => $fileId,
-                'metadata' => $metadata
+                'metadata' => $metadata,
+                'indexWarning' => $indexWarning
             ]
         ]);
 
@@ -288,8 +378,7 @@ try {
                 if (isWorkspaceDeleted($fileData)) continue;
 
                 // 兼容旧数据：自动迁移权限记录
-                $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
-                if ($dbPermissions->get($permKey) === null) {
+                if (getFilePermissionRecord($dbPermissions, $fileId, $username) === null) {
                     // 检查文件作者是否是当前用户
                     if (isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
                         grantFilePermission($dbPermissions, $fileId, $username, 'owner');
@@ -348,10 +437,11 @@ try {
             respond(['success' => false, 'message' => '工作区已被删除，不能继续操作']);
         }
 
-        $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
-        if ($dbPermissions->get($permKey) === null) {
+        if (getFilePermissionRecord($dbPermissions, $fileId, $username) === null) {
             if (isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
-                grantFilePermission($dbPermissions, $fileId, $username, 'owner');
+                if (!grantFilePermission($dbPermissions, $fileId, $username, 'owner')) {
+                    respond(['success' => false, 'message' => '无法更新工作区权限记录'], 503);
+                }
             } else {
                 respond(['success' => false, 'message' => '无权限修改此文件'], 403);
             }
@@ -360,24 +450,37 @@ try {
         }
 
         $fileData['metadata']['name'] = $name;
-        $dbFiles->set($sanitizedFileId, json_encode($fileData));
-
-        $userFilesKey = sanitizeDbKey($username . '_files');
-        $existingFiles = $dbUsers->get_array($userFilesKey);
-        if (!$existingFiles || !is_array($existingFiles)) {
-            $existingFiles = [];
+        $fileData['content'] = normalizeWorkspaceNumericAttributes($fileData['content']);
+        $encodedFileData = json_encode($fileData, JSON_UNESCAPED_UNICODE);
+        if (!workspaceDbValueFitsStorage($encodedFileData) || !databaseSetVerified($dbFiles, $sanitizedFileId, $encodedFileData)) {
+            respond(['success' => false, 'message' => '工作区名称写入失败'], 503);
         }
 
-        if (!in_array($fileId, $existingFiles)) {
-            $dbUsers->push($userFilesKey, $fileId);
+        $userFilesKey = sanitizeDbKey($username . '_files');
+        $indexWarning = null;
+        try {
+            $existingFiles = $dbUsers->get_array($userFilesKey);
+            if (!is_array($existingFiles)) {
+                $existingFiles = [];
+            }
+
+            if (!in_array($fileId, $existingFiles, true) && !databasePushVerified($dbUsers, $userFilesKey, $fileId)) {
+                $indexWarning = '工作区名称已更新，但兼容文件列表索引暂未更新';
+                error_log("Workspace rename user_files index update failed for {$username}/{$fileId}");
+            }
+        } catch (Throwable $error) {
+            $indexWarning = '工作区名称已更新，但兼容文件列表索引暂未更新';
+            $safeError = sanitizeSingleLineLogText($error->getMessage(), 512);
+            error_log("Workspace rename user_files index update failed for {$username}/{$fileId}: {$safeError}");
         }
 
         respond([
             'success' => true,
-            'message' => '工作区名称已更新',
+            'message' => $indexWarning ?: '工作区名称已更新',
             'data' => [
                 'fileId' => $fileId,
-                'metadata' => $fileData['metadata']
+                'metadata' => $fileData['metadata'],
+                'indexWarning' => $indexWarning
             ]
         ]);
 
@@ -409,8 +512,7 @@ try {
         }
 
         // 检查读权限（兼容旧数据：如果没有权限记录，检查文件作者）
-        $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
-        if ($dbPermissions->get($permKey) === null) {
+        if (getFilePermissionRecord($dbPermissions, $fileId, $username) === null) {
             // 没有权限记录，检查文件作者
             if (isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
                 // 自动迁移：创建权限记录
@@ -422,6 +524,7 @@ try {
             respond(['success' => false, 'message' => '无权访问该文件'], 403);
         }
 
+        $fileData['content'] = normalizeWorkspaceNumericAttributes($fileData['content']);
         respond([
             'success' => true,
             'data' => $fileData
@@ -452,10 +555,11 @@ try {
              respond(['success' => true, 'message' => '工作区已标记删除']);
          }
 
-         $permKey = sanitizeDbKey("perm_{$fileId}_{$username}");
-         if ($dbPermissions->get($permKey) === null) {
-             if (isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
-                 grantFilePermission($dbPermissions, $fileId, $username, 'owner');
+        if (getFilePermissionRecord($dbPermissions, $fileId, $username) === null) {
+            if (isset($fileData['metadata']['author']) && $fileData['metadata']['author'] === $username) {
+                if (!grantFilePermission($dbPermissions, $fileId, $username, 'owner')) {
+                    respond(['success' => false, 'message' => '无法更新工作区权限记录'], 503);
+                }
              } else {
                  respond(['success' => false, 'message' => '无权删除该文件'], 403);
              }
@@ -473,7 +577,10 @@ try {
 
          $fileData['metadata']['deleted'] = true;
          $fileData['metadata']['deletedAt'] = date('c');
-         $dbFiles->set($sanitizedFileId, json_encode($fileData));
+         $encodedFileData = json_encode($fileData, JSON_UNESCAPED_UNICODE);
+         if (!workspaceDbValueFitsStorage($encodedFileData) || !databaseSetVerified($dbFiles, $sanitizedFileId, $encodedFileData)) {
+             respond(['success' => false, 'message' => '工作区删除标记写入失败'], 503);
+         }
 
          respond(['success' => true, 'message' => '工作区已标记删除']);
     } else {

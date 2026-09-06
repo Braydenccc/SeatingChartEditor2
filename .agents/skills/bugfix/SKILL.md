@@ -24,7 +24,7 @@ description: 座位表编辑器 v2 的 Codex 专用 Bug 修复工作流。用于
 - 图标统一使用 `lucide-vue-next`，按需具名导入，用 `:size` 控制尺寸；不要内联 SVG 或用 Unicode 充当图标。
 - CSS 颜色使用 `src/assets/main.css` 中的 `var(--color-*)` 变量；不要新增硬编码十六进制、RGB 或 RGBA。
 - 不使用 base64；本地图片显示用 `URL.createObjectURL()`。
-- 新文件优先使用 `.ts`，类型放在 `src/types/`；迁移中的旧 `.js` 文件按现状小步修改。
+- `src` 仅使用 TypeScript，Vue 脚本必须声明 `lang="ts"`，类型放在 `src/types/`。
 - 不自动创建 Git 提交、分支、PR 或 GitHub Issue，除非用户明确要求。
 
 ## 2. 快速定位
@@ -40,14 +40,14 @@ description: 座位表编辑器 v2 的 Codex 专用 Bug 修复工作流。用于
 常用入口：
 
 - 学生数据：`src/composables/useStudentData.ts`
-- 座位数据：`src/composables/useSeatChart.js`
-- 编辑模式：`src/composables/useEditMode.js`
-- 规则引擎：`src/composables/useSeatRules.js`
-- 自动排位：`src/composables/useAssignment.js`
+- 座位数据：`src/composables/useSeatChart.ts`
+- 编辑模式：`src/composables/useEditMode.ts`
+- 规则引擎：`src/composables/useSeatRules.ts`
+- 自动排位：`src/composables/useAssignment.ts`
 - 区域数据：`src/composables/useZoneData.ts`
-- 区域轮换：`src/composables/useZoneRotation.js`
+- 区域轮换：`src/composables/useZoneRotation.ts`
 - 座位组件：`src/components/seat/SeatChart.vue`、`src/components/seat/SeatItem.vue`
-- 学生组件：`src/components/student/StudentList.vue`、`src/components/student/StudentItem.vue`
+- 学生组件：`src/components/student/StudentList.vue`、`src/components/student/CandidateItem.vue`
 - 布局组件：`src/App.vue`、`src/views/EditorView.vue`、`src/components/workbench/EditorWorkbench.vue`
 
 复杂模块先按需阅读 `.agents/features/`：
@@ -120,12 +120,12 @@ npm run type-check
 
 测试文件参考：
 
-- `src/composables/__tests__/useStudentData.test.js`
-- `src/composables/__tests__/useSeatChart.test.js`
-- `src/composables/__tests__/useSeatRules.test.js`
-- `src/composables/__tests__/useAssignment.test.js`
-- `src/composables/__tests__/integration.test.js`
-- `src/composables/__tests__/edge-cases.test.js`
+- `src/composables/__tests__/useStudentData.test.ts`
+- `src/composables/__tests__/useSeatChart.test.ts`
+- `src/composables/__tests__/useSeatRules.test.ts`
+- `src/composables/__tests__/useAssignment.test.ts`
+- `src/composables/__tests__/integration.test.ts`
+- `src/composables/__tests__/edge-cases.test.ts`
 
 ## 6. 文档与沉淀
 

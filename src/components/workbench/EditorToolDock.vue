@@ -2,119 +2,145 @@
   <footer class="editor-tool-dock">
     <div v-if="zoneEditSession" class="zone-edit-strip">
       <span>{{ zoneEditSession.title || '正在编辑选区' }}</span>
-      <button type="button" @click="finishZoneEditing">
-        <Check :size="15" stroke-width="2.4" />
+      <NButton size="tiny" type="primary" @click="finishZoneEditing">
+        <template #icon><Check :size="15" stroke-width="2.4" /></template>
         <span>完成</span>
-      </button>
+      </NButton>
     </div>
 
     <div class="tool-group mobile-only">
-      <button class="tool-button" :title="isSeatFullscreen ? '退出全屏座位表' : '全屏座位表'" @click="toggleSeatFullscreen">
-        <Minimize2 v-if="isSeatFullscreen" :size="17" stroke-width="2" />
-        <Maximize2 v-else :size="17" stroke-width="2" />
+      <NButton
+        size="small"
+        quaternary
+        class="tool-button"
+        :title="isSeatFullscreen ? '退出全屏座位表' : '全屏座位表'"
+        :aria-label="isSeatFullscreen ? '退出全屏座位表' : '全屏座位表'"
+        :aria-pressed="isSeatFullscreen"
+        @click="toggleSeatFullscreen"
+      >
+        <template #icon>
+          <Minimize2 v-if="isSeatFullscreen" :size="17" stroke-width="2" />
+          <Maximize2 v-else :size="17" stroke-width="2" />
+        </template>
         <span>{{ isSeatFullscreen ? '退出' : '全屏' }}</span>
-      </button>
-      <button class="tool-button" title="候选学生" @click="openWorkbenchDrawer('candidates')">
-        <Users :size="17" stroke-width="2" />
+      </NButton>
+      <NButton
+        size="small"
+        quaternary
+        class="tool-button"
+        title="上下文"
+        aria-label="上下文"
+        :aria-pressed="mobileDrawer === 'selection'"
+        @click="openWorkbenchDrawer('selection')"
+      >
+        <template #icon><PanelRightOpen :size="17" stroke-width="2" /></template>
+        <span>上下文</span>
+      </NButton>
+      <NButton size="small" quaternary class="tool-button" title="候选学生" aria-label="候选学生" :aria-pressed="mobileDrawer === 'candidates'" @click="openWorkbenchDrawer('candidates')">
+        <template #icon><Users :size="17" stroke-width="2" /></template>
         <span>学生</span>
-      </button>
-      <button class="tool-button" title="更多工具" @click="openWorkbenchDrawer('tools')">
-        <MoreHorizontal :size="17" stroke-width="2" />
+      </NButton>
+      <NButton size="small" quaternary class="tool-button" title="更多工具" aria-label="更多工具" :aria-pressed="mobileDrawer === 'tools'" @click="openWorkbenchDrawer('tools')">
+        <template #icon><MoreHorizontal :size="17" stroke-width="2" /></template>
         <span>工具</span>
-      </button>
+      </NButton>
     </div>
 
     <div v-if="selectedStudent" class="placement-strip mobile-placement">
       <span>正在放置：{{ selectedStudent.name || '未命名' }}</span>
-      <button type="button" @click="clearStudentSelection">取消</button>
+      <NButton size="tiny" secondary @click="clearStudentSelection">取消</NButton>
     </div>
 
     <div class="tool-group">
-      <button class="tool-button icon-only" title="撤销" :disabled="!canUndo" @click="undo">
+      <NButton size="small" quaternary circle class="tool-button icon-only" title="撤销" aria-label="撤销" :disabled="!canUndo" @click="undo">
         <Undo2 :size="17" stroke-width="2" />
-      </button>
-      <button class="tool-button icon-only" title="重做" :disabled="!canRedo" @click="redo">
+      </NButton>
+      <NButton size="small" quaternary circle class="tool-button icon-only" title="重做" aria-label="重做" :disabled="!canRedo" @click="redo">
         <Redo2 :size="17" stroke-width="2" />
-      </button>
-      <button class="tool-button" :class="{ active: currentMode === EditMode.NORMAL && !isSelectionMode }" title="普通模式" @click="activateTool('normal')">
-        <MousePointer2 :size="17" stroke-width="2" />
+      </NButton>
+      <NButton size="small" class="tool-button" :type="currentMode === EditMode.NORMAL && !isSelectionMode ? 'primary' : 'default'" :secondary="currentMode === EditMode.NORMAL && !isSelectionMode" :quaternary="currentMode !== EditMode.NORMAL || isSelectionMode" title="普通模式" aria-label="普通模式" :aria-pressed="currentMode === EditMode.NORMAL && !isSelectionMode" @click="activateTool('normal')">
+        <template #icon><MousePointer2 :size="17" stroke-width="2" /></template>
         <span>普通</span>
-      </button>
-      <button
+      </NButton>
+      <NButton
+        size="small"
         class="tool-button"
-        :class="{ active: isSelectionMode }"
+        :type="isSelectionMode ? 'primary' : 'default'"
+        :secondary="isSelectionMode"
+        :quaternary="!isSelectionMode"
         :title="selectionToolTitle"
         :aria-label="selectionToolTitle"
         :aria-pressed="isSelectionMode"
         @click="toggleSelectionMode"
       >
-        <BoxSelect :size="17" stroke-width="2" />
+        <template #icon><BoxSelect :size="17" stroke-width="2" /></template>
         <span>多选</span>
         <span v-if="isSelectionMode && selectedCount > 0" class="selection-badge">{{ selectedCount }}</span>
-      </button>
+      </NButton>
       <div v-if="isSelectionMode" class="selection-mode-hint" role="status">
         {{ selectionModeHint }}
       </div>
     </div>
 
     <div class="tool-group">
-      <button class="tool-button" :class="{ active: currentMode === EditMode.SWAP }" title="交换座位" @click="activateTool('swap')">
-        <ArrowLeftRight :size="17" stroke-width="2" />
+      <NButton size="small" class="tool-button" :type="currentMode === EditMode.SWAP ? 'primary' : 'default'" :secondary="currentMode === EditMode.SWAP" :quaternary="currentMode !== EditMode.SWAP" title="交换座位" aria-label="交换座位" :aria-pressed="currentMode === EditMode.SWAP" @click="activateTool('swap')">
+        <template #icon><ArrowLeftRight :size="17" stroke-width="2" /></template>
         <span>交换</span>
-      </button>
-      <button class="tool-button" :class="{ active: currentMode === EditMode.CLEAR }" title="清空座位" @click="activateTool('clear')">
-        <Trash2 :size="17" stroke-width="2" />
+      </NButton>
+      <NButton size="small" class="tool-button" :type="currentMode === EditMode.CLEAR ? 'error' : 'default'" :secondary="currentMode === EditMode.CLEAR" :quaternary="currentMode !== EditMode.CLEAR" title="清空座位" aria-label="清空座位" :aria-pressed="currentMode === EditMode.CLEAR" @click="activateTool('clear')">
+        <template #icon><Trash2 :size="17" stroke-width="2" /></template>
         <span>清空</span>
-      </button>
-      <button class="tool-button" :class="{ active: currentMode === EditMode.EMPTY_EDIT }" title="空置座位" @click="activateTool('empty')">
-        <LayoutGrid :size="17" stroke-width="2" />
+      </NButton>
+      <NButton size="small" class="tool-button" :type="currentMode === EditMode.EMPTY_EDIT ? 'warning' : 'default'" :secondary="currentMode === EditMode.EMPTY_EDIT" :quaternary="currentMode !== EditMode.EMPTY_EDIT" title="空置座位" aria-label="空置座位" :aria-pressed="currentMode === EditMode.EMPTY_EDIT" @click="activateTool('empty')">
+        <template #icon><LayoutGrid :size="17" stroke-width="2" /></template>
         <span>空置</span>
-      </button>
+      </NButton>
     </div>
 
     <div class="tool-group workflows">
-      <button class="tool-button" title="座位配置" @click="openWorkbenchDialog('seatConfig')">
-        <Settings :size="17" stroke-width="2" />
+      <NButton size="small" quaternary class="tool-button" title="座位配置" aria-label="座位配置" @click="openWorkbenchDialog('seatConfig')">
+        <template #icon><Settings :size="17" stroke-width="2" /></template>
         <span>配置</span>
-      </button>
-      <button class="tool-button" title="位移轮换" @click="openWorkbenchDialog('shiftRotation')">
-        <MoveDiagonal2 :size="17" stroke-width="2" />
+      </NButton>
+      <NButton size="small" quaternary class="tool-button" title="位移轮换" aria-label="位移轮换" @click="openWorkbenchDialog('shiftRotation')">
+        <template #icon><MoveDiagonal2 :size="17" stroke-width="2" /></template>
         <span>位移</span>
-      </button>
-      <button class="tool-button" title="选区轮换" @click="openWorkbenchDialog('zoneRotation')">
-        <RefreshCcw :size="17" stroke-width="2" />
+      </NButton>
+      <NButton size="small" quaternary class="tool-button" title="选区轮换" aria-label="选区轮换" @click="openWorkbenchDialog('zoneRotation')">
+        <template #icon><RefreshCcw :size="17" stroke-width="2" /></template>
         <span>轮换</span>
-      </button>
-      <button class="tool-button" title="智能排位" @click="openWorkbenchDialog('assignment')">
-        <Shuffle :size="17" stroke-width="2" />
+      </NButton>
+      <NButton size="small" quaternary class="tool-button" title="智能排位" aria-label="智能排位" @click="openWorkbenchDialog('assignment')">
+        <template #icon><Shuffle :size="17" stroke-width="2" /></template>
         <span>排位</span>
-      </button>
-      <button class="tool-button" title="规则管理" @click="openWorkbenchDialog('rules')">
-        <Scale :size="17" stroke-width="2" />
+      </NButton>
+      <NButton size="small" quaternary class="tool-button" title="规则管理" aria-label="规则管理" @click="openWorkbenchDialog('rules')">
+        <template #icon><Scale :size="17" stroke-width="2" /></template>
         <span>规则</span>
-      </button>
+      </NButton>
     </div>
 
     <div class="tool-group zoom-tools">
-      <button class="tool-button icon-only" title="缩小" :disabled="scale <= MIN_SCALE" @click="zoomOut">
+      <NButton size="small" quaternary circle class="tool-button icon-only" title="缩小" aria-label="缩小座位表" :disabled="scale <= MIN_SCALE" @click="zoomOut">
         <Minus :size="17" stroke-width="2" />
-      </button>
-      <button class="tool-button zoom-label" title="自适应大小" @click="fitToViewport">
+      </NButton>
+      <NButton size="small" quaternary class="tool-button zoom-label" title="自适应大小" :aria-label="`自适应座位表大小，当前 ${Math.round(scale * 100)}%`" @click="fitToViewport">
         {{ Math.round(scale * 100) }}%
-      </button>
-      <button class="tool-button icon-only" title="放大" :disabled="scale >= MAX_SCALE" @click="zoomIn">
+      </NButton>
+      <NButton size="small" quaternary circle class="tool-button icon-only" title="放大" aria-label="放大座位表" :disabled="scale >= MAX_SCALE" @click="zoomIn">
         <Plus :size="17" stroke-width="2" />
-      </button>
-      <button class="tool-button export-tool" title="导出" @click="router.push({ path: '/export', query: { tab: 'image' } })">
-        <FileOutput :size="17" stroke-width="2" />
+      </NButton>
+      <NButton size="small" quaternary class="tool-button export-tool" title="导出" aria-label="导出" @click="router.push({ path: '/export', query: { tab: 'image' } })">
+        <template #icon><FileOutput :size="17" stroke-width="2" /></template>
         <span>导出</span>
-      </button>
+      </NButton>
     </div>
   </footer>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
+import { NButton } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import {
   ArrowLeftRight,
@@ -128,6 +154,7 @@ import {
   MoreHorizontal,
   MousePointer2,
   MoveDiagonal2,
+  PanelRightOpen,
   Plus,
   Redo2,
   RefreshCcw,
@@ -139,38 +166,36 @@ import {
   Users
 } from 'lucide-vue-next'
 import { useMediaQuery } from '@vueuse/core'
+import { mobileWorkbenchMediaQuery } from '@/constants/layout'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
+import { useEditorCommands } from '@/composables/useEditorCommands'
 import { useEditMode } from '@/composables/useEditMode'
 import { useSelection } from '@/composables/useSelection'
 import { useStudentData } from '@/composables/useStudentData'
 import { useUndo } from '@/composables/useUndo'
 import { useZoom } from '@/composables/useZoom'
-import { useZoneData } from '@/composables/useZoneData'
-import { useZoneRotation } from '@/composables/useZoneRotation'
-import { useLogger } from '@/composables/useLogger'
 
 const router = useRouter()
 const {
-  setTool,
-  openDialog,
-  openMobileDrawer,
-  closeMobileDrawer,
   zoneEditSession,
-  finishZoneEditSession,
   isSeatFullscreen,
+  mobileDrawer,
   toggleSeatFullscreen
 } = useEditorWorkbench()
-const { currentMode, setMode, clearFirstSelectedSeat, EditMode } = useEditMode()
-const { isSelectionMode, selectedCount, toggleSelectionMode: toggleRawSelectionMode } = useSelection()
+const { currentMode, EditMode } = useEditMode()
+const { isSelectionMode } = useSelection()
+const {
+  selectedCount,
+  activateTool,
+  toggleSelectionMode,
+  finishZoneEditing,
+  openWorkbenchDialog,
+  openWorkbenchDrawer
+} = useEditorCommands()
 const { students, selectedStudentId, clearSelection: clearStudentSelection } = useStudentData()
 const { undo, redo, canUndo, canRedo } = useUndo()
 const { scale, zoomIn, zoomOut, MIN_SCALE, MAX_SCALE, fitToViewport } = useZoom()
-const { clearZoneSelection } = useZoneData()
-const { clearEditingZone } = useZoneRotation()
-const { info } = useLogger()
-const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
-const isLandscape = useMediaQuery('(orientation: landscape)')
-const isFullscreenLandscape = computed(() => isSeatFullscreen.value && isMobileWorkbench.value && isLandscape.value)
+const isMobileWorkbench = useMediaQuery(mobileWorkbenchMediaQuery)
 
 const selectedStudent = computed(() => (
   students.value.find(student => student.id === selectedStudentId.value) || null
@@ -188,72 +213,6 @@ const selectionToolTitle = computed(() => {
     : '多选座位：按住左键拖过座位连续选择，Shift+右键框选'
 })
 
-const activateTool = (tool) => {
-  finishZoneEditing()
-  setTool(tool)
-  if (tool === 'normal') {
-    setMode(EditMode.NORMAL)
-    clearFirstSelectedSeat()
-    if (isSelectionMode.value) toggleRawSelectionMode()
-    return
-  }
-  closeMobileDrawer()
-  if (isSelectionMode.value) toggleRawSelectionMode()
-  const modeMap = {
-    swap: EditMode.SWAP,
-    clear: EditMode.CLEAR,
-    empty: EditMode.EMPTY_EDIT
-  }
-  if (currentMode.value === modeMap[tool]) {
-    setMode(EditMode.NORMAL)
-    setTool('normal')
-  } else {
-    setMode(modeMap[tool])
-    const hints = {
-      swap: '交换模式：依次点击两个座位交换学生',
-      clear: '清空模式：点击有学生的座位移出学生',
-      empty: '空置编辑：点击座位切换是否可用'
-    }
-    info(hints[tool])
-  }
-}
-
-const toggleSelectionMode = () => {
-  finishZoneEditing()
-  if (currentMode.value !== EditMode.NORMAL) {
-    setMode(EditMode.NORMAL)
-    setTool('normal')
-  }
-  toggleRawSelectionMode()
-  if (isSelectionMode.value) {
-    info(isMobileWorkbench.value
-      ? '多选模式：在座位表上滑动涂抹选择座位'
-      : '多选模式：按住左键涂抹选择座位，再从上下文面板执行操作')
-  } else {
-    closeMobileDrawer()
-  }
-}
-
-const finishZoneEditing = () => {
-  clearZoneSelection()
-  clearEditingZone()
-  setMode(EditMode.NORMAL)
-  finishZoneEditSession()
-}
-
-const openWorkbenchDialog = (dialog) => {
-  finishZoneEditing()
-  openDialog(dialog)
-}
-
-const openWorkbenchDrawer = (drawer) => {
-  finishZoneEditing()
-  if (drawer === 'candidates' && isFullscreenLandscape.value) {
-    closeMobileDrawer()
-    return
-  }
-  openMobileDrawer(drawer)
-}
 </script>
 
 <style scoped>
@@ -297,22 +256,6 @@ const openWorkbenchDrawer = (drawer) => {
   flex-shrink: 0;
 }
 
-.zone-edit-strip button {
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 0 8px;
-  border: none;
-  border-radius: 5px;
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .placement-strip {
   min-height: 38px;
   display: inline-flex;
@@ -329,38 +272,18 @@ const openWorkbenchDrawer = (drawer) => {
   flex-shrink: 0;
 }
 
-.placement-strip button {
-  min-height: 28px;
-  border: 1px solid var(--color-border);
-  border-radius: 5px;
-  background: var(--color-surface);
-  color: var(--color-primary);
-  padding: 0 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .tool-group:last-child {
   border-right: none;
 }
 
 .tool-button {
   position: relative;
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
   white-space: nowrap;
-  cursor: pointer;
+}
+
+.tool-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .selection-badge {
@@ -391,24 +314,7 @@ const openWorkbenchDrawer = (drawer) => {
 }
 
 .tool-button.icon-only {
-  width: 38px;
-  padding: 0;
-}
-
-.tool-button:hover:not(:disabled) {
-  background: var(--color-bg-hover);
-  color: var(--color-primary);
-}
-
-.tool-button.active {
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-  border-color: color-mix(in srgb, var(--color-primary) 18%, transparent);
-}
-
-.tool-button:disabled {
-  color: var(--color-text-disabled);
-  cursor: not-allowed;
+  flex: 0 0 auto;
 }
 
 .zoom-label {

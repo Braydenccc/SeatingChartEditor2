@@ -21,7 +21,7 @@
   --color-bg-card: #fafbfc;
   --color-bg-subtle: #f8fafc;
   --color-bg-soft: #f1f5f9;
-  --color-bg-hover: #f8f9fa;
+  --color-bg-hover: var(--color-bg-subtle);
   --color-bg-overlay: rgba(0, 0, 0, 0.5);
 
   /* 文字颜色 */
@@ -34,19 +34,19 @@
   /* 边框颜色 */
   --color-border: #e2e8f0;
   --color-border-strong: #cbd5e1;
-  --color-border-hover: #cbd5e1;
+  --color-border-hover: var(--color-border-strong);
   --color-border-light: #f1f5f9;
   --color-border-dark: #94a3b8;
 
   /* 次要背景色 */
-  --color-bg-secondary: #f5f5f5;
+  --color-bg-secondary: var(--color-bg-subtle);
 
   /* 状态颜色 */
   --color-danger: #f44336;
   --color-danger-hover: #d32f2f;
   --color-danger-text: #ef4444;
   --color-danger-bg: #fef2f2;
-  --color-danger-bg-light: #fef2f2;
+  --color-danger-bg-light: var(--color-danger-bg);
   --color-danger-dark: #c62828;
 
   --color-success: #059669;
@@ -54,11 +54,11 @@
   --color-success-text: #10b981;
   --color-success-bg: #d1fae5;
   --color-success-bg-light: #f0fdf4;
-  --color-success-dark: #047857;
+  --color-success-dark: var(--color-success-hover);
 
   --color-warning: #f59e0b;
   --color-warning-hover: #d97706;
-  --color-warning-text: #f59e0b;
+  --color-warning-text: var(--color-warning);
   --color-warning-bg: #fef3c7;
   --color-warning-bg-light: #fffbeb;
   --color-warning-dark: #b45309;
@@ -68,13 +68,12 @@
   --color-info-text: #3b82f6;
   --color-info-bg: #eff6ff;
   --color-info-bg-light: #dbeafe;
-  --color-info-dark: #1e40af;
+  --color-info-dark: var(--color-info-hover);
 
   /* 特殊颜色 */
-  --color-error-bg-light: #fef2f2;
-  --color-link: #2563eb;
-  --color-link-hover: #1d4ed8;
-  --color-accent: #6366f1;
+  --color-error-bg-light: var(--color-danger-bg);
+  --color-link: var(--color-info);
+  --color-link-hover: var(--color-info-hover);
   --color-warning-light: #fed7aa;
 
   /* 阴影 */
@@ -91,7 +90,8 @@
   --seat-card-outer-height: calc(var(--seat-card-height) + var(--seat-card-border-width) * 2);
   --seat-card-transition: 0.18s ease;
   --seat-card-shadow-hover: 0 4px 12px var(--shadow-lg);
-  --seat-card-shadow-drag: 0 8px 24px color-mix(in srgb, var(--color-primary) 35%, transparent);
+  --seat-card-shadow-drag: 0 8px 24px color-mix(in srgb, var(--color-info) 32%, transparent);
+  --seat-card-placeholder-size: 13px;
   --candidate-card-height: 68px;
   --candidate-card-radius: 8px;
   --student-card-face-gap: 4px;
@@ -107,25 +107,25 @@
   --student-card-attribute-size: 8px;
 
   /* 特定组件颜色 */
-  --color-header-bg: #ffffff;
-  --color-sidebar-bg: #fafbfc;
-  --color-dialog-bg: #ffffff;
-  --color-input-bg: #ffffff;
-  --color-input-border: #e2e8f0;
-  --color-button-secondary-bg: #ffffff;
-  --color-button-secondary-text: #64748b;
-  --color-tag-bg: #e0e7ff;
-  --color-tag-text: #4338ca;
+  --color-header-bg: var(--color-surface);
+  --color-sidebar-bg: var(--color-bg-card);
+  --color-dialog-bg: var(--color-surface);
+  --color-input-bg: var(--color-surface);
+  --color-input-border: var(--color-border);
+  --color-button-secondary-bg: var(--color-surface);
+  --color-button-secondary-text: var(--color-text-muted);
+  --color-tag-bg: var(--color-info-bg);
+  --color-tag-text: var(--color-info);
 
   /* 滚动条颜色 */
-  --scrollbar-track: #f1f5f9;
-  --scrollbar-thumb: #cbd5e1;
-  --scrollbar-thumb-hover: #94a3b8;
+  --scrollbar-track: var(--color-bg-soft);
+  --scrollbar-thumb: var(--color-border-strong);
+  --scrollbar-thumb-hover: var(--color-text-disabled);
 
   /* 编辑模式指示色 */
-  --color-mode-swap: #f59e0b;
-  --color-mode-empty: #8b5cf6;
-  --color-mode-zone: #06b6d4;
+  --color-mode-swap: var(--color-warning);
+  --color-mode-empty: var(--color-border-dark);
+  --color-mode-zone: var(--color-info);
 
   /* 标签调色板 */
   --tag-color-1: #FF6B6B;
@@ -156,7 +156,7 @@
   --color-bg-card: #111827;
   --color-bg-subtle: #151d2e;
   --color-bg-soft: #253347;
-  --color-bg-hover: #2a3f5c;
+  --color-bg-hover: var(--color-bg-selected);
   --color-bg-overlay: rgba(0, 0, 0, 0.7);
 
   /* 文字颜色 - 优化深色模式可读性 */
@@ -169,19 +169,19 @@
   /* 边框颜色 - 提升可见度 */
   --color-border: #3d4f63;
   --color-border-strong: #536578;
-  --color-border-hover: #536578;
+  --color-border-hover: var(--color-border-strong);
   --color-border-light: #253347;
   --color-border-dark: #8899aa;
 
   /* 次要背景色 */
-  --color-bg-secondary: #151d2e;
+  --color-bg-secondary: var(--color-bg-subtle);
 
   /* 状态颜色 */
   --color-danger: #f87171;
   --color-danger-hover: #ef4444;
   --color-danger-text: #fca5a5;
   --color-danger-bg: #450a0a;
-  --color-danger-bg-light: #450a0a;
+  --color-danger-bg-light: var(--color-danger-bg);
   --color-danger-dark: #dc2626;
 
   --color-success: #34d399;
@@ -189,7 +189,7 @@
   --color-success-text: #6ee7b7;
   --color-success-bg: #064e3b;
   --color-success-bg-light: #022c22;
-  --color-success-dark: #059669;
+  --color-success-dark: var(--color-success-hover);
 
   --color-warning: #fbbf24;
   --color-warning-hover: #f59e0b;
@@ -203,13 +203,12 @@
   --color-info-text: #93c5fd;
   --color-info-bg: #1e3a8a;
   --color-info-bg-light: #1e40af;
-  --color-info-dark: #2563eb;
+  --color-info-dark: var(--color-info-hover);
 
   /* 特殊颜色 */
-  --color-error-bg-light: #450a0a;
-  --color-link: #60a5fa;
-  --color-link-hover: #93c5fd;
-  --color-accent: #818cf8;
+  --color-error-bg-light: var(--color-danger-bg);
+  --color-link: var(--color-info);
+  --color-link-hover: var(--color-info-text);
   --color-warning-light: #92400e;
 
   /* 阴影 */
@@ -219,25 +218,25 @@
   --shadow-primary: rgba(74, 158, 255, 0.4);
 
   /* 特定组件颜色 */
-  --color-header-bg: #111827;
-  --color-sidebar-bg: #111827;
-  --color-dialog-bg: #1e293b;
-  --color-input-bg: #151d2e;
-  --color-input-border: #3d4f63;
-  --color-button-secondary-bg: #2a3f5c;
-  --color-button-secondary-text: #cbd5e1;
-  --color-tag-bg: #1e3a8a;
-  --color-tag-text: #93c5fd;
+  --color-header-bg: var(--color-bg-card);
+  --color-sidebar-bg: var(--color-bg-card);
+  --color-dialog-bg: var(--color-surface);
+  --color-input-bg: var(--color-bg-subtle);
+  --color-input-border: var(--color-border);
+  --color-button-secondary-bg: var(--color-bg-selected);
+  --color-button-secondary-text: var(--color-text-secondary);
+  --color-tag-bg: var(--color-info-bg);
+  --color-tag-text: var(--color-info-text);
 
   /* 滚动条颜色 */
-  --scrollbar-track: #111827;
-  --scrollbar-thumb: #475569;
-  --scrollbar-thumb-hover: #64748b;
+  --scrollbar-track: var(--color-bg-card);
+  --scrollbar-thumb: var(--color-text-muted);
+  --scrollbar-thumb-hover: var(--color-text-secondary);
 
   /* 编辑模式指示色 */
-  --color-mode-swap: #f59e0b;
-  --color-mode-empty: #8b5cf6;
-  --color-mode-zone: #06b6d4;
+  --color-mode-swap: var(--color-warning);
+  --color-mode-empty: var(--color-border-dark);
+  --color-mode-zone: var(--color-info);
 
   /* 标签调色板（深色模式调整亮度） */
   --tag-color-1: #ff8a8a;
@@ -273,7 +272,7 @@
     --color-bg-card: #111827;
     --color-bg-subtle: #151d2e;
     --color-bg-soft: #253347;
-    --color-bg-hover: #2a3f5c;
+    --color-bg-hover: var(--color-bg-selected);
     --color-bg-overlay: rgba(0, 0, 0, 0.7);
 
     --color-text-primary: #f1f5f9;
@@ -284,17 +283,17 @@
 
     --color-border: #3d4f63;
     --color-border-strong: #536578;
-    --color-border-hover: #536578;
+    --color-border-hover: var(--color-border-strong);
     --color-border-light: #253347;
     --color-border-dark: #8899aa;
 
-    --color-bg-secondary: #151d2e;
+    --color-bg-secondary: var(--color-bg-subtle);
 
     --color-danger: #f87171;
     --color-danger-hover: #ef4444;
     --color-danger-text: #fca5a5;
     --color-danger-bg: #450a0a;
-    --color-danger-bg-light: #450a0a;
+    --color-danger-bg-light: var(--color-danger-bg);
     --color-danger-dark: #dc2626;
 
     --color-success: #34d399;
@@ -302,7 +301,7 @@
     --color-success-text: #6ee7b7;
     --color-success-bg: #064e3b;
     --color-success-bg-light: #022c22;
-    --color-success-dark: #059669;
+    --color-success-dark: var(--color-success-hover);
 
     --color-warning: #fbbf24;
     --color-warning-hover: #f59e0b;
@@ -316,12 +315,11 @@
     --color-info-text: #93c5fd;
     --color-info-bg: #1e3a8a;
     --color-info-bg-light: #1e40af;
-    --color-info-dark: #2563eb;
+    --color-info-dark: var(--color-info-hover);
 
-    --color-error-bg-light: #450a0a;
-    --color-link: #60a5fa;
-    --color-link-hover: #93c5fd;
-    --color-accent: #818cf8;
+    --color-error-bg-light: var(--color-danger-bg);
+    --color-link: var(--color-info);
+    --color-link-hover: var(--color-info-text);
     --color-warning-light: #92400e;
 
     --shadow-sm: rgba(0, 0, 0, 0.3);
@@ -329,23 +327,23 @@
     --shadow-lg: rgba(0, 0, 0, 0.6);
     --shadow-primary: rgba(74, 158, 255, 0.4);
 
-    --color-header-bg: #111827;
-    --color-sidebar-bg: #111827;
-    --color-dialog-bg: #1e293b;
-    --color-input-bg: #151d2e;
-    --color-input-border: #3d4f63;
-    --color-button-secondary-bg: #2a3f5c;
-    --color-button-secondary-text: #cbd5e1;
-    --color-tag-bg: #1e3a8a;
-    --color-tag-text: #93c5fd;
+    --color-header-bg: var(--color-bg-card);
+    --color-sidebar-bg: var(--color-bg-card);
+    --color-dialog-bg: var(--color-surface);
+    --color-input-bg: var(--color-bg-subtle);
+    --color-input-border: var(--color-border);
+    --color-button-secondary-bg: var(--color-bg-selected);
+    --color-button-secondary-text: var(--color-text-secondary);
+    --color-tag-bg: var(--color-info-bg);
+    --color-tag-text: var(--color-info-text);
 
-    --scrollbar-track: #111827;
-    --scrollbar-thumb: #475569;
-    --scrollbar-thumb-hover: #64748b;
+    --scrollbar-track: var(--color-bg-card);
+    --scrollbar-thumb: var(--color-text-muted);
+    --scrollbar-thumb-hover: var(--color-text-secondary);
 
-    --color-mode-swap: #f59e0b;
-    --color-mode-empty: #8b5cf6;
-    --color-mode-zone: #06b6d4;
+    --color-mode-swap: var(--color-warning);
+    --color-mode-empty: var(--color-border-dark);
+    --color-mode-zone: var(--color-info);
 
     --tag-color-1: #ff8a8a;
     --tag-color-2: #6eddd4;
@@ -369,6 +367,11 @@
   justify-content: center;
   vertical-align: middle;
   flex-shrink: 0;
+}
+
+/* 保留按钮焦点本身和 focus-visible 轮廓，但不让 Naive UI 额外改变焦点背景。 */
+.n-button {
+  --n-color-focus: var(--n-color) !important;
 }
 
 html,
@@ -455,17 +458,7 @@ a:hover,
     -webkit-text-size-adjust: 100%;
   }
 
-  /* 确保触摸区域足够大 */
-  button,
-  input[type="button"],
-  input[type="submit"],
-  .clickable {
-    min-height: 44px;
-    min-width: 44px;
-  }
-
   /* 优化触摸反馈 */
-  button:active,
   .clickable:active {
     background-color: var(--color-bg-hover);
     transition: background-color 0.1s ease;
@@ -489,6 +482,7 @@ a:hover,
     --seat-card-width: 102px;
     --seat-card-height: 68px;
     --seat-card-radius: 10px;
+    --seat-card-placeholder-size: 11px;
     --student-card-face-gap: 3px;
     --student-card-face-padding: 5px;
     --student-card-name-size: 14px;
@@ -507,6 +501,7 @@ a:hover,
     --seat-card-width: 96px;
     --seat-card-height: 64px;
     --seat-card-radius: 9px;
+    --seat-card-placeholder-size: 10px;
     --student-card-face-gap: 2px;
     --student-card-face-padding: 4px;
     --student-card-name-size: 13px;
@@ -525,6 +520,7 @@ a:hover,
     --seat-card-width: 92px;
     --seat-card-height: 62px;
     --seat-card-radius: 10px;
+    --seat-card-placeholder-size: 11px;
     --student-card-face-gap: 3px;
     --student-card-face-padding: 5px;
     --student-card-name-size: 12px;
@@ -543,6 +539,7 @@ a:hover,
     --seat-card-width: 78px;
     --seat-card-height: 50px;
     --seat-card-radius: 8px;
+    --seat-card-placeholder-size: 10px;
     --student-card-face-gap: 2px;
     --student-card-face-padding: 4px;
     --student-card-name-size: 10px;

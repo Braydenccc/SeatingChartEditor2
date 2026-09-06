@@ -1,14 +1,16 @@
 <template>
   <div class="tag-student-selector">
-    <label class="selector-label">分配学生:</label>
+    <label class="selector-label" for="tag-student-search">分配学生</label>
     <div class="search-box">
-      <Search :size="14" class="search-icon" />
-      <input
-        v-model="searchQuery"
-        type="text"
+      <NInput
+        v-model:value="searchQuery"
+        size="small"
         placeholder="搜索姓名或学号..."
         class="search-input"
-      />
+        :input-props="{ id: 'tag-student-search' }"
+      >
+        <template #prefix><Search :size="14" /></template>
+      </NInput>
     </div>
     <div class="student-list" v-if="filteredStudents.length > 0">
       <div
@@ -16,18 +18,17 @@
         :key="student.id"
         class="student-row"
         :class="{ selected: isSelected(student.id) }"
-        @click="toggleStudent(student.id)"
+        @click="updateStudentSelection(student.id, !isSelected(student.id))"
       >
-        <label class="checkbox-wrapper" @click.stop>
-          <input
-            type="checkbox"
-            :checked="isSelected(student.id)"
-            @change="toggleStudent(student.id)"
-          />
-          <span class="checkmark"></span>
-        </label>
-        <span class="student-name">{{ student.name || '未命名' }}</span>
-        <span class="student-number" v-if="student.studentNumber">#{{ student.studentNumber }}</span>
+        <NCheckbox
+          class="checkbox-wrapper"
+          :checked="isSelected(student.id)"
+          :aria-labelledby="getStudentLabelId(student.id)"
+          @click.stop
+          @update:checked="checked => updateStudentSelection(student.id, checked)"
+        />
+        <span :id="getStudentLabelId(student.id)" class="student-name">{{ student.name || '未命名' }}</span>
+        <span class="student-number" v-if="hasStudentNumber(student.studentNumber)">#{{ student.studentNumber }}</span>
       </div>
     </div>
     <div v-else class="empty-hint">
@@ -39,22 +40,21 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Search } from 'lucide-vue-next'
+import { NCheckbox, NInput } from 'naive-ui'
+import type { Student } from '@/types/models'
 
-const props = defineProps({
-  modelValue: {
-    type: Array,
-    default: () => []
-  },
-  students: {
-    type: Array,
-    default: () => []
-  }
+const props = withDefaults(defineProps<{
+  modelValue?: number[]
+  students?: Student[]
+}>(), {
+  modelValue: () => [],
+  students: () => []
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits<{ 'update:modelValue': [value: number[]] }>()
 
 const searchQuery = ref('')
 const selectedIds = computed({
@@ -72,14 +72,16 @@ const filteredStudents = computed(() => {
   })
 })
 
-const isSelected = (studentId) => selectedIds.value.includes(studentId)
+const isSelected = (studentId: number) => selectedIds.value.includes(studentId)
+const hasStudentNumber = (value: unknown) => value !== null && value !== undefined && value !== ''
+const getStudentLabelId = (studentId: number) => `tag-student-label-${studentId}`
 
-const toggleStudent = (studentId) => {
+const updateStudentSelection = (studentId: number, checked: boolean) => {
   const current = [...selectedIds.value]
   const index = current.indexOf(studentId)
-  if (index >= 0) {
+  if (!checked && index >= 0) {
     current.splice(index, 1)
-  } else {
+  } else if (checked && index < 0) {
     current.push(studentId)
   }
   selectedIds.value = current
@@ -100,38 +102,11 @@ const toggleStudent = (studentId) => {
 }
 
 .search-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--color-bg-secondary);
-  border: 2px solid var(--color-border);
-  border-radius: 6px;
   margin-bottom: 8px;
-  transition: border-color 0.3s;
-}
-
-.search-box:focus-within {
-  border-color: var(--color-primary);
-}
-
-.search-icon {
-  color: var(--color-text-disabled);
-  flex-shrink: 0;
 }
 
 .search-input {
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  color: var(--color-text-primary);
-  outline: none;
   width: 100%;
-  font-family: inherit;
-}
-
-.search-input::placeholder {
-  color: var(--color-text-disabled);
 }
 
 .student-list {
@@ -178,6 +153,11 @@ const toggleStudent = (studentId) => {
   background: var(--color-bg-subtle);
 }
 
+.student-row:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .student-row.selected {
   background: var(--color-selection-bg);
   box-shadow: inset 3px 0 0 var(--color-selection-border);
@@ -188,13 +168,6 @@ const toggleStudent = (studentId) => {
   align-items: center;
   cursor: pointer;
   position: relative;
-}
-
-.checkbox-wrapper input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--color-primary);
 }
 
 .student-name {

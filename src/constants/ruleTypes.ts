@@ -1,0 +1,410 @@
+/**
+ * ruleTypes.ts - 智能排位规则系统常量与元数据
+ * Rules DSL v3 — 完整谓词枚举、权重定义、UI 文本
+ */
+import type { RuleParams, RulePriority as RulePriorityValue } from '@/types/models'
+import { maxSeatGroupCount } from '@/constants/seatConfig'
+
+export interface PredicateOption {
+  value: string | number
+  label: string
+}
+
+export interface PredicateParamSpec {
+  key: string
+  label: string
+  type: 'number' | 'select' | 'zone' | 'attribute'
+  min?: number
+  max?: number
+  integer?: boolean
+  options?: PredicateOption[]
+  default: unknown
+}
+
+export interface PredicateMeta {
+  relation: 'single' | 'pair' | 'ordered_pair'
+  minSubjects: number
+  params: PredicateParamSpec[]
+  ordered?: boolean
+}
+
+// 分层评分会遍历“分层数 × 大组数”，与布局支持的最大大组数保持同一安全上界。
+export const maxRuleBandCount = maxSeatGroupCount
+
+export function getPredicateNumberParamError(
+  value: unknown,
+  spec: PredicateParamSpec
+): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '必须是有限数字'
+  if (spec.integer && !Number.isInteger(value)) return '必须是整数'
+  if (spec.min !== undefined && value < spec.min) return `不能小于 ${spec.min}`
+  if (spec.max !== undefined && value > spec.max) return `不能大于 ${spec.max}`
+  return null
+}
+
+// ==================== 优先级 ====================
+
+export const RulePriority = {
+  REQUIRED: 'required',
+  PREFER: 'prefer',
+  OPTIONAL: 'optional'
+} as const
+
+export const PENALTY_WEIGHTS: Record<RulePriorityValue, number> = {
+  required: 100000,
+  prefer: 1000,
+  optional: 10
+}
+
+export const PRIORITY_LABELS = {
+  required: '必须',
+  prefer: '尽量',
+  optional: '可选'
+}
+
+export const PRIORITY_COLORS = {
+  required: '#ef4444',
+  prefer: '#f59e0b',
+  optional: '#94a3b8'
+}
+
+export const PRIORITY_ICONS = {
+  required: '必',
+  prefer: '优',
+  optional: '选'
+}
+
+// ==================== 主体类型（兼容旧字段展示） ====================
+
+export const SUBJECT_KIND_LABELS = {
+  multi: '多对象',
+  single: '单对象（旧）',
+  dual: '双对象（旧）',
+  student: '单个学生',
+  pair: '学生对',
+  tag: '标签分组',
+  tag_pair: '标签对'
+}
+
+// ==================== 谓词（Predicate） ====================
+
+export const RuleType = {
+  // A. 单人位置谓词
+  IN_ROW_RANGE: 'IN_ROW_RANGE',
+  NOT_IN_COLUMN_TYPE: 'NOT_IN_COLUMN_TYPE',
+  IN_ZONE: 'IN_ZONE',
+  NOT_IN_ZONE: 'NOT_IN_ZONE',
+  IN_GROUP_RANGE: 'IN_GROUP_RANGE',
+
+  // B. 对关系谓词
+  MUST_BE_SEATMATES: 'MUST_BE_SEATMATES',
+  MUST_NOT_BE_SEATMATES: 'MUST_NOT_BE_SEATMATES',
+  DISTANCE_AT_MOST: 'DISTANCE_AT_MOST',
+  DISTANCE_AT_LEAST: 'DISTANCE_AT_LEAST',
+  NOT_BLOCK_VIEW: 'NOT_BLOCK_VIEW',
+  MUST_BE_SAME_GROUP: 'MUST_BE_SAME_GROUP',
+  MUST_NOT_BE_SAME_GROUP: 'MUST_NOT_BE_SAME_GROUP',
+  MUST_BE_ADJACENT_ROW: 'MUST_BE_ADJACENT_ROW',
+
+  // C. 分组分散谓词
+  DISTRIBUTE_EVENLY: 'DISTRIBUTE_EVENLY',
+  CLUSTER_TOGETHER: 'CLUSTER_TOGETHER',
+
+  // D. 数值参考谓词
+  ATTRIBUTE_ROW_GRADIENT: 'ATTRIBUTE_ROW_GRADIENT',
+  ATTRIBUTE_GROUP_BALANCE: 'ATTRIBUTE_GROUP_BALANCE',
+  ATTRIBUTE_PAIR_DELTA: 'ATTRIBUTE_PAIR_DELTA',
+  ATTRIBUTE_DISTRIBUTE_BANDS: 'ATTRIBUTE_DISTRIBUTE_BANDS'
+}
+
+// 谓词中文标签
+export const RULE_TYPE_LABELS: Record<string, string> = {
+  IN_ROW_RANGE: '坐在指定行范围',
+  NOT_IN_COLUMN_TYPE: '不坐在指定列类型',
+  IN_ZONE: '必须在指定分区',
+  NOT_IN_ZONE: '禁止在指定分区',
+  IN_GROUP_RANGE: '坐在指定大组范围',
+  MUST_BE_SEATMATES: '必须同桌',
+  MUST_NOT_BE_SEATMATES: '禁止同桌',
+  DISTANCE_AT_MOST: '距离上限',
+  DISTANCE_AT_LEAST: '距离下限',
+  NOT_BLOCK_VIEW: '不遮挡视线',
+  MUST_BE_SAME_GROUP: '必须同大组',
+  MUST_NOT_BE_SAME_GROUP: '必须不同大组',
+  MUST_BE_ADJACENT_ROW: '必须相邻排',
+  DISTRIBUTE_EVENLY: '均匀分散',
+  CLUSTER_TOGETHER: '聚集在一起',
+  ATTRIBUTE_ROW_GRADIENT: '数值前后梯度',
+  ATTRIBUTE_GROUP_BALANCE: '数值大组均衡',
+  ATTRIBUTE_PAIR_DELTA: '数值差距控制',
+  ATTRIBUTE_DISTRIBUTE_BANDS: '数值分层分散'
+}
+
+// 谓词描述（用于 UI 提示）
+export const RULE_TYPE_DESCRIPTIONS = {
+  IN_ROW_RANGE: '限定坐在第 N～M 排之间（1=最前排）',
+  NOT_IN_COLUMN_TYPE: '避开特定列类型（边缘/过道/中间）',
+  IN_ZONE: '必须坐在指定的选区范围内',
+  NOT_IN_ZONE: '禁止坐在指定的选区范围内',
+  IN_GROUP_RANGE: '限定在第 N～M 大组之间（1=最左组）',
+  MUST_BE_SEATMATES: '对象集合内任意两者必须同桌',
+  MUST_NOT_BE_SEATMATES: '对象集合内任意两者禁止同桌',
+  DISTANCE_AT_MOST: '对象集合内任意两者曼哈顿距离不超过 N',
+  DISTANCE_AT_LEAST: '对象集合内任意两者直线距离至少为 N',
+  NOT_BLOCK_VIEW: '对象集合内前者不可坐在后者的视线正后方',
+  MUST_BE_SAME_GROUP: '对象集合内任意两者必须同一大组',
+  MUST_NOT_BE_SAME_GROUP: '对象集合内任意两者必须不同大组',
+  MUST_BE_ADJACENT_ROW: '对象集合内任意两者在同大组内行数差为 1',
+  DISTRIBUTE_EVENLY: '同标签学生两两之间保持足够距离（直线距离最大化）',
+  CLUSTER_TOGETHER: '同标签学生尽量聚集在同一区域',
+  ATTRIBUTE_ROW_GRADIENT: '按数值从前到后形成梯度，如身高低值靠前',
+  ATTRIBUTE_GROUP_BALANCE: '让各大组的数值均值或总和尽量接近',
+  ATTRIBUTE_PAIR_DELTA: '控制对象集合内两两数值差距',
+  ATTRIBUTE_DISTRIBUTE_BANDS: '按数值分层后均匀分散到各组'
+}
+
+// 谓词元数据：适用对象语义 + 参数规格
+export const PREDICATE_META: Record<string, PredicateMeta> = {
+  IN_ROW_RANGE: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      { key: 'minRow', label: '最前排', type: 'number', min: 1, integer: true, default: 1 },
+      { key: 'maxRow', label: '最后排', type: 'number', min: 1, integer: true, default: 3 }
+    ]
+  },
+  NOT_IN_COLUMN_TYPE: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      {
+        key: 'columnType',
+        label: '列类型',
+        type: 'select',
+        options: [
+          { value: 'edge', label: '边缘列（过道+墙边）' },
+          { value: 'aisle', label: '过道列' },
+          { value: 'wall', label: '墙边列' },
+          { value: 'center', label: '中间列' }
+        ],
+        default: 'aisle'
+      }
+    ]
+  },
+  IN_ZONE: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      { key: 'zoneId', label: '选区', type: 'zone', default: null }
+    ]
+  },
+  NOT_IN_ZONE: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      { key: 'zoneId', label: '选区', type: 'zone', default: null }
+    ]
+  },
+  IN_GROUP_RANGE: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      { key: 'minGroup', label: '最左大组', type: 'number', min: 1, integer: true, default: 1 },
+      { key: 'maxGroup', label: '最右大组', type: 'number', min: 1, integer: true, default: 2 }
+    ]
+  },
+  MUST_BE_SEATMATES: {
+    relation: 'pair',
+    minSubjects: 2,
+    params: []
+  },
+  MUST_NOT_BE_SEATMATES: {
+    relation: 'pair',
+    minSubjects: 2,
+    params: []
+  },
+  DISTANCE_AT_MOST: {
+    relation: 'pair',
+    minSubjects: 2,
+    params: [
+      { key: 'distance', label: '最大距离', type: 'number', min: 1, default: 2 }
+    ]
+  },
+  DISTANCE_AT_LEAST: {
+    relation: 'pair',
+    minSubjects: 2,
+    params: [
+      { key: 'distance', label: '最小距离', type: 'number', min: 1, default: 3 }
+    ]
+  },
+  NOT_BLOCK_VIEW: {
+    relation: 'ordered_pair',
+    minSubjects: 2,
+    params: [
+      {
+        key: 'tolerance',
+        label: '容忍角度',
+        type: 'select',
+        options: [
+          { value: 0, label: '仅正后方（严格）' },
+          { value: 1, label: '正后方±1列（宽松）' }
+        ],
+        default: 0
+      }
+    ],
+    ordered: true // id1 不遮挡 id2（有序）
+  },
+  MUST_BE_SAME_GROUP: {
+    relation: 'pair',
+    minSubjects: 2,
+    params: []
+  },
+  MUST_NOT_BE_SAME_GROUP: {
+    relation: 'pair',
+    minSubjects: 2,
+    params: []
+  },
+  MUST_BE_ADJACENT_ROW: {
+    relation: 'pair',
+    minSubjects: 2,
+    params: []
+  },
+  DISTRIBUTE_EVENLY: {
+    relation: 'single',
+    minSubjects: 1,
+    params: []
+  },
+  CLUSTER_TOGETHER: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      {
+        key: 'scope',
+        label: '聚集范围',
+        type: 'select',
+        options: [
+          { value: 'group', label: '聚集在同一大组' },
+          { value: 'zone', label: '聚集在同一区域' }
+        ],
+        default: 'group'
+      }
+    ]
+  },
+  ATTRIBUTE_ROW_GRADIENT: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      { key: 'attributeId', label: '数值属性', type: 'attribute', default: 'height' },
+      {
+        key: 'direction',
+        label: '方向',
+        type: 'select',
+        options: [
+          { value: 'lowFront', label: '低值靠前' },
+          { value: 'highFront', label: '高值靠前' }
+        ],
+        default: 'lowFront'
+      }
+    ]
+  },
+  ATTRIBUTE_GROUP_BALANCE: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      { key: 'attributeId', label: '数值属性', type: 'attribute', default: 'score' },
+      {
+        key: 'aggregate',
+        label: '均衡目标',
+        type: 'select',
+        options: [
+          { value: 'average', label: '大组平均值' },
+          { value: 'sum', label: '大组合计值' }
+        ],
+        default: 'average'
+      }
+    ]
+  },
+  ATTRIBUTE_PAIR_DELTA: {
+    relation: 'pair',
+    minSubjects: 2,
+    params: [
+      { key: 'attributeId', label: '数值属性', type: 'attribute', default: 'score' },
+      { key: 'maxDelta', label: '最大差值', type: 'number', min: 0, default: 20 }
+    ]
+  },
+  ATTRIBUTE_DISTRIBUTE_BANDS: {
+    relation: 'single',
+    minSubjects: 1,
+    params: [
+      { key: 'attributeId', label: '数值属性', type: 'attribute', default: 'score' },
+      {
+        key: 'bandCount',
+        label: '分层数',
+        type: 'number',
+        min: 2,
+        max: maxRuleBandCount,
+        integer: true,
+        default: 3
+      }
+    ]
+  }
+}
+
+// 列类型标签（用于 UI 显示）
+export const COLUMN_TYPE_LABELS: Record<string, string> = {
+  edge: '边缘列',
+  aisle: '过道列',
+  wall: '墙边列',
+  center: '中间列'
+}
+
+// 分散维度标签
+export const SCOPE_LABELS: Record<string, string> = {
+  group: '大组',
+  row: '排',
+  zone: '区域'
+}
+
+// ==================== 逻辑操作符（多规则组合） ====================
+
+export const LogicOperator = {
+  AND: 'AND',
+  OR: 'OR'
+} as const
+
+export const LOGIC_OPERATOR_LABELS = {
+  AND: '与（全部满足）',
+  OR: '或（满足任一）'
+}
+
+// ==================== 取反修饰符 ====================
+
+export const NOT_LABEL = '非（取反）'
+
+/**
+ * 获取指定谓词适用的主体模式列表（兼容旧调用，内部已切到 relation 语义）
+ */
+export function getCompatibleSubjectModes(predicate: string): Array<'single' | 'dual'> {
+  const relation = PREDICATE_META[predicate]?.relation
+  if (!relation) return []
+  return relation === 'single' ? ['single'] : ['dual']
+}
+
+/**
+ * 获取指定谓词的参数规格
+ */
+export function getPredicateParams(predicate: string): PredicateParamSpec[] {
+  return PREDICATE_META[predicate]?.params ?? []
+}
+
+/**
+ * 生成谓词参数的默认值对象
+ */
+export function getDefaultParams(predicate: string): RuleParams {
+  const params = getPredicateParams(predicate)
+  const result: RuleParams = {}
+  for (const p of params) {
+    result[p.key] = p.default
+  }
+  return result
+}

@@ -155,4 +155,385 @@ describe('assignmentPrecheck', () => {
     expect(result.pass).toBe(true)
     expect(result.blockingReasons.join('\n')).not.toContain('选区容量不足')
   })
+
+  it('warns instead of blocking when a preferred zone rule exceeds capacity', () => {
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      students: [
+        { id: 's1', name: '甲', tags: ['care'] },
+        { id: 's2', name: '乙', tags: ['care'] },
+        { id: 's3', name: '丙', tags: ['care'] }
+      ],
+      zones: [
+        { id: 'front', name: '前排', seatIds: ['seat-0-0-0', 'seat-0-1-0'] }
+      ],
+      activeRules: [
+        {
+          id: 'prefer-front',
+          predicate: 'IN_ZONE',
+          priority: 'prefer',
+          subjects: [{ type: 'tag', id: 'care' }],
+          params: { zoneId: 'front' },
+          name: '照顾标签尽量在前排'
+        }
+      ]
+    })
+
+    expect(result.pass).toBe(true)
+    expect(result.blockingReasons).toEqual([])
+    expect(result.warnings.join('\n')).toContain('需要 3 个座位')
+  })
+
+  it('warns when a detected contradiction includes a non-required rule', () => {
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      students: [{ id: 's1', name: '甲' }],
+      activeRules: [
+        {
+          id: 'required-rule',
+          predicate: 'CUSTOM_REQUIRED',
+          priority: 'required',
+          subjects: [{ type: 'person', id: 's1' }],
+          params: {}
+        },
+        {
+          id: 'prefer-rule',
+          predicate: 'CUSTOM_PREFER',
+          priority: 'prefer',
+          subjects: [{ type: 'person', id: 's1' }],
+          params: {}
+        }
+      ],
+      detectConflicts: () => [{
+        type: 'contradiction',
+        ruleIds: ['required-rule', 'prefer-rule'],
+        message: '必须规则与建议规则冲突'
+      }]
+    })
+
+    expect(result.pass).toBe(true)
+    expect(result.blockingReasons).toEqual([])
+    expect(result.warnings.join('\n')).toContain('必须规则与建议规则冲突')
+  })
+
+  it('blocks when every rule in a detected contradiction is required', () => {
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      students: [{ id: 's1', name: '甲' }],
+      activeRules: [
+        {
+          id: 'required-a',
+          predicate: 'CUSTOM_A',
+          priority: 'required',
+          subjects: [{ type: 'person', id: 's1' }],
+          params: {}
+        },
+        {
+          id: 'required-b',
+          predicate: 'CUSTOM_B',
+          priority: 'required',
+          subjects: [{ type: 'person', id: 's1' }],
+          params: {}
+        }
+      ],
+      detectConflicts: () => [{
+        type: 'contradiction',
+        ruleIds: ['required-a', 'required-b'],
+        message: '两条必须规则冲突'
+      }]
+    })
+
+    expect(result.pass).toBe(false)
+    expect(result.blockingReasons.join('\n')).toContain('两条必须规则冲突')
+  })
+
+  it('checks the complement of a required negated position rule', () => {
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      students: [{ id: 's1', name: '甲' }],
+      activeRules: [{
+        id: 'not-first-group',
+        predicate: 'IN_GROUP_RANGE',
+        not: true,
+        priority: 'required',
+        subjects: [{ type: 'person', id: 's1' }],
+        params: { minGroup: 1, maxGroup: 1 }
+      }]
+    })
+
+    expect(result.pass).toBe(false)
+    expect(result.blockingReasons.join('\n')).toContain('学生位置不可行')
+  })
+
+  it('uses per-group columns and available-seat topology for deskmate feasibility', () => {
+    const topologySeats = [
+      { id: 'seat-0-0-0', groupIndex: 0, columnIndex: 0, rowIndex: 0 },
+      { id: 'seat-0-1-0', groupIndex: 0, columnIndex: 1, rowIndex: 0 }
+    ]
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 1,
+        seatsPerColumn: 1,
+        groups: [{ columns: 2, rows: 1 }]
+      },
+      students: [{ id: 's1', name: '甲' }, { id: 's2', name: '乙' }],
+      activeRules: [{
+        id: 'required-deskmates',
+        predicate: 'MUST_BE_SEATMATES',
+        priority: 'required',
+        subjects: [{ type: 'person', id: 's1' }, { type: 'person', id: 's2' }],
+        params: {}
+      }]
+    })
+
+    expect(result.pass).toBe(true)
+    expect(result.blockingReasons).toEqual([])
+  })
+
+  it('rejects distance two plus deskmates when only adjacent-column pairs exist', () => {
+    const topologySeats = [
+      { id: 'seat-0-0-0', groupIndex: 0, columnIndex: 0, rowIndex: 0 },
+      { id: 'seat-0-1-0', groupIndex: 0, columnIndex: 1, rowIndex: 0 }
+    ]
+    const subjects = [{ type: 'person', id: 's1' }, { type: 'person', id: 's2' }]
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 2,
+        seatsPerColumn: 1,
+        groups: [{ columns: 2, rows: 1 }]
+      },
+      students: [{ id: 's1', name: '甲' }, { id: 's2', name: '乙' }],
+      activeRules: [
+        {
+          id: 'required-deskmates',
+          predicate: 'MUST_BE_SEATMATES',
+          priority: 'required',
+          subjects,
+          params: {}
+        },
+        {
+          id: 'required-distance',
+          predicate: 'DISTANCE_AT_LEAST',
+          priority: 'required',
+          subjects,
+          params: { distance: 2 }
+        }
+      ]
+    })
+
+    expect(result.pass).toBe(false)
+    expect(result.blockingReasons.join('\n')).toContain('无法嵌入当前可用座位拓扑')
+  })
+
+  it('accepts distance two plus deskmates when a two-column-gap pair exists', () => {
+    const topologySeats = Array.from({ length: 3 }, (_, columnIndex) => ({
+      id: `seat-0-${columnIndex}-0`,
+      groupIndex: 0,
+      columnIndex,
+      rowIndex: 0
+    }))
+    const subjects = [{ type: 'person', id: 's1' }, { type: 'person', id: 's2' }]
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 3,
+        seatsPerColumn: 1,
+        groups: [{ columns: 3, rows: 1 }]
+      },
+      students: [{ id: 's1', name: '甲' }, { id: 's2', name: '乙' }],
+      activeRules: [
+        {
+          id: 'required-deskmates',
+          predicate: 'MUST_BE_SEATMATES',
+          priority: 'required',
+          subjects,
+          params: {}
+        },
+        {
+          id: 'required-distance',
+          predicate: 'DISTANCE_AT_LEAST',
+          priority: 'required',
+          subjects,
+          params: { distance: 2 }
+        }
+      ]
+    })
+
+    expect(result.pass).toBe(true)
+    expect(result.blockingReasons).toEqual([])
+  })
+
+  it('rejects deskmate bindings when actual available seats have no deskmate edge', () => {
+    const topologySeats = [
+      { id: 'seat-0-0-0', groupIndex: 0, columnIndex: 0, rowIndex: 0 },
+      { id: 'seat-0-0-1', groupIndex: 0, columnIndex: 0, rowIndex: 1 }
+    ]
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 3,
+        seatsPerColumn: 2,
+        groups: [{ columns: 3, rows: 2 }]
+      },
+      students: [{ id: 's1', name: '甲' }, { id: 's2', name: '乙' }],
+      activeRules: [{
+        id: 'required-deskmates',
+        predicate: 'MUST_BE_SEATMATES',
+        priority: 'required',
+        subjects: [{ type: 'person', id: 's1' }, { type: 'person', id: 's2' }],
+        params: {}
+      }]
+    })
+
+    expect(result.pass).toBe(false)
+    expect(result.blockingReasons.join('\n')).toContain('当前可用座位拓扑')
+  })
+
+  it('rejects a K4 deskmate graph that cannot embed into a five-seat row', () => {
+    const topologySeats = Array.from({ length: 5 }, (_, columnIndex) => ({
+      id: `seat-0-${columnIndex}-0`,
+      groupIndex: 0,
+      columnIndex,
+      rowIndex: 0
+    }))
+    const students = Array.from({ length: 4 }, (_, index) => ({
+      id: `s${index + 1}`,
+      name: `学生${index + 1}`
+    }))
+
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 5,
+        seatsPerColumn: 1,
+        groups: [{ columns: 5, rows: 1 }]
+      },
+      students,
+      activeRules: [{
+        id: 'required-k4',
+        predicate: 'MUST_BE_SEATMATES',
+        priority: 'required',
+        subjects: students.map(student => ({ type: 'person', id: student.id })),
+        params: {}
+      }]
+    })
+
+    expect(result.pass).toBe(false)
+    expect(result.blockingReasons.join('\n')).toContain('无法嵌入当前可用座位拓扑')
+  })
+
+  it('accepts a three-student deskmate triangle on three consecutive seats', () => {
+    const topologySeats = Array.from({ length: 3 }, (_, columnIndex) => ({
+      id: `seat-0-${columnIndex}-0`,
+      groupIndex: 0,
+      columnIndex,
+      rowIndex: 0
+    }))
+    const students = Array.from({ length: 3 }, (_, index) => ({
+      id: `s${index + 1}`,
+      name: `学生${index + 1}`
+    }))
+
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 3,
+        seatsPerColumn: 1,
+        groups: [{ columns: 3, rows: 1 }]
+      },
+      students,
+      activeRules: [{
+        id: 'required-triangle',
+        predicate: 'MUST_BE_SEATMATES',
+        priority: 'required',
+        subjects: students.map(student => ({ type: 'person', id: student.id })),
+        params: {}
+      }]
+    })
+
+    expect(result.pass).toBe(true)
+    expect(result.blockingReasons).toEqual([])
+  })
+
+  it('warns instead of blocking when deskmate embedding reaches its search budget', () => {
+    const topologySeats = Array.from({ length: 5 }, (_, columnIndex) => ({
+      id: `seat-0-${columnIndex}-0`,
+      groupIndex: 0,
+      columnIndex,
+      rowIndex: 0
+    }))
+    const students = Array.from({ length: 4 }, (_, index) => ({
+      id: `s${index + 1}`,
+      name: `学生${index + 1}`
+    }))
+
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      seats: topologySeats,
+      availableSeats: topologySeats,
+      seatConfig: {
+        groupCount: 1,
+        columnsPerGroup: 5,
+        seatsPerColumn: 1,
+        groups: [{ columns: 5, rows: 1 }]
+      },
+      students,
+      deskmateEmbeddingNodeLimit: 1,
+      activeRules: [{
+        id: 'required-k4',
+        predicate: 'MUST_BE_SEATMATES',
+        priority: 'required',
+        subjects: students.map(student => ({ type: 'person', id: student.id })),
+        params: {}
+      }]
+    })
+
+    expect(result.pass).toBe(true)
+    expect(result.warnings.join('\n')).toContain('搜索达到预算上限')
+  })
+
+  it('maps expanded AND subrule conflict IDs back to the parent priority', () => {
+    const result = createAssignmentPrecheck({
+      ...baseInput,
+      students: [{ id: 's1', name: '甲' }, { id: 's2', name: '乙' }],
+      activeRules: [{
+        id: 'required-composite',
+        priority: 'required',
+        subjects: [{ type: 'person', id: 's1' }, { type: 'person', id: 's2' }],
+        logicOperator: 'AND',
+        subRules: [
+          { predicate: 'MUST_BE_SAME_GROUP', params: {} },
+          { predicate: 'MUST_NOT_BE_SAME_GROUP', params: {} }
+        ]
+      }],
+      detectConflicts: () => [{
+        type: 'contradiction',
+        ruleIds: ['required-composite:0', 'required-composite:1'],
+        message: '复合规则子条件冲突'
+      }]
+    })
+
+    expect(result.pass).toBe(false)
+    expect(result.blockingReasons.join('\n')).toContain('复合规则子条件冲突')
+  })
 })

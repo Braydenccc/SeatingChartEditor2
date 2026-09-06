@@ -2,10 +2,10 @@
   <div class="zone-list-container">
     <div class="zone-list-header">
       <h4>选区列表</h4>
-      <button class="add-zone-btn" @click="handleAddZone"><Plus :size="11" stroke-width="2" /> 添加选区</button>
+      <NButton size="small" type="primary" secondary @click="handleAddZone"><Plus :size="11" stroke-width="2" /> 添加选区</NButton>
     </div>
 
-    <div class="zone-list-content">
+    <div class="zone-list-content" role="list">
       <ZoneItem
         v-for="zone in zones"
         :key="zone.id"
@@ -28,13 +28,17 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { Plus } from 'lucide-vue-next'
+import ZoneItem from './ZoneItem.vue'
 import { useZoneData } from '@/composables/useZoneData'
 import { useTagData } from '@/composables/useTagData'
-import { useEditMode, EditMode } from '@/composables/useEditMode'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
-import { useZoneRotation } from '@/composables/useZoneRotation'
+import { useEditorCommands } from '@/composables/useEditorCommands'
+import { useUiFeedback } from '@/composables/useLogger'
+import { showRuleReferenceBlockFeedback } from '@/utils/ruleReferenceFeedback'
+import type { Zone } from '@/types/models'
 
 const {
   zones,
@@ -45,29 +49,26 @@ const {
   addTagToZone,
   removeTagFromZone,
   getZoneColor,
-  selectZone,
-  clearZoneSelection,
   toggleZoneVisible
 } = useZoneData()
 
 const { tags } = useTagData()
-const { setMode } = useEditMode()
-const { activeWorkbenchDialog, startZoneEditSession } = useEditorWorkbench()
-const { clearEditingZone } = useZoneRotation()
+const { activeWorkbenchDialog } = useEditorWorkbench()
+const { finishZoneEditing, startGlobalZoneEditing } = useEditorCommands()
+const uiFeedback = useUiFeedback()
 
-const startGlobalZoneEdit = (zoneId) => {
+const startGlobalZoneEdit = (zoneId: number) => {
   const zone = zones.value.find(item => item.id === zoneId)
-  clearEditingZone()
-  selectZone(zoneId)
-  setMode(EditMode.ZONE_EDIT)
-  if (activeWorkbenchDialog.value !== 'assignment') return
-  startZoneEditSession({
-    kind: 'assignment',
-    sourceDialog: 'assignment',
-    zoneId,
-    title: zone?.name || `选区 ${zoneId}`,
-    subtitle: '在座位表上点击座位，将其加入或移出当前排位选区'
-  })
+  const session = activeWorkbenchDialog.value === 'assignment'
+    ? {
+        kind: 'assignment' as const,
+        sourceDialog: 'assignment' as const,
+        zoneId,
+        title: zone?.name || `选区 ${zoneId}`,
+        subtitle: '在座位表上点击座位，将其加入或移出当前排位选区'
+      }
+    : undefined
+  startGlobalZoneEditing(zoneId, session)
 }
 
 // 添加选区
@@ -77,43 +78,54 @@ const handleAddZone = () => {
 }
 
 // 选择选区
-const handleSelectZone = (zoneId) => {
+const handleSelectZone = (zoneId: number) => {
   if (selectedZoneId.value === zoneId) {
     // 取消选中,退出选区编辑模式
-    clearZoneSelection()
-    setMode(EditMode.NORMAL)
+    finishZoneEditing()
   } else {
     startGlobalZoneEdit(zoneId)
   }
 }
 
 // 更新选区
-const handleUpdateZone = (zoneId, updates) => {
+const handleUpdateZone = (zoneId: number, updates: Partial<Zone>) => {
   updateZone(zoneId, updates)
 }
 
 // 删除选区
-const handleDeleteZone = (zoneId) => {
+const handleDeleteZone = (zoneId: number) => {
   const wasSelected = selectedZoneId.value === zoneId
-  deleteZone(zoneId)
+  const zone = zones.value.find(item => item.id === zoneId)
+  const deletion = deleteZone(zoneId)
+  if (!deletion.success && deletion.reason === 'referenced-by-rules') {
+    showRuleReferenceBlockFeedback(
+      uiFeedback,
+      '无法删除选区',
+      `选区“${zone?.name || '未命名'}”`,
+      deletion.references
+    )
+    return
+  }
+  if (!deletion.success) return
+  uiFeedback.success(`已成功删除选区“${zone?.name || '未命名'}”`)
   // 如果删除的是当前选中的选区,退出选区编辑模式
   if (wasSelected) {
-    setMode(EditMode.NORMAL)
+    finishZoneEditing()
   }
 }
 
 // 为选区添加标签
-const handleAddTag = (zoneId, tagId) => {
+const handleAddTag = (zoneId: number, tagId: number) => {
   addTagToZone(zoneId, tagId)
 }
 
 // 从选区移除标签
-const handleRemoveTag = (zoneId, tagId) => {
+const handleRemoveTag = (zoneId: number, tagId: number) => {
   removeTagFromZone(zoneId, tagId)
 }
 
 // 切换选区可见性
-const handleToggleVisible = (zoneId) => {
+const handleToggleVisible = (zoneId: number) => {
   toggleZoneVisible(zoneId)
 }
 </script>
@@ -137,24 +149,6 @@ const handleToggleVisible = (zoneId) => {
   font-size: 15px;
   font-weight: 600;
   color: var(--color-primary);
-}
-
-.add-zone-btn {
-  padding: 6px 12px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.add-zone-btn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-bg-secondary);
 }
 
 .zone-list-content {
@@ -207,9 +201,5 @@ const handleToggleVisible = (zoneId) => {
     font-size: 14px;
   }
 
-  .add-zone-btn {
-    font-size: 11px;
-    padding: 5px 10px;
-  }
 }
 </style>

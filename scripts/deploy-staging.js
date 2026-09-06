@@ -20,6 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -102,6 +103,37 @@ function shouldSkip(filePath) {
   return /\.(exe|docx?|pptx?|xlsx?|jsx|tsx?|less|scss|sass)$/i.test(filePath)
     || ['bun.lock', 'bun.lockb', 'package.json', 'package-lock.json',
         'pnpm-lock.yaml', 'tsconfig.json', 'yarn.lock'].includes(path.basename(filePath));
+}
+
+/** Keep all entry documents behind their supporting assets while preserving relative order. */
+export function orderDeploymentUploads(uploads) {
+  const regularFiles = [];
+  const entryFiles = [];
+
+  for (const upload of uploads) {
+    const normalizedPath = upload.localFile.replaceAll('\\', '/');
+    const fileName = normalizedPath.slice(normalizedPath.lastIndexOf('/') + 1).toLowerCase();
+    (fileName === 'index.html' ? entryFiles : regularFiles).push(upload);
+  }
+
+  return [...regularFiles, ...entryFiles];
+}
+
+/** Execute an already-built deployment plan. Cleanup is deliberately the final operation. */
+export async function executeDeploymentPlan({
+  uploads,
+  staleKeys,
+  cleanupEnabled,
+  uploadFile,
+  deleteStaleFiles,
+}) {
+  for (const upload of orderDeploymentUploads(uploads)) {
+    await uploadFile(upload);
+  }
+
+  if (cleanupEnabled && staleKeys.size > 0) {
+    await deleteStaleFiles(staleKeys);
+  }
 }
 
 // ─── Retiehe API ──────────────────────────────────────────────────────────────
@@ -271,6 +303,7 @@ async function main() {
     fallbackMode = true;
   }
 
+  let staleRemoteKeys = new Set();
   if (!fallbackMode) {
     // Build sets of remote keys that belong to our deployPath scope
     // Key format in Retiehe: e.g. "test/index.html", "test/assets/main.js"
@@ -283,19 +316,12 @@ async function main() {
       localFiles.map((f) => (prefixSlash ? `${prefixSlash}${f}` : f)),
     );
 
-    // 5. Delete remote files that no longer exist locally (within scope)
-    const toDelete = new Set([...remoteKeysInScope].filter((k) => !expectedRemoteKeys.has(k)));
-    if (toDelete.size > 0) {
-      console.log(`Deleting ${toDelete.size} stale remote file(s) within "${prefix || '/'}"...`);
-      for (const k of toDelete) console.log('  Delete:', k);
-      await deleteRemoteFiles(site, username, toDelete);
-      console.log('Stale files deleted.');
-    } else {
-      console.log('No stale files to delete.');
-    }
+    // 5. Record remote files that no longer exist locally. Cleanup happens after all uploads.
+    staleRemoteKeys = new Set([...remoteKeysInScope].filter((k) => !expectedRemoteKeys.has(k)));
   }
 
-  // 6. Upload new / changed files
+  // 6. Build the complete upload plan before changing the remote site.
+  const uploadPlan = [];
   for (const localFile of localFiles) {
     if (shouldSkip(localFile)) {
       console.log('Skipped (not for browsers):', localFile);
@@ -324,21 +350,50 @@ async function main() {
       }
     }
 
-    console.log('Uploading:', remoteKey);
+    uploadPlan.push({
+      localFile,
+      localPath,
+      remoteKey,
+      text: isTextFile(localFile),
+    });
+  }
 
-    if (isTextFile(localFile)) {
-      // Text files: use single-file string upload (mirrors rth-cli.js watch mode la())
-      await uploadTextFile(site, username, remoteKey, fs.readFileSync(localPath, 'utf8'));
-    } else {
-      // Binary / compressed files: multipart upload
-      await uploadBinaryFile(site, username, remoteKey, localPath);
-    }
+  // 7. Upload supporting assets first, switch entry documents last, then clean stale files.
+  await executeDeploymentPlan({
+    uploads: uploadPlan,
+    staleKeys: staleRemoteKeys,
+    cleanupEnabled: !fallbackMode,
+    uploadFile: async ({ localPath, remoteKey, text }) => {
+      console.log('Uploading:', remoteKey);
+      if (text) {
+        // Text files: use single-file string upload (mirrors rth-cli.js watch mode la())
+        await uploadTextFile(site, username, remoteKey, fs.readFileSync(localPath, 'utf8'));
+      } else {
+        // Binary / compressed files: multipart upload
+        await uploadBinaryFile(site, username, remoteKey, localPath);
+      }
+    },
+    deleteStaleFiles: async (keys) => {
+      console.log(`Deleting ${keys.size} stale remote file(s) within "${prefix || '/'}"...`);
+      for (const key of keys) console.log('  Delete:', key);
+      await deleteRemoteFiles(site, username, keys);
+      console.log('Stale files deleted.');
+    },
+  });
+
+  if (!fallbackMode && staleRemoteKeys.size === 0) {
+    console.log('No stale files to delete.');
   }
 
   console.log('Done.');
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+const isMainModule = process.argv[1]
+  && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
+}

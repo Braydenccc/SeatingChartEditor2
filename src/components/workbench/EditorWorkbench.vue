@@ -17,9 +17,11 @@
 
     <aside class="context-rail">
       <div v-if="!zoneEditSession" class="rail-tabs">
-        <button :class="{ active: rightRailTab === 'selection' }" @click="setRightRailTab('selection')">上下文</button>
-        <button :class="{ active: rightRailTab === 'candidates' }" @click="setRightRailTab('candidates')">学生</button>
-        <button :class="{ active: rightRailTab === 'activity' }" @click="setRightRailTab('activity')">状态</button>
+        <NTabs :value="rightRailTab" type="segment" size="small" @update:value="setRightRailTab">
+          <NTabPane name="selection" tab="上下文" />
+          <NTabPane name="candidates" tab="学生" />
+          <NTabPane name="activity" tab="状态" />
+        </NTabs>
       </div>
       <div class="rail-content">
         <ZoneEditContextPanel v-if="zoneEditSession" />
@@ -40,40 +42,56 @@
       <span>拖到此处移出学生</span>
     </div>
 
-    <Transition :name="suspendedMobileDrawer ? '' : 'drawer'">
-      <div
-        v-if="activeMobileSheet"
-        class="mobile-drawer-shell"
-        :class="{ 'is-drag-suspended': suspendedMobileDrawer }"
+    <NDrawer
+      :show="mobileDrawerVisible"
+      to=".chart-region"
+      placement="bottom"
+      height="min(68dvh, calc(100% - 8px))"
+      display-directive="show"
+      :z-index="999"
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="mobileDrawerTitleId"
+      @mask-click="closeMobileSheet"
+      @esc="closeMobileSheet"
+      @update:show="value => !value && mobileDrawerVisible && closeMobileSheet()"
+    >
+      <NDrawerContent
+        closable
+        :body-style="{ minHeight: 0, overflow: 'hidden' }"
+        :body-content-style="{ height: '100%', padding: 0, overflow: 'hidden' }"
+        @close="closeMobileDrawer"
       >
-        <div
-          class="mobile-drawer-header"
+        <template #header>
+          <strong
+          :id="mobileDrawerTitleId"
+          class="mobile-drawer-title"
           @pointerdown="handleDrawerPointerDown"
           @pointermove="handleDrawerPointerMove"
           @pointerup="handleDrawerPointerUp"
           @pointercancel="handleDrawerPointerCancel"
         >
-          <strong>{{ mobileDrawerTitle }}</strong>
-          <button type="button" @pointerdown.stop @click.stop="closeMobileDrawer">关闭</button>
-        </div>
+            {{ mobileDrawerTitle }}
+          </strong>
+        </template>
         <div class="mobile-drawer-body">
           <ZoneEditContextPanel v-if="zoneEditSession" />
           <ContextInspector v-else-if="mobileSheet === 'context'" />
           <StudentPoolPanel v-else-if="mobileSheet === 'candidates'" />
           <MobileToolsPanel v-else-if="mobileSheet === 'tools'" />
         </div>
-      </div>
-    </Transition>
-
-    <div v-if="activeMobileSheet && !suspendedMobileDrawer" class="mobile-drawer-backdrop" @click="closeMobileSheet"></div>
+      </NDrawerContent>
+    </NDrawer>
 
     <WorkbenchDialogs />
   </div>
 </template>
 
-<script setup>
-import { computed } from 'vue'
+<script setup lang="ts">
+import { computed, useId } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
+import { mobileWorkbenchMediaQuery } from '@/constants/layout'
+import { NDrawer, NDrawerContent, NTabPane, NTabs } from 'naive-ui'
 import { LogOut } from 'lucide-vue-next'
 import SeatChart from '@/components/seat/SeatChart.vue'
 import ActivityPanel from './ActivityPanel.vue'
@@ -87,7 +105,8 @@ import { useDragState } from '@/composables/useDragState'
 import { useEditorWorkbench } from '@/composables/useEditorWorkbench'
 
 const isWideDesktop = useMediaQuery('(min-width: 1440px)')
-const isMobileWorkbench = useMediaQuery('(max-width: 1024px)')
+const mobileDrawerTitleId = `${useId()}-mobile-drawer-title`
+const isMobileWorkbench = useMediaQuery(mobileWorkbenchMediaQuery)
 const isLandscape = useMediaQuery('(orientation: landscape)')
 const {
   rightRailTab,
@@ -108,6 +127,7 @@ const activeMobileSheet = computed(() => {
   if (isFullscreenLandscape.value && mobileSheet.value === 'candidates') return null
   return mobileSheet.value
 })
+const mobileDrawerVisible = computed(() => Boolean(activeMobileSheet.value) && !suspendedMobileDrawer.value)
 
 const mobileDrawerTitle = computed(() => {
   const titles = {
@@ -116,22 +136,25 @@ const mobileDrawerTitle = computed(() => {
     selection: '上下文',
     tools: '工具'
   }
-  return titles[mobileSheet.value] || titles[mobileDrawer.value] || ''
+  const sheet = mobileSheet.value
+  if (sheet) return titles[sheet]
+  const drawer = mobileDrawer.value
+  return drawer ? titles[drawer] : ''
 })
 
 let drawerStartY = 0
 let drawerDragY = 0
 let isDrawerDragging = false
 
-const handleDrawerPointerDown = (e) => {
+const handleDrawerPointerDown = (e: PointerEvent) => {
   if (e.pointerType !== 'touch') return
   isDrawerDragging = true
   drawerStartY = e.clientY
   drawerDragY = 0
-  e.currentTarget.setPointerCapture?.(e.pointerId)
+  if (e.currentTarget instanceof Element) e.currentTarget.setPointerCapture?.(e.pointerId)
 }
 
-const handleDrawerPointerMove = (e) => {
+const handleDrawerPointerMove = (e: PointerEvent) => {
   if (!isDrawerDragging) return
   drawerDragY = e.clientY - drawerStartY
 }
@@ -167,6 +190,7 @@ const handleDrawerPointerCancel = () => {
   min-width: 0;
   min-height: 0;
   background: var(--color-surface);
+  position: relative;
   overflow: hidden;
 }
 
@@ -203,11 +227,6 @@ const handleDrawerPointerCancel = () => {
   grid-row: 2;
 }
 
-.mobile-drawer-backdrop,
-.mobile-drawer-shell {
-  display: none;
-}
-
 @media (max-width: 1439px) and (min-width: 1025px) {
   .editor-workbench {
     grid-template-columns: minmax(0, 1fr) 340px;
@@ -222,31 +241,13 @@ const handleDrawerPointerCancel = () => {
   }
 
   .rail-tabs {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
+    display: block;
     padding: 8px;
     border-bottom: 1px solid var(--color-border);
     background: var(--color-bg-secondary);
     flex-shrink: 0;
   }
 
-  .rail-tabs button {
-    min-height: 32px;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    cursor: pointer;
-  }
-
-  .rail-tabs button.active {
-    background: var(--color-surface);
-    color: var(--color-primary);
-    font-weight: 600;
-    box-shadow: var(--shadow-sm);
-  }
 }
 
 .editor-workbench.zone-editing {
@@ -260,7 +261,6 @@ const handleDrawerPointerCancel = () => {
 @media (max-width: 1024px) {
   .editor-workbench {
     --mobile-tool-dock-height: calc(56px + env(safe-area-inset-bottom, 0px));
-    --mobile-drawer-limit: calc(100dvh - var(--app-header-height, 78px) - var(--mobile-tool-dock-height) - 8px);
     display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) var(--mobile-tool-dock-height);
@@ -294,7 +294,6 @@ const handleDrawerPointerCancel = () => {
   }
 
   .editor-workbench.seat-fullscreen {
-    --mobile-drawer-limit: calc(100dvh - var(--mobile-tool-dock-height) - 8px);
     display: grid;
     position: fixed;
     inset: 0;
@@ -307,10 +306,6 @@ const handleDrawerPointerCancel = () => {
     min-height: 100dvh;
     max-height: none;
     background: var(--color-bg-secondary);
-  }
-
-  .editor-workbench.seat-fullscreen .mobile-drawer-backdrop {
-    inset: 0 0 var(--mobile-tool-dock-height) 0;
   }
 
   .editor-workbench.seat-fullscreen.fullscreen-landscape {
@@ -339,14 +334,6 @@ const handleDrawerPointerCancel = () => {
   .editor-workbench.seat-fullscreen.fullscreen-landscape .tool-dock {
     grid-column: 1;
     grid-row: 2;
-  }
-
-  .mobile-drawer-backdrop {
-    display: block;
-    position: fixed;
-    inset: var(--app-header-height, 0px) 0 var(--mobile-tool-dock-height) 0;
-    z-index: 998;
-    background: var(--color-bg-overlay);
   }
 
   .seat-touch-drop-out-zone {
@@ -378,37 +365,6 @@ const handleDrawerPointerCancel = () => {
     transform: translateY(-2px);
   }
 
-  .mobile-drawer-shell {
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: var(--mobile-tool-dock-height);
-    z-index: 999;
-    max-height: min(68vh, var(--mobile-drawer-limit));
-    min-height: min(240px, var(--mobile-drawer-limit));
-    background: var(--color-surface);
-    border-top: 1px solid var(--color-border);
-    border-radius: 10px 10px 0 0;
-    box-shadow: var(--shadow-lg);
-    overflow: hidden;
-    transition: transform 0.2s ease, opacity 0.16s ease;
-  }
-
-  .mobile-drawer-shell:has(.mobile-drawer-body :focus) {
-    max-height: min(78vh, var(--mobile-drawer-limit));
-  }
-
-  .mobile-drawer-shell.is-drag-suspended {
-    transform: none;
-    opacity: 0;
-    visibility: hidden;
-    box-shadow: none;
-    pointer-events: none;
-    transition: none !important;
-  }
-
   :global(body.student-dragging-from-candidate) .editor-workbench {
     grid-template-rows: minmax(0, 1fr) var(--mobile-tool-dock-height);
   }
@@ -421,30 +377,13 @@ const handleDrawerPointerCancel = () => {
     display: none;
   }
 
-  .mobile-drawer-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 44px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--color-border);
-    flex-shrink: 0;
-  }
-
-  .mobile-drawer-header strong {
+  .mobile-drawer-title {
+    display: block;
+    width: 100%;
+    min-width: 0;
     color: var(--color-text-primary);
     font-size: 14px;
-  }
-
-  .mobile-drawer-header button {
-    min-height: 34px;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: var(--color-bg-subtle);
-    color: var(--color-primary);
-    padding: 0 10px;
-    font-size: 13px;
-    cursor: pointer;
+    touch-action: none;
   }
 
   .mobile-drawer-body {
@@ -469,14 +408,4 @@ const handleDrawerPointerCancel = () => {
   }
 }
 
-.drawer-enter-active,
-.drawer-leave-active {
-  transition: transform 0.24s ease, opacity 0.2s ease;
-}
-
-.drawer-enter-from,
-.drawer-leave-to {
-  transform: translateY(100%);
-  opacity: 0;
-}
 </style>

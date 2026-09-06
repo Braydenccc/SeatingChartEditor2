@@ -31,7 +31,7 @@
             <span class="in-row-text">{{ renderRuleText(item.rule) }}</span>
             <span v-if="item.reason" class="in-row-reason">{{ item.reason }}</span>
             <div class="in-row-actions">
-              <button class="in-action-btn" @click="emit('focus-rule', item)">定位规则</button>
+              <NButton size="tiny" type="primary" secondary @click="emit('focus-rule', item)">定位规则</NButton>
             </div>
           </div>
         </div>
@@ -39,11 +39,18 @@
     </div>
     
     <div class="in-report-body" v-if="satisfiedRules.length > 0">
-        <div class="in-group-header toggle-btn" @click="showSatisfied = !showSatisfied">
+        <NButton
+          class="in-group-header toggle-btn"
+          text
+          block
+          :aria-expanded="showSatisfied"
+          aria-controls="assignment-satisfied-rules"
+          @click="showSatisfied = !showSatisfied"
+        >
           已满足的规则 ({{ satisfiedRules.length }})
           <ChevronDown :size="14" stroke-width="2" :style="{ transform: showSatisfied ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }" />
-        </div>
-      <div class="in-rule-rows" v-show="showSatisfied">
+        </NButton>
+      <div id="assignment-satisfied-rules" class="in-rule-rows" v-show="showSatisfied">
         <div v-for="rule in satisfiedRules" :key="rule.id" class="in-rule-row ok">
           <Check :size="14" stroke-width="2" />
           <div class="in-row-content">
@@ -60,7 +67,8 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { ref, computed } from 'vue'
 import { AlertTriangle, Check, ChevronDown, CircleAlert, CircleX, ShieldCheck } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
@@ -193,13 +201,19 @@ const gradeIconComponent = computed(() => {
 .in-group-header.toggle-btn {
   cursor: pointer;
   display: flex;
+  width: 100%;
   justify-content: space-between;
   align-items: center;
+  border-radius: 0;
   user-select: none;
   transition: background 0.15s;
 }
 .in-group-header.toggle-btn:hover {
   background: var(--color-bg-subtle);
+}
+.in-group-header.toggle-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 /* .toggle-icon: replaced by ChevronDown component */
 
@@ -252,23 +266,6 @@ const gradeIconComponent = computed(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.in-action-btn {
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-
-.in-action-btn.primary {
-  border-color: var(--color-info-text);
-  background: var(--color-info-bg);
-  color: var(--color-info);
 }
 
 .in-no-rules-tip {

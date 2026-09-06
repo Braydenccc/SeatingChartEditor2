@@ -16,9 +16,9 @@ This file provides guidance to Codex when working with code in this repository.
 - 不自动创建 Git 提交、分支、PR 或 GitHub Issue，除非用户明确要求。
 - 执行 Bug 修复任务时使用 `.agents/skills/bugfix/SKILL.md`。
 
-# 多 Agent 共享指南
+# Agent 项目指南
 
-本文件是本项目 agent 文档的公共真源。`AGENTS.md`、`CLAUDE.md`、`.trae/rules/project-architecture.md` 等入口文档应由 `npm run docs:sync` 生成或同步，不要手动维护多份完整规则。
+本文件是本项目 Agent 规则的公共真源。根目录 `AGENTS.md` 应由 `npm run docs:sync` 生成，不要直接维护生成文件。
 
 ## 开发命令
 
@@ -32,7 +32,7 @@ This file provides guidance to Codex when working with code in this repository.
 | `npm run build:desktop:win` | 构建 Tauri Windows 安装包（NSIS/MSI） |
 | `npm run build:test` | 构建测试环境版本，会临时 patch 指定文件并自动还原 |
 | `npm run preview` | 预览构建结果 |
-| `npm run deploy:main` | 合并到 `main` 并推送生产分支 |
+| `npm run deploy:main` | 通过安全快进检查和精确 lease，将当前提交推送到 `origin/main`；不切换或合并本地 `main` |
 | `npm run test` | 运行 Vitest watch 模式 |
 | `npm run test:run` | 运行 Vitest 单次测试 |
 | `npm run test:coverage` | 生成覆盖率报告 |
@@ -43,7 +43,7 @@ This file provides guidance to Codex when working with code in this repository.
 | `npm run version:timestamp` | 按当前 UTC 时间同步发布、SemVer 与 MSI 版本 |
 | `npm run version:check` | 检查各版本文件是否来自同一时间戳 |
 
-Node.js >= 20.0.0。项目没有统一 linter/formatter；单元与组件测试使用 Vitest + happy-dom，浏览器流程测试使用 Playwright。
+Node.js `^20.19.0 || >=22.12.0`。项目没有统一 linter/formatter；单元与组件测试使用 Vitest + happy-dom，浏览器流程测试使用 Playwright。
 
 ## 版本规则
 
@@ -54,16 +54,18 @@ Node.js >= 20.0.0。项目没有统一 linter/formatter；单元与组件测试�
 本项目是 Vue 3 + Vite 的教室座位表编辑器，支持 Web、Tauri 桌面端和 Retinbox Web Hosting。当前应用使用 `vue-router` 的 hash 路由，不再是无路由单页结构。
 
 ```text
-src/main.js
+src/main.ts
 └── src/App.vue
-    ├── RouterView
-    ├── GlobalDropZone
-    ├── LoginDialog
-    └── CloudWorkspaceDialog
+    └── AppUiProvider
+        ├── RouterView
+        ├── GlobalDropZone
+        ├── LoginDialog
+        └── CloudWorkspaceDialog
 
 src/router/index.ts
 ├── /editor   -> src/views/EditorView.vue
 ├── /files    -> src/views/FilesView.vue
+├── /user     -> src/views/UserView.vue
 ├── /students -> src/views/StudentsView.vue
 ├── /export   -> src/views/ExportView.vue
 └── /settings -> src/views/SettingsView.vue
@@ -91,6 +93,7 @@ EditorView.vue
 - `useTagData`：学生标签系统
 - `useZoneData`：座位分区管理
 - `useEditMode`：编辑模式状态机
+- `useEditorCommands`：跨编辑模式、选区、工作台弹层和区域编辑的协调入口
 - `useEditorWorkbench`：编辑工作台右栏、移动抽屉、区域编辑会话状态
 - `useDragState` / `useStudentDragging`：拖拽分配
 - `useDragPreview`：拖拽预览效果
@@ -107,6 +110,8 @@ EditorView.vue
 - `useImageExport`：导出高清 PNG
 - `useExcelData`：Excel 导入导出
 - `useExportSettings`：导出配置
+- `useGlobalSettings`：全局主题和界面设置唯一真源，负责迁移、即时生效和防抖持久化
+- `useLogger` / `useUiFeedback`：活动日志、消息、确认对话框和长任务反馈
 
 ## 座位数据结构
 
@@ -134,7 +139,12 @@ EditorView.vue
 - 不自动运行 `npm run dev`、`npm run build`、`npm run build:web`、`npm run build:desktop`、`npm run build:test`，除非用户明确要求。
 - 图标统一使用 `lucide-vue-next`，按需具名导入，通过 `:size` prop 控制尺寸；禁止内联 SVG 和 Unicode 字符充当图标。
 - CSS 颜色必须使用 `var(--color-*)` 变量；不要在组件中硬编码十六进制、RGB 或 RGBA 颜色。颜色变量定义在 `src/assets/main.css`。
-- 新文件优先使用 `.ts`，类型定义放在 `src/types/`。当前迁移仍是 JS/TS 混合，引用文件时以实际存在路径为准。
+- `src` 只使用 TypeScript；Vue 脚本必须声明 `lang="ts"`，领域类型放在 `src/types/`，外部 JSON/API 数据先按 `unknown` 校验。
+- 通用按钮、表单、列表、导航、反馈和弹层使用 Naive UI 并显式具名导入；座位画布、学生卡片、拖拽预览和导出渲染保留自定义 DOM。
+- 根级 UI API 只能由 `AppUiProvider` / `UiApiBridge` 注册。业务代码通过 `useUiFeedback` 使用 Message、Dialog 和 Loading，不重复创建离散 API。
+- 全局界面设置通过 `useGlobalSettings` 即改即存；会修改工作区数据的配置必须保留草稿、应用按钮、确认和撤销/自动保存流程。
+- 通用弹层使用 `ResponsiveOverlay`：桌面为 Modal，移动为底部 Drawer。编辑器移动面板使用 Naive `NDrawer`，不得恢复旧手写抽屉壳。
+- 不用全局 `button/input` 选择器或 Naive UI 内部 DOM 选择器修改控件 padding、宽高和字体，避免旧新样式叠加；移动端触控尺寸作用于组件根节点。
 - 组件使用 PascalCase，Composable 使用 camelCase + `use` 前缀，常量使用 camelCase。
 - 禁止直接修改 `dist/`；所有修改应在源文件中完成。
 - 临时测试脚本放在 `test-scr/`，不要放在 `public/` 或 `src/`。
@@ -155,6 +165,7 @@ EditorView.vue
 - `.agents/features/07-cloud-sync.md`
 - `.agents/features/08-export-system.md`
 - `.agents/features/09-security-enhancements.md`
+- `.agents/features/10-admin-api.md`
 - `.agents/rules/项目规范.md`
 - `.agents/rules/学生卡片外观规范.md`
 
@@ -165,9 +176,6 @@ EditorView.vue
 - `.agents/retiehe_web_host/SKILL.md`
 - `.agents/retiehe_web_host/references/REFERENCE.md`
 - `.agents/rules/Retinbox Web Hosting Documentation.md`
-- `.trae/rules/rth-php-functions.md`
-- `.trae/rules/rth-database.md`
-- `.trae/rules/rth-overview.md`
 
 关键规则：
 

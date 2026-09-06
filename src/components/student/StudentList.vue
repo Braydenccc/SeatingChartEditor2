@@ -35,19 +35,19 @@
 
         <!-- 操作按钮组 -->
         <div class="empty-actions">
-          <button class="empty-action-btn outline" type="button" @click="goFilesView">
-            <FolderOpen :size="16" stroke-width="2" />
+          <NButton class="empty-action-btn" secondary block attr-type="button" @click="goFilesView">
+            <template #icon><FolderOpen :size="16" stroke-width="2" /></template>
             <span>到文件页导入</span>
-          </button>
+          </NButton>
           <div class="empty-action-row">
-            <button class="empty-action-btn outline" @click="handleLoadWorkspace">
-              <FolderOpen :size="14" stroke-width="2" />
+            <NButton class="empty-action-btn" secondary @click="handleLoadWorkspace">
+              <template #icon><FolderOpen :size="14" stroke-width="2" /></template>
               <span>本地工作区</span>
-            </button>
-            <button class="empty-action-btn outline" :title="cloudLoadTitle" @click="openCloudLoad">
-              <CloudDownload :size="14" stroke-width="2" />
+            </NButton>
+            <NButton class="empty-action-btn" secondary :title="cloudLoadTitle" @click="openCloudLoad">
+              <template #icon><CloudDownload :size="14" stroke-width="2" /></template>
               <span>{{ cloudLoadLabel }}</span>
-            </button>
+            </NButton>
           </div>
         </div>
       </div>
@@ -94,7 +94,8 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import { computed, ref, defineAsyncComponent, onMounted, onUnmounted, watch } from 'vue'
 import { useWindowSize } from '@vueuse/core'
@@ -110,26 +111,19 @@ import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useAuth } from '@/composables/useAuth'
 
 const StudentEditDialog = defineAsyncComponent(() => import('./StudentEditDialog.vue'))
-const props = defineProps({
-  displayMode: {
-    type: String,
-    default: 'grid'
-  },
-  filterMode: {
-    type: String,
-    default: 'unassigned'
-  },
-  searchText: {
-    type: String,
-    default: ''
-  },
-  activeTagIds: {
-    type: Array,
-    default: () => []
-  }
+const props = withDefaults(defineProps<{
+  displayMode?: 'grid' | 'compact'
+  filterMode?: 'unassigned' | 'all' | 'assigned'
+  searchText?: string
+  activeTagIds?: number[]
+}>(), {
+  displayMode: 'grid',
+  filterMode: 'unassigned',
+  searchText: '',
+  activeTagIds: () => []
 })
 const showStudentEditDialog = ref(false)
-const editingStudentId = ref(null)
+const editingStudentId = ref<number | null>(null)
 
 const { students, selectedStudentId, selectStudent } = useStudentData()
 const { findSeatByStudent, clearSeat, getStudentAtSeat } = useSeatChart()
@@ -151,13 +145,14 @@ const goFilesView = () => {
 }
 
 // 处理双击编辑学生
-const handleEditStudent = (studentId) => {
+const handleEditStudent = (studentId: number) => {
   editingStudentId.value = studentId
   showStudentEditDialog.value = true
 }
 
-const handleLoadWorkspace = async (event = null) => {
-  const file = event?.target?.files?.[0] || null
+const handleLoadWorkspace = async (event: Event | null = null) => {
+  const input = event?.target instanceof HTMLInputElement ? event.target : null
+  const file = input?.files?.[0] || null
   try {
     const loadedWorkspace = await loadWorkspace(file)
     if (!loadedWorkspace) return
@@ -171,18 +166,18 @@ const handleLoadWorkspace = async (event = null) => {
         saveLastWorkspace({ type: 'local', name: loadedWorkspace.name || '本地工作区' })
       }
     } catch (err) {
-      error('恢复工作区时发生错误: ' + (err.message || err))
+      error('恢复工作区时发生错误: ' + (err instanceof Error ? err.message : String(err)))
     }
   } catch (err) {
-    error(`加载失败: ${err.message}`)
+    error(`加载失败: ${err instanceof Error ? err.message : String(err)}`)
   } finally {
-    if (event?.target) event.target.value = ''
+    if (input) input.value = ''
   }
 }
 
 const isDragOver = ref(false)
 const isTouchDropOver = ref(false)  // 触摸移出区域 hover 状态
-const studentItemsRef = ref(null)   // .student-items 元素引用
+const studentItemsRef = ref<HTMLElement | null>(null)   // .student-items 元素引用
 
 // 未入座学生计算属性
 const unassignedStudents = computed(() => {
@@ -199,7 +194,7 @@ const visibleStudents = computed(() => {
     if (activeTags.length > 0 && !activeTags.every(tagId => (student.tags || []).includes(tagId))) return false
     if (!search) return true
     const name = String(student.name || '').toLowerCase()
-    const number = String(student.studentNumber || '').toLowerCase()
+    const number = String(student.studentNumber ?? '').toLowerCase()
     return name.includes(search) || number.includes(search)
   })
 })
@@ -227,15 +222,17 @@ const hasFocusedFilter = computed(() => (
 watch(visibleStudents, (items) => {
   if (!isMobile.value || props.displayMode !== 'compact') return
   if (!hasFocusedFilter.value || items.length !== 1) return
-  if (selectedStudentId.value === items[0].id) return
-  selectStudent(items[0].id)
+  const onlyStudent = items[0]
+  if (!onlyStudent || selectedStudentId.value === onlyStudent.id) return
+  selectStudent(onlyStudent.id)
 })
 
 // ==================== 触摸移出处理 ====================
 // 监听全局触摸拖拽事件，判断手指是否在候选区上方
-const handleGlobalTouchMove = (e) => {
+const handleGlobalTouchMove = (e: TouchEvent) => {
   if (!isTouchDraggingFromSeat.value || !studentItemsRef.value) return
-  const touch = e.touches[0]
+  const touch = e.touches.item(0)
+  if (!touch) return
   const rect = studentItemsRef.value.getBoundingClientRect()
   isTouchDropOver.value = (
     touch.clientX >= rect.left && touch.clientX <= rect.right &&
@@ -243,7 +240,7 @@ const handleGlobalTouchMove = (e) => {
   )
 }
 
-const handleGlobalTouchEnd = (e) => {
+const handleGlobalTouchEnd = (_e: TouchEvent) => {
   if (!isTouchDropOver.value) {
     isTouchDropOver.value = false
     return
@@ -263,8 +260,8 @@ onUnmounted(() => {
   document.removeEventListener('touchend', handleGlobalTouchEnd)
 })
 
-const handleDragOver = (e) => {
-  e.dataTransfer.dropEffect = 'move'
+const handleDragOver = (e: DragEvent) => {
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
   isDragOver.value = true
 }
 
@@ -272,17 +269,17 @@ const handleDragLeave = () => {
   isDragOver.value = false
 }
 
-const handleDrop = (e) => {
+const handleDrop = (e: DragEvent) => {
   isDragOver.value = false
   const raw = getDragData(e)
   if (!raw) return
 
   try {
-    const data = JSON.parse(raw)
-    if (data.type === 'seat' && data.studentId != null) {
-      if (data.selectedSeatIds && data.selectedSeatIds.length > 1) {
+    const value: unknown = JSON.parse(raw)
+    if (isSeatDragPayload(value)) {
+      if (value.selectedSeatIds && value.selectedSeatIds.length > 1) {
         const beforeSnapshot = createSnapshot()
-        data.selectedSeatIds.forEach(seatId => {
+        value.selectedSeatIds.forEach(seatId => {
           const studentId = getStudentAtSeat(seatId)
           if (studentId !== null) {
             clearSeat(seatId, false)
@@ -290,9 +287,9 @@ const handleDrop = (e) => {
         })
         const afterSnapshot = createSnapshot()
         recordBatch(beforeSnapshot, afterSnapshot)
-        success(`已将 ${data.selectedSeatIds.length} 名学生移回候选列表`)
+        success(`已将 ${value.selectedSeatIds.length} 名学生移回候选列表`)
       } else {
-        clearSeat(data.seatId)
+        clearSeat(value.seatId)
         success('已将学生移回候选列表')
       }
     }
@@ -303,8 +300,26 @@ const handleDrop = (e) => {
   }
 }
 
-const getDragData = (e) => {
-  return e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain')
+interface SeatDragPayload {
+  type: 'seat'
+  seatId: string
+  studentId: number
+  selectedSeatIds?: string[]
+}
+
+const isSeatDragPayload = (value: unknown): value is SeatDragPayload => {
+  if (typeof value !== 'object' || value === null) return false
+  const candidate = value as Record<string, unknown>
+  return candidate.type === 'seat' &&
+    typeof candidate.seatId === 'string' &&
+    typeof candidate.studentId === 'number' &&
+    (candidate.selectedSeatIds === undefined || (
+      Array.isArray(candidate.selectedSeatIds) && candidate.selectedSeatIds.every(id => typeof id === 'string')
+    ))
+}
+
+const getDragData = (e: DragEvent) => {
+  return e.dataTransfer?.getData('application/json') || e.dataTransfer?.getData('text/plain') || ''
 }
 </script>
 
@@ -507,36 +522,9 @@ const getDragData = (e) => {
   max-width: 280px;
 }
 
-.hidden-input {
-  display: none;
-}
-
 .empty-action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 20px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
   min-height: 44px;
-  border: none;
   width: 100%;
-}
-
-.empty-action-btn.outline {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border);
-}
-
-.empty-action-btn.outline:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
 }
 
 .empty-action-row {
@@ -546,8 +534,6 @@ const getDragData = (e) => {
 
 .empty-action-row .empty-action-btn {
   flex: 1;
-  padding: 10px 12px;
-  font-size: 13px;
 }
 
 /* 触摸拖拽激活时，即使全部入座也要显示移出目标 */
@@ -631,8 +617,6 @@ const getDragData = (e) => {
 
   .empty-action-row .empty-action-btn {
     flex: 1;
-    padding: 10px 12px;
-    font-size: 13px;
   }
 }
 

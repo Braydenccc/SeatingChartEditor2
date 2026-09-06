@@ -43,18 +43,21 @@
         </ul>
       </div>
 
-      <button class="action-button" @click="openRotationConfig">
+      <NButton class="action-button" type="primary" secondary block @click="openRotationConfig">
+        <span class="action-button-content">
           <RotateCw :size="18" />
-          <div class="button-content">
+          <span class="button-content">
             <span class="button-title">打开轮换配置</span>
             <span class="button-desc">在编辑器工作台中管理轮换组和选区</span>
-          </div>
-        </button>
+          </span>
+        </span>
+        </NButton>
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Info, RotateCw, ArrowLeftRight } from 'lucide-vue-next'
@@ -197,25 +200,19 @@ const openRotationConfig = async () => {
 }
 
 .action-button {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
+  height: auto;
+  min-height: 72px;
+  justify-content: flex-start;
   text-align: left;
-  color: var(--color-primary);
-  width: 100%;
 }
 
-.action-button:hover {
-  border-color: var(--color-primary);
-  background: var(--color-bg-secondary);
-  transform: translateX(4px);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 10%, transparent);
+.action-button-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  white-space: normal;
 }
 
 .button-content {

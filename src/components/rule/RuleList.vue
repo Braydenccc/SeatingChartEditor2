@@ -4,68 +4,71 @@
     <!-- 搜索与筛选工具栏 -->
     <div class="rule-toolbar">
       <div class="search-box">
-        <Search :size="15" color="var(--color-text-disabled)" stroke-width="2.5" />
-        <input v-model="searchQuery" type="text" placeholder="搜索规则、学生、备注..." />
-        <button v-if="searchQuery" class="clear-search" @click="searchQuery = ''" aria-label="清空搜索">
-          <X :size="12" />
-        </button>
+        <NInput v-model:value="searchQuery" size="small" placeholder="搜索规则、学生、备注..." aria-label="搜索规则" clearable>
+          <template #prefix><Search :size="15" stroke-width="2.5" /></template>
+        </NInput>
       </div>
 
       <div class="filter-row">
         <div class="filter-tabs">
-          <button
+          <NButton
             v-for="tab in priorityTabs"
             :key="tab.key"
             class="filter-tab"
             :class="{ active: filterPriority === tab.key }"
+            size="small"
+            :secondary="filterPriority === tab.key"
+            :type="filterPriority === tab.key ? 'primary' : 'default'"
             @click="filterPriority = tab.key"
           >
             {{ tab.label }}
-          </button>
+          </NButton>
         </div>
         <div class="toolbar-actions">
-          <button class="action-btn" @click="emit('export')" title="导出规则">
+          <NButton size="small" quaternary circle aria-label="导出规则" @click="emit('export')" title="导出规则">
             <FileOutput :size="14" />
-          </button>
-          <button class="action-btn" @click="emit('import')" title="导入规则">
+          </NButton>
+          <NButton size="small" quaternary circle aria-label="导入规则" @click="emit('import')" title="导入规则">
             <FileInput :size="14" />
-          </button>
-          <button
+          </NButton>
+          <NButton
             v-if="rules.length > 0"
-            class="action-btn danger"
-            :class="{ confirming: isClearingAllRules.value }"
+            size="small"
+            quaternary
+            circle
+            type="error"
+            aria-label="清空全部规则"
             @click="handleClearAll"
-            :title="isClearingAllRules.value ? '再次点击确认清空全部' : '清空全部'"
+            title="清空全部"
           >
             <Trash2 :size="14" />
-          </button>
+          </NButton>
         </div>
       </div>
 
       <div v-if="filteredRules.length > 0" class="batch-toolbar">
         <label class="batch-select-all">
-          <input
-            type="checkbox"
+          <NCheckbox
             :checked="isAllFilteredSelected"
-            @change="toggleSelectAllFiltered"
+            @update:checked="toggleSelectAllFiltered"
           />
           <span>全选当前筛选项</span>
         </label>
         <div class="batch-actions">
           <span class="batch-count">已选 {{ selectedRuleIds.length }} 条</span>
-          <button class="batch-btn required" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('required')">设为必须</button>
-          <button class="batch-btn prefer" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('prefer')">设为建议</button>
-          <button class="batch-btn optional" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('optional')">设为可选</button>
-          <button class="batch-btn" :disabled="!hasSelectedRules" @click="handleBatchToggle(true)">启用</button>
-          <button class="batch-btn" :disabled="!hasSelectedRules" @click="handleBatchToggle(false)">停用</button>
-          <button
-            class="batch-btn danger"
-            :class="{ confirming: isDeletingSelectedRules.value }"
+          <NButton size="tiny" type="error" secondary :disabled="!hasSelectedRules" @click="handleBatchSetPriority('required')">设为必须</NButton>
+          <NButton size="tiny" type="warning" secondary :disabled="!hasSelectedRules" @click="handleBatchSetPriority('prefer')">设为建议</NButton>
+          <NButton size="tiny" :disabled="!hasSelectedRules" @click="handleBatchSetPriority('optional')">设为可选</NButton>
+          <NButton size="tiny" :disabled="!hasSelectedRules" @click="handleBatchToggle(true)">启用</NButton>
+          <NButton size="tiny" :disabled="!hasSelectedRules" @click="handleBatchToggle(false)">停用</NButton>
+          <NButton
+            size="tiny"
+            type="error"
             :disabled="!hasSelectedRules"
             @click="handleBatchDelete"
           >
-            {{ isDeletingSelectedRules.value ? '确认删除' : '删除' }}
-          </button>
+            删除
+          </NButton>
         </div>
       </div>
     </div>
@@ -76,11 +79,19 @@
       <template v-if="hasScannedConflicts && conflicts.length > 0">发现 {{ conflicts.length }} 条逻辑冲突规则</template>
       <template v-else-if="hasScannedConflicts">未发现逻辑冲突</template>
       <template v-else>正在检查逻辑冲突...</template>
-      <button v-if="conflicts.length > 0" class="conflict-detail-btn" @click="showConflicts = !showConflicts">
+      <NButton
+        v-if="conflicts.length > 0"
+        class="conflict-detail-action"
+        size="tiny"
+        text
+        :aria-expanded="showConflicts"
+        aria-controls="rule-conflict-details"
+        @click="showConflicts = !showConflicts"
+      >
         {{ showConflicts ? '收起' : '详情' }}
-      </button>
+      </NButton>
     </div>
-    <div v-if="showConflicts && conflicts.length > 0" class="conflict-list">
+    <div id="rule-conflict-details" v-if="showConflicts && conflicts.length > 0" class="conflict-list">
       <div v-for="(c, i) in conflicts" :key="i" class="conflict-item">
         <span class="conflict-type-badge" :class="c.type">{{ c.type === 'infeasible' ? '无法满足' : '逻辑矛盾' }}</span>
         {{ c.message }}
@@ -107,22 +118,24 @@
         }"
         >
           <!-- 主行 -->
-          <div class="rule-main" @click="toggleExpand(rule.id)">
+          <div class="rule-main">
             <div class="rule-priority-bar" :style="{ background: PRIORITY_COLORS[rule.priority] }"></div>
 
             <div class="rule-select" @click.stop>
-              <input
-                type="checkbox"
+              <NCheckbox
                 :checked="isSelected(rule.id)"
-                @change="toggleSelectRule(rule.id)"
+                :aria-label="`选择规则：${getRuleText(rule)}`"
+                @update:checked="toggleSelectRule(rule.id)"
               />
             </div>
 
             <div class="rule-toggle">
-            <label class="toggle-switch" @click.stop>
-              <input type="checkbox" :checked="rule.enabled" @change="handleToggle(rule.id)" />
-              <span class="toggle-knob"></span>
-            </label>
+            <NSwitch
+              size="small"
+              :value="rule.enabled"
+              :aria-label="`${rule.enabled ? '停用' : '启用'}规则：${getRuleText(rule)}`"
+              @update:value="handleToggle(rule.id)"
+            />
           </div>
 
           <div class="rule-text">
@@ -130,19 +143,28 @@
           </div>
 
           <div class="rule-actions">
-            <button class="rule-edit-btn" title="编辑规则" @click.stop="emit('edit', rule.id)">
-              <Pencil :size="14" stroke-width="2" />
+            <NButton size="tiny" quaternary title="编辑规则" @click.stop="emit('edit', rule.id)">
+              <template #icon><Pencil :size="14" stroke-width="2" /></template>
               <span>编辑</span>
-            </button>
-            <span class="rule-chevron" :class="{ open: expandedId === rule.id }">
-              <ChevronDown :size="14" />
-            </span>
+            </NButton>
+            <NButton
+              class="rule-expand-button"
+              size="tiny"
+              quaternary
+              circle
+              :aria-label="`${expandedId === rule.id ? '收起' : '展开'}规则详情：${getRuleText(rule)}`"
+              :aria-expanded="expandedId === rule.id"
+              :aria-controls="getRuleDetailId(rule.id)"
+              @click="toggleExpand(rule.id)"
+            >
+              <ChevronDown class="rule-chevron" :class="{ open: expandedId === rule.id }" :size="14" />
+            </NButton>
           </div>
         </div>
 
         <!-- 展开区：参数详情 + 删除 -->
         <transition name="expand">
-          <div v-if="expandedId === rule.id" class="rule-detail">
+          <div v-if="expandedId === rule.id" :id="getRuleDetailId(rule.id)" class="rule-detail">
             <div class="rule-detail-grid">
               <div v-if="rule.description" class="detail-item full-width">
                 <span class="detail-key">使用指南</span>
@@ -165,7 +187,7 @@
               <!-- 子规则列表（多规则时显示） -->
               <template v-if="rule.subRules && rule.subRules.length > 1">
                 <div v-for="(sr, idx) in rule.subRules" :key="`sr-${idx}`" class="detail-item full-width sub-rule-detail">
-                  <span class="detail-key">条件 #{{ idx + 1 }}</span>
+                  <span class="detail-key">条件 #{{ Number(idx) + 1 }}</span>
                   <span class="detail-val">{{ getSubRuleText(rule, sr) }}</span>
                 </div>
               </template>
@@ -184,19 +206,12 @@
               </div>
             </div>
             <div class="detail-actions">
-              <button
-                class="btn-edit"
-                @click="emit('edit', rule.id)"
-              >
+              <NButton size="small" type="primary" secondary @click="emit('edit', rule.id)">
                 编辑规则
-              </button>
-              <button
-                class="btn-delete"
-                :class="{ confirming: isDeletingRule(rule.id).value }"
-                @click="handleDelete(rule)"
-              >
-                {{ isDeletingRule(rule.id).value ? '确认删除' : '删除规则' }}
-              </button>
+              </NButton>
+              <NButton size="small" type="error" secondary @click="handleDelete(rule)">
+                删除规则
+              </NButton>
             </div>
           </div>
         </transition>
@@ -205,12 +220,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
-import { Search, X, FileOutput, FileInput, Trash2, AlertTriangle, ClipboardList, ChevronDown, Pencil } from 'lucide-vue-next'
+import { NButton, NCheckbox, NInput, NSwitch } from 'naive-ui'
+import { Search, FileOutput, FileInput, Trash2, AlertTriangle, ClipboardList, ChevronDown, Pencil } from 'lucide-vue-next'
 import { useSeatRules } from '@/composables/useSeatRules'
 import { useLogger } from '@/composables/useLogger'
-import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
@@ -222,42 +237,42 @@ import {
   PREDICATE_META,
   COLUMN_TYPE_LABELS,
   SCOPE_LABELS
-} from '@/constants/ruleTypes.js'
+} from '@/constants/ruleTypes'
+import type { Rule, RulePriority, RuleSubRule, RuleSubject } from '@/types/models'
 
-const props = defineProps({
-  focusRuleId: {
-    type: String,
-    default: ''
-  }
+const props = withDefaults(defineProps<{ focusRuleId?: string }>(), {
+  focusRuleId: ''
 })
 
-const emit = defineEmits(['export', 'import', 'edit'])
+const emit = defineEmits<{
+  (e: 'export' | 'import'): void
+  (e: 'edit', ruleId: string): void
+}>()
 
 const { rules, renderRuleText, renderRuleTextWithoutPriority, toggleRule, updateRule, deleteRule, clearAllRules, detectConflicts } = useSeatRules()
 const { students } = useStudentData()
 const { tags } = useTagData()
 const { attributeDefinitions, getAttributeById } = useStudentAttributes()
-const { requestConfirm, isConfirming } = useConfirmAction()
-const { info, success } = useLogger()
+const { success, confirm } = useLogger()
 
 const searchQuery = ref('')
-const filterPriority = ref('all')
-const expandedId = ref(null)
+const filterPriority = ref<RulePriority | 'all'>('all')
+const expandedId = ref<string | null>(null)
 const showConflicts = ref(false)
-const selectedRuleIds = ref([])
+const selectedRuleIds = ref<string[]>([])
 const selectedRuleIdSet = computed(() => new Set(selectedRuleIds.value))
 
-const priorityTabs = [
+const priorityTabs: Array<{ key: RulePriority | 'all'; label: string }> = [
   { key: 'all', label: '全部' },
   { key: 'required', label: '必须' },
   { key: 'prefer', label: '建议' },
   { key: 'optional', label: '可选' }
 ]
 
-const conflicts = ref([])
+const conflicts = ref<ReturnType<typeof detectConflicts>>([])
 const hasScannedConflicts = ref(false)
-const ruleTextCache = new Map()
-let autoConflictScanTimer = null
+const ruleTextCache = new Map<string, { signature: string; text: string }>()
+let autoConflictScanTimer: number | null = null
 
 const filteredRules = computed(() => {
   let list = rules.value
@@ -281,13 +296,10 @@ const isAllFilteredSelected = computed(() => {
   return filteredRuleIds.value.every(id => selectedRuleIdSet.value.has(id))
 })
 const hasSelectedRules = computed(() => selectedRuleIds.value.length > 0)
-const deleteSelectedRulesKey = 'deleteSelectedRules'
-const clearAllRulesKey = 'clearAllRules'
-const isDeletingSelectedRules = isConfirming(deleteSelectedRulesKey)
-const isClearingAllRules = isConfirming(clearAllRulesKey)
+const getRuleDetailId = (ruleId: string) => `rule-detail-${ruleId.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 
 const studentNameMap = computed(() => {
-  const map = new Map()
+  const map = new Map<number, string>()
   for (const student of students.value) {
     map.set(student.id, student.name || `学生#${student.id}`)
   }
@@ -295,7 +307,7 @@ const studentNameMap = computed(() => {
 })
 
 const tagNameMap = computed(() => {
-  const map = new Map()
+  const map = new Map<number, string>()
   for (const tag of tags.value) {
     map.set(tag.id, tag.name || `标签#${tag.id}`)
   }
@@ -330,9 +342,9 @@ const conflictScanVersion = computed(() => {
   return `${ruleVersion}::${studentVersion}::${tagVersion}`
 })
 
-const isSelected = (ruleId) => selectedRuleIdSet.value.has(ruleId)
+const isSelected = (ruleId: string) => selectedRuleIdSet.value.has(ruleId)
 
-const toggleSelectRule = (ruleId) => {
+const toggleSelectRule = (ruleId: string) => {
   if (selectedRuleIds.value.includes(ruleId)) {
     selectedRuleIds.value = selectedRuleIds.value.filter(id => id !== ruleId)
   } else {
@@ -349,11 +361,11 @@ const toggleSelectAllFiltered = () => {
   selectedRuleIds.value = [...merged]
 }
 
-const toggleExpand = (id) => {
+const toggleExpand = (id: string) => {
   expandedId.value = expandedId.value === id ? null : id
 }
 
-const handleToggle = (ruleId) => {
+const handleToggle = (ruleId: string) => {
   toggleRule(ruleId)
   hasScannedConflicts.value = false
 }
@@ -366,7 +378,7 @@ const clearInvalidSelections = () => {
   }
 }
 
-const handleBatchSetPriority = (priority) => {
+const handleBatchSetPriority = (priority: RulePriority) => {
   const count = selectedRuleIds.value.length
   selectedRuleIds.value.forEach(ruleId => {
     updateRule(ruleId, { priority })
@@ -375,7 +387,7 @@ const handleBatchSetPriority = (priority) => {
   hasScannedConflicts.value = false
 }
 
-const handleBatchToggle = (enabled) => {
+const handleBatchToggle = (enabled: boolean) => {
   const count = selectedRuleIds.value.length
   selectedRuleIds.value.forEach(ruleId => {
     updateRule(ruleId, { enabled })
@@ -384,63 +396,37 @@ const handleBatchToggle = (enabled) => {
   hasScannedConflicts.value = false
 }
 
-const handleBatchDelete = () => {
+const handleBatchDelete = async () => {
   const count = selectedRuleIds.value.length
   if (count === 0) return
-  if (!isDeletingSelectedRules.value) {
-    info(`请再次点击以确认删除已选 ${count} 条规则`)
-  }
-  requestConfirm(
-    deleteSelectedRulesKey,
-    () => {
-      selectedRuleIds.value.forEach(ruleId => deleteRule(ruleId))
-      selectedRuleIds.value = []
-      if (expandedId.value && !rules.value.find(r => r.id === expandedId.value)) {
-        expandedId.value = null
-      }
-      success(`已成功删除 ${count} 条规则`)
-      hasScannedConflicts.value = false
-    },
-    `确定删除已选 ${count} 条规则？此操作不可撤销。`
-  )
+  const confirmed = await confirm({ title: '删除所选规则', content: `确认删除已选 ${count} 条规则？`, positiveText: '删除', type: 'error' })
+  if (!confirmed) return
+  selectedRuleIds.value.forEach(ruleId => deleteRule(ruleId))
+  selectedRuleIds.value = []
+  if (expandedId.value && !rules.value.find(r => r.id === expandedId.value)) expandedId.value = null
+  success(`已成功删除 ${count} 条规则`)
+  hasScannedConflicts.value = false
 }
 
-const getDeletingKey = (id) => `deleteRule-${id}`
-const isDeletingRule = (id) => isConfirming(getDeletingKey(id))
-
-const handleDelete = (rule) => {
-  if (!isDeletingRule(rule.id).value) {
-    info(`请再次点击以确认删除此规则`)
-  }
-  requestConfirm(
-    getDeletingKey(rule.id),
-    () => {
-      deleteRule(rule.id)
-      success(`成功删除规则`)
-      if (expandedId.value === rule.id) expandedId.value = null
-    },
-    `确定删除此规则？`
-  )
+const handleDelete = async (rule: Rule) => {
+  const confirmed = await confirm({ title: '删除规则', content: '确认删除此规则？', positiveText: '删除', type: 'error' })
+  if (!confirmed) return
+  deleteRule(rule.id)
+  success('成功删除规则')
+  if (expandedId.value === rule.id) expandedId.value = null
 }
 
-const handleClearAll = () => {
+const handleClearAll = async () => {
   const count = rules.value.length
   if (count === 0) return
-  if (!isClearingAllRules.value) {
-    info(`请再次点击以确认清空全部 ${count} 条规则`)
-  }
-  requestConfirm(
-    clearAllRulesKey,
-    () => {
-      clearAllRules()
-      expandedId.value = null
-      selectedRuleIds.value = []
-      success(`已成功清空 ${count} 条规则`)
-      conflicts.value = []
-      hasScannedConflicts.value = false
-    },
-    `确定清空全部 ${count} 条规则？此操作不可撤销。`
-  )
+  const confirmed = await confirm({ title: '清空全部规则', content: `确认清空全部 ${count} 条规则？`, positiveText: '清空', type: 'error' })
+  if (!confirmed) return
+  clearAllRules()
+  expandedId.value = null
+  selectedRuleIds.value = []
+  success(`已成功清空 ${count} 条规则`)
+  conflicts.value = []
+  hasScannedConflicts.value = false
 }
 
 const runConflictScan = () => {
@@ -466,11 +452,11 @@ const scheduleAutoConflictScan = () => {
   }, 120)
 }
 
-const getRuleSignature = (rule) => {
+const getRuleSignature = (rule: Rule) => {
   return `${rule.id}:${rule.updatedAt || rule.createdAt || 0}`
 }
 
-const getRuleText = (rule) => {
+const getRuleText = (rule: Rule) => {
   const signature = getRuleSignature(rule)
   const cached = ruleTextCache.get(rule.id)
   if (cached?.signature === signature) return cached.text
@@ -479,7 +465,7 @@ const getRuleText = (rule) => {
   return text
 }
 
-const getSubRuleText = (rule, subRule) => {
+const getSubRuleText = (rule: Rule, subRule: RuleSubRule) => {
   return renderRuleTextWithoutPriority({
     ...subRule,
     subjects: rule.subjects?.length ? rule.subjects : (subRule.subjects || []),
@@ -487,18 +473,22 @@ const getSubRuleText = (rule, subRule) => {
   })
 }
 
-const getParamLabel = (predicate, key) => {
+const getParamLabel = (predicate: string, key: string) => {
   const meta = PREDICATE_META[predicate]
   const param = meta?.params?.find(p => p.key === key)
   return param?.label ?? key
 }
 
-const formatParamValue = (predicate, key, value) => {
-  if (key === 'columnType') return COLUMN_TYPE_LABELS[value] ?? value
-  if (key === 'scope') return SCOPE_LABELS[value] ?? value
+const formatParamValue = (predicate: string, key: string, value: unknown) => {
+  if (key === 'columnType' && typeof value === 'string') {
+    return COLUMN_TYPE_LABELS[value as keyof typeof COLUMN_TYPE_LABELS] ?? value
+  }
+  if (key === 'scope' && typeof value === 'string') {
+    return SCOPE_LABELS[value as keyof typeof SCOPE_LABELS] ?? value
+  }
   if (key === 'tolerance') return value === 0 ? '仅正后方' : '正后方±1列'
   if (key === 'attributeId') {
-    const attribute = getAttributeById(value)
+    const attribute = typeof value === 'string' ? getAttributeById(value) : undefined
     return attribute ? (attribute.unit ? `${attribute.name}（${attribute.unit}）` : attribute.name) : String(value)
   }
   if (key === 'direction') return value === 'highFront' ? '高值靠前' : '低值靠前'
@@ -506,21 +496,21 @@ const formatParamValue = (predicate, key, value) => {
   return String(value)
 }
 
-const formatSubjects = (subjects) => {
+const formatSubjects = (subjects: RuleSubject[] | undefined) => {
   if (!subjects?.length) return '-'
   return subjects.map(s => {
     if (s.type === 'person') {
-      return studentNameMap.value.get(s.id) || `学生#${s.id}`
+      return s.id === null ? '未选择学生' : (studentNameMap.value.get(s.id) || `学生#${s.id}`)
     }
     if (s.type === 'tag') {
-      return tagNameMap.value.get(s.id) || `标签#${s.id}`
+      return s.id === null ? '未选择标签' : (tagNameMap.value.get(s.id) || `标签#${s.id}`)
     }
     if (s.type === 'all') return '全体学生'
     return '-'
   }).join('、')
 }
 
-const focusRule = async (ruleId) => {
+const focusRule = async (ruleId: string) => {
   if (!ruleId) return false
   const target = rules.value.find(r => r.id === ruleId)
   if (!target) return false
@@ -617,103 +607,13 @@ defineExpose({ focusRule })
   margin-right: 2px;
 }
 
-.batch-btn {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 5px 8px;
-  cursor: pointer;
-}
-
-.batch-btn:hover {
-  border-color: var(--color-text-disabled);
-}
-
-.batch-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.batch-btn.required {
-  color: var(--color-danger);
-  border-color: var(--color-danger-text);
-  background: var(--color-danger-bg);
-}
-
-.batch-btn.prefer {
-  color: var(--color-warning);
-  border-color: var(--color-warning-text);
-  background: var(--color-warning-bg);
-}
-
-.batch-btn.optional {
-  color: var(--color-text-secondary);
-  border-color: var(--color-border);
-  background: var(--color-bg-secondary);
-}
-
-.batch-btn.danger {
-  color: var(--color-danger);
-  border-color: var(--color-danger-text);
-  background: var(--color-danger-bg);
-}
-
-.batch-btn.danger.confirming {
-  background: var(--color-danger);
-  color: var(--color-text-inverse);
-  border-color: var(--color-danger);
-}
-
 .search-box {
-  position: relative;
   display: flex;
   align-items: center;
 }
 
-.search-box svg {
-  position: absolute;
-  left: 12px;
-}
-
-.search-box input {
+.search-box > * {
   width: 100%;
-  padding: 10px 36px;
-  background: var(--color-input-bg);
-  border: 1.5px solid var(--color-border);
-  border-radius: 10px;
-  font-size: 13px;
-  outline: none;
-  transition: all 0.2s;
-}
-
-.search-box input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent);
-}
-
-.clear-search {
-  position: absolute;
-  right: 8px;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  line-height: 0;
-  border: none;
-  background: var(--color-border);
-  color: var(--color-text-muted);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.clear-search svg {
-  display: block;
-  flex-shrink: 0;
 }
 
 .filter-row {
@@ -725,66 +625,12 @@ defineExpose({ focusRule })
 
 .filter-tabs {
   display: flex;
-  background: var(--color-bg-subtle);
-  padding: 3px;
-  border-radius: 10px;
-  gap: 2px;
-}
-
-.filter-tab {
-  padding: 6px 14px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.filter-tab:hover { color: var(--color-text-primary); }
-.filter-tab.active {
-  background: var(--color-surface);
-  color: var(--color-primary);
-  box-shadow: 0 2px 6px var(--shadow-sm);
+  gap: 4px;
 }
 
 .toolbar-actions {
   display: flex;
   gap: 6px;
-}
-
-.action-btn {
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-surface);
-  border: 1.5px solid var(--color-border);
-  border-radius: 8px;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.action-btn:hover {
-  background: var(--color-bg-subtle);
-  border-color: var(--color-border-strong);
-  color: var(--color-text-primary);
-}
-
-.action-btn.danger:hover {
-  border-color: var(--color-danger-text);
-  color: var(--color-danger-text);
-  background: var(--color-danger-bg);
-}
-
-.action-btn.danger.confirming {
-  background: var(--color-danger);
-  color: var(--color-text-inverse);
-  border-color: var(--color-danger);
 }
 
 /* ==================== 冲突警告 ==================== */
@@ -812,17 +658,7 @@ defineExpose({ focusRule })
   color: var(--color-success);
 }
 
-.conflict-detail-btn {
-  background: none;
-  border: none;
-  font-size: 12px;
-  color: currentColor;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 0;
-}
-
-.conflict-detail-btn:first-of-type {
+.conflict-detail-action {
   margin-left: auto;
 }
 
@@ -907,7 +743,6 @@ defineExpose({ focusRule })
   display: flex;
   align-items: center;
   padding: 10px 12px 10px 0;
-  cursor: pointer;
   gap: 8px;
   user-select: none;
 }
@@ -932,43 +767,6 @@ defineExpose({ focusRule })
   align-items: center;
 }
 
-.toggle-switch {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  width: 34px;
-  height: 20px;
-  cursor: pointer;
-  vertical-align: middle;
-}
-
-.toggle-switch input { display: none; }
-
-.toggle-knob {
-  position: absolute;
-  inset: 0;
-  background: var(--color-border-strong);
-  border-radius: 20px;
-  transition: background 0.2s;
-}
-
-.toggle-knob::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  background: var(--color-surface);
-  border-radius: 50%;
-  transition: transform 0.2s;
-  box-shadow: 0 1px 3px var(--shadow-md);
-}
-
-.toggle-switch input:checked ~ .toggle-knob { background: var(--color-success); }
-.toggle-switch input:checked ~ .toggle-knob::after { transform: translateX(14px); }
-
 .rule-text {
   flex: 1;
   min-width: 0;
@@ -988,25 +786,9 @@ defineExpose({ focusRule })
 
 .rule-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
-.rule-edit-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-height: 30px;
-  padding: 0 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.rule-edit-btn:hover {
-  border-color: var(--color-primary);
-  background: var(--color-bg-subtle);
+.rule-expand-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .rule-chevron {
@@ -1092,40 +874,7 @@ defineExpose({ focusRule })
   padding-left: 10px;
 } /* Darkened for readability */
 
-.detail-actions { display: flex; justify-content: flex-end; }
-
-.btn-edit {
-  padding: 5px 14px;
-  border: 1.5px solid var(--color-info-text);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-info);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-right: 8px;
-}
-
-.btn-edit:hover { background: var(--color-info-bg); }
-
-.btn-delete {
-  padding: 5px 14px;
-  border: 1.5px solid var(--color-danger-text);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-danger);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-delete:hover { background: var(--color-danger-bg); }
-
-.btn-delete.confirming {
-  background: var(--color-danger);
-  color: var(--color-text-inverse);
-  border-color: var(--color-danger);
-}
+.detail-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 /* ==================== 动画 ==================== */
 .expand-enter-active,
@@ -1172,11 +921,6 @@ defineExpose({ focusRule })
     justify-content: flex-end;
   }
 
-  .action-btn {
-    width: 40px;
-    height: 40px;
-  }
-
   .batch-toolbar {
     gap: 6px;
   }
@@ -1184,10 +928,6 @@ defineExpose({ focusRule })
   .batch-actions {
     max-height: 92px;
     overflow-y: auto;
-  }
-
-  .batch-btn {
-    min-height: 34px;
   }
 
   .rule-main {
@@ -1217,16 +957,6 @@ defineExpose({ focusRule })
     justify-content: space-between;
   }
 
-  .rule-edit-btn {
-    width: 40px;
-    min-height: 36px;
-    padding: 0;
-  }
-
-  .rule-edit-btn span {
-    display: none;
-  }
-
   .rule-detail {
     padding: 12px;
   }
@@ -1239,11 +969,5 @@ defineExpose({ focusRule })
     gap: 8px;
   }
 
-  .btn-edit,
-  .btn-delete {
-    flex: 1;
-    min-height: 40px;
-    margin-right: 0;
-  }
 }
 </style>

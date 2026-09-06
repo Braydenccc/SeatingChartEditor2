@@ -1,7 +1,11 @@
 import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
-import type { Student, UseStudentDataReturn } from '@/types'
+import type { EntityDeletionResult, Student, UseStudentDataReturn } from '@/types'
+import { normalizeNumberInput } from '@/utils/inputNormalization'
 import { useSeatChart } from './useSeatChart'
+import { useUndo } from './useUndo'
+import { attributeDefinitions } from './studentAttributeState'
+import { getRuleReferences } from './seatRuleState'
 
 // 学生数据管理
 const students = ref<Student[]>([])
@@ -9,6 +13,7 @@ let nextStudentId: number = 1
 
 // 当前选中的学生ID
 const selectedStudentId = ref<number | null>(null)
+const lastStudentDeletionResult = ref<EntityDeletionResult | null>(null)
 
 const createEmptyNumericAttributes = (): Record<string, number | null> => ({})
 
@@ -18,14 +23,19 @@ const normalizeNumericAttributes = (
   const normalized: Record<string, number | null> = {}
   if (!attributes || typeof attributes !== 'object') return normalized
 
+  const definitionsById = new Map(
+    attributeDefinitions.value.map(definition => [definition.id, definition])
+  )
+
   Object.entries(attributes).forEach(([key, value]) => {
     if (!key) return
-    if (value === null || value === undefined || value === '') {
-      normalized[key] = null
-      return
-    }
-    const numberValue = typeof value === 'number' ? value : Number(value)
-    normalized[key] = Number.isFinite(numberValue) ? numberValue : null
+    const definition = definitionsById.get(key)
+    if (!definition) return
+    normalized[key] = normalizeNumberInput(value, {
+      min: definition.min ?? undefined,
+      max: definition.max ?? undefined,
+      precision: definition.precision
+    })
   })
   return normalized
 }
@@ -46,14 +56,24 @@ const clearSeatAssignmentsForStudents = (studentIds: number[]): void => {
   })
 }
 
+const removeStudentsById = (studentIds: number[]): void => {
+  if (studentIds.length === 0) return
+  const studentIdSet = new Set(studentIds)
+  clearSeatAssignmentsForStudents(studentIds)
+  students.value = students.value.filter(student => !studentIdSet.has(student.id))
+  if (selectedStudentId.value !== null && studentIdSet.has(selectedStudentId.value)) {
+    selectedStudentId.value = null
+  }
+}
+
 export function useStudentData(): UseStudentDataReturn {
   // 排序后的学生列表：空白学号在前，有学号的按学号排序
   const sortedStudents: ComputedRef<Student[]> = computed(() => {
     return [...students.value].sort((a, b) => {
       // 空白学号排在前面
-      if (!a.studentNumber && !b.studentNumber) return 0
-      if (!a.studentNumber) return -1
-      if (!b.studentNumber) return 1
+      if (a.studentNumber == null && b.studentNumber == null) return 0
+      if (a.studentNumber == null) return -1
+      if (b.studentNumber == null) return 1
       // 都有学号则按学号排序
       return a.studentNumber - b.studentNumber
     })
@@ -74,6 +94,7 @@ export function useStudentData(): UseStudentDataReturn {
 
   // 批量设置学生人数
   const setStudentCount = (targetCount: number): boolean => {
+    lastStudentDeletionResult.value = null
     const currentCount = students.value.length
 
     if (targetCount > currentCount) {
@@ -93,25 +114,38 @@ export function useStudentData(): UseStudentDataReturn {
       // 删除空白学生
       const emptyStudents = students.value.filter(s =>
         !s.name &&
-        !s.studentNumber &&
+        s.studentNumber == null &&
         s.tags.length === 0 &&
         !hasMeaningfulNumericAttributes(s.numericAttributes)
       )
       const toDelete = currentCount - targetCount
 
-      if (emptyStudents.length >= toDelete) {
-        // 删除足够的空白学生
-        const idsToDelete = emptyStudents.slice(0, toDelete).map(s => s.id)
-        clearSeatAssignmentsForStudents(idsToDelete)
-        students.value = students.value.filter(s => !idsToDelete.includes(s.id))
-        return true
-      } else {
-        // 删除所有空白学生但仍不够
-        const idsToDelete = emptyStudents.map(s => s.id)
-        clearSeatAssignmentsForStudents(idsToDelete)
-        students.value = students.value.filter(s => !idsToDelete.includes(s.id))
-        return false // 返回false表示无法完全满足
+      const referencedEmptyStudents = emptyStudents.map(student => ({
+        student,
+        references: getRuleReferences('student', student.id)
+      }))
+      const deletableEmptyStudents = referencedEmptyStudents
+        .filter(candidate => candidate.references.length === 0)
+        .map(candidate => candidate.student)
+
+      if (deletableEmptyStudents.length < toDelete) {
+        // 完整预检未通过时保持名单、座位、选中态和 Undo/Redo 原样，
+        // 避免界面显示“缩减失败”但工作区已经发生部分删除。
+        const references = referencedEmptyStudents.flatMap(candidate => candidate.references)
+        if (references.length > 0) {
+          lastStudentDeletionResult.value = {
+            success: false,
+            reason: 'referenced-by-rules',
+            references
+          }
+        }
+        return false
       }
+
+      const idsToDelete = deletableEmptyStudents.slice(0, toDelete).map(s => s.id)
+      removeStudentsById(idsToDelete)
+      useUndo().clearHistory()
+      return true
     }
     return true
   }
@@ -158,13 +192,31 @@ export function useStudentData(): UseStudentDataReturn {
   }
 
   // 删除学生
-  const deleteStudent = (studentId: number): void => {
-    clearSeatAssignmentsForStudents([studentId])
-    students.value = students.value.filter(s => s.id !== studentId)
-    // 健壮性：如果被删除的学生正处于选中状态，则清空焦点
-    if (selectedStudentId.value === studentId) {
-      selectedStudentId.value = null
+  const deleteStudent = (studentId: number): EntityDeletionResult => {
+    if (!students.value.some(student => student.id === studentId)) {
+      const result: EntityDeletionResult = {
+        success: false,
+        reason: 'not-found',
+        references: []
+      }
+      lastStudentDeletionResult.value = result
+      return result
     }
+    const references = getRuleReferences('student', studentId)
+    if (references.length > 0) {
+      const result: EntityDeletionResult = {
+        success: false,
+        reason: 'referenced-by-rules',
+        references
+      }
+      lastStudentDeletionResult.value = result
+      return result
+    }
+    removeStudentsById([studentId])
+    useUndo().clearHistory()
+    const result: EntityDeletionResult = { success: true, references: [] }
+    lastStudentDeletionResult.value = result
+    return result
   }
 
   const addTagToStudents = (tagId: number, studentIds: number[]): void => {
@@ -206,6 +258,17 @@ export function useStudentData(): UseStudentDataReturn {
     students.value = []
     selectedStudentId.value = null
     nextStudentId = 1
+    lastStudentDeletionResult.value = null
+  }
+
+  const replaceStudentData = (nextStudents: Student[]): void => {
+    students.value = nextStudents.map(student => ({
+      ...student,
+      tags: [...student.tags],
+      numericAttributes: { ...(student.numericAttributes || {}) }
+    }))
+    lastStudentDeletionResult.value = null
+    syncStudentIdCounter()
   }
 
   // 同步学生 ID 计数器（工作区加载后调用）
@@ -226,6 +289,7 @@ export function useStudentData(): UseStudentDataReturn {
   return {
     students: sortedStudents,
     selectedStudentId,
+    lastStudentDeletionResult,
     selectStudent,
     clearSelection,
     getSelectedStudent,
@@ -237,6 +301,7 @@ export function useStudentData(): UseStudentDataReturn {
     removeTagFromStudent,
     removeTagFromStudents,
     clearAllStudents,
+    replaceStudentData,
     syncStudentIdCounter
   }
 }

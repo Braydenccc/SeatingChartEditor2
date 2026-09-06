@@ -1,26 +1,14 @@
 <template>
-  <Teleport to="body" :disabled="presentation === 'embedded'">
-    <div v-show="visible" :class="['export-overlay', { embedded: presentation === 'embedded' }]"
-      @mousedown.self="overlayMouseDownSelf = true"
-      @mouseup.self="handleOverlayMouseUp">
-      <div :class="['export-dialog', { embedded: presentation === 'embedded' }]">
-
-        <!-- ── 标题栏 ── -->
-        <div class="dialog-header">
-          <h3>导出设置</h3>
-          <button class="close-btn" @click="$emit('close')" aria-label="关闭">
-            <X :size="18" stroke-width="2" />
-          </button>
-        </div>
+  <div v-show="visible" class="export-workspace">
 
         <!-- ── Tab 栏 ── -->
         <div class="tab-bar">
-          <button :class="['tab-btn', { active: activeTab === 'image' }]" @click="activeTab = 'image'">
+          <NButton class="export-tab-button" size="small" :type="activeTab === 'image' ? 'primary' : 'default'" :secondary="activeTab !== 'image'" @click="activeTab = 'image'">
             图片导出
-          </button>
-          <button :class="['tab-btn', { active: activeTab === 'excel' }]" @click="activeTab = 'excel'">
+          </NButton>
+          <NButton class="export-tab-button" size="small" :type="activeTab === 'excel' ? 'primary' : 'default'" :secondary="activeTab !== 'excel'" @click="activeTab = 'excel'">
             Excel 导出
-          </button>
+          </NButton>
         </div>
 
         <!-- ── 主体 ── -->
@@ -35,45 +23,50 @@
                 <h4>基础设置</h4>
                 <div class="setting-row">
                   <label>标题:</label>
-                  <input v-model="exportSettings.title" type="text" placeholder="班级座位表" />
+                  <NInput v-model:value="exportSettings.title" placeholder="班级座位表" />
                 </div>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.showTitle" /><span>显示标题</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.showRowNumbers" /><span>显示行号</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.showGroupLabels" /><span>显示组号</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.showPodium" /><span>显示讲台</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.flipVertical" /><span>上下翻转座位表</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.flipHorizontal" /><span>左右翻转座位表</span></label>
+                <NCheckbox v-model:checked="exportSettings.showTitle">显示标题</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.showRowNumbers">显示行号</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.showGroupLabels">显示组号</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.showPodium">显示讲台</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.flipVertical">上下翻转座位表</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.flipHorizontal">左右翻转座位表</NCheckbox>
                 <div class="mode-row">
                   <span class="mode-label">模式:</span>
-                  <label class="radio-item"><input type="radio" value="color" v-model="exportSettings.colorMode" /><span>彩色</span></label>
-                  <label class="radio-item"><input type="radio" value="bw" v-model="exportSettings.colorMode" /><span>灰度</span></label>
-                  <label class="radio-item"><input type="radio" value="pureBw" v-model="exportSettings.colorMode" /><span>黑白</span></label>
+                  <NRadioGroup v-model:value="exportSettings.colorMode" name="image-color-mode">
+                    <NRadio value="color">彩色</NRadio>
+                    <NRadio value="bw">灰度</NRadio>
+                    <NRadio value="pureBw">黑白</NRadio>
+                  </NRadioGroup>
                 </div>
               </div>
 
               <div class="settings-section">
                 <h4>间距</h4>
                 <div class="spacing-grid">
-                  <div class="num-input"><label>列间距</label><input type="number" v-model.number="exportSettings.colGap" min="0" max="100" /></div>
-                  <div class="num-input"><label>行间距</label><input type="number" v-model.number="exportSettings.rowGap" min="0" max="100" /></div>
-                  <div class="num-input"><label>组间距</label><input type="number" v-model.number="exportSettings.groupGap" min="0" max="200" /></div>
-                  <div class="num-input"><label>边距</label><input type="number" v-model.number="exportSettings.padding" min="0" max="100" /></div>
+                  <div class="num-input"><label>列间距</label><NInputNumber :value="exportSettings.colGap" :min="0" :max="100" @update:value="value => updateExportNumber('colGap', value, 0, 100)" /></div>
+                  <div class="num-input"><label>行间距</label><NInputNumber :value="exportSettings.rowGap" :min="0" :max="100" @update:value="value => updateExportNumber('rowGap', value, 0, 100)" /></div>
+                  <div class="num-input"><label>组间距</label><NInputNumber :value="exportSettings.groupGap" :min="0" :max="200" @update:value="value => updateExportNumber('groupGap', value, 0, 200)" /></div>
+                  <div class="num-input"><label>边距</label><NInputNumber :value="exportSettings.padding" :min="0" :max="100" @update:value="value => updateExportNumber('padding', value, 0, 100)" /></div>
                 </div>
               </div>
 
               <div class="settings-section">
                 <h4>标签</h4>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.enableTagLabels" /><span>启用标签</span></label>
+                <NCheckbox v-model:checked="exportSettings.enableTagLabels">启用标签</NCheckbox>
                 <div v-if="exportSettings.enableTagLabels && tags.length > 0" class="tag-list">
                   <div v-for="tag in tags" :key="tag.id" class="tag-row">
-                    <label class="check-item" v-if="tagSettingsLocal[tag.id]">
-                      <input type="checkbox" v-model="tagSettingsLocal[tag.id].enabled" @change="syncTagSettings" />
+                    <NCheckbox
+                      v-if="tagSettingsLocal[tag.id]"
+                      v-model:checked="tagSettingsLocal[tag.id].enabled"
+                      @update:checked="syncTagSettings"
+                    >
                       <span class="tag-dot" :style="{ backgroundColor: tag.color }"></span>
                       <span>{{ tag.name }}</span>
-                    </label>
-                    <input v-if="tagSettingsLocal[tag.id] && tagSettingsLocal[tag.id].enabled"
-                      type="text" v-model="tagSettingsLocal[tag.id].displayText"
-                      @input="syncTagSettings" class="tag-input"
+                    </NCheckbox>
+                    <NInput v-if="tagSettingsLocal[tag.id] && tagSettingsLocal[tag.id].enabled"
+                      v-model:value="tagSettingsLocal[tag.id].displayText"
+                      @update:value="syncTagSettings" class="tag-input"
                       placeholder="显示文本" maxlength="4" />
                   </div>
                 </div>
@@ -82,21 +75,21 @@
               <div class="settings-section">
                 <h4>字号</h4>
                 <div class="spacing-grid">
-                  <div class="num-input"><label>姓名</label><input type="number" v-model.number="exportSettings.fontSizeName" min="8" max="60" /></div>
-                  <div class="num-input"><label>学号</label><input type="number" v-model.number="exportSettings.fontSizeStudentId" min="8" max="60" /></div>
-                  <div class="num-input"><label>标题</label><input type="number" v-model.number="exportSettings.fontSizeTitle" min="8" max="80" /></div>
-                  <div class="num-input"><label>行号</label><input type="number" v-model.number="exportSettings.fontSizeRowNumber" min="8" max="40" /></div>
-                  <div class="num-input"><label>组号</label><input type="number" v-model.number="exportSettings.fontSizeGroupLabel" min="8" max="40" /></div>
-                  <div class="num-input"><label>讲台</label><input type="number" v-model.number="exportSettings.fontSizePodium" min="8" max="40" /></div>
-                  <div class="num-input"><label>标签</label><input type="number" v-model.number="exportSettings.fontSizeTag" min="8" max="30" /></div>
+                  <div class="num-input"><label>姓名</label><NInputNumber :value="exportSettings.fontSizeName" :min="8" :max="60" @update:value="value => updateExportNumber('fontSizeName', value, 8, 60)" /></div>
+                  <div class="num-input"><label>学号</label><NInputNumber :value="exportSettings.fontSizeStudentId" :min="8" :max="60" @update:value="value => updateExportNumber('fontSizeStudentId', value, 8, 60)" /></div>
+                  <div class="num-input"><label>标题</label><NInputNumber :value="exportSettings.fontSizeTitle" :min="8" :max="80" @update:value="value => updateExportNumber('fontSizeTitle', value, 8, 80)" /></div>
+                  <div class="num-input"><label>行号</label><NInputNumber :value="exportSettings.fontSizeRowNumber" :min="8" :max="40" @update:value="value => updateExportNumber('fontSizeRowNumber', value, 8, 40)" /></div>
+                  <div class="num-input"><label>组号</label><NInputNumber :value="exportSettings.fontSizeGroupLabel" :min="8" :max="40" @update:value="value => updateExportNumber('fontSizeGroupLabel', value, 8, 40)" /></div>
+                  <div class="num-input"><label>讲台</label><NInputNumber :value="exportSettings.fontSizePodium" :min="8" :max="40" @update:value="value => updateExportNumber('fontSizePodium', value, 8, 40)" /></div>
+                  <div class="num-input"><label>标签</label><NInputNumber :value="exportSettings.fontSizeTag" :min="8" :max="30" @update:value="value => updateExportNumber('fontSizeTag', value, 8, 30)" /></div>
                 </div>
               </div>
 
               <div class="settings-section">
                 <h4>位置微调</h4>
                 <div class="spacing-grid">
-                  <div class="num-input"><label>姓名 Y 偏移</label><input type="number" v-model.number="exportSettings.offsetYName" min="-100" max="100" /></div>
-                  <div class="num-input"><label>学号 Y 偏移</label><input type="number" v-model.number="exportSettings.offsetYStudentId" min="-100" max="100" /></div>
+                  <div class="num-input"><label>姓名 Y 偏移</label><NInputNumber :value="exportSettings.offsetYName" :min="-100" :max="100" @update:value="value => updateExportNumber('offsetYName', value, -100, 100)" /></div>
+                  <div class="num-input"><label>学号 Y 偏移</label><NInputNumber :value="exportSettings.offsetYStudentId" :min="-100" :max="100" @update:value="value => updateExportNumber('offsetYStudentId', value, -100, 100)" /></div>
                 </div>
               </div>
             </template>
@@ -106,7 +99,7 @@
               <h4>云端保存</h4>
               <div class="setting-row">
                 <label>保存路径(网盘):</label>
-                <input v-model="exportSettings.webdavExportDir" type="text" placeholder="/sce_data" title="为空则默认使用 /sce_data" />
+                <NInput v-model:value="exportSettings.webdavExportDir" placeholder="/sce_data" title="为空则默认使用 /sce_data" />
               </div>
             </div>
 
@@ -116,26 +109,28 @@
                 <h4>内容</h4>
                 <div class="setting-row">
                   <label>标题文字:</label>
-                  <input v-model="exportSettings.title" type="text" placeholder="班级座位表" />
+                  <NInput v-model:value="exportSettings.title" placeholder="班级座位表" />
                 </div>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowTitle" /><span>显示标题行</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowGroupLabels" /><span>显示组号行</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowRowNumbers" /><span>显示行号列</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowStudentId" /><span>格子内显示学号</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowPodium" /><span>显示讲台行</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelFlipVertical" /><span>上下翻转座位表</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelFlipHorizontal" /><span>左右翻转座位表</span></label>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowGroupGap" /><span>保留大组间空列</span></label>
+                <NCheckbox v-model:checked="exportSettings.excelShowTitle">显示标题行</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.excelShowGroupLabels">显示组号行</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.excelShowRowNumbers">显示行号列</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.excelShowStudentId">格子内显示学号</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.excelShowPodium">显示讲台行</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.excelFlipVertical">上下翻转座位表</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.excelFlipHorizontal">左右翻转座位表</NCheckbox>
+                <NCheckbox v-model:checked="exportSettings.excelShowGroupGap">保留大组间空列</NCheckbox>
               </div>
 
               <div class="settings-section">
                 <h4>外观</h4>
                 <div class="mode-row">
                   <span class="mode-label">配色:</span>
-                  <label class="radio-item"><input type="radio" value="color" v-model="exportSettings.excelColorMode" /><span>彩色</span></label>
-                  <label class="radio-item"><input type="radio" value="bw" v-model="exportSettings.excelColorMode" /><span>单色</span></label>
+                  <NRadioGroup v-model:value="exportSettings.excelColorMode" name="excel-color-mode">
+                    <NRadio value="color">彩色</NRadio>
+                    <NRadio value="bw">单色</NRadio>
+                  </NRadioGroup>
                 </div>
-                <label class="check-item"><input type="checkbox" v-model="exportSettings.excelShowBorders" /><span>显示边框</span></label>
+                <NCheckbox v-model:checked="exportSettings.excelShowBorders">显示边框</NCheckbox>
               </div>
 
               <div class="settings-section" v-if="exportSettings.excelShowBorders">
@@ -143,15 +138,15 @@
                 <div class="font-style-section">
                   <h5 class="subsection-title">外边框</h5>
                   <div class="spacing-grid">
-                    <div class="num-input"><label>样式</label><select v-model="exportSettings.excelOuterBorderStyle"><option value="thin">细 (Thin)</option><option value="medium">中 (Medium)</option><option value="thick">粗 (Thick)</option><option value="dashed">虚线 (Dashed)</option><option value="dotted">点线 (Dotted)</option><option value="double">双线条 (Double)</option></select></div>
-                    <div class="color-input"><label>颜色</label><div class="fill-color-picker"><div class="fill-color-swatch has-value" :style="{ backgroundColor: exportSettings.excelOuterBorderColor || '#000000' }"><input v-model="exportSettings.excelOuterBorderColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelOuterBorderColor" maxlength="7" /></div></div>
+                    <div class="num-input"><label>样式</label><NSelect v-model:value="exportSettings.excelOuterBorderStyle" :options="borderStyleOptions" /></div>
+                    <div class="color-input"><label>颜色</label><NColorPicker v-model:value="exportSettings.excelOuterBorderColor" :modes="['hex']" :show-alpha="false" /></div>
                   </div>
                 </div>
                 <div class="font-style-section">
                   <h5 class="subsection-title">内边框</h5>
                   <div class="spacing-grid">
-                    <div class="num-input"><label>样式</label><select v-model="exportSettings.excelInnerBorderStyle"><option value="thin">细 (Thin)</option><option value="medium">中 (Medium)</option><option value="thick">粗 (Thick)</option><option value="dashed">虚线 (Dashed)</option><option value="dotted">点线 (Dotted)</option><option value="double">双线条 (Double)</option></select></div>
-                    <div class="color-input"><label>颜色</label><div class="fill-color-picker"><div class="fill-color-swatch has-value" :style="{ backgroundColor: exportSettings.excelInnerBorderColor || '#000000' }"><input v-model="exportSettings.excelInnerBorderColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelInnerBorderColor" maxlength="7" /></div></div>
+                    <div class="num-input"><label>样式</label><NSelect v-model:value="exportSettings.excelInnerBorderStyle" :options="borderStyleOptions" /></div>
+                    <div class="color-input"><label>颜色</label><NColorPicker v-model:value="exportSettings.excelInnerBorderColor" :modes="['hex']" :show-alpha="false" /></div>
                   </div>
                 </div>
               </div>
@@ -160,42 +155,42 @@
                 <div class="font-style-section">
                   <h5 class="subsection-title">标题</h5>
                   <div class="spacing-grid">
-                    <div class="num-input"><label>字号(pt)</label><input type="number" v-model.number="exportSettings.excelTitleFontSize" min="8" max="36" /></div>
-                    <div class="color-input"><label>字体颜色</label><div class="fill-color-picker"><div class="fill-color-swatch has-value" :style="{ backgroundColor: exportSettings.excelTitleFontColor || '#000000' }"><input v-model="exportSettings.excelTitleFontColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelTitleFontColor" maxlength="7" /></div></div>
-                    <div class="color-input fill-color"><label>背景颜色</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelTitleFillColor }" :style="{ backgroundColor: exportSettings.excelTitleFillColor || undefined }"><input v-model="exportSettings.excelTitleFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelTitleFillColor" placeholder="--" maxlength="7" /></div></div>
+                    <div class="num-input"><label>字号(pt)</label><NInputNumber :value="exportSettings.excelTitleFontSize" :min="8" :max="36" @update:value="value => updateExportNumber('excelTitleFontSize', value, 8, 36)" /></div>
+                    <div class="color-input"><label>字体颜色</label><NColorPicker v-model:value="exportSettings.excelTitleFontColor" :modes="['hex']" :show-alpha="false" /></div>
+                    <div class="color-input fill-color"><label>背景颜色</label><NColorPicker v-model:value="exportSettings.excelTitleFillColor" :modes="['hex']" :show-alpha="false" :actions="['clear']" /></div>
                   </div>
                   <div class="font-style-row">
-                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelTitleFontBold" /><span>粗体</span></label>
-                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelTitleFontItalic" /><span>斜体</span></label>
+                    <NCheckbox v-model:checked="exportSettings.excelTitleFontBold">粗体</NCheckbox>
+                    <NCheckbox v-model:checked="exportSettings.excelTitleFontItalic">斜体</NCheckbox>
                   </div>
                 </div>
                 <div class="font-style-section">
                   <h5 class="subsection-title">表头（组号/行号/讲台）</h5>
                   <div class="spacing-grid">
-                    <div class="num-input"><label>字号(pt)</label><input type="number" v-model.number="exportSettings.excelHeaderFontSize" min="6" max="24" /></div>
-                    <div class="color-input"><label>字体颜色</label><div class="fill-color-picker"><div class="fill-color-swatch has-value" :style="{ backgroundColor: exportSettings.excelHeaderFontColor || '#000000' }"><input v-model="exportSettings.excelHeaderFontColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelHeaderFontColor" maxlength="7" /></div></div>
+                    <div class="num-input"><label>字号(pt)</label><NInputNumber :value="exportSettings.excelHeaderFontSize" :min="6" :max="24" @update:value="value => updateExportNumber('excelHeaderFontSize', value, 6, 24)" /></div>
+                    <div class="color-input"><label>字体颜色</label><NColorPicker v-model:value="exportSettings.excelHeaderFontColor" :modes="['hex']" :show-alpha="false" /></div>
                   </div>
                   <div class="font-style-row">
-                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelHeaderFontBold" /><span>粗体</span></label>
-                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelHeaderFontItalic" /><span>斜体</span></label>
+                    <NCheckbox v-model:checked="exportSettings.excelHeaderFontBold">粗体</NCheckbox>
+                    <NCheckbox v-model:checked="exportSettings.excelHeaderFontItalic">斜体</NCheckbox>
                   </div>
                   <div class="sub-fill-row">
-                    <div class="color-input fill-color"><label>组号背景</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelHeaderFillColor }" :style="{ backgroundColor: exportSettings.excelHeaderFillColor || undefined }"><input v-model="exportSettings.excelHeaderFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelHeaderFillColor" placeholder="--" maxlength="7" /></div></div>
-                    <div class="color-input fill-color"><label>行号背景</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelRowNumFillColor }" :style="{ backgroundColor: exportSettings.excelRowNumFillColor || undefined }"><input v-model="exportSettings.excelRowNumFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelRowNumFillColor" placeholder="--" maxlength="7" /></div></div>
-                    <div class="color-input fill-color"><label>讲台背景</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelPodiumFillColor }" :style="{ backgroundColor: exportSettings.excelPodiumFillColor || undefined }"><input v-model="exportSettings.excelPodiumFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelPodiumFillColor" placeholder="--" maxlength="7" /></div></div>
+                    <div class="color-input fill-color"><label>组号背景</label><NColorPicker v-model:value="exportSettings.excelHeaderFillColor" :modes="['hex']" :show-alpha="false" :actions="['clear']" /></div>
+                    <div class="color-input fill-color"><label>行号背景</label><NColorPicker v-model:value="exportSettings.excelRowNumFillColor" :modes="['hex']" :show-alpha="false" :actions="['clear']" /></div>
+                    <div class="color-input fill-color"><label>讲台背景</label><NColorPicker v-model:value="exportSettings.excelPodiumFillColor" :modes="['hex']" :show-alpha="false" :actions="['clear']" /></div>
                   </div>
                 </div>
                 <div class="font-style-section">
                   <h5 class="subsection-title">座位格</h5>
                   <div class="spacing-grid">
-                    <div class="num-input"><label>姓名字号(pt)</label><input type="number" v-model.number="exportSettings.excelNameFontSize" min="8" max="24" /></div>
-                    <div class="num-input"><label>学号字号(pt)</label><input type="number" v-model.number="exportSettings.excelIdFontSize" min="6" max="18" /></div>
-                    <div class="color-input"><label>字体颜色</label><div class="fill-color-picker"><div class="fill-color-swatch has-value" :style="{ backgroundColor: exportSettings.excelSeatCellFontColor || '#000000' }"><input v-model="exportSettings.excelSeatCellFontColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelSeatCellFontColor" maxlength="7" /></div></div>
-                    <div class="color-input fill-color"><label>背景颜色</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelSeatFillColor }" :style="{ backgroundColor: exportSettings.excelSeatFillColor || undefined }"><input v-model="exportSettings.excelSeatFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelSeatFillColor" placeholder="--" maxlength="7" /></div></div>
+                    <div class="num-input"><label>姓名字号(pt)</label><NInputNumber :value="exportSettings.excelNameFontSize" :min="8" :max="24" @update:value="value => updateExportNumber('excelNameFontSize', value, 8, 24)" /></div>
+                    <div class="num-input"><label>学号字号(pt)</label><NInputNumber :value="exportSettings.excelIdFontSize" :min="6" :max="18" @update:value="value => updateExportNumber('excelIdFontSize', value, 6, 18)" /></div>
+                    <div class="color-input"><label>字体颜色</label><NColorPicker v-model:value="exportSettings.excelSeatCellFontColor" :modes="['hex']" :show-alpha="false" /></div>
+                    <div class="color-input fill-color"><label>背景颜色</label><NColorPicker v-model:value="exportSettings.excelSeatFillColor" :modes="['hex']" :show-alpha="false" :actions="['clear']" /></div>
                   </div>
                   <div class="font-style-row">
-                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelSeatCellFontBold" /><span>粗体</span></label>
-                    <label class="check-item"><input type="checkbox" v-model="exportSettings.excelSeatCellFontItalic" /><span>斜体</span></label>
+                    <NCheckbox v-model:checked="exportSettings.excelSeatCellFontBold">粗体</NCheckbox>
+                    <NCheckbox v-model:checked="exportSettings.excelSeatCellFontItalic">斜体</NCheckbox>
                   </div>
                 </div>
               </div>
@@ -203,8 +198,8 @@
               <div class="settings-section">
                 <h4>尺寸</h4>
                 <div class="spacing-grid">
-                  <div class="num-input"><label>列宽(字符)</label><input type="number" v-model.number="exportSettings.excelCellWidth" min="6" max="30" /></div>
-                  <div class="num-input"><label>行高(点)</label><input type="number" v-model.number="exportSettings.excelSeatRowHeight" min="20" max="100" /></div>
+                  <div class="num-input"><label>列宽(字符)</label><NInputNumber :value="exportSettings.excelCellWidth" :min="6" :max="30" @update:value="value => updateExportNumber('excelCellWidth', value, 6, 30)" /></div>
+                  <div class="num-input"><label>行高(点)</label><NInputNumber :value="exportSettings.excelSeatRowHeight" :min="20" :max="100" @update:value="value => updateExportNumber('excelSeatRowHeight', value, 20, 100)" /></div>
                 </div>
               </div>
 
@@ -212,14 +207,15 @@
                 <h4>格式化</h4>
                 <div class="setting-row">
                   <label>单元格内容模板:</label>
-                  <textarea
-                    v-model="exportSettings.excelCellFormat"
-                    rows="4"
+                  <NInput
+                    v-model:value="exportSettings.excelCellFormat"
+                    type="textarea"
+                    :rows="4"
                     class="format-textarea"
                     spellcheck="false"
                     autocomplete="off"
                     placeholder="%n[color:#ff0000,bold]&#10;%i[size:10]"
-                  ></textarea>
+                  />
                   <div class="format-hint">支持占位符：%n 姓名，%i 学号，%r 行号，%g 组号，%s/%j 序号，%% 百分号</div>
                   <div class="format-hint">内联样式语法：%n[color:#ff0000,bold,italic,size:14]</div>
                   <div class="format-hint">说明：关闭“格子内显示学号”后，模板中的 %i 会输出空文本。</div>
@@ -227,21 +223,15 @@
                 <div class="spacing-grid">
                   <div class="num-input">
                     <label>行号方案</label>
-                    <select v-model="exportSettings.excelRowNumberScheme">
-                      <option v-for="item in numberSchemeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-                    </select>
+                    <NSelect v-model:value="exportSettings.excelRowNumberScheme" :options="numberSchemeOptions" />
                   </div>
                   <div class="num-input">
                     <label>组号方案</label>
-                    <select v-model="exportSettings.excelGroupNumberScheme">
-                      <option v-for="item in numberSchemeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-                    </select>
+                    <NSelect v-model:value="exportSettings.excelGroupNumberScheme" :options="numberSchemeOptions" />
                   </div>
                   <div class="num-input">
                     <label>序号方案</label>
-                    <select v-model="exportSettings.excelSerialNumberScheme">
-                      <option v-for="item in numberSchemeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-                    </select>
+                    <NSelect v-model:value="exportSettings.excelSerialNumberScheme" :options="numberSchemeOptions" />
                   </div>
                 </div>
                 <div class="format-hint" style="margin-top:6px">提示：带圈数字仅支持 1-20，超过范围会自动回退为阿拉伯数字。</div>
@@ -249,18 +239,17 @@
 
               <div class="settings-section">
                 <h4>标签统计表</h4>
-                <label class="check-item">
-                  <input type="checkbox" v-model="exportSettings.excelShowTagTable" />
-                  <span>导出标签统计</span>
-                </label>
+                <NCheckbox v-model:checked="exportSettings.excelShowTagTable">导出标签统计</NCheckbox>
                 <div v-if="exportSettings.excelShowTagTable" class="tag-table-options">
                   <div class="sub-fill-row" style="margin-top:6px">
-                    <div class="color-input fill-color"><label>表头背景</label><div class="fill-color-picker"><div class="fill-color-swatch" :class="{ 'has-value': !!exportSettings.excelTagHeaderFillColor }" :style="{ backgroundColor: exportSettings.excelTagHeaderFillColor || undefined }"><input v-model="exportSettings.excelTagHeaderFillColor" type="color" /></div><input type="text" class="fill-color-hex" v-model="exportSettings.excelTagHeaderFillColor" placeholder="--" maxlength="7" /></div></div>
+                    <div class="color-input fill-color"><label>表头背景</label><NColorPicker v-model:value="exportSettings.excelTagHeaderFillColor" :modes="['hex']" :show-alpha="false" :actions="['clear']" /></div>
                   </div>
                   <div class="mode-row" style="margin-top:6px">
                     <span class="mode-label">位置:</span>
-                    <label class="radio-item"><input type="radio" :value="false" v-model="exportSettings.excelTagTableNewSheet" /><span>座位下方</span></label>
-                    <label class="radio-item"><input type="radio" :value="true" v-model="exportSettings.excelTagTableNewSheet" /><span>新工作表</span></label>
+                    <NRadioGroup v-model:value="exportSettings.excelTagTableNewSheet" name="tag-table-location">
+                      <NRadio :value="false">座位下方</NRadio>
+                      <NRadio :value="true">新工作表</NRadio>
+                    </NRadioGroup>
                   </div>
                   <div v-if="tags.length === 0" class="tag-empty-hint">暂无标签数据</div>
                   <div v-else class="tag-preview-list">
@@ -290,8 +279,7 @@
               <div class="excel-preview-wrap">
                 <div class="excel-preview-hint">预览（与实际 Excel 文件布局一致）</div>
                 <div v-if="isExcelGenerating" class="excel-preview-loading">
-                  <div class="spinner"></div>
-                  <span>正在生成 Excel 预览...</span>
+                  <NSpin size="large" description="正在生成 Excel 预览..." />
                 </div>
                 <div v-else class="excel-preview-scroll" ref="excelScrollRef">
                   <div class="excel-preview-scale-wrapper" :style="{ zoom: Math.min(1, excelScale) }">
@@ -300,14 +288,17 @@
                 </div>
                 <!-- Excel 工作表选项卡 -->
                 <div class="excel-preview-tabs" v-if="excelSheetNames.length > 1">
-                  <button 
-                    v-for="(name, index) in excelSheetNames" 
-                    :key="name" 
-                    :class="['excel-tab-btn', { active: excelActiveSheetIndex === index }]"
+                  <NButton
+                    v-for="(name, index) in excelSheetNames"
+                    :key="name"
+                    class="excel-tab-btn"
+                    size="tiny"
+                    :type="excelActiveSheetIndex === index ? 'success' : 'default'"
+                    :secondary="excelActiveSheetIndex !== index"
                     @click="excelActiveSheetIndex = index"
                   >
                     {{ name }}
-                  </button>
+                  </NButton>
                 </div>
               </div>
             </template>
@@ -316,42 +307,46 @@
 
         <!-- ── 底部按钮 ── -->
         <div class="dialog-footer">
-          <button class="btn secondary" @click="$emit('close')">关闭</button>
           <template v-if="activeTab === 'image'">
-            <button v-if="authType === 'webdav'" class="btn primary btn-info" :disabled="isGenerating || isUploading" @click="handleCloudExportImage">
-              <Loader2 v-if="isUploading" :size="14" stroke-width="2" class="spin-icon" />
-              <CloudUpload v-else :size="14" stroke-width="2" />
+            <NButton v-if="authType === 'webdav'" type="info" :loading="isUploading" :disabled="isGenerating || isImageExporting || isUploading" @click="handleCloudExportImage">
+              <CloudUpload v-if="!isUploading" :size="14" stroke-width="2" />
               {{ isUploading ? '上传中...' : '保存至云盘' }}
-            </button>
-            <button class="btn primary" :disabled="isGenerating || isUploading" @click="handleDownload">
-              <Loader2 v-if="isGenerating" :size="14" stroke-width="2" class="spin-icon" />
-              <Download v-else :size="14" stroke-width="2" />
-              下载图片
-            </button>
+            </NButton>
+            <NButton type="primary" :loading="isImageExporting && !isUploading" :disabled="isGenerating || isImageExporting || isUploading" @click="handleDownload">
+              <Download v-if="!isImageExporting || isUploading" :size="14" stroke-width="2" />
+              {{ isImageExporting && !isUploading ? '生成中...' : '下载图片' }}
+            </NButton>
           </template>
           <template v-if="activeTab === 'excel'">
-            <button v-if="authType === 'webdav'" class="btn excel" :disabled="isExcelDownloading || isUploading" @click="handleCloudExportExcel">
-              <Loader2 v-if="isUploading" :size="14" stroke-width="2" class="spin-icon" />
-              <CloudUpload v-else :size="14" stroke-width="2" />
+            <NButton v-if="authType === 'webdav'" type="success" :loading="isUploading" :disabled="isExcelDownloading || isUploading" @click="handleCloudExportExcel">
+              <CloudUpload v-if="!isUploading" :size="14" stroke-width="2" />
               {{ isUploading ? '上传中...' : '保存至云盘' }}
-            </button>
-            <button class="btn excel" :disabled="isExcelDownloading || isUploading" @click="handleExcelDownload">
-              <Loader2 v-if="isExcelDownloading" :size="14" stroke-width="2" class="spin-icon" />
-              <Download v-else :size="14" stroke-width="2" />
+            </NButton>
+            <NButton type="success" :loading="isExcelDownloading" :disabled="isExcelDownloading || isUploading" @click="handleExcelDownload">
+              <Download v-if="!isExcelDownloading" :size="14" stroke-width="2" />
               {{ isExcelDownloading ? '生成中...' : '下载 Excel' }}
-            </button>
+            </NButton>
           </template>
         </div>
-      </div>
-    </div>
-  </Teleport>
+  </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { X, CloudUpload, Download, Loader2 } from 'lucide-vue-next'
-import { useExportSettings } from '@/composables/useExportSettings'
-import { useImageExport } from '@/composables/useImageExport'
+import {
+  NButton,
+  NCheckbox,
+  NColorPicker,
+  NInput,
+  NInputNumber,
+  NRadio,
+  NRadioGroup,
+  NSpin,
+  NSelect
+} from 'naive-ui'
+import { CloudUpload, Download } from 'lucide-vue-next'
+import { useExportSettings, type ExportSettingsState } from '@/composables/useExportSettings'
+import { createLatestImagePreviewRunner, useImageExport } from '@/composables/useImageExport'
 import { useTagData } from '@/composables/useTagData'
 import { useExcelData } from '@/composables/useExcelData'
 import { useSeatChart } from '@/composables/useSeatChart'
@@ -362,21 +357,55 @@ import { useCloudWorkspace } from '@/composables/useCloudWorkspace'
 import { useLogger } from '@/composables/useLogger'
 import { escapeHtmlWithBreaks } from '@/utils/xss'
 import { saveBinaryFile } from '@/platform/files'
+import { normalizeRequiredNumberInput } from '@/utils/inputNormalization'
+import type { WorkBook } from 'xlsx-js-style'
 
-const props = defineProps({
-  visible: { type: Boolean, default: false },
-  presentation: {
-    type: String,
-    default: 'dialog',
-    validator: (value) => ['dialog', 'embedded'].includes(value)
-  },
-  initialTab: {
-    type: String,
-    default: 'image',
-    validator: (value) => ['image', 'excel'].includes(value)
+interface ExcelCellStyle {
+  font?: {
+    bold?: boolean
+    italic?: boolean
+    sz?: number
+    color?: { rgb?: string }
   }
+  alignment?: {
+    horizontal?: string
+    vertical?: string
+    wrapText?: boolean
+  }
+  border?: Partial<Record<'top' | 'bottom' | 'left' | 'right', {
+    style?: string
+    color?: { rgb?: string }
+  }>>
+  fill?: { fgColor?: { rgb?: string } }
+}
+
+interface RichTextPart {
+  t?: string
+  s?: {
+    font?: {
+      bold?: boolean
+      italic?: boolean
+      sz?: number
+      color?: { rgb?: string }
+    }
+  }
+}
+
+interface LocalTagSetting {
+  enabled: boolean
+  displayText: string
+}
+
+const props = withDefaults(defineProps<{
+  visible?: boolean
+  initialTab?: 'image' | 'excel'
+}>(), {
+  visible: false,
+  initialTab: 'image'
 })
-const emit = defineEmits(['close', 'exported'])
+const emit = defineEmits<{
+  exported: [value: Blob | null]
+}>()
 
 const { exportSettings, initializeTagSettings, updateTagSetting } = useExportSettings()
 const { exportToImage } = useImageExport()
@@ -389,26 +418,67 @@ const { putFile } = useWebDav()
 const { loadCloudSettings, saveCloudSettings } = useCloudWorkspace()
 const { success, error } = useLogger()
 
-const activeTab = ref(props.initialTab === 'excel' ? 'excel' : 'image')
+type NumericExportSettingKey = {
+  [Key in keyof ExportSettingsState]: ExportSettingsState[Key] extends number ? Key : never
+}[keyof ExportSettingsState]
+
+const updateExportNumber = (
+  key: NumericExportSettingKey,
+  value: number | null,
+  min: number,
+  max: number
+) => {
+  exportSettings.value[key] = normalizeRequiredNumberInput(
+    value,
+    exportSettings.value[key],
+    { min, max, precision: 0 }
+  )
+}
+
+const activeTab = ref<'image' | 'excel'>(props.initialTab === 'excel' ? 'excel' : 'image')
 const previewUrl = ref('')
 const isGenerating = ref(false)
+const isImageExporting = ref(false)
 const isExcelGenerating = ref(false)
 const isExcelDownloading = ref(false)
-const tagSettingsLocal = ref({})
-let debounceTimer = null
+const tagSettingsLocal = ref<Record<number, LocalTagSetting>>({})
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 const isUploading = ref(false)
 
-const excelScrollRef = ref(null)
-const excelContentRef = ref(null)
+const excelScrollRef = ref<HTMLElement | null>(null)
+const excelContentRef = ref<HTMLElement | null>(null)
 const excelScale = ref(1)
-let excelResizeObserver = null
-let removeExcelResizeListener = null
+let excelResizeObserver: ResizeObserver | null = null
+let removeExcelResizeListener: (() => void) | null = null
 let lastPreviewObjectUrl = ''
+let previewRefreshPending = false
+
+const revokeObjectUrl = (url: string) => {
+  if (url) URL.revokeObjectURL(url)
+}
+
+const previewRunner = createLatestImagePreviewRunner({
+  generate: () => exportToImage({ resolution: 'preview' }),
+  onLatest: (url) => {
+    revokeObjectUrl(lastPreviewObjectUrl)
+    lastPreviewObjectUrl = url
+    previewUrl.value = url
+  },
+  onDiscard: revokeObjectUrl,
+  onRunningChange: (running) => {
+    isGenerating.value = running
+  },
+  onError: () => {
+    revokeObjectUrl(lastPreviewObjectUrl)
+    lastPreviewObjectUrl = ''
+    previewUrl.value = ''
+  }
+})
 
 const updateExcelScale = () => {
   if (!excelScrollRef.value || !excelContentRef.value || activeTab.value !== 'excel') return
   const contentEl = excelContentRef.value.firstElementChild
-  if (!contentEl) return
+  if (!(contentEl instanceof HTMLElement)) return
   const scrollWidth = excelScrollRef.value.clientWidth
   const contentWidth = contentEl.offsetWidth
   if (contentWidth > 0 && contentWidth > scrollWidth - 30) {
@@ -419,7 +489,7 @@ const updateExcelScale = () => {
 }
 
 const excelActiveSheetIndex = ref(0)
-const excelSheetNames = ref([])
+const excelSheetNames = ref<string[]>([])
 const numberSchemeOptions = [
   { value: 'arabic', label: '12' },
   { value: 'alpha', label: 'AB' },
@@ -429,22 +499,24 @@ const numberSchemeOptions = [
   { value: 'circled', label: '①②（1-20）' }
 ]
 
-// overlay 点击关闭保护（防止从弹窗内拖出后关闭）
-const overlayMouseDownSelf = ref(false)
-const handleOverlayMouseUp = () => {
-  if (overlayMouseDownSelf.value) emit('close')
-  overlayMouseDownSelf.value = false
-}
+const borderStyleOptions = [
+  { value: 'thin', label: '细 (Thin)' },
+  { value: 'medium', label: '中 (Medium)' },
+  { value: 'thick', label: '粗 (Thick)' },
+  { value: 'dashed', label: '虚线 (Dashed)' },
+  { value: 'dotted', label: '点线 (Dotted)' },
+  { value: 'double', label: '双线条 (Double)' }
+]
 
 // ── 标签人数统计 ──
-const getTagStudentCount = (tagId) => {
+const getTagStudentCount = (tagId: number) => {
   return students.value.filter(s => s.tags && s.tags.includes(tagId)).length
 }
 
 // ── HTML 转义（防止学生名字中含有 < > & 等字符破坏预览）
-const esc = (str) => String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const esc = (str: unknown) => String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-const excelWorkbook = ref(null)
+const excelWorkbook = ref<WorkBook | null>(null)
 
 const buildCurrentExcelOptions = () => ({
   ...buildExcelOptionsFromSettings(exportSettings.value),
@@ -570,7 +642,7 @@ const excelPreviewHtml = computed(() => {
   const maxCol = range.e.c
 
   // 2. 解析样式并转为原生 CSS
-  const getCssFromStyle = (style = {}) => {
+  const getCssFromStyle = (style: ExcelCellStyle = {}) => {
     let css = ''
     if (style.font) {
       if (style.font.bold) css += 'font-weight:bold;'
@@ -581,7 +653,7 @@ const excelPreviewHtml = computed(() => {
     if (style.alignment) {
       if (style.alignment.horizontal) css += `text-align:${style.alignment.horizontal};`
       if (style.alignment.vertical) {
-        const vMap = { top: 'top', center: 'middle', bottom: 'bottom' }
+        const vMap: Record<string, string> = { top: 'top', center: 'middle', bottom: 'bottom' }
         css += `vertical-align:${vMap[style.alignment.vertical] || 'middle'};`
       }
       if (style.alignment.wrapText) css += 'white-space:pre-wrap;word-break:break-all;'
@@ -589,7 +661,8 @@ const excelPreviewHtml = computed(() => {
       css += 'vertical-align:middle;'
     }
     if (style.border) {
-      for (const edge of ['top', 'bottom', 'left', 'right']) {
+      const borderEdges: Array<keyof NonNullable<ExcelCellStyle['border']>> = ['top', 'bottom', 'left', 'right']
+      for (const edge of borderEdges) {
         if (style.border[edge]) {
           const bs = style.border[edge].style
           const bc = style.border[edge].color?.rgb || '000000'
@@ -615,7 +688,7 @@ const excelPreviewHtml = computed(() => {
   }
 
   // 辅助：渲染富文本
-  const renderRichText = (richParts, baseStyle = {}) => {
+  const renderRichText = (richParts: RichTextPart[]) => {
     if (!richParts || !Array.isArray(richParts)) return ''
 
     let html = ''
@@ -641,14 +714,14 @@ const excelPreviewHtml = computed(() => {
   }
 
   // 辅助：坐标转换
-  const encode_cell = (r, c) => {
+  const encode_cell = (r: number, c: number) => {
     const colStr = c < 26 ? String.fromCharCode(65 + c) : String.fromCharCode(64 + Math.floor(c / 26)) + String.fromCharCode(65 + c % 26)
     return colStr + (r + 1)
   }
 
   // 3. 构建单元格合并映射字典，用于 <td colspan/rowspan> 计算并跳过被覆盖的单元格
-  const mergeMap = new Map() // 'r,c' -> { r, c }
-  const skipMap = new Set()  // 'r,c'
+  const mergeMap = new Map<string, { r: number; c: number }>()
+  const skipMap = new Set<string>()
   if (ws['!merges']) {
     ws['!merges'].forEach(m => {
       const rs = m.e.r - m.s.r + 1
@@ -720,7 +793,7 @@ const excelPreviewHtml = computed(() => {
         if (cell.s) tdAttr += getCssFromStyle(cell.s)
         
         if (cell.t === 'r' && cell.r) {
-          v = renderRichText(cell.r, cell.s)
+          v = renderRichText(cell.r)
         } else {
           v = cell.v !== undefined && cell.v !== null ? String(cell.v) : ''
           v = escapeHtmlWithBreaks(v)
@@ -752,7 +825,7 @@ watch(() => [activeTab.value, props.visible], ([tab, vis]) => {
 
 // ── 标签本地副本 ──
 const initTagLocal = () => {
-  const s = {}
+  const s: Record<number, LocalTagSetting> = {}
   tags.value.forEach(tag => {
     s[tag.id] = {
       enabled:     exportSettings.value.tagSettings[tag.id]?.enabled ?? true,
@@ -764,7 +837,9 @@ const initTagLocal = () => {
 
 const syncTagSettings = () => {
   Object.keys(tagSettingsLocal.value).forEach(tagId => {
-    updateTagSetting(parseInt(tagId), tagSettingsLocal.value[tagId])
+    const numericTagId = parseInt(tagId)
+    const setting = tagSettingsLocal.value[numericTagId]
+    if (setting) updateTagSetting(numericTagId, setting)
   })
   generatePreview()
 }
@@ -774,20 +849,11 @@ const generatePreviewNow = async () => {
     clearTimeout(debounceTimer)
     debounceTimer = null
   }
-
-  isGenerating.value = true
-  try {
-    const nextUrl = await exportToImage()
-    if (lastPreviewObjectUrl) {
-      URL.revokeObjectURL(lastPreviewObjectUrl)
-    }
-    lastPreviewObjectUrl = nextUrl
-    previewUrl.value = nextUrl
-  } catch {
-    previewUrl.value = ''
-  } finally {
-    isGenerating.value = false
+  if (isImageExporting.value) {
+    previewRefreshPending = true
+    return
   }
+  await previewRunner.request()
 }
 
 // ── 图片预览（防抖）──
@@ -801,14 +867,13 @@ const generatePreview = () => {
 
 // ── 下载图片 ──
 const handleDownload = async () => {
-  await generatePreviewNow()
-  const url = previewUrl.value
-  if (!url) return
-
-  const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-  const filename = `座位表_${ts}.png`
+  isImageExporting.value = true
+  let printUrl = ''
   try {
-    const exportedBlob = await fetch(url).then((res) => res.blob())
+    printUrl = await exportToImage({ resolution: 'print' })
+    const exportedBlob = await fetch(printUrl).then((res) => res.blob())
+    const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+    const filename = `座位表_${ts}.png`
     await saveBinaryFile(exportedBlob, {
       title: '保存座位表图片',
       defaultPath: filename,
@@ -820,6 +885,13 @@ const handleDownload = async () => {
   } catch (err) {
     console.warn('图片导出失败:', err)
     emit('exported', null)
+  } finally {
+    revokeObjectUrl(printUrl)
+    isImageExporting.value = false
+    if (previewRefreshPending && props.visible && activeTab.value === 'image') {
+      previewRefreshPending = false
+      generatePreview()
+    }
   }
 }
 
@@ -842,7 +914,7 @@ const handleExcelDownload = async () => {
 }
 
 // ── WebDAV 上传 ──
-const getWebdavPath = (filename) => {
+const getWebdavPath = (filename: string) => {
   let dir = (exportSettings.value.webdavExportDir || '').trim()
   if (!dir) dir = '/sce_data'
   if (!dir.endsWith('/')) dir += '/'
@@ -851,18 +923,19 @@ const getWebdavPath = (filename) => {
 }
 
 const handleCloudExportImage = async () => {
-  await generatePreviewNow()
-  const url = previewUrl.value
-  if (!url) return
-  
+  isImageExporting.value = true
   isUploading.value = true
+  let printUrl = ''
   try {
-    const res = await fetch(url)
+    const config = webdavConfig.value
+    if (!config) throw new Error('请先配置 WebDAV')
+    printUrl = await exportToImage({ resolution: 'print' })
+    const res = await fetch(printUrl)
     const blob = await res.blob()
     const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     const filename = `座位表_${ts}.png`
     const path = getWebdavPath(filename)
-    await putFile(webdavConfig.value, path, blob, 'image/png')
+    await putFile(config, path, blob, 'image/png')
     success(`图片已保存到云盘：${path}`)
     
     // Save settings back
@@ -870,15 +943,23 @@ const handleCloudExportImage = async () => {
       webdavExportDir: exportSettings.value.webdavExportDir
     })
   } catch (err) {
-    error(`保存到云盘失败：${err.message || '未知错误，请确保存储目录存在。'}`)
+    error(`保存到云盘失败：${err instanceof Error ? err.message : '未知错误，请确保存储目录存在。'}`)
   } finally {
+    revokeObjectUrl(printUrl)
+    isImageExporting.value = false
     isUploading.value = false
+    if (previewRefreshPending && props.visible && activeTab.value === 'image') {
+      previewRefreshPending = false
+      generatePreview()
+    }
   }
 }
 
 const handleCloudExportExcel = async () => {
   isUploading.value = true
   try {
+    const config = webdavConfig.value
+    if (!config) throw new Error('请先配置 WebDAV')
     const buffer = await exportSeatChartToExcelBuffer(
       organizedSeats.value,
       students.value,
@@ -889,14 +970,14 @@ const handleCloudExportExcel = async () => {
     const ts = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     const filename = `座位表_${ts}.xlsx`
     const path = getWebdavPath(filename)
-    await putFile(webdavConfig.value, path, buffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    await putFile(config, path, buffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     success(`Excel 已保存到云盘：${path}`)
     
     saveCloudSettings({
       webdavExportDir: exportSettings.value.webdavExportDir
     })
   } catch (err) {
-    error(`保存到云盘失败：${err.message || '未知错误，请确保存储目录存在。'}`)
+    error(`保存到云盘失败：${err instanceof Error ? err.message : '未知错误，请确保存储目录存在。'}`)
   } finally {
     isUploading.value = false
   }
@@ -996,103 +1077,37 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
+  previewRunner.dispose()
   if (excelResizeObserver) excelResizeObserver.disconnect()
   removeExcelResizeListener?.()
   if (lastPreviewObjectUrl) {
-    URL.revokeObjectURL(lastPreviewObjectUrl)
+    revokeObjectUrl(lastPreviewObjectUrl)
     lastPreviewObjectUrl = ''
   }
 })
 </script>
 
 <style scoped>
-/* ── 遮罩 ── */
-.export-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--color-bg-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  animation: fadeIn 0.15s ease;
-}
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-.export-overlay.embedded {
-  position: static;
-  inset: auto;
-  z-index: auto;
-  height: 100%;
-  min-height: 0;
-  align-items: stretch;
-  justify-content: stretch;
-  background: transparent;
-  animation: none;
-}
-
-/* ── 对话框 ── */
-.export-dialog {
+.export-workspace {
   background: var(--color-surface);
-  border-radius: 16px;
-  box-shadow: 0 20px 60px var(--shadow-lg);
   display: flex;
   flex-direction: column;
-  width: 1100px;
-  max-width: 95vw;
-  max-height: 90vh;
-  animation: slideUp 0.2s ease;
-}
-@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-.export-dialog.embedded {
   width: 100%;
-  max-width: none;
-  max-height: none;
   height: 100%;
   min-height: 0;
-  border-radius: 0;
-  box-shadow: none;
-  animation: none;
-  border: none;
 }
 
-.export-dialog.embedded .dialog-header {
-  display: none;
-}
-
-.export-dialog.embedded .tab-bar {
+.export-workspace .tab-bar {
   padding: 8px 16px 0;
 }
 
-.export-dialog.embedded .settings-panel {
+.export-workspace .settings-panel {
   width: 340px;
 }
 
-.export-dialog.embedded .preview-panel {
+.export-workspace .preview-panel {
   min-height: 0;
 }
-
-.export-dialog.embedded .dialog-footer .secondary {
-  display: none;
-}
-
-/* ── 标题栏 ── */
-.dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--color-border-light);
-  flex-shrink: 0;
-}
-.dialog-header h3 { margin: 0; font-size: 17px; font-weight: 600; color: var(--color-primary); }
-.close-btn {
-  width: 30px; height: 30px; border: none; background: var(--color-bg-secondary);
-  border-radius: 8px; cursor: pointer; font-size: 15px; color: var(--color-text-secondary);
-  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
-}
-.close-btn:hover { background: var(--color-border); color: var(--color-text-primary); }
 
 /* ── Tab 栏 ── */
 .tab-bar {
@@ -1103,22 +1118,6 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   background: var(--color-bg-subtle);
 }
-.tab-btn {
-  padding: 8px 20px;
-  border: none;
-  background: transparent;
-  border-radius: 8px 8px 0 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: all 0.15s;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-.tab-btn:hover { color: var(--color-primary); background: var(--color-bg-hover); }
-.tab-btn.active { color: var(--color-primary); font-weight: 700; border-bottom: 2px solid var(--color-primary); background: var(--color-surface); }
-
 /* ── 主体 ── */
 .dialog-body {
   display: flex;
@@ -1152,50 +1151,16 @@ onBeforeUnmount(() => {
 
 .setting-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
 .setting-row label { font-size: 12px; color: var(--color-text-secondary); font-weight: 500; }
-.setting-row input[type="text"] {
-  padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 6px; font-size: 13px; transition: border-color 0.2s;
-}
-.setting-row textarea,
-.num-input select {
-  padding: 6px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 13px;
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--color-surface);
-}
-.setting-row input[type="color"] {
-  width: 60px;
-  height: 30px;
-  padding: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  cursor: pointer;
-}
-.setting-row input[type="text"]:focus { outline: none; border-color: var(--color-primary); }
-.setting-row textarea:focus,
-.num-input select:focus,
-.setting-row input[type="color"]:focus { outline: none; border-color: var(--color-primary); }
 .format-textarea { resize: vertical; min-height: 64px; }
 .format-hint { color: var(--color-text-muted); font-size: 11px; line-height: 1.4; }
 
-.check-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; font-size: 13px; color: var(--color-text-secondary); }
-.check-item input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
-
 .mode-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; flex-wrap: wrap; }
 .mode-label { font-size: 12px; color: var(--color-text-secondary); font-weight: 500; }
-.radio-item { display: flex; align-items: center; gap: 3px; cursor: pointer; font-size: 13px; color: var(--color-text-secondary); }
-.radio-item input[type="radio"] { width: 14px; height: 14px; cursor: pointer; }
 
 .spacing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .num-input { display: flex; flex-direction: column; gap: 2px; }
 .num-input label { font-size: 11px; color: var(--color-text-muted); }
-.num-input input[type="number"] {
-  padding: 5px 8px; border: 1px solid var(--color-border); border-radius: 5px; font-size: 13px; width: 100%; box-sizing: border-box;
-}
-.num-input input[type="number"]:focus { outline: none; border-color: var(--color-primary); }
+.num-input > :not(label) { width: 100%; }
 
 .tag-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .tag-row {
@@ -1204,10 +1169,8 @@ onBeforeUnmount(() => {
 }
 .tag-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--shadow-lg); flex-shrink: 0; }
 .tag-input {
-  padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 4px;
-  font-size: 12px; width: 100%; box-sizing: border-box;
+  width: 100%;
 }
-.tag-input:focus { outline: none; border-color: var(--color-primary); }
 
 /* 标签统计预览列表 */
 .tag-table-options { margin-top: 4px; }
@@ -1228,20 +1191,17 @@ onBeforeUnmount(() => {
 }
 
 /* 字体样式区域 */
-.font-style-section,
-.placeholder-style-section {
+.font-style-section {
   background: var(--color-bg-subtle);
   padding: 10px;
   border-radius: 6px;
   margin-bottom: 8px;
 }
-.font-style-section:last-child,
-.placeholder-style-section:last-child {
+.font-style-section:last-child {
   margin-bottom: 0;
 }
 
-.font-style-row,
-.placeholder-style-row {
+.font-style-row {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1249,78 +1209,16 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
-.placeholder-style-grid,
 .color-input {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-.color-input {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.color-input input[type="color"] {
-  width: 100%;
-  height: 26px;
-  padding: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: 5px;
-  background: var(--color-surface);
-  cursor: pointer;
-  box-sizing: border-box;
 }
 .color-input label {
   font-size: 11px;
   color: var(--color-text-muted);
 }
 
-.fill-color-picker {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.fill-color-swatch {
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 3px;
-  cursor: pointer;
-  position: relative;
-  flex-shrink: 0;
-  background-image: repeating-linear-gradient(45deg, var(--color-border-strong) 0, var(--color-border-strong) 1px, var(--color-bg-soft) 1px, var(--color-bg-soft) 5px);
-  background-size: 6px 6px;
-  box-sizing: border-box;
-}
-.fill-color-swatch.has-value {
-  background-image: none;
-}
-.fill-color-swatch input[type="color"] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  margin: 0;
-  border: none;
-  cursor: pointer;
-}
-.fill-color-hex {
-  width: 56px;
-  height: 22px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 0 4px;
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  background: var(--color-surface);
-  box-sizing: border-box;
-  font-family: Consolas, Monaco, monospace;
-}
-.fill-color-hex::placeholder {
-  color: var(--color-text-disabled);
-}
 
 .sub-fill-row {
   display: flex;
@@ -1366,20 +1264,8 @@ onBeforeUnmount(() => {
   border-radius: 0 0 4px 4px;
 }
 .excel-tab-btn {
-  padding: 6px 16px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border-strong);
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  cursor: pointer;
   z-index: 1;
   position: relative;
-  margin-bottom: -1px;
-}
-.excel-tab-btn:hover {
-  background: var(--color-bg-subtle);
 }
 .excel-preview-scale-wrapper {
   transform-origin: top center;
@@ -1397,73 +1283,20 @@ onBeforeUnmount(() => {
   font-size: 14px;
 }
 
-.excel-preview-loading .spinner {
-  width: 30px;
-  height: 30px;
-  border: 3px solid color-mix(in srgb, var(--color-primary) 10%, transparent);
-  border-top: 3px solid var(--color-primary);
-  border-radius: 50%;
-  animation: excel-spin 1s linear infinite;
-}
-
-@keyframes excel-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.excel-tab-btn.active {
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-surface);
-  font-weight: 600;
-  color: var(--color-success);
-  z-index: 3;
-}
-
-
 /* ── 底部 ── */
 .dialog-footer {
   display: flex; justify-content: flex-end; gap: 10px;
   padding: 12px 20px; border-top: 1px solid var(--color-border-light); flex-shrink: 0;
 }
-.btn {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 20px; border-radius: 8px; font-size: 13px;
-  font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
-}
-.btn.secondary { background: var(--color-bg-secondary); color: var(--color-text-secondary); }
-.btn.secondary:hover { background: var(--color-border); }
-.btn.primary { background: var(--color-primary); color: var(--color-text-inverse); }
-.btn.primary:hover { background: var(--color-primary-hover); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-primary) 30%, transparent); }
-.btn.btn-info { background: var(--color-info); }
-.btn.btn-info:hover { background: var(--color-info-hover); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-info) 30%, transparent); }
-.btn.excel { background: var(--color-success); color: var(--color-text-inverse); }
-.btn.excel:hover { background: var(--color-success-hover); box-shadow: 0 3px 10px color-mix(in srgb, var(--color-success) 30%, transparent); }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
 /* ── 响应式 ── */
 @media (max-width: 768px) {
-  .export-dialog { width: 98vw; max-height: 92vh; border-radius: 12px; }
-  .export-dialog.embedded { width: 100%; max-height: none; border-radius: 0; }
-  .export-dialog.embedded .tab-bar { padding: 6px 10px 0; overflow-x: auto; scrollbar-width: none; }
-  .export-dialog.embedded .tab-bar::-webkit-scrollbar { display: none; }
+  .export-workspace .tab-bar { padding: 6px 10px 0; overflow-x: auto; scrollbar-width: none; }
+  .export-workspace .tab-bar::-webkit-scrollbar { display: none; }
   .dialog-body { flex-direction: column; }
-  .settings-panel { width: 100%; max-height: 40vh; border-right: none; border-bottom: 1px solid var(--color-border-light); padding: 12px; }
-  .export-dialog.embedded .settings-panel { width: 100%; max-height: 34vh; }
+  .settings-panel { width: 100%; max-height: 34vh; border-right: none; border-bottom: 1px solid var(--color-border-light); padding: 12px; }
   .preview-panel { flex: 1; min-height: 0; padding: 12px; }
   .preview-img { max-height: 30vh; }
-  .tab-btn { min-height: 40px; padding: 0 16px; white-space: nowrap; }
-  .setting-row input[type="text"] { min-height: 44px; padding: 10px 12px; font-size: 15px; }
-  .setting-row textarea,
-  .num-input select { min-height: 44px; font-size: 15px; }
-  .check-item { min-height: 40px; padding: 8px 0; font-size: 14px; }
-  .check-item input[type="checkbox"] { width: 18px; height: 18px; }
-  .radio-item { font-size: 14px; }
-  .radio-item input[type="radio"] { width: 18px; height: 18px; }
-  .num-input input[type="number"] { min-height: 44px; padding: 8px 10px; font-size: 15px; }
-  .tag-input { min-height: 40px; padding: 8px 10px; font-size: 14px; }
-  .btn { min-height: 44px; padding: 10px 20px; font-size: 14px; }
+  .export-tab-button { white-space: nowrap; }
   .dialog-footer { flex-wrap: wrap; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0)); }
-  .dialog-header { padding: 12px 16px; }
-  .close-btn { width: 36px; height: 36px; }
 }
 </style>

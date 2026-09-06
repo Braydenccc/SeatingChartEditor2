@@ -1,17 +1,8 @@
 import { computed, ref } from 'vue'
 import { useCloudWorkspace } from './useCloudWorkspace'
+import type { CloudWorkspaceFile } from './useCloudWorkspace'
 
 type WorkspaceSource = 'retiehe' | 'webdav'
-
-interface CloudWorkspaceItem {
-  fileId: string
-  source?: WorkspaceSource
-  metadata?: {
-    name?: string
-    time?: string
-    size?: number
-  }
-}
 
 interface UseCloudWorkspaceStatsOptions {
   source?: WorkspaceSource
@@ -48,7 +39,7 @@ const formatDateTime = (value?: string): string => {
 
 export function useCloudWorkspaceStats(options: UseCloudWorkspaceStatsOptions = {}) {
   const { listWorkspaces } = useCloudWorkspace()
-  const workspaces = ref<CloudWorkspaceItem[]>([])
+  const workspaces = ref<CloudWorkspaceFile[]>([])
   const isRefreshing = ref(false)
   const errorMessage = ref('')
 

@@ -15,26 +15,26 @@
           <strong>{{ selectedCount }} 个座位</strong>
         </div>
         <div class="action-grid">
-          <button :disabled="!hasSelectionStudent" @click="editSelectedSeats">
-            <Edit3 :size="14" stroke-width="2" />
+          <NButton size="small" secondary :disabled="!hasSelectionStudent" @click="editSelectedSeats">
+            <template #icon><Edit3 :size="14" stroke-width="2" /></template>
             <span>编辑学生</span>
-          </button>
-          <button :disabled="!hasSelectionStudent" @click="clearSelectedSeats">
-            <UserMinus :size="14" stroke-width="2" />
+          </NButton>
+          <NButton size="small" type="error" secondary :disabled="!hasSelectionStudent" @click="clearSelectedSeats">
+            <template #icon><UserMinus :size="14" stroke-width="2" /></template>
             <span>移出学生</span>
-          </button>
-          <button :disabled="!canShuffleSelection" @click="shuffleSelectedSeats">
-            <component :is="selectedCount === 2 ? ArrowLeftRight : Shuffle" :size="14" stroke-width="2" />
+          </NButton>
+          <NButton size="small" type="info" secondary :disabled="!canShuffleSelection" @click="shuffleSelectedSeats">
+            <template #icon><component :is="selectedCount === 2 ? ArrowLeftRight : Shuffle" :size="14" stroke-width="2" /></template>
             <span>{{ selectedCount === 2 ? '交换座位' : '打乱座位' }}</span>
-          </button>
-          <button :disabled="!canAssignSelection" @click="assignSelectedSeats">
-            <Sparkles :size="14" stroke-width="2" />
+          </NButton>
+          <NButton size="small" type="success" secondary :disabled="!canAssignSelection" @click="assignSelectedSeats">
+            <template #icon><Sparkles :size="14" stroke-width="2" /></template>
             <span>排入学生</span>
-          </button>
-          <button @click="clearSelection">
-            <X :size="14" stroke-width="2" />
+          </NButton>
+          <NButton size="small" secondary @click="cancelSeatSelection">
+            <template #icon><X :size="14" stroke-width="2" /></template>
             <span>取消选择</span>
-          </button>
+          </NButton>
         </div>
       </div>
 
@@ -46,26 +46,26 @@
           <div><span>学生</span><strong>{{ seatStudentName }}</strong></div>
         </div>
         <div class="action-grid">
-          <button :disabled="!singleSelectedSeat.studentId" @click="editSelectedSeats">
-            <Edit3 :size="14" stroke-width="2" />
+          <NButton size="small" secondary :disabled="!singleSelectedSeat.studentId" @click="editSelectedSeats">
+            <template #icon><Edit3 :size="14" stroke-width="2" /></template>
             <span>编辑学生</span>
-          </button>
-          <button :disabled="!singleSelectedSeat.studentId" @click="clearSingleSelectedSeat">
-            <UserMinus :size="14" stroke-width="2" />
+          </NButton>
+          <NButton size="small" type="error" secondary :disabled="!singleSelectedSeat.studentId" @click="clearSingleSelectedSeat">
+            <template #icon><UserMinus :size="14" stroke-width="2" /></template>
             <span>移出学生</span>
-          </button>
-          <button :disabled="!canAssignSelection" @click="assignSelectedSeats">
-            <Sparkles :size="14" stroke-width="2" />
+          </NButton>
+          <NButton size="small" type="success" secondary :disabled="!canAssignSelection" @click="assignSelectedSeats">
+            <template #icon><Sparkles :size="14" stroke-width="2" /></template>
             <span>排入学生</span>
-          </button>
-          <button @click="toggleSingleSelectedEmpty">
-            <LayoutGrid :size="14" stroke-width="2" />
+          </NButton>
+          <NButton size="small" type="warning" secondary @click="toggleSingleSelectedEmpty">
+            <template #icon><LayoutGrid :size="14" stroke-width="2" /></template>
             <span>切换空置</span>
-          </button>
-          <button @click="clearSelection">
+          </NButton>
+          <NButton size="small" secondary @click="cancelSeatSelection">
             <X :size="14" stroke-width="2" />
             <span>取消选择</span>
-          </button>
+          </NButton>
         </div>
       </div>
 
@@ -73,7 +73,7 @@
         <div class="section-title">选中学生</div>
         <div class="student-card">
           <strong>{{ selectedStudent.name || '未命名' }}</strong>
-          <span>{{ selectedStudent.studentNumber || '无学号' }}</span>
+          <span>{{ selectedStudent.studentNumber ?? '无学号' }}</span>
         </div>
         <div class="detail-list">
           <div><span>状态</span><strong>{{ selectedStudentSeat ? '已入座' : '未入座' }}</strong></div>
@@ -83,23 +83,24 @@
         <div class="student-edit-form">
           <label class="field-row">
             <span>姓名</span>
-            <input
+            <NInput
               class="context-input"
-              :value="selectedStudent.name"
+              size="small"
+              :value="selectedStudentNameInputValue"
               placeholder="未命名"
-              @change="handleSelectedStudentNameChange($event.target.value)"
-              @keydown.enter="$event.target.blur()"
+              @update:value="handleSelectedStudentNameChange"
+              @blur="commitSelectedStudentName"
+              @keyup.enter="commitSelectedStudentName"
             />
           </label>
           <label class="field-row">
             <span>学号</span>
-            <input
+            <NInputNumber
               class="context-input"
-              type="number"
-              :value="selectedStudent.studentNumber ?? ''"
+              size="small"
+              :value="selectedStudent.studentNumber"
               placeholder="可选"
-              @change="handleSelectedStudentNumberChange($event.target.value)"
-              @keydown.enter="$event.target.blur()"
+              @update:value="handleSelectedStudentNumberChange"
             />
           </label>
 
@@ -112,15 +113,15 @@
                 class="field-row"
               >
                 <span>{{ attribute.unit ? `${attribute.name}（${attribute.unit}）` : attribute.name }}</span>
-                <input
+                <NInputNumber
                   class="context-input"
-                  type="number"
+                  size="small"
                   :step="getAttributeStep(attribute)"
                   :min="attribute.min ?? undefined"
                   :max="attribute.max ?? undefined"
+                  :precision="attribute.precision ?? undefined"
                   :value="getSelectedNumericValue(attribute.id)"
-                  @change="handleSelectedNumericChange(attribute, $event.target.value)"
-                  @keydown.enter="$event.target.blur()"
+                  @update:value="value => handleSelectedNumericChange(attribute, value)"
                 />
               </label>
             </div>
@@ -129,24 +130,27 @@
           <div class="student-edit-section">
             <div class="section-subtitle">标签</div>
             <div v-if="tags.length > 0" class="tag-toggle-list">
-              <button
+              <NButton
                 v-for="tag in tags"
                 :key="tag.id"
                 class="tag-toggle"
                 :class="{ active: isSelectedStudentTagActive(tag.id) }"
                 :style="{ '--student-tag-color': tag.color }"
+                size="tiny"
+                secondary
+                :color="isSelectedStudentTagActive(tag.id) ? tag.color : undefined"
                 @click="toggleSelectedStudentTag(tag.id)"
               >
                 <span class="tag-dot"></span>
                 <span class="tag-name">{{ tag.name || '未命名标签' }}</span>
                 <Check v-if="isSelectedStudentTagActive(tag.id)" :size="12" stroke-width="2.5" />
-              </button>
+              </NButton>
             </div>
             <div v-else class="empty-hint">暂无标签，可在名单与属性中新增</div>
           </div>
         </div>
 
-        <button class="full-action" @click="clearStudentSelection">取消选择</button>
+        <NButton size="small" secondary block @click="clearStudentSelection">取消选择</NButton>
       </div>
 
       <div v-else class="context-section">
@@ -162,7 +166,7 @@
       <div class="context-section recent-section">
         <div class="section-title-row">
           <div class="section-title">最近操作与提示</div>
-          <button v-if="logs.length > 0" class="text-action" type="button" @click="clearLogs">清空</button>
+          <NButton v-if="logs.length > 0" class="text-action" attr-type="button" @click="clearLogs">清空</NButton>
         </div>
         <div v-if="recentLogs.length > 0" class="recent-list">
           <div v-for="log in recentLogs" :key="log.id" class="recent-item" :class="`type-${log.type}`">
@@ -186,12 +190,14 @@
   </section>
 </template>
 
-<script setup>
-import { computed, ref } from 'vue'
+<script setup lang="ts">
+import { NButton, NInput, NInputNumber } from 'naive-ui'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { ArrowLeftRight, Check, Edit3, LayoutGrid, Shuffle, Sparkles, UserMinus, X } from 'lucide-vue-next'
 import BatchEditDialog from '@/components/student/BatchEditDialog.vue'
 import StudentEditDialog from '@/components/student/StudentEditDialog.vue'
 import { useEditMode } from '@/composables/useEditMode'
+import { useEditorCommands } from '@/composables/useEditorCommands'
 import { useLogger } from '@/composables/useLogger'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useSelection } from '@/composables/useSelection'
@@ -199,14 +205,18 @@ import { useStudentData } from '@/composables/useStudentData'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useTagData } from '@/composables/useTagData'
 import { useUndo } from '@/composables/useUndo'
+import { normalizeNumberInput } from '@/utils/inputNormalization'
+import { shuffleArray } from '@/utils/shuffleArray'
+import type { NumericAttributeDefinition, Student } from '@/types/models'
 
 const { currentMode, EditMode } = useEditMode()
+const { cancelSeatSelection } = useEditorCommands()
 const { logs, clearLogs, success, warning } = useLogger()
 const { seats, seatConfig, getSeat, clearSeat, toggleEmpty, getStudentAtSeat, findSeatByStudent, assignStudent, swapSeats } = useSeatChart()
 const { selectedCount, selectedSeatsArray, clearSelection, isSelectionMode } = useSelection()
 const { students, selectedStudentId, updateStudent, clearSelection: clearStudentSelection } = useStudentData()
 const { tags } = useTagData()
-const { enabledAttributeDefinitions, parseNumericValue } = useStudentAttributes()
+const { enabledAttributeDefinitions } = useStudentAttributes()
 const { recordBatch, createSnapshot } = useUndo()
 
 const modeLabel = computed(() => {
@@ -236,13 +246,36 @@ const unassignedCount = computed(() => students.value.filter(student => !findSea
 const recentLogs = computed(() => logs.value.slice(0, 5))
 
 const selectedStudent = computed(() => students.value.find(student => student.id === selectedStudentId.value) || null)
+const selectedStudentNameDraft = shallowRef<{ entity: Student; value: string } | null>(null)
+const selectedStudentNameInputValue = computed(() => {
+  const student = selectedStudent.value
+  if (!student) return ''
+  return selectedStudentNameDraft.value?.entity === student && students.value.includes(student)
+    ? selectedStudentNameDraft.value.value
+    : student.name
+})
+watch(
+  selectedStudent,
+  (nextStudent, previousStudent) => {
+    const draft = selectedStudentNameDraft.value
+    if (!draft || draft.entity === nextStudent) return
+    selectedStudentNameDraft.value = null
+    if (draft.entity === previousStudent && students.value.includes(draft.entity)) {
+      updateStudent(draft.entity.id, { name: draft.value.trim() })
+    }
+  },
+  { flush: 'sync' }
+)
 const selectedStudentSeat = computed(() => selectedStudent.value ? findSeatByStudent(selectedStudent.value.id) : null)
-const singleSelectedSeat = computed(() => selectedCount.value === 1 ? getSeat(selectedSeatsArray.value[0]) : null)
+const singleSelectedSeat = computed(() => {
+  const seatId = selectedSeatsArray.value[0]
+  return selectedCount.value === 1 && seatId ? getSeat(seatId) : null
+})
 const enabledStudentAttributes = computed(() => enabledAttributeDefinitions.value)
 const showBatchEditDialog = ref(false)
-const batchEditStudentIds = ref([])
+const batchEditStudentIds = ref<number[]>([])
 const showStudentEditDialog = ref(false)
-const editingStudentId = ref(null)
+const editingStudentId = ref<number | null>(null)
 
 const seatStudentName = computed(() => {
   const studentId = singleSelectedSeat.value ? getStudentAtSeat(singleSelectedSeat.value.id) : null
@@ -254,7 +287,7 @@ const seatStudentName = computed(() => {
 const selectedSeatStudentIds = computed(() => {
   const ids = selectedSeatsArray.value
     .map(seatId => getStudentAtSeat(seatId))
-    .filter(studentId => studentId !== null && studentId !== undefined)
+    .filter((studentId): studentId is number => studentId !== null)
   return Array.from(new Set(ids))
 })
 
@@ -281,7 +314,7 @@ const headerText = computed(() => {
   return modeLabel.value
 })
 
-const formatLogTime = (timestamp) => {
+const formatLogTime = (timestamp: string | number | Date) => {
   const date = new Date(timestamp)
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')
@@ -289,50 +322,51 @@ const formatLogTime = (timestamp) => {
   return `${hours}:${minutes}:${seconds}`
 }
 
-const handleSelectedStudentNameChange = (value) => {
-  if (!selectedStudent.value) return
-  updateStudent(selectedStudent.value.id, { name: value })
+const handleSelectedStudentNameChange = (value: string) => {
+  const student = selectedStudent.value
+  if (!student || !students.value.includes(student)) return
+  selectedStudentNameDraft.value = {
+    entity: student,
+    value
+  }
 }
 
-const handleSelectedStudentNumberChange = (value) => {
+const commitSelectedStudentName = () => {
+  const draft = selectedStudentNameDraft.value
+  const student = selectedStudent.value
+  if (!draft || !student || draft.entity !== student || !students.value.includes(draft.entity)) return
+  selectedStudentNameDraft.value = null
+  updateStudent(draft.entity.id, { name: draft.value.trim() })
+}
+
+const handleSelectedStudentNumberChange = (value: number | null) => {
   if (!selectedStudent.value) return
-  const normalized = value === '' || value === null || value === undefined
-    ? null
-    : Number(value)
   updateStudent(selectedStudent.value.id, {
-    studentNumber: Number.isFinite(normalized) ? normalized : null
+    studentNumber: normalizeNumberInput(value)
   })
 }
 
-const getAttributeStep = (attribute) => {
+const getAttributeStep = (attribute: NumericAttributeDefinition) => {
   const precision = Math.max(0, Number(attribute.precision ?? 0))
   return precision === 0 ? 1 : Number(`0.${'0'.repeat(Math.max(0, precision - 1))}1`)
 }
 
-const getSelectedNumericValue = (attributeId) => {
+const getSelectedNumericValue = (attributeId: string) => {
   const value = selectedStudent.value?.numericAttributes?.[attributeId]
-  return value === null || value === undefined ? '' : value
+  return value === null || value === undefined ? null : value
 }
 
-const normalizeSelectedNumericValue = (value, attribute) => {
-  if (value === '' || value === null || value === undefined) return null
-  const parsed = parseNumericValue(value, { ...attribute, min: null, max: null })
-  if (parsed === null) return undefined
-  let nextValue = parsed
-  if (attribute.min !== null && attribute.min !== undefined && nextValue < attribute.min) {
-    nextValue = attribute.min
-  }
-  if (attribute.max !== null && attribute.max !== undefined && nextValue > attribute.max) {
-    nextValue = attribute.max
-  }
-  const precision = Math.max(0, Number(attribute.precision ?? 0))
-  return precision > 0 ? Number(nextValue.toFixed(precision)) : Math.round(nextValue)
+const normalizeSelectedNumericValue = (value: unknown, attribute: NumericAttributeDefinition) => {
+  return normalizeNumberInput(value, {
+    min: attribute.min ?? undefined,
+    max: attribute.max ?? undefined,
+    precision: attribute.precision ?? 0
+  })
 }
 
-const handleSelectedNumericChange = (attribute, value) => {
+const handleSelectedNumericChange = (attribute: NumericAttributeDefinition, value: number | null) => {
   if (!selectedStudent.value) return
   const normalized = normalizeSelectedNumericValue(value, attribute)
-  if (normalized === undefined) return
   updateStudent(selectedStudent.value.id, {
     numericAttributes: {
       ...(selectedStudent.value.numericAttributes || {}),
@@ -341,11 +375,11 @@ const handleSelectedNumericChange = (attribute, value) => {
   })
 }
 
-const isSelectedStudentTagActive = (tagId) => {
+const isSelectedStudentTagActive = (tagId: number) => {
   return selectedStudent.value?.tags?.includes(tagId) || false
 }
 
-const toggleSelectedStudentTag = (tagId) => {
+const toggleSelectedStudentTag = (tagId: number) => {
   if (!selectedStudent.value) return
   const currentTags = selectedStudent.value.tags || []
   const nextTags = currentTags.includes(tagId)
@@ -358,7 +392,9 @@ const editSelectedSeats = () => {
   const studentIds = selectedSeatStudentIds.value
   if (studentIds.length === 0) return
   if (studentIds.length === 1) {
-    editingStudentId.value = studentIds[0]
+    const studentId = studentIds[0]
+    if (studentId === undefined) return
+    editingStudentId.value = studentId
     showStudentEditDialog.value = true
     return
   }
@@ -395,7 +431,9 @@ const shuffleSelectedSeats = () => {
     return
   }
   const ids = selectedSeatsArray.value
-  const studentIds = ids.map(id => getStudentAtSeat(id)).filter(Boolean)
+  const studentIds = ids
+    .map(id => getStudentAtSeat(id))
+    .filter((studentId): studentId is number => studentId !== null)
   if (studentIds.length < 2) {
     warning('选中座位中的学生不足两个')
     return
@@ -403,6 +441,7 @@ const shuffleSelectedSeats = () => {
   const before = createSnapshot()
   if (ids.length === 2) {
     const [seatA, seatB] = ids
+    if (!seatA || !seatB) return
     const studentA = getStudentAtSeat(seatA)
     const studentB = getStudentAtSeat(seatB)
     if (studentA && studentB) {
@@ -410,18 +449,20 @@ const shuffleSelectedSeats = () => {
     } else if (studentA || studentB) {
       const fromSeat = studentA ? seatA : seatB
       const toSeat = studentA ? seatB : seatA
-      clearSeat(fromSeat, false)
-      assignStudent(toSeat, studentA || studentB, false)
+      const movingStudentId = studentA ?? studentB
+      if (movingStudentId !== null) {
+        clearSeat(fromSeat, false)
+        assignStudent(toSeat, movingStudentId, false)
+      }
     }
   } else {
-    for (let i = studentIds.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [studentIds[i], studentIds[j]] = [studentIds[j], studentIds[i]]
-    }
+    const shuffledStudentIds = shuffleArray(studentIds)
     const occupiedIds = ids.filter(id => getStudentAtSeat(id))
     for (const seatId of occupiedIds) clearSeat(seatId, false)
     for (let i = 0; i < occupiedIds.length; i++) {
-      assignStudent(occupiedIds[i], studentIds[i], false)
+      const seatId = occupiedIds[i]
+      const studentId = shuffledStudentIds[i]
+      if (seatId && studentId !== undefined) assignStudent(seatId, studentId, false)
     }
   }
   const after = createSnapshot()
@@ -434,11 +475,13 @@ const assignSelectedSeats = () => {
   const unassigned = students.value.filter(student => !findSeatByStudent(student.id))
   if (emptyIds.length === 0 || unassigned.length === 0) return
 
-  const shuffled = [...unassigned].sort(() => Math.random() - 0.5)
+  const shuffled = shuffleArray(unassigned)
   const count = Math.min(emptyIds.length, shuffled.length)
   const before = createSnapshot()
   for (let i = 0; i < count; i++) {
-    assignStudent(emptyIds[i], shuffled[i].id, false)
+    const seatId = emptyIds[i]
+    const student = shuffled[i]
+    if (seatId && student) assignStudent(seatId, student.id, false)
   }
   const after = createSnapshot()
   recordBatch(before, after)
@@ -601,20 +644,6 @@ const assignSelectedSeats = () => {
 
 .context-input {
   width: 100%;
-  min-height: 32px;
-  box-sizing: border-box;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  padding: 0 9px;
-  font-size: 13px;
-}
-
-.context-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 16%, transparent);
 }
 
 .tag-toggle-list {
@@ -625,28 +654,6 @@ const assignSelectedSeats = () => {
 
 .tag-toggle {
   max-width: 100%;
-  min-height: 30px;
-  border: 1px solid color-mix(in srgb, var(--student-tag-color) 45%, var(--color-border));
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 8px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.tag-toggle:hover {
-  background: color-mix(in srgb, var(--student-tag-color) 10%, var(--color-surface));
-  border-color: color-mix(in srgb, var(--student-tag-color) 70%, var(--color-border));
-}
-
-.tag-toggle.active {
-  background: color-mix(in srgb, var(--student-tag-color) 16%, var(--color-surface));
-  border-color: var(--student-tag-color);
 }
 
 .tag-dot {
@@ -681,26 +688,8 @@ const assignSelectedSeats = () => {
   margin-top: 12px;
 }
 
-.action-grid button,
-.full-action {
-  min-height: 34px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.action-grid button:hover:not(:disabled),
-.full-action:hover {
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.action-grid button:disabled {
-  color: var(--color-text-disabled);
-  cursor: not-allowed;
+.action-grid > * {
+  width: 100%;
 }
 
 .recent-section p {
@@ -722,7 +711,7 @@ const assignSelectedSeats = () => {
   gap: 7px;
   padding: 7px;
   border-left: 3px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 3px;
   background: var(--color-surface);
   color: var(--color-text-secondary);
   font-size: 12px;
@@ -776,8 +765,7 @@ const assignSelectedSeats = () => {
   }
 
   .context-input {
-    min-height: 40px;
-    font-size: 15px;
+    min-height: 44px;
   }
 
   .action-grid {
@@ -785,10 +773,5 @@ const assignSelectedSeats = () => {
     gap: 7px;
   }
 
-  .action-grid button,
-  .full-action {
-    min-height: 40px;
-    padding: 0 8px;
-  }
 }
 </style>

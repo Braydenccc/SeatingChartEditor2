@@ -50,8 +50,8 @@
 ### 代码路径
 
 **客户端：**
-- [src/utils/crypto.js](../../src/utils/crypto.js) — `encryptPasswordForTransport()` 函数
-- [src/composables/useAuth.js](../../src/composables/useAuth.js) — `callAuthApi()` 函数
+- [src/utils/crypto.ts](../../src/utils/crypto.ts) — `encryptPasswordForTransport()` 函数
+- [src/composables/useAuth.ts](../../src/composables/useAuth.ts) — `callAuthApi()` 函数
 
 **服务器端：**
 - [public/api/auth.php](../../public/api/auth.php) — `decryptPasswordFromTransport()` 函数
@@ -138,7 +138,7 @@
 
 **客户端：**
 - [src/utils/workspaceValidation.ts](../../src/utils/workspaceValidation.ts) — 完整工作区结构校验
-- [src/composables/useWorkspace.js](../../src/composables/useWorkspace.js) — 迁移、原子提交与失败回滚
+- [src/composables/useWorkspace.ts](../../src/composables/useWorkspace.ts) — 迁移、原子提交与失败回滚
 
 ### 错误响应
 
@@ -158,6 +158,8 @@
 - 不影响用户体验
 
 ## 3. 测试
+
+后端安全回归同时由 CI 覆盖：PHP 7.2 与 8.2 矩阵会对所有 `public/api/*.php` 运行 PHP lint，离线契约夹具验证账号/session、DAV 公网地址与请求体限制、调试端点默认关闭。其中 PHP 7.2 覆盖 packed-IP CIDR fallback，PHP 8.2 同时覆盖原生全局地址校验与夹具强制的 fallback。Vite mock 与浏览器 E2E 不能替代这组 PHP 检查。
 
 ### 测试脚本
 
@@ -197,6 +199,16 @@
 - 默认值：`true`（生产环境强制 HTTPS）
 - 开发环境可设置为 `false` 禁用 HTTPS 检查
 
+**TRUST_PROXY_PROTO_HEADERS**（可选）：
+- 默认值：`false`，此时忽略 `X-Forwarded-Proto`、`X-Forwarded-SSL` 和 `CF-Visitor`
+- 只有应用位于受控反向代理之后，且代理会覆盖或清除客户端传入的同名头时，才可设置为 `true`
+
+**TRUST_PROXY_IP_HEADERS**（可选）：
+- 默认值：`false`，客户端 IP 直接取 `REMOTE_ADDR`
+- 仅在同样受控的反向代理边界内启用；否则攻击者可伪造限流来源地址
+
+管理 API 的本地 HTTP 例外只根据 `REMOTE_ADDR` 是否为 loopback 判断，不信任可由客户端伪造的 `Host`。非本机开发若确需 HTTP，必须显式设置 `ADMIN_ALLOW_HTTP=true`。
+
 ### 兼容性
 
 - **浏览器要求**：支持 Web Crypto API（所有现代浏览器）
@@ -217,6 +229,9 @@
 
 - 已解决：密码明文传输（客户端抓包可见）
 - 已解决：文件上传缺少格式验证（可被滥用为通用 API）
+- 已解决：WebDAV 公网地址校验在支持 `FILTER_FLAG_GLOBAL_RANGE` 的 PHP 中使用原生全局范围判断；PHP 7.2 使用 packed-IP CIDR fallback，明确拒绝本地、私有、特殊用途、文档、保留及转换地址，未知地址空间按 fail-closed 处理。DNS 预检后的 IP 仍通过 cURL 固定，并在请求完成后复核实际连接 peer，防止二次解析重绑定。
+- 已解决：DAV 请求体只依赖 `Content-Length` 的 10 MiB 限制；现按实际读取字节强制执行。
+- 已解决：调试端点信任 `Host` 或代理回环地址；现在生产环境始终关闭，只允许 development/test 显式开关加独立高熵请求头令牌。
 
 ### 仍需注意的安全事项
 
@@ -224,6 +239,13 @@
 - 注意：**速率限制**：已实现登录速率限制（5 次/5 分钟）
 - 注意：**密码强度**：已强制要求 8 字符 + 大小写 + 数字
 - 注意：**Token 过期**：已实现 30 天过期（记住我 90 天）
+- 注意：**限流并发安全**：登录、IP 和管理接口限流使用 Retinbox 原子数组 `push` 记录独立尝试，并清理时间窗口外条目，不再使用会丢增量的 `get`/`set` 读改写。
+- 注意：**对象权限隔离**：工作区权限使用无歧义哈希键，读取时同时核对 `username`、`fileId` 和权限值；旧键只在主体完全匹配时迁移。
+- 注意：**写入确认**：工作区单条 KV 使用 60000 字节/字符安全上限，写入后回读校验；列表数组追加也会确认结果。
+- 注意：**注册补偿**：同一用户名注册先通过 Retinbox 原子数组取得短期租约，再按账号、带 `registrationMarker` 的待提交资料、会话三步写入。提交资料与成功响应前均核对账号、资料和会话仍属于本次请求；失败补偿只删除与本次 expected value 一致的数据，避免并发注册互相删除或清理后来覆盖的数据。
+- 注意：**审计编码**：管理审计与认证安全日志字段先规范为有效 UTF-8 并安全截断，JSON 编码使用无效 UTF-8 替换；认证安全日志单条最多 4096 字节，主记录过大或无法编码时写入最小兜底记录并同步记录有界服务器错误日志。
+- 注意：**禁用会话吊销**：管理员禁用账号时会先轮换持久化 `sessionEpoch`，再删除当前服务端会话；重新启用前再次确认删除成功。鉴权同时核对 profile 世代与签发时的密码哈希指纹，因此即使删除失败或并发登录晚于删除写入，禁用前及旧密码签发的 token 也不会恢复有效。禁用、重新启用、管理员重置密码和用户修改密码共用同一账号安全租约；自助改密在租约内先吊销旧会话再写入密码和新会话，不会用陈旧 profile 覆盖管理员操作。
+- 注意：**服务端文件标识**：新建云工作区的 `fileId` 仅由服务端随机生成。客户端提供的 ID 只可覆盖已存在且有写权限的工作区，不能用于预占或选择新建记录键。
 
 ### 未来改进方向
 
@@ -231,6 +253,10 @@
 - 添加 Subresource Integrity (SRI) 校验
 - 实现更细粒度的文件权限控制
 - 添加审计日志（已部分实现）
+
+### 已知待决风险
+
+WebDAV 密码当前仍使用前端源码中的固定 fallback key 加密。该机制可避免直接明文展示，但无法在 `users_settings` 数据库或本地 Cookie 泄露时保护第三方 WebDAV 凭据。本轮不改变凭据策略；后续需要在“桌面系统凭据库、Web 端仅内存保存、用户口令派生”之间做产品取舍。
 
 ## 6. 常见问题
 

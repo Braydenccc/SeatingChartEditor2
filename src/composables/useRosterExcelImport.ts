@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { useEditMode } from '@/composables/useEditMode'
 import { useExcelData } from '@/composables/useExcelData'
+import type { ExcelInput, ExcelRosterPreview, ExcelRosterPreviewStudent } from '@/composables/useExcelData'
 import { useLogger } from '@/composables/useLogger'
 import { useSeatChart } from '@/composables/useSeatChart'
 import { useSeatRules } from '@/composables/useSeatRules'
@@ -12,10 +13,9 @@ import { useUndo } from '@/composables/useUndo'
 import { useZoneData } from '@/composables/useZoneData'
 import { useZoneRotation } from '@/composables/useZoneRotation'
 
-type ImportableExcelFile = File | {
+export type ImportableExcelFile = File | {
   name?: string
-  bytes?: Uint8Array
-  arrayBuffer?: () => Promise<ArrayBuffer>
+  bytes: Uint8Array
 }
 
 export type RosterImportMode = 'replace' | 'append'
@@ -27,33 +27,7 @@ type ImportIssue = {
   field?: string
 }
 
-type RosterImportPreview = {
-  students: any[]
-  tagNames: string[]
-  attributes: Array<{
-    id: string
-    key: string
-    name: string
-    unit: string
-    header: string
-    existing?: boolean
-  }>
-  issues: ImportIssue[]
-  hasErrors: boolean
-}
-
-const rosterTagColors = [
-  'var(--tag-color-1)',
-  'var(--tag-color-2)',
-  'var(--tag-color-3)',
-  'var(--tag-color-4)',
-  'var(--tag-color-5)',
-  'var(--tag-color-6)',
-  'var(--tag-color-7)',
-  'var(--tag-color-8)',
-  'var(--tag-color-9)',
-  'var(--tag-color-10)'
-]
+type RosterImportPreview = ExcelRosterPreview
 
 export const isExcelRosterFile = (file?: { name?: string } | null): boolean => {
   const name = String(file?.name || '').toLowerCase()
@@ -110,7 +84,7 @@ export function useRosterExcelImport() {
       }
 
       const studentNumber = student.studentNumber
-      if (studentNumber === null || studentNumber === undefined || studentNumber === '') return
+      if (studentNumber === null || studentNumber === undefined) return
       const numberValue = Number(studentNumber)
       if (!Number.isFinite(numberValue)) {
         issues.push({
@@ -179,7 +153,7 @@ export function useRosterExcelImport() {
   const getRowIssues = (rowNumber: number, mode: RosterImportMode = importMode.value) =>
     getModeIssues(mode).filter(issue => issue.rowNumber === rowNumber)
 
-  const updatePreviewStudent = (rowNumber: number, updates: Record<string, any>) => {
+  const updatePreviewStudent = (rowNumber: number, updates: Partial<ExcelRosterPreviewStudent>) => {
     if (!importPreview.value) return
     importPreview.value.students = importPreview.value.students.map(student => {
       if (student.rowNumber !== rowNumber) return student
@@ -251,14 +225,14 @@ export function useRosterExcelImport() {
 
     isPreparingImport.value = true
     try {
-      const preview = await previewImportFromExcel(file) as RosterImportPreview
+      const preview = await previewImportFromExcel(file as ExcelInput)
       importPreview.value = preview
       importFileName.value = file.name || 'Excel 名单'
       importMode.value = hasExistingRosterImportState() ? 'replace' : 'append'
       previewDialogVisible.value = true
       return true
-    } catch (err: any) {
-      error(`导入失败: ${err.message || err}`)
+    } catch (err) {
+      error(`导入失败: ${err instanceof Error ? err.message : String(err)}`)
       return false
     } finally {
       isPreparingImport.value = false
@@ -299,16 +273,15 @@ export function useRosterExcelImport() {
         tagNameToId[tag.name] = tag.id
       })
 
-      preview.tagNames.forEach((tagName: string, index: number) => {
+      preview.tagNames.forEach((tagName: string) => {
         if (tagNameToId[tagName] != null) return
         tagNameToId[tagName] = addTag({
-          name: tagName,
-          color: rosterTagColors[(tags.value.length + index) % rosterTagColors.length]
+          name: tagName
         })
       })
 
       const attributeKeyToId: Record<string, string> = {}
-      preview.attributes.forEach(attribute => {
+      ;(preview.attributes ?? []).forEach(attribute => {
         const definition = ensureAttributeForHeader(attribute.header, { allowImplicit: true })
         if (definition) {
           attributeKeyToId[attribute.id] = definition.id

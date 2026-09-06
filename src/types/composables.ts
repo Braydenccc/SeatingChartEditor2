@@ -10,12 +10,21 @@ import type {
   RuleSubject,
   RulePredicate,
   RuleParams,
+  RuleReferencedEntityType,
+  RuleEntityReference,
+  EntityDeletionResult,
   GroupConfig,
   SeatPosition,
   AssignmentIterationInfo
 } from './models'
 
 // Composable 返回类型定义
+
+export interface WorkspaceSaveResult {
+  success: boolean
+  canceled: boolean
+  error?: string
+}
 
 // useStudentData 返回类型
 export interface UseStudentDataReturn {
@@ -26,12 +35,20 @@ export interface UseStudentDataReturn {
   getSelectedStudent: ComputedRef<Student | null>
   addStudent: () => number
   setStudentCount: (targetCount: number) => boolean
-  updateStudent: (studentId: number, studentData: Partial<Student>) => void
-  deleteStudent: (studentId: number) => void
+  updateStudent: (
+    studentId: number,
+    studentData: Partial<Omit<Student, 'tags' | 'numericAttributes'>> & {
+      tags?: (number | null | undefined)[]
+      numericAttributes?: Record<string, unknown>
+    }
+  ) => void
+  deleteStudent: (studentId: number) => EntityDeletionResult
+  lastStudentDeletionResult: Ref<EntityDeletionResult | null>
   addTagToStudents: (tagId: number, studentIds: number[]) => void
   removeTagFromStudent: (tagId: number, studentId: number) => void
   removeTagFromStudents: (tagId: number) => void
   clearAllStudents: () => void
+  replaceStudentData: (students: Student[]) => void
   syncStudentIdCounter: () => void
 }
 
@@ -44,8 +61,9 @@ export interface UseTagDataReturn {
   editTag: (tagId: number, tagData: Partial<Tag>) => void
   updateTag: (tagId: number, tagData: Partial<Tag>) => void
   getTagById: (tagId: number) => Tag | undefined
-  deleteTag: (tagId: number) => void
+  deleteTag: (tagId: number) => EntityDeletionResult
   clearAllTags: () => void
+  replaceTagData: (tags: Tag[]) => void
   setShowTagsInSeatChart: (show: boolean) => void
   setTagDisplayMode: (mode: 'dot' | 'corner' | 'bottom') => void
 }
@@ -56,13 +74,13 @@ export interface UseZoneDataReturn {
   selectedZoneId: Ref<number | null>
   addZone: () => number
   updateZone: (zoneId: number, updates: Partial<Zone>) => void
-  deleteZone: (zoneId: number) => void
+  deleteZone: (zoneId: number) => EntityDeletionResult
   addTagToZone: (zoneId: number, tagId: number) => void
   removeTagFromZone: (zoneId: number, tagId: number) => void
   addSeatToZone: (zoneId: number, seatId: string) => void
   removeSeatFromZone: (zoneId: number, seatId: string) => void
   toggleSeatInZone: (zoneId: number, seatId: string) => void
-  getZoneForSeat: (seatId: string) => Zone | null
+  getZoneForSeat: (seatId: unknown) => Zone | null
   getZoneColor: (zoneId: number) => string
   selectZone: (zoneId: number) => void
   clearZoneSelection: () => void
@@ -71,6 +89,7 @@ export interface UseZoneDataReturn {
   removeTagFromAllZones: (tagId: number) => void
   cleanupInvalidSeats: (validSeatIds: string[]) => void
   clearAllZones: () => void
+  replaceZoneData: (zones: Zone[]) => void
   syncZoneIdCounter: () => void
 }
 
@@ -83,9 +102,10 @@ export interface UseSeatChartReturn {
   initializeSeats: () => void
   assignStudent: (seatId: string, studentId: number, recordUndo?: boolean) => void
   clearSeat: (seatId: string, recordUndo?: boolean) => void
-  swapSeats: (seatId1: string, seatId2: string, recordUndo?: boolean) => void
+  swapSeats: (seatId1: string, seatId2: string, recordUndo?: boolean) => boolean
   toggleEmpty: (seatId: string, recordUndo?: boolean) => void
   updateConfig: (newConfig: Partial<SeatConfig>) => void
+  replaceSeatChartState: (config: SeatConfig, seats: Seat[]) => void
   getGroupConfig: (groupIndex: number) => GroupConfig
   parseSeatId: (seatId: string) => SeatPosition | null
   generateSeatId: (groupIndex: number, columnIndex: number, rowIndex: number) => string
@@ -107,6 +127,10 @@ export interface UseSeatRulesReturn {
   clearAllRules: () => void
   getRuleText: (rule: Rule) => string
   validateRule: (rule: Rule) => { valid: boolean; errors: string[] }
+  getRuleReferences: (
+    entityType: RuleReferencedEntityType,
+    entityId: number | string
+  ) => RuleEntityReference[]
   [key: string]: unknown
 }
 

@@ -14,10 +14,15 @@ export default defineConfig({
     globals: true,
     root: fileURLToPath(new URL('../', import.meta.url)),
     include: ['test-scr/assignment-performance-benchmark.test.js'],
-    setupFiles: ['./src/test-utils/setup.js'],
+    setupFiles: ['./src/test-utils/setup.ts'],
     testTimeout: 120000,
     hookTimeout: 30000,
-    threads: false,
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: true
+      }
+    },
     watch: false
   }
 })

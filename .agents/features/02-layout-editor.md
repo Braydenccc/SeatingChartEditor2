@@ -15,16 +15,20 @@ description: 用户核心视窗交互域。负责可视化整个三维数组的�
 - 个体组件: `src/components/seat/SeatItem.vue`
 - 学生卡片信息展示: `src/components/student/StudentCardFace.vue`
 - 候选学生列表: `src/components/student/StudentList.vue`
-- 视图矩阵与平移: `src/composables/useZoom.js`
-- 工具栏模式: `src/composables/useEditMode.js`
-- 多选管理: `src/composables/useSelection.js`
-- 拖拽预览: `src/composables/useDragPreview.js`
+- 视图矩阵与平移: `src/composables/useZoom.ts`
+- 工具栏模式: `src/composables/useEditMode.ts`
+- 编辑命令协调: `src/composables/useEditorCommands.ts`
+- 多选管理: `src/composables/useSelection.ts`
+- 拖拽预览: `src/composables/useDragPreview.ts`
 - 工作台状态: `src/composables/useEditorWorkbench.ts`
+- 基础座位配置: `src/components/settings/panels/SeatConfigPanel.vue`
+- 高级座位配置: `src/components/layout/SeatConfigDialog.vue`
+- 座位配置约束: `src/constants/seatConfig.ts`
 
 ## 3. 核心 API 暴露 (Core Internal Logic)
 
 ```javascript
-// from useEditMode.js
+// from useEditMode.ts
 export const EditMode = {
   NORMAL: 'normal',           // 默认业务模式（给座位分发左侧选中的学生）
   EMPTY_EDIT: 'empty_edit',   // 建筑模式（将实体座位标记为空气块/过道）
@@ -35,19 +39,24 @@ export const EditMode = {
 ```
 
 ## 4. 关键实现节点 (Implementation Details)
-- **HTML5 拖放 (Drag & Drop)**: 严重依赖 `dragstart`, `dragover` (必须加 `.prevent` 劫持默认行为), `drop` 原生事件。`useStudentDragging.js` 统一接管这些动作，将 `draggedStudentId` 注册到内存。
+- **HTML5 拖放 (Drag & Drop)**: 严重依赖 `dragstart`, `dragover` (必须加 `.prevent` 劫持默认行为), `drop` 原生事件。`useStudentDragging.ts` 统一接管这些动作，将 `draggedStudentId` 注册到内存。
 - **桌面触屏混合输入**: Tauri/Web 端的触屏电脑不能只用 `pointer: coarse` 判断交互方式。同一设备可能同时有鼠标、触摸和手写笔，候选学生与座位拖拽应优先依据最近一次 `pointerType` 或 `touchstart` 选择 HTML5 拖拽或长按触摸拖拽，避免鼠标拖拽被禁用或手指触发原生拖拽幽灵图。
 - **候选学生入口**: 当前编辑页由 `EditorWorkbench` 组织。Web 桌面端候选学生不再使用旧的底部可调高度候选栏；在常规桌面宽度下，候选学生位于右侧工作台栏的「学生」标签页；超宽桌面会额外显示独立的右侧 `student-rail`，旁边保留上下文/状态栏。移动端通过底部工具栏打开候选学生抽屉，横屏全屏时可转为侧栏显示。
 - **共享学生卡片展示**: `SeatItem` 和 `CandidateItem` 只保留外壳、状态类和业务事件，学生姓名、学号、标签和数值属性统一由 `StudentCardFace` 渲染。座位图仍使用固定尺寸座位卡，右侧候选栏继续使用宽列表卡片。
 - **纯 CSS 中心化放大点**: `useZoom` 仅输出了 `scale` 和 `translate(x, y)` 几个变量。座位图通过 `transform: matrix(...)` 和 `transform-origin` 进行视图包裹，避免让底层数十万个 DOM 由于尺寸变化进行疯狂重排（Reflow），这是防卡顿优化的最关键一环。
 - **自适应居中计算 (`autoCenter`)**: 编辑器加载时或按恢复键时，会读取父盒子的 clientW/H 和 内部内容的 W/H 自动应用最佳比例参数，使得居中呈现。
+- **自适应缩放上限**: 全局设置 `defaultZoom` 表示自动适配的缩放上限，而不是每次进入编辑器都强制使用的绝对缩放值。`autoCenter` 取宽度适配、高度适配与该上限三者的最小值，并限制在 20%～300%；设置变化会立即重新执行自适应。鼠标滚轮、工具栏等手动缩放仍可在 20%～300% 范围内调整并超过该自动上限。
 - **选区拖拽 (`useDragPreview`)**: 支持多选座位后整体拖拽移动。通过 `clientToChartLocal` 将鼠标坐标转换为画布本地坐标，再通过 `chartLocalToGrid` 计算目标网格位置。拖拽预览返回 `student`、`isEmptySeat`、`isAnchor` 等结构化数据，由 `SeatChart` 复用 `StudentCardFace` 渲染，不再克隆座位 DOM 的 `innerHTML`。触摸端长按拖拽也按起点判断：起点在当前多选内则带动选区，起点不在多选内则只移动单个座位。
 - **右侧固定上下文面板**: 桌面端普通模式下左键点击座位会将选区收敛为单个座位；多选模式下按住左键拖过座位可涂抹加入多选，右键座位仍可加入当前多选并切换到右侧上下文面板。移动端普通模式点击座位不创建选区，必须通过底部「多选」工具进入涂抹选择；退出多选工具不会清空已有选区。面板复用选区操作能力，提供编辑、移出、交换/打乱、排入、切换空置与取消选择。点击空白处会清空选区。
+- **座位配置草稿交接**: 基础与高级配置统一使用 `maxSeatGroupCount` 的 50 组上限。`SeatConfigPanel` 进入编辑器前把完整草稿快照交给 `useEditorWorkbench`，`WorkbenchDialogs` 在用户确认后将高级布局结果覆盖到该草稿再应用，避免尚未应用的护法位、错位距离等设置在跳转时丢失。
+- **布局与撤销边界**: `updateConfig()` 完成行、列、大组或护法位拓扑协调后必须清空 Undo/Redo。旧快照只允许在当前座位 ID 集与快照完全一致时原子回放；布局变化后的历史不能部分套用到新拓扑，也不能恢复已经不存在的座位或重复学生分配。
+- **位移失败反馈**: `shiftSeats()` 返回 `false` 时，位移轮换弹层保留当前参数并提示调整，不记录 Undo、不显示成功消息，也不关闭窗口；只有原子位移成功后才提交历史。
 
 ## 5. AI 开发提示 / 防坑指南 (Vibe Coding Caveats)
 - **DOM重排开销**: 绝对不要在 `SeatChart.vue` 内去循环写 `margin/width` 的 `style` 计算（除了全局控制的Gap）。
 - **拖拽的幽灵阻断**: 在处理”将学生拖回侧边栏扔掉”逻辑中，Vue 原生的 `@dragend` 与 `@drop` 判断常常无法完美闭环（因为跨越了可滚动 DOM 边界），需要小心依赖全局事件捕获清理状态。
-- **交互冲突**: 模式控制 (`currentMode.value`) 是排他的。例如当处于 `SWAP` 模式点两次触发互换时，就不能再触发左键直接塞人的 `NORMAL` 处理。如果后续引入新模式，务必通过 `useEditMode.js` 进行单向流管理。
+- **交互冲突**: 模式控制 (`currentMode.value`) 是排他的。例如当处于 `SWAP` 模式点两次触发互换时，就不能再触发左键直接塞人的 `NORMAL` 处理。所有用户触发的跨模式切换必须经过 `useEditorCommands.ts`，由它清理交换首选座位、冲突选区、区域会话和移动抽屉；`useEditMode.ts` 只维护模式本身。
+- **移动抽屉**: 学生、上下文和工具面板使用 Naive UI `NDrawer`，挂载在座位区域以保留底部工具坞。拖拽期间由 `useEditorWorkbench.ts` 暂时隐藏并恢复，不得恢复旧手写 drawer shell。
 - **选区拖拽性能**: `useDragPreview` 在拖拽过程中会频繁计算坐标转换和网格吸附，需要缓存 `chartRect` 避免重复调用 `getBoundingClientRect()`。拖拽预览元素使用绝对定位和 `transform` 而非 `left/top` 以提升性能。
 - **选区状态同步**: `useSelection` 使用 `Set` 存储选中的座位ID，修改后必须调用 `triggerRef()` 手动触发响应式更新，否则 Vue 无法检测到 Set 内部变化。
 - **旧候选栏清理**: 不要恢复 `src/components/layout/EditorPanel.vue`、`ResizeDivider` 或 `useResizablePanel` 这套旧底部候选栏体系。当前 `StudentList` 只负责列表内容与拖放目标，外层位置和尺寸由 `StudentPoolPanel` / `EditorWorkbench` 管理。

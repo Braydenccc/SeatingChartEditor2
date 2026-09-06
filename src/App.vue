@@ -1,15 +1,13 @@
-<script setup>
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+<script setup lang="ts">
+import { NButton } from 'naive-ui'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterView } from 'vue-router'
-import { History, RotateCcw, X } from 'lucide-vue-next'
-import LoadingSpinner from './components/ui/LoadingSpinner.vue'
+import { History, RotateCcw } from 'lucide-vue-next'
 import GlobalDropZone from './components/ui/GlobalDropZone.vue'
+import AppUiProvider from './components/providers/AppUiProvider.vue'
+import ResponsiveOverlay from './components/ui/ResponsiveOverlay.vue'
 
-const LoginDialog = defineAsyncComponent({
-  loader: () => import('./components/auth/LoginDialog.vue'),
-  loadingComponent: LoadingSpinner,
-  delay: 200
-})
+const LoginDialog = defineAsyncComponent(() => import('./components/auth/LoginDialog.vue'))
 const CloudWorkspaceDialog = defineAsyncComponent(() => import('./components/workspace/CloudWorkspaceDialog.vue'))
 const WelcomeIntroDialog = defineAsyncComponent(() => import('./components/onboarding/WelcomeIntroDialog.vue'))
 const RosterExcelImportDialog = defineAsyncComponent(() => import('./components/student/RosterExcelImportDialog.vue'))
@@ -22,11 +20,10 @@ import { useUndo } from '@/composables/useUndo'
 import { useCloudWorkspaceDialog } from '@/composables/useCloudWorkspaceDialog'
 import { useGlobalSettings } from '@/composables/useGlobalSettings'
 import { useAutoSave } from '@/composables/useAutoSave'
-import { useRouteLoading } from '@/composables/useRouteLoading'
 import { useWelcomeOnboarding } from '@/composables/useWelcomeOnboarding'
 import { initializeTags } from '@/composables/useTagData'
 
-const { isLoginDialogVisible, initAuth, isLoggedIn } = useAuth()
+const { isLoginDialogVisible, initAuth, token, webdavConfig } = useAuth()
 const { loadWorkspaceFromCloud } = useCloudWorkspace()
 const { applyWorkspaceData, getLastWorkspace } = useWorkspace()
 const { success, warning, error } = useLogger()
@@ -35,26 +32,31 @@ const { showCloudDialog, cloudDialogMode, handleCloudSuccess } = useCloudWorkspa
 const { settings, applyThemeColor, applyColorScheme } = useGlobalSettings()
 const {
   startAutoSave,
+  flushAutoSave,
   autoSaveBackup,
   getAutoSaveBackup,
-  isAutoSavePromptDue,
-  markAutoSaveBackupHandled,
-  restoreAutoSaveBackup
+  restoreAutoSaveBackup,
+  discardAutoSaveRecovery
 } = useAutoSave()
-const { isRouteLoading } = useRouteLoading()
 const { isWelcomeIntroVisible, showWelcomeIntroIfNeeded } = useWelcomeOnboarding()
 
-const loginDialogInitialTab = ref('login')
+watch(
+  () => settings.value.editor.undoHistorySize,
+  size => setMaxHistory(size),
+  { immediate: true }
+)
+
+const loginDialogInitialTab = ref<'login' | 'register'>('login')
 const showAutoSavePrompt = ref(false)
 const isRestoringAutoSave = ref(false)
 let lastWorkspaceRestoreStarted = false
 
-const handleOpenLogin = (tab = 'login') => {
+const handleOpenLogin = (tab: 'login' | 'register' = 'login') => {
   loginDialogInitialTab.value = tab
   isLoginDialogVisible.value = true
 }
 
-const formatAutoSaveTime = (value) => {
+const formatAutoSaveTime = (value: Date | string | null | undefined) => {
   if (!value) return '未知时间'
   const date = value instanceof Date ? value : new Date(value)
   if (!Number.isFinite(date.getTime())) return '未知时间'
@@ -79,40 +81,49 @@ const autoSavePromptMeta = computed(() => {
   return `${formatAutoSaveTime(backup.time || backup.timeIso)} · ${studentCount} 名学生 · ${assignedCount} 个已排座位`
 })
 
-const restoreLastWorkspaceIfNeeded = () => {
+const restoreLastWorkspaceIfNeeded = async () => {
   if (lastWorkspaceRestoreStarted) return
   lastWorkspaceRestoreStarted = true
 
   const lastWs = getLastWorkspace()
 
   if (lastWs && lastWs.type === 'cloud' && lastWs.fileId) {
-    const unwatch = watch(() => isLoggedIn.value, async (loggedIn) => {
-      if (loggedIn) {
-        try {
-          const result = await loadWorkspaceFromCloud(lastWs.fileId, lastWs.source)
-          if (result.success && result.data && result.data.content) {
-            const workspaceData = typeof result.data.content === 'string'
-              ? JSON.parse(result.data.content)
-              : result.data.content
+    const lastFileId = lastWs.fileId
+    const lastSource = lastWs.source === 'webdav' ? 'webdav' : 'retiehe'
+    const hasRequiredCredential = lastSource === 'webdav'
+      ? Boolean(webdavConfig.value)
+      : Boolean(token.value)
 
-            await applyWorkspaceData(workspaceData)
-            success(`已自动恢复上次任务：${lastWs.name}`)
-          }
-        } catch (e) {
-          console.error('Auto restore failed:', e)
-          warning(`自动恢复云端任务失败：${e.message || '网络错误，请检查连接后手动重试'}`)
-        } finally {
-          unwatch()
-        }
-      }
-    }, { immediate: true })
+    if (!hasRequiredCredential) {
+      warning(`未连接${lastSource === 'webdav' ? ' WebDAV' : ' SCE 账号'}，无法自动恢复上次云端任务：${lastWs.name}`)
+      return
+    }
 
-    setTimeout(() => {
-      if (!isLoggedIn.value) {
-        warning(`未登录，无法自动恢复上次云端任务：${lastWs.name}`)
-        unwatch()
+    try {
+      const result = await loadWorkspaceFromCloud(lastFileId, lastSource)
+      if (!result.success) {
+        warning(`自动恢复云端任务失败：${result.message || '云端服务未返回可用内容，请手动重试'}`)
+        return
       }
-    }, 2000)
+      if (!result.data || result.data.content == null) {
+        warning('自动恢复云端任务失败：云端工作区内容为空')
+        return
+      }
+
+      const workspaceData = typeof result.data.content === 'string'
+        ? JSON.parse(result.data.content)
+        : result.data.content
+      const applied = await applyWorkspaceData(workspaceData)
+      if (!applied) {
+        warning('自动恢复云端任务失败：工作区内容无法应用，请手动加载并检查文件')
+        return
+      }
+
+      success(`已自动恢复上次任务：${lastWs.name}`)
+    } catch (e) {
+      console.error('Auto restore failed:', e)
+      warning(`自动恢复云端任务失败：${e instanceof Error ? e.message : '网络错误，请检查连接后手动重试'}`)
+    }
   } else if (lastWs && lastWs.type === 'local') {
     success(`欢迎回来！上次任务：${lastWs.name} (本地文件需手动再次加载)`)
   }
@@ -120,7 +131,44 @@ const restoreLastWorkspaceIfNeeded = () => {
 
 const continueStartup = () => {
   showWelcomeIntroIfNeeded()
-  restoreLastWorkspaceIfNeeded()
+  void restoreLastWorkspaceIfNeeded()
+}
+
+const isEditableShortcutTarget = (event: KeyboardEvent) => event.composedPath().some((target) => {
+  if (!(target instanceof HTMLElement)) return false
+  const tagName = target.tagName.toLowerCase()
+  return tagName === 'input' ||
+    tagName === 'textarea' ||
+    tagName === 'select' ||
+    target.isContentEditable ||
+    target.getAttribute('role') === 'textbox'
+})
+
+const handleGlobalKeyDown = (event: KeyboardEvent) => {
+  if (event.defaultPrevented || event.isComposing || event.altKey || isEditableShortcutTarget(event)) return
+  if (!(event.ctrlKey || event.metaKey)) return
+
+  const key = event.key.toLowerCase()
+  const isUndo = key === 'z' && !event.shiftKey
+  const isRedo = key === 'y' || (key === 'z' && event.shiftKey)
+
+  if (isUndo && canUndo.value) {
+    event.preventDefault()
+    undo()
+  } else if (isRedo && canRedo.value) {
+    event.preventDefault()
+    redo()
+  }
+}
+
+const flushAutoSaveBestEffort = () => {
+  void flushAutoSave().catch((flushError) => {
+    console.error('Failed to flush auto save:', flushError)
+  })
+}
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'hidden') flushAutoSaveBestEffort()
 }
 
 const handleRestoreAutoSavePrompt = async () => {
@@ -135,6 +183,7 @@ const handleRestoreAutoSavePrompt = async () => {
     }
 
     showAutoSavePrompt.value = false
+    startAutoSave()
     success('已恢复自动保存的工作区')
     showWelcomeIntroIfNeeded()
   } finally {
@@ -142,11 +191,31 @@ const handleRestoreAutoSavePrompt = async () => {
   }
 }
 
-const handleDismissAutoSavePrompt = async () => {
-  await markAutoSaveBackupHandled(autoSaveBackup.value)
+const handleDismissAutoSavePrompt = () => {
   showAutoSavePrompt.value = false
+  startAutoSave()
   warning('已暂不恢复自动保存，可在文件页的自动保存卡片中恢复')
   continueStartup()
+}
+
+const handleDiscardAutoSavePrompt = async () => {
+  if (isRestoringAutoSave.value) return
+
+  isRestoringAutoSave.value = true
+  try {
+    const discarded = await discardAutoSaveRecovery()
+    if (!discarded) {
+      error('无法忽略这份自动保存，受保护的恢复副本仍会保留')
+      return
+    }
+
+    showAutoSavePrompt.value = false
+    startAutoSave()
+    warning('已忽略这份自动保存')
+    continueStartup()
+  } finally {
+    isRestoringAutoSave.value = false
+  }
 }
 
 onMounted(async () => {
@@ -156,59 +225,59 @@ onMounted(async () => {
   applyColorScheme()
   applyThemeColor()
 
-  if (settings.value.editor.undoHistorySize) {
-    setMaxHistory(settings.value.editor.undoHistorySize)
-  }
-
   if (settings.value.ui.enableAnimations !== undefined) {
     document.documentElement.classList.toggle('disable-animations', !settings.value.ui.enableAnimations)
   }
 
-  startAutoSave()
-  const backup = await getAutoSaveBackup()
-  if (backup && await isAutoSavePromptDue(backup)) {
-    showAutoSavePrompt.value = true
-  } else {
+  try {
+    const backup = await getAutoSaveBackup({ preserveCurrentAsRecovery: true })
+    if (backup) {
+      showAutoSavePrompt.value = true
+    } else {
+      startAutoSave()
+      continueStartup()
+    }
+  } catch (autoSaveError) {
+    const detail = autoSaveError instanceof Error ? autoSaveError.message : String(autoSaveError)
+    console.error('Failed to initialize auto save:', autoSaveError)
+    error(`自动保存备份读取失败，已暂停本次运行的自动保存以保护原备份：${detail}`)
     continueStartup()
   }
 
-  const handleKeyDown = (e) => {
-    const isCtrl = e.ctrlKey || e.metaKey
-
-    if (isCtrl && e.key === 'z' && !e.shiftKey) {
-      e.preventDefault()
-      if (canUndo.value) undo()
-    }
-
-    if (isCtrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-      e.preventDefault()
-      if (canRedo.value) redo()
-    }
-  }
-
-  document.addEventListener('keydown', handleKeyDown)
+  document.addEventListener('keydown', handleGlobalKeyDown)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('pagehide', flushAutoSaveBestEffort)
 
   const prefetchAsyncComponents = () => {
     const idleCallback = window.requestIdleCallback || ((cb) => setTimeout(cb, 2000))
     idleCallback(() => {
-      import('./components/auth/LoginDialog.vue')
-      import('./components/relation/SeatRuleEditor.vue')
-      import('./components/layout/ExportPreview.vue')
-      import('./components/workspace/CloudWorkspaceDialog.vue')
-      import('./components/student/StudentRosterDialog.vue')
-      import('xlsx-js-style')
+      const prefetch = (request: Promise<unknown>, label: string) => {
+        void request.catch((prefetchError) => {
+          console.warn(`Optional prefetch failed: ${label}`, prefetchError)
+        })
+      }
+      prefetch(import('./components/auth/LoginDialog.vue'), 'LoginDialog')
+      prefetch(import('./components/layout/ExportPreview.vue'), 'ExportPreview')
+      prefetch(import('./components/workspace/CloudWorkspaceDialog.vue'), 'CloudWorkspaceDialog')
+      prefetch(import('./components/student/StudentRosterDialog.vue'), 'StudentRosterDialog')
+      prefetch(import('xlsx-js-style'), 'xlsx-js-style')
     })
   }
 
   prefetchAsyncComponents()
 })
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleGlobalKeyDown)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('pagehide', flushAutoSaveBestEffort)
+})
 </script>
 
 <template>
-  <div class="app-root">
+  <AppUiProvider>
+    <div class="app-root">
     <RouterView @open-login="handleOpenLogin" />
-
-    <LoadingSpinner v-if="isRouteLoading" text="正在切换页面..." />
 
     <GlobalDropZone />
 
@@ -228,39 +297,41 @@ onMounted(async () => {
       @success="handleCloudSuccess"
     />
 
-    <Transition name="autosave-prompt">
-      <div v-if="showAutoSavePrompt" class="autosave-overlay" @mousedown.self="handleDismissAutoSavePrompt">
-        <section class="autosave-dialog" role="dialog" aria-modal="true" aria-labelledby="autosave-prompt-title">
-          <header class="autosave-header">
+    <ResponsiveOverlay
+      :show="showAutoSavePrompt"
+      title="发现自动保存"
+      :busy="isRestoringAutoSave"
+      :desktop-width="560"
+      @update:show="value => !value && handleDismissAutoSavePrompt()"
+    >
+          <div class="autosave-header">
             <div class="autosave-icon">
               <History :size="22" stroke-width="2" />
             </div>
             <div>
-              <h2 id="autosave-prompt-title">发现自动保存</h2>
               <p>{{ autoSavePromptMeta }}</p>
             </div>
-            <button class="autosave-close" type="button" aria-label="稍后处理" @click="handleDismissAutoSavePrompt">
-              <X :size="18" stroke-width="2" />
-            </button>
-          </header>
+          </div>
 
           <p class="autosave-message">可以先恢复这份自动保存，也可以稍后在文件页顶部的自动保存卡片中打开。</p>
 
-          <footer class="autosave-actions">
-            <button class="autosave-secondary" type="button" :disabled="isRestoringAutoSave" @click="handleDismissAutoSavePrompt">
+          <template #footer><div class="autosave-actions">
+            <NButton class="autosave-discard" attr-type="button" secondary type="error" :disabled="isRestoringAutoSave" @click="handleDiscardAutoSavePrompt">
+              忽略此备份
+            </NButton>
+            <NButton class="autosave-secondary" attr-type="button" secondary :disabled="isRestoringAutoSave" @click="handleDismissAutoSavePrompt">
               稍后处理
-            </button>
-            <button class="autosave-primary" type="button" :disabled="isRestoringAutoSave" @click="handleRestoreAutoSavePrompt">
-              <RotateCcw :size="16" stroke-width="2" />
+            </NButton>
+            <NButton class="autosave-primary" attr-type="button" type="primary" :loading="isRestoringAutoSave" @click="handleRestoreAutoSavePrompt">
+              <template #icon><RotateCcw :size="16" stroke-width="2" /></template>
               <span>{{ isRestoringAutoSave ? '恢复中' : '恢复自动保存' }}</span>
-            </button>
-          </footer>
-        </section>
-      </div>
-    </Transition>
+            </NButton>
+          </div></template>
+    </ResponsiveOverlay>
 
     <WelcomeIntroDialog v-if="isWelcomeIntroVisible" />
-  </div>
+    </div>
+  </AppUiProvider>
 </template>
 
 <style scoped>
@@ -271,26 +342,6 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.autosave-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: var(--color-bg-overlay);
-}
-
-.autosave-dialog {
-  width: min(440px, 100%);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-dialog-bg);
-  box-shadow: 0 18px 48px color-mix(in srgb, var(--color-text-primary) 18%, transparent);
-  color: var(--color-text-primary);
 }
 
 .autosave-header {
@@ -327,24 +378,6 @@ onMounted(async () => {
   line-height: 1.6;
 }
 
-.autosave-close {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
-
-.autosave-close:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
 .autosave-message {
   padding: 14px 18px 4px;
 }
@@ -353,84 +386,22 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  padding: 14px 18px 18px;
 }
 
+.autosave-discard,
 .autosave-secondary,
 .autosave-primary {
   min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 8px;
-  padding: 0 14px;
   font-size: 13px;
   font-weight: 600;
-  cursor: pointer;
-}
-
-.autosave-secondary {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-}
-
-.autosave-primary {
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.autosave-secondary:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.autosave-primary:hover {
-  background: var(--color-primary-hover);
-}
-
-.autosave-secondary:disabled,
-.autosave-primary:disabled {
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
-.autosave-prompt-enter-active,
-.autosave-prompt-leave-active {
-  transition: opacity 0.18s ease;
-}
-
-.autosave-prompt-enter-active .autosave-dialog,
-.autosave-prompt-leave-active .autosave-dialog {
-  transition: transform 0.18s ease;
-}
-
-.autosave-prompt-enter-from,
-.autosave-prompt-leave-to {
-  opacity: 0;
-}
-
-.autosave-prompt-enter-from .autosave-dialog,
-.autosave-prompt-leave-to .autosave-dialog {
-  transform: translateY(10px);
 }
 
 @media (max-width: 560px) {
-  .autosave-overlay {
-    align-items: flex-end;
-    padding: 12px;
-  }
-
-  .autosave-dialog {
-    border-radius: 12px;
-  }
-
   .autosave-actions {
     flex-direction: column-reverse;
   }
 
+  .autosave-discard,
   .autosave-secondary,
   .autosave-primary {
     width: 100%;

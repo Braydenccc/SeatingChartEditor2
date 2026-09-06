@@ -1,7 +1,8 @@
 import { ref } from 'vue'
 import type { Ref } from 'vue'
-import type { Tag, UseTagDataReturn } from '@/types'
+import type { EntityDeletionResult, Tag, UseTagDataReturn } from '@/types'
 import { DEFAULT_TAGS, getNextColor } from '@/constants/tagColors'
+import { getRuleReferences } from './seatRuleState'
 
 // 标签数据管理
 const tags = ref<Tag[]>([])
@@ -66,8 +67,16 @@ export function useTagData(): UseTagDataReturn {
   }
 
   // 删除标签
-  const deleteTag = (tagId: number): void => {
+  const deleteTag = (tagId: number): EntityDeletionResult => {
+    if (!tags.value.some(tag => tag.id === tagId)) {
+      return { success: false, reason: 'not-found', references: [] }
+    }
+    const references = getRuleReferences('tag', tagId)
+    if (references.length > 0) {
+      return { success: false, reason: 'referenced-by-rules', references }
+    }
     tags.value = tags.value.filter(t => t.id !== tagId)
+    return { success: true, references: [] }
   }
 
   // 清除所有标签
@@ -75,6 +84,14 @@ export function useTagData(): UseTagDataReturn {
     tags.value = []
     nextTagId = 1
     colorIndex = 0
+  }
+
+  const replaceTagData = (nextTags: Tag[]): void => {
+    tags.value = nextTags.map(tag => ({ ...tag }))
+    nextTagId = tags.value.length > 0
+      ? Math.max(...tags.value.map(tag => tag.id)) + 1
+      : 1
+    colorIndex = tags.value.length
   }
 
   // 设置全局标签显示开关
@@ -97,6 +114,7 @@ export function useTagData(): UseTagDataReturn {
     getTagById,
     deleteTag,
     clearAllTags,
+    replaceTagData,
     setShowTagsInSeatChart,
     setTagDisplayMode
   }

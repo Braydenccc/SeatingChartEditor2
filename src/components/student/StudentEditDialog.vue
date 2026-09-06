@@ -1,33 +1,26 @@
 <template>
-  <transition name="dialog-fade">
-    <div v-if="visible" class="student-edit-overlay" @mousedown.self="close">
-      <div class="student-edit-dialog">
-        <div class="dialog-header">
-          <h3>编辑学生信息</h3>
-          <button class="close-btn" @click="close" title="关闭">
-            <X :size="20" />
-          </button>
-        </div>
-
+  <ResponsiveOverlay :show="visible" title="编辑学生信息" :busy="isCommitting" :desktop-width="560" @update:show="value => !value && requestClose()">
         <div class="dialog-body">
           <div class="form-group">
-            <label class="form-label">姓名</label>
-            <input
-              v-model="localName"
+            <label class="form-label" :for="nameInputId">姓名</label>
+            <NInput
+              v-model:value="localName"
               type="text"
               class="form-input"
               placeholder="请输入学生姓名"
+              :input-props="{ id: nameInputId }"
               @keyup.enter="handleSave"
             />
           </div>
 
           <div class="form-group">
-            <label class="form-label">学号</label>
-            <input
-              v-model="localNumber"
+            <label class="form-label" :for="numberInputId">学号</label>
+            <NInput
+              v-model:value="localNumber"
               type="text"
               class="form-input"
               placeholder="请输入学号（可选）"
+              :input-props="{ id: numberInputId }"
               @keyup.enter="handleSave"
             />
           </div>
@@ -39,14 +32,17 @@
                 v-for="attribute in enabledAttributeDefinitions"
                 :key="attribute.id"
                 class="numeric-field"
+                :for="numericInputId(attribute.id)"
               >
                 <span>{{ attribute.unit ? `${attribute.name}（${attribute.unit}）` : attribute.name }}</span>
-                <input
-                  v-model="localNumericAttributes[attribute.id]"
-                  type="number"
+                <NInputNumber
+                  :value="localNumericAttributes[attribute.id]"
                   :min="attribute.min ?? undefined"
                   :max="attribute.max ?? undefined"
+                  :precision="attribute.precision ?? undefined"
                   class="form-input"
+                  :input-props="{ id: numericInputId(attribute.id) }"
+                  @update:value="value => updateLocalNumericAttribute(attribute, value)"
                   @keyup.enter="handleSave"
                 />
               </label>
@@ -63,7 +59,12 @@
                   class="tag-item"
                   :style="{ '--tag-color': getTagColor(tagId) }"
                   :title="getTagName(tagId)"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`移除标签 ${getTagName(tagId)}`"
                   @click="removeTag(tagId)"
+                  @keydown.enter.prevent="removeTag(tagId)"
+                  @keydown.space.prevent="removeTag(tagId)"
                 >
                   <span class="tag-name">{{ getTagName(tagId) }}</span>
                   <X :size="12" />
@@ -76,7 +77,12 @@
                   class="tag-option"
                   :style="{ '--tag-color': tag.color }"
                   :title="tag.name"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`添加标签 ${tag.name}`"
                   @click="addTag(tag.id)"
+                  @keydown.enter.prevent="addTag(tag.id)"
+                  @keydown.space.prevent="addTag(tag.id)"
                 >
                   <span class="tag-name">{{ tag.name }}</span>
                 </span>
@@ -86,45 +92,59 @@
           </div>
         </div>
 
-        <div class="dialog-footer">
-          <button class="btn btn-secondary" @click="close">取消</button>
-          <button class="btn btn-primary" @click="handleSave">保存</button>
-        </div>
-      </div>
-    </div>
-  </transition>
+        <template #footer><div class="dialog-footer">
+          <NButton class="dialog-action" secondary @click="requestClose">取消</NButton>
+          <NButton class="dialog-action" type="primary" :loading="isCommitting" @click="handleSave">保存</NButton>
+        </div></template>
+  </ResponsiveOverlay>
 </template>
 
-<script setup>
-import { ref, computed, watch } from 'vue'
+<script setup lang="ts">
+import { ref, computed, watch, useId } from 'vue'
+import { NButton, NInput, NInputNumber } from 'naive-ui'
 import { X } from 'lucide-vue-next'
+import ResponsiveOverlay from '@/components/ui/ResponsiveOverlay.vue'
 import { useStudentData } from '@/composables/useStudentData'
 import { useTagData } from '@/composables/useTagData'
 import { useStudentAttributes } from '@/composables/useStudentAttributes'
 import { useLogger } from '@/composables/useLogger'
+import { normalizeNumberInput } from '@/utils/inputNormalization'
+import type { NumericAttributeDefinition, Student } from '@/types/models'
 
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false
-  },
-  studentId: {
-    type: String,
-    default: null
-  }
+const props = withDefaults(defineProps<{
+  visible?: boolean
+  studentId?: number | null
+}>(), {
+  visible: false,
+  studentId: null
 })
 
-const emit = defineEmits(['update:visible', 'saved'])
+const emit = defineEmits<{
+  'update:visible': [value: boolean]
+  saved: []
+}>()
 
 const { students, updateStudent } = useStudentData()
 const { tags } = useTagData()
 const { enabledAttributeDefinitions } = useStudentAttributes()
-const { success } = useLogger()
+const { success, confirm } = useLogger()
 
 const localName = ref('')
 const localNumber = ref('')
-const localTags = ref([])
-const localNumericAttributes = ref({})
+const localTags = ref<number[]>([])
+const localNumericAttributes = ref<Record<string, number | null>>({})
+const originalSnapshot = ref('')
+const isCommitting = ref(false)
+const idPrefix = useId()
+const nameInputId = `${idPrefix}-name`
+const numberInputId = `${idPrefix}-number`
+const numericInputId = (attributeId: string) => `${idPrefix}-numeric-${attributeId.replace(/[^A-Za-z0-9_-]/g, '-')}`
+const getFormSnapshot = () => JSON.stringify({
+  name: localName.value,
+  number: localNumber.value,
+  tags: localTags.value,
+  numericAttributes: localNumericAttributes.value
+})
 
 // 当前学生信息
 const currentStudent = computed(() => {
@@ -141,9 +161,10 @@ const availableTags = computed(() => {
 watch(() => props.studentId, (newId) => {
   if (newId && currentStudent.value) {
     localName.value = currentStudent.value.name || ''
-    localNumber.value = currentStudent.value.studentNumber || ''
+    localNumber.value = currentStudent.value.studentNumber == null ? '' : String(currentStudent.value.studentNumber)
     localTags.value = currentStudent.value.tags ? [...currentStudent.value.tags] : []
     localNumericAttributes.value = { ...(currentStudent.value.numericAttributes || {}) }
+    originalSnapshot.value = getFormSnapshot()
   }
 }, { immediate: true })
 
@@ -151,55 +172,87 @@ watch(() => props.studentId, (newId) => {
 watch(() => props.visible, (newVisible) => {
   if (newVisible && currentStudent.value) {
     localName.value = currentStudent.value.name || ''
-    localNumber.value = currentStudent.value.studentNumber || ''
+    localNumber.value = currentStudent.value.studentNumber == null ? '' : String(currentStudent.value.studentNumber)
     localTags.value = currentStudent.value.tags ? [...currentStudent.value.tags] : []
     localNumericAttributes.value = { ...(currentStudent.value.numericAttributes || {}) }
+    originalSnapshot.value = getFormSnapshot()
   }
 })
 
-const getTagName = (tagId) => {
+const getTagName = (tagId: number) => {
   const tag = tags.value.find(t => t.id === tagId)
   return tag ? tag.name : '未知'
 }
 
-const getTagColor = (tagId) => {
+const getTagColor = (tagId: number) => {
   const tag = tags.value.find(t => t.id === tagId)
   return tag ? tag.color : 'var(--color-text-disabled)'
 }
 
-const addTag = (tagId) => {
+const addTag = (tagId: number) => {
   if (!localTags.value.includes(tagId)) {
     localTags.value.push(tagId)
   }
 }
 
-const removeTag = (tagId) => {
+const removeTag = (tagId: number) => {
   localTags.value = localTags.value.filter(id => id !== tagId)
+}
+
+const updateLocalNumericAttribute = (
+  attribute: NumericAttributeDefinition,
+  value: number | null
+) => {
+  localNumericAttributes.value[attribute.id] = normalizeNumberInput(value, {
+    min: attribute.min ?? undefined,
+    max: attribute.max ?? undefined,
+    precision: attribute.precision ?? 0
+  })
 }
 
 const handleSave = () => {
   if (!props.studentId) return
 
-  const numericAttributes = {}
+  const numericAttributes: Student['numericAttributes'] = {}
   enabledAttributeDefinitions.value.forEach(attribute => {
     const value = localNumericAttributes.value[attribute.id]
-    if (value === '' || value === null || value === undefined) {
+    if (value === null || value === undefined) {
       numericAttributes[attribute.id] = null
       return
     }
-    const parsed = Number(value)
-    numericAttributes[attribute.id] = Number.isFinite(parsed) ? parsed : null
+    numericAttributes[attribute.id] = normalizeNumberInput(value, {
+      min: attribute.min ?? undefined,
+      max: attribute.max ?? undefined,
+      precision: attribute.precision ?? 0
+    })
   })
 
   updateStudent(props.studentId, {
     name: localName.value,
-    studentNumber: localNumber.value,
+    studentNumber: localNumber.value.trim() === '' || !Number.isFinite(Number(localNumber.value))
+      ? null
+      : Number(localNumber.value),
     tags: localTags.value,
     numericAttributes
   })
 
   success('学生信息已更新')
   emit('saved')
+  isCommitting.value = true
+  close()
+  isCommitting.value = false
+}
+
+const requestClose = async () => {
+  if (!isCommitting.value && originalSnapshot.value && originalSnapshot.value !== getFormSnapshot()) {
+    const discard = await confirm({
+      title: '放弃学生信息修改',
+      content: '当前修改尚未保存，确认放弃？',
+      positiveText: '放弃修改',
+      type: 'warning'
+    })
+    if (!discard) return
+  }
   close()
 }
 
@@ -209,76 +262,8 @@ const close = () => {
 </script>
 
 <style scoped>
-.student-edit-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--color-bg-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 9999;
-}
-
-.student-edit-dialog {
-  background: var(--color-surface);
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
-  box-shadow: 0 18px 48px color-mix(in srgb, var(--color-text-primary) 18%, transparent);
-  width: min(560px, calc(100vw - 32px));
-  max-height: min(90dvh, 760px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 24px;
-  border-bottom: 1px solid var(--color-border);
-  flex: 0 0 auto;
-}
-
-.dialog-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.close-btn {
-  background: transparent;
-  border: none;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  cursor: pointer;
-  color: var(--color-text-muted);
-  border-radius: 8px;
-  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-}
-
-.close-btn:hover,
-.close-btn:focus-visible {
-  background: var(--color-bg-subtle);
-  color: var(--color-text-primary);
-}
-
-.close-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
-}
 
 .dialog-body {
-  padding: 22px 24px;
-  overflow-y: auto;
   overflow-x: hidden;
   flex: 1;
   min-height: 0;
@@ -301,27 +286,7 @@ const close = () => {
 }
 
 .form-input {
-  box-sizing: border-box;
   width: 100%;
-  height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  line-height: 1.4;
-  color: var(--color-text-primary);
-  background: var(--color-input-bg);
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent);
-}
-
-.form-input::placeholder {
-  color: var(--color-text-disabled);
 }
 
 .tags-container {
@@ -436,85 +401,24 @@ const close = () => {
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  padding: 14px 24px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg-subtle);
   flex: 0 0 auto;
 }
 
-.btn {
+.tag-item:focus-visible,
+.tag-option:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
+}
+
+.dialog-action {
   min-width: 92px;
-  height: 44px;
-  padding: 0 18px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
-.btn-secondary {
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-}
-
-.btn-secondary:hover {
-  background: var(--color-bg-secondary);
-  border-color: var(--color-border-strong);
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: var(--color-surface);
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-hover);
-}
-
-.btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
-}
-
-.dialog-fade-enter-active,
-.dialog-fade-leave-active {
-  transition: opacity 0.2s;
-}
-
-.dialog-fade-enter-from,
-.dialog-fade-leave-to {
-  opacity: 0;
-}
-
-.dialog-fade-enter-active .student-edit-dialog,
-.dialog-fade-leave-active .student-edit-dialog {
-  transition: transform 0.2s;
-}
-
-.dialog-fade-enter-from .student-edit-dialog,
-.dialog-fade-leave-to .student-edit-dialog {
-  transform: scale(0.95);
-}
 
 @media (max-width: 768px) {
-  .student-edit-dialog {
-    width: min(560px, calc(100vw - 24px));
-    max-height: calc(100dvh - 24px);
-  }
 
-  .dialog-header {
-    padding: 16px 20px;
-  }
-
-  .dialog-body {
-    padding: 20px;
-  }
-
-  .dialog-footer {
-    padding: 12px 20px;
+  .dialog-action {
+    min-height: 44px;
   }
 }
 
@@ -527,7 +431,7 @@ const close = () => {
     gap: 10px;
   }
 
-  .btn {
+  .dialog-action {
     min-width: 0;
     flex: 1;
   }

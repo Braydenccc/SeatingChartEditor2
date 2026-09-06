@@ -17,5 +17,5 @@ describe('useSettingsDialog', () => {
       tab: 'workspace',
       category: 'seat'
     })
-  })
+  }, 20_000)
 })

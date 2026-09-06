@@ -10,10 +10,14 @@ export type {
   GroupConfig,
   Zone,
   Rule,
+  RuleSubRule,
   RuleSubject,
   RulePriority,
   RulePredicate,
   RuleParams,
+  RuleReferencedEntityType,
+  RuleEntityReference,
+  EntityDeletionResult,
   Workspace,
   WorkspaceMeta,
   WorkspaceLayout,
@@ -28,6 +32,7 @@ export type {
 
 // Composable 返回类型
 export type {
+  WorkspaceSaveResult,
   UseStudentDataReturn,
   UseTagDataReturn,
   UseZoneDataReturn,

@@ -1,4 +1,4 @@
-name: Test
+name: Verify and Deliver
 
 on:
   push:
@@ -6,81 +6,52 @@ on:
   pull_request:
     branches: [main, dev]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-deliver-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
-    runs-on: windows-latest
+  verification:
+    name: Verify exact commit
+    uses: ./.github/workflows/verification.yml
 
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [20.x]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run type check
-        run: npm run type-check
-
-      - name: Run full test suite
-        run: npm run test:run
-
-      - name: Archive test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ matrix.node-version }}
-          path: html/
-          if-no-files-found: ignore
-          retention-days: 30
-
-  test-summary:
-    runs-on: windows-latest
-    needs: [test, e2e]
-    if: always()
-
-    steps:
-      - name: Test Summary
-        run: echo "Tests completed. Check artifacts for detailed results."
-
-  e2e:
+  release_metadata:
+    name: Prepare release timestamp
+    if: github.event_name == 'push'
+    needs: verification
     runs-on: ubuntu-latest
+    outputs:
+      release_timestamp: ${{ steps.release_timestamp.outputs.value }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Generate one UTC release timestamp
+        id: release_timestamp
+        shell: bash
+        run: echo "value=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+  deploy:
+    name: Deploy verified commit
+    if: github.event_name == 'push'
+    needs: [verification, release_metadata]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      commit_sha: ${{ github.sha }}
+      ref_name: ${{ github.ref_name }}
+      release_timestamp: ${{ needs.release_metadata.outputs.release_timestamp }}
+    secrets: inherit
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Run browser workflow tests
-        run: npm run test:e2e
-
-      - name: Archive browser test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-results
-          path: |
-            playwright-report/
-            test-results/e2e/
-          if-no-files-found: ignore
-          retention-days: 30
+  release:
+    name: Release verified main commit
+    if: github.event_name == 'push' && github.ref_name == 'main'
+    needs: [verification, release_metadata]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/build-release.yml
+    with:
+      commit_sha: ${{ github.sha }}
+      verification_passed: true
+      release_timestamp: ${{ needs.release_metadata.outputs.release_timestamp }}
+    secrets: inherit

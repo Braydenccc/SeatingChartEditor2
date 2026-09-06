@@ -19,8 +19,8 @@ related_files:
 
 - `is_enable`: 总开关，值必须严格为 `1`，否则所有 admin API 视为未验证。
 - `api_token_hash`: 管理员明文 token 的 SHA-256 hex，后端不保存明文 token。
-- `audit_logs`: 所有 admin 调用日志，后端仅追加和读取。
-- `audit_failures`: 失败、参数错误、校验未通过或未验证调用的备份日志，后端仅追加和读取。
+- `audit_logs`: 所有 admin 调用日志，最多保留最近 500 条。
+- `audit_failures`: 失败、参数错误、校验未通过或未验证调用的备份日志，最多保留最近 500 条。
 
 后端不提供修改或删除 `admin` 配置与日志的云函数；清理、关闭或更换密钥只能通过热铁盒数据库管理界面手动完成。
 
@@ -42,7 +42,7 @@ Content-Type: application/json
 - 工作区管理：`list_workspaces`、`get_workspace_detail`、`rename_workspace`、`set_workspace_deleted`
 - 审计查询：`list_audit_logs`、`list_audit_failures`
 
-`set_user_status` 使用 `user_profiles` 数据库存储普通用户状态。老用户没有 profile 时默认为 `active`；状态为 `disabled` 时，普通登录和已有会话校验都会被拒绝。
+`set_user_status` 使用 `user_profiles` 数据库存储普通用户状态。老用户没有 profile 时默认为 `active`；切换为 `disabled` 时先轮换 `sessionEpoch`，再确认删除当前服务端会话。鉴权会核对该世代和签发时的密码哈希指纹；重新启用前也会再次确认会话已删除，避免禁用前的 30/90 天 token、删除失败残留或并发登录补写的 token 恢复有效。`set_user_status`、`reset_user_password` 与用户自助改密共用 `registration_locks` 中的同用户安全租约，避免陈旧请求覆盖禁用或密码重置；`reset_user_password` 在写入新密码前同样轮换世代。
 
 `set_workspace_deleted` 只做软删除和恢复：删除时写入 `metadata.deleted`、`metadata.deletedAt` 和 `metadata.tags[] = deleted`；恢复时移除删除标签并清除删除时间。admin API 不提供物理删除工作区。
 
@@ -51,3 +51,7 @@ Content-Type: application/json
 日志字段包括 `id`、`time`、`timestamp`、`action`、`success`、`verified`、`status`、`ip`、`userAgent`、`reason`、`target` 和 `paramsSummary`。
 
 `paramsSummary` 会脱敏敏感字段，不记录 token、密码、新密码、工作区 content、WebDAV 凭据或用户设置详情。
+
+日志数组通过原子 `push` 追加，超过上限后删除最早条目。未认证请求的限流也使用原子尝试记录，避免并发 `get`/`set` 覆盖导致限流失效；限流存储无法确认时按失败关闭返回 503。
+
+所有外部字符串字段在写入审计日志前会先规范为有效 UTF-8 并按字节安全截断。JSON 编码启用 `JSON_INVALID_UTF8_SUBSTITUTE`；若完整记录仍无法编码，后端会写入不含原始请求字段的最小兜底记录，并通过服务器错误日志报告降级。
